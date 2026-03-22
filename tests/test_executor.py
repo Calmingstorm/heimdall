@@ -206,6 +206,135 @@ class TestExecute:
         assert '"status"' not in result
 
 
+class TestRunScript:
+    """Tests for the run_script composite tool."""
+
+    @pytest.mark.asyncio
+    async def test_basic_bash_script(self, executor: ToolExecutor):
+        """run_script writes to temp file, executes with bash, cleans up."""
+        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
+            mock_ssh.return_value = (0, "hello world")
+            result = await executor.execute("run_script", {
+                "host": "server",
+                "script": "#!/bin/bash\necho hello world",
+            })
+        assert result == "hello world"
+        cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
+        # Must use base64 encoding to avoid heredoc issues
+        assert "base64" in cmd
+        # Must use mktemp for the temp file
+        assert "mktemp" in cmd
+        # Must execute with bash
+        assert "bash" in cmd
+        # Must clean up
+        assert "rm -f" in cmd
+
+    @pytest.mark.asyncio
+    async def test_python_interpreter(self, executor: ToolExecutor):
+        """run_script respects interpreter parameter."""
+        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
+            mock_ssh.return_value = (0, "42")
+            result = await executor.execute("run_script", {
+                "host": "server",
+                "script": "print(6 * 7)",
+                "interpreter": "python3",
+            })
+        assert result == "42"
+        cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
+        assert "python3" in cmd
+
+    @pytest.mark.asyncio
+    async def test_script_failure_reports_exit_code(self, executor: ToolExecutor):
+        """run_script reports exit code on failure."""
+        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
+            mock_ssh.return_value = (1, "syntax error line 3")
+            result = await executor.execute("run_script", {
+                "host": "server",
+                "script": "bad script content",
+            })
+        assert "Script failed (exit 1)" in result
+        assert "syntax error" in result
+
+    @pytest.mark.asyncio
+    async def test_unknown_host(self, executor: ToolExecutor):
+        """run_script rejects unknown hosts."""
+        result = await executor.execute("run_script", {
+            "host": "nonexistent",
+            "script": "echo hi",
+        })
+        assert "Unknown or disallowed host" in result
+
+    @pytest.mark.asyncio
+    async def test_unsupported_interpreter(self, executor: ToolExecutor):
+        """run_script rejects unsupported interpreters."""
+        result = await executor.execute("run_script", {
+            "host": "server",
+            "script": "echo hi",
+            "interpreter": "evil_binary",
+        })
+        assert "Unsupported interpreter" in result
+
+    @pytest.mark.asyncio
+    async def test_script_with_special_characters(self, executor: ToolExecutor):
+        """run_script handles scripts with quotes, heredocs, and special chars via base64."""
+        script = '''#!/bin/bash
+echo "Hello $USER"
+cat << 'EOF'
+This has "quotes" and $variables and `backticks`
+EOF
+echo 'done'
+'''
+        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
+            mock_ssh.return_value = (0, "Hello root\nThis has stuff\ndone")
+            result = await executor.execute("run_script", {
+                "host": "server",
+                "script": script,
+            })
+        assert "done" in result
+        cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
+        # The actual script content should NOT appear in the command (it's base64-encoded)
+        assert "Hello $USER" not in cmd
+        assert "base64" in cmd
+
+    @pytest.mark.asyncio
+    async def test_custom_filename(self, executor: ToolExecutor):
+        """run_script uses custom filename in mktemp pattern."""
+        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
+            mock_ssh.return_value = (0, "ok")
+            await executor.execute("run_script", {
+                "host": "server",
+                "script": "echo ok",
+                "filename": "deploy.sh",
+            })
+        cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
+        assert "deploy.sh" in cmd
+
+    @pytest.mark.asyncio
+    async def test_output_truncation(self, executor: ToolExecutor):
+        """run_script truncates very long output."""
+        long_output = "\n".join(f"line {i}" for i in range(300))
+        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
+            mock_ssh.return_value = (0, long_output)
+            result = await executor.execute("run_script", {
+                "host": "server",
+                "script": "generate lots of output",
+            })
+        assert "omitted" in result
+
+    @pytest.mark.asyncio
+    async def test_all_supported_interpreters(self, executor: ToolExecutor):
+        """All documented interpreters are accepted."""
+        for interp in ["bash", "sh", "python3", "python", "node", "ruby", "perl"]:
+            with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
+                mock_ssh.return_value = (0, "ok")
+                result = await executor.execute("run_script", {
+                    "host": "server",
+                    "script": "echo ok",
+                    "interpreter": interp,
+                })
+            assert result == "ok", f"Interpreter {interp} failed"
+
+
 class TestDockerTools:
     @pytest.mark.asyncio
     async def test_docker_logs(self, executor: ToolExecutor):

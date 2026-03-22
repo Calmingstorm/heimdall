@@ -324,6 +324,55 @@ class ToolExecutor:
         output = await self._run_on_host(inp["host"], inp["command"])
         return _truncate_lines(output)
 
+    async def _handle_run_script(self, inp: dict) -> str:
+        """Write a script to a temp file, execute it, and clean up."""
+        host = inp["host"]
+        script = inp["script"]
+        interpreter = inp.get("interpreter", "bash")
+
+        # Map interpreter to file extension
+        ext_map = {
+            "bash": ".sh", "sh": ".sh", "python3": ".py", "python": ".py",
+            "node": ".js", "ruby": ".rb", "perl": ".pl",
+        }
+        ext = ext_map.get(interpreter, ".sh")
+        filename = inp.get("filename") or f"loki_script{ext}"
+
+        # Sanitize interpreter to prevent injection
+        allowed_interpreters = {"bash", "sh", "python3", "python", "node", "ruby", "perl"}
+        if interpreter not in allowed_interpreters:
+            return f"Unsupported interpreter: {interpreter}. Use one of: {', '.join(sorted(allowed_interpreters))}"
+
+        resolved = self._resolve_host(host)
+        if not resolved:
+            return f"Unknown or disallowed host: {host}"
+        address, ssh_user, _os = resolved
+
+        # Base64-encode script to avoid all quoting/heredoc issues
+        encoded = base64.b64encode(script.encode()).decode()
+
+        safe_filename = shlex.quote(filename)
+        # Write to temp file, execute, capture output, clean up
+        cmd = (
+            f"TMPF=$(mktemp /tmp/{safe_filename}.XXXXXXXX) && "
+            f"echo '{encoded}' | base64 -d > \"$TMPF\" && "
+            f"chmod +x \"$TMPF\" && "
+            f"{interpreter} \"$TMPF\" 2>&1; EXIT=$?; "
+            f"rm -f \"$TMPF\"; exit $EXIT"
+        )
+
+        code, output = await run_ssh_command(
+            host=address,
+            command=cmd,
+            ssh_key_path=self.config.ssh_key_path,
+            known_hosts_path=self.config.ssh_known_hosts_path,
+            timeout=self.config.command_timeout_seconds,
+            ssh_user=ssh_user,
+        )
+        if code != 0:
+            return f"Script failed (exit {code}):\n{_truncate_lines(output)}"
+        return _truncate_lines(output)
+
     async def _handle_read_file(self, inp: dict) -> str:
         path = inp["path"]
         lines = inp.get("lines", 200)

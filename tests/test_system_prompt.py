@@ -213,9 +213,9 @@ class TestSystemPromptQuality:
             assert phrase in prompt, f"Must forbid phrase: {phrase}"
         # Must identify as executor, not assistant
         assert "EXECUTOR" in prompt
-        # Must instruct write-then-execute for scripts
-        assert "write_file" in prompt
-        assert "write the script to a file" in prompt.lower()
+        # Must instruct run_script for multi-line scripts
+        assert "run_script" in prompt
+        assert "writes to temp file" in prompt.lower() or "run_script" in prompt
 
     def test_no_inline_heredoc_pattern(self):
         """System prompt must forbid inline heredocs/multi-line SSH commands."""
@@ -224,6 +224,15 @@ class TestSystemPromptQuality:
         )
         assert "heredoc" in prompt.lower()
         assert "Never use inline heredocs" in prompt or "never use inline heredocs" in prompt.lower()
+
+    def test_run_script_referenced(self):
+        """System prompt must reference run_script for multi-line scripts."""
+        prompt = build_system_prompt(
+            context="", hosts={}, services=[], playbooks=[],
+        )
+        assert "run_script" in prompt
+        # Must say to use run_script for complex/multi-line scripts
+        assert "multi-line" in prompt.lower() or "multi_line" in prompt.lower()
 
 
 class TestTimezoneSupport:

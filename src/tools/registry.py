@@ -155,7 +155,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "run_command",
-        "description": "Run a shell command on a managed host. Use this for anything not covered by the specific tools — installing packages, editing configs, deploying code, git operations, Docker commands, etc.",
+        "description": "Run a single-line shell command on a managed host. For multi-line scripts, use run_script instead. Use this for simple commands — installing packages, checking status, Docker commands, etc.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -165,10 +165,42 @@ TOOLS: list[dict] = [
                 },
                 "command": {
                     "type": "string",
-                    "description": "The shell command to execute",
+                    "description": "The shell command to execute (single line preferred; for multi-line use run_script)",
                 },
             },
             "required": ["host", "command"],
+        },
+        "requires_approval": True,
+    },
+    {
+        "name": "run_script",
+        "description": (
+            "Write a script to a temp file on a managed host and execute it. Use this instead of run_command "
+            "for ANY multi-line script, complex commands, heredocs, or code blocks. The script is written to "
+            "a temp file, executed with the chosen interpreter, and the temp file is cleaned up. This avoids "
+            "all quoting/heredoc issues with SSH."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "host": {
+                    "type": "string",
+                    "description": "Host alias from config (e.g. 'myserver', 'webhost')",
+                },
+                "script": {
+                    "type": "string",
+                    "description": "The full script content to execute",
+                },
+                "interpreter": {
+                    "type": "string",
+                    "description": "Script interpreter: 'bash' (default), 'python3', 'python', 'sh', 'node', 'ruby', 'perl'",
+                },
+                "filename": {
+                    "type": "string",
+                    "description": "Optional filename (default: auto-generated based on interpreter). Used for the temp file.",
+                },
+            },
+            "required": ["host", "script"],
         },
         "requires_approval": True,
     },

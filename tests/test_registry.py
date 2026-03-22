@@ -43,6 +43,7 @@ class TestRequiresApproval:
         assert requires_approval("restart_service") is True
         assert requires_approval("run_ansible_playbook") is True
         assert requires_approval("run_command") is True
+        assert requires_approval("run_script") is True
         assert requires_approval("write_file") is True
         assert requires_approval("purge_messages") is True
         assert requires_approval("schedule_task") is True
@@ -86,7 +87,7 @@ class TestToolDescriptions:
     def test_approval_tools_still_have_requires_approval_flag(self):
         """Removing text from descriptions must NOT remove the boolean flag."""
         approval_tools = [
-            "restart_service", "run_ansible_playbook", "run_command",
+            "restart_service", "run_ansible_playbook", "run_command", "run_script",
             "write_file", "purge_messages", "schedule_task", "delete_schedule",
             "create_digest", "create_skill", "delete_skill",
             "docker_compose_action", "git_pull", "git_commit", "git_push",
