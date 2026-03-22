@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import time
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Callable, Awaitable
@@ -34,7 +33,6 @@ def _patch_voice_recv_dave():
         from discord.ext.voice_recv.opus import PacketDecoder
 
         _original_decode = PacketDecoder._decode_packet
-        from discord.opus import Decoder as OpusDecoder
 
         _dave_fail_count = [0]
         _dave_ok_count = [0]
@@ -112,9 +110,6 @@ class VoiceMessageProxy:
 
     async def reply(self, content: str, **kwargs) -> discord.Message:
         return await self.channel.send(content, **kwargs)
-
-    async def add_reaction(self, emoji: str) -> None:
-        pass
 
 
 class PCMStreamSource(discord.AudioSource):

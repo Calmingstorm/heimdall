@@ -145,15 +145,6 @@ class TestVoiceMessageProxy:
         await proxy.reply("Hello!")
         channel.send.assert_called_once_with("Hello!")
 
-    async def test_add_reaction_is_noop(self):
-        """add_reaction() is a no-op for voice messages."""
-        proxy = VoiceMessageProxy(
-            author=MagicMock(), channel=AsyncMock(),
-            id=1, guild=MagicMock(),
-        )
-        # Should not raise
-        await proxy.add_reaction("👍")
-
     def test_attributes(self):
         """Proxy stores author, channel, id, guild."""
         member = MagicMock()

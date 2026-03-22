@@ -6,7 +6,6 @@ runs in the background with progress updates via an editable Discord message.
 from __future__ import annotations
 
 import asyncio
-import re
 import time
 import uuid
 from dataclasses import dataclass, field
