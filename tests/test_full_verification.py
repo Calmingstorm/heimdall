@@ -1,7 +1,7 @@
 """Full functionality verification tests — Round 13.
 
 Comprehensive end-to-end verification of all major subsystems after
-the Ansiblex → Loki transformation (Rounds 1-12).
+the Loki transformation (Rounds 1-12).
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ SRC = ROOT / "src"
 # ---------------------------------------------------------------------------
 
 class TestIdentityComplete:
-    """Verify the Ansiblex → Loki rename is 100% complete."""
+    """Verify the Loki identity rename is 100% complete."""
 
     def _source_files(self):
         for f in SRC.rglob("*.py"):
@@ -79,82 +79,11 @@ class TestIdentityComplete:
 
 
 # ---------------------------------------------------------------------------
-# 2. Personal data absence — comprehensive check
+# 2. Personal data absence — covered by test_security_audit.py (42 tests)
 # ---------------------------------------------------------------------------
-
-class TestNoPersonalData:
-    """Verify zero personal data in all tracked source and config files."""
-
-    PERSONAL_IPS = [
-        "192.168.1.3", "192.168.1.13", "192.168.1.20",
-        "192.168.1.9", "192.168.1.27",
-    ]
-    PERSONAL_IDS = [
-        "441602773310767105", "757383353141035140",
-        "1469121766910726210", "1485046995650482406",
-        "1469135502115606792", "1483270529061228586",
-        "1485046396775043142", "1481679552181698610",
-        "1482174235743879249",
-    ]
-    PERSONAL_NAMES = ["calmingstorm", "audrastaia"]
-    PERSONAL_PATHS = ["/root/ansiblex", "/opt/ansiblex"]
-    PERSONAL_URLS = ["gitea.lan"]
-
-    def _tracked_source_files(self):
-        """All Python source and config files (not BUILD_STATUS.md)."""
-        for f in SRC.rglob("*.py"):
-            yield f
-        for f in ROOT.glob("*.yml"):
-            yield f
-        yield ROOT / ".env.example"
-
-    def test_no_personal_ips_in_source(self):
-        for f in self._tracked_source_files():
-            content = f.read_text()
-            for ip in self.PERSONAL_IPS:
-                assert ip not in content, f"{f.name} contains {ip}"
-
-    def test_no_personal_discord_ids_in_source(self):
-        for f in SRC.rglob("*.py"):
-            content = f.read_text()
-            for did in self.PERSONAL_IDS:
-                assert did not in content, f"{f.name} contains {did}"
-
-    def test_no_personal_names_in_source(self):
-        for f in SRC.rglob("*.py"):
-            content = f.read_text().lower()
-            for name in self.PERSONAL_NAMES:
-                assert name not in content, f"{f.name} contains {name}"
-
-    def test_no_personal_paths_in_source(self):
-        for f in SRC.rglob("*.py"):
-            content = f.read_text()
-            for path in self.PERSONAL_PATHS:
-                assert path not in content, f"{f.name} contains {path}"
-
-    def test_no_gitea_urls_in_source(self):
-        for f in SRC.rglob("*.py"):
-            content = f.read_text()
-            for url in self.PERSONAL_URLS:
-                assert url not in content, f"{f.name} contains {url}"
-
-    def test_config_yml_no_personal_data(self):
-        content = (ROOT / "config.yml").read_text()
-        for ip in self.PERSONAL_IPS:
-            assert ip not in content
-        for did in self.PERSONAL_IDS:
-            assert did not in content
-        assert "ansiblex" not in content.lower()
-
-    def test_no_personal_ips_in_test_files(self):
-        """Test files should use 10.0.0.x, not 192.168.1.x."""
-        for f in (ROOT / "tests").rglob("*.py"):
-            content = f.read_text()
-            # Skip tests that contain IPs as negative assertions
-            if "test_security_audit" in f.name or "test_full_verification" in f.name:
-                continue
-            for ip in self.PERSONAL_IPS:
-                assert ip not in content, f"{f.name} contains {ip}"
+# Removed: TestNoPersonalData class was redundant with the comprehensive
+# test_security_audit.py which scans all tracked files for personal IPs,
+# Discord IDs, names, paths, and URLs.
 
 
 # ---------------------------------------------------------------------------

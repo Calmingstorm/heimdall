@@ -33,9 +33,13 @@ def _get_tracked_source_files() -> list[str]:
 def _get_tracked_test_files() -> list[str]:
     """Get tracked .py files in tests/ (excluding audit/verification tests that
     contain personal data strings as negative assertions)."""
-    # test_config.py and test_security_audit.py contain strings like
-    # assert "192.168.1" not in ... — these are verification tests, not leaks.
-    excluded = {"tests/test_config.py", "tests/test_security_audit.py"}
+    # These files contain strings like assert "192.168.1" not in ...
+    # or assert "AnsiblexBot" not in ... — verification tests, not leaks.
+    excluded = {
+        "tests/test_config.py",
+        "tests/test_security_audit.py",
+        "tests/test_full_verification.py",
+    }
     return [
         f for f in _get_tracked_files()
         if f.startswith("tests/") and f.endswith(".py") and f not in excluded
