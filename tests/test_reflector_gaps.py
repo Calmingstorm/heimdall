@@ -257,13 +257,38 @@ class TestParseEntriesEdgeCases:
         result = ConversationReflector._parse_entries(raw)
         assert result == []
 
-    def test_consolidation_empty_returns_trimmed(self):
-        """Consolidation returning empty entries falls back to trimmed originals (lines 250-252)."""
+    async def test_consolidation_empty_returns_trimmed(self, reflector, mock_text_fn):
+        """Consolidation returning empty entries falls back to trimmed originals (lines 285-288)."""
+        # LLM returns empty/invalid JSON → _parse_entries returns [] → fallback to trimmed
+        mock_text_fn.return_value = "not valid json"
+        entries = [
+            {"key": f"k{i}", "category": "fact", "content": f"entry {i}",
+             "updated_at": f"2024-01-0{i+1}T00:00:00+00:00"}
+            for i in range(5)
+        ]
+        result = await reflector._consolidate(entries)
+        # Should return trimmed list (consolidation_target=3), sorted by updated_at desc
+        assert len(result) == 3
+        assert result[0]["key"] == "k4"  # most recent first
 
-    def test_user_id_preserved_in_consolidation(self, reflector):
-        """user_id from original is preserved when consolidation drops it (lines 264-265)."""
-        # Tested in TestConsolidateNewEntryTimestamps — this is an alias test
-        pass
+    async def test_user_id_preserved_in_consolidation(self, reflector, mock_text_fn):
+        """user_id from original is preserved when consolidation drops it (lines 299-301)."""
+        # Original entries have user_id, consolidated entries don't → should be restored
+        originals = [
+            {"key": "k1", "category": "preference", "content": "likes dark mode",
+             "user_id": "user_42", "updated_at": "2024-01-01T00:00:00+00:00"},
+            {"key": "k2", "category": "fact", "content": "runs Ubuntu",
+             "user_id": "user_99", "updated_at": "2024-01-02T00:00:00+00:00"},
+        ]
+        # LLM returns consolidated entries WITHOUT user_id
+        mock_text_fn.return_value = json.dumps([
+            {"key": "k1", "category": "preference", "content": "likes dark mode"},
+            {"key": "k2", "category": "fact", "content": "runs Ubuntu"},
+        ])
+        result = await reflector._consolidate(originals)
+        assert len(result) == 2
+        assert result[0]["user_id"] == "user_42"
+        assert result[1]["user_id"] == "user_99"
 
     def test_parse_entries_preserves_user_id(self):
         """_parse_entries should preserve user_id when present in LLM response."""
