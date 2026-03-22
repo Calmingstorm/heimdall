@@ -108,7 +108,7 @@ class VoiceConfig(BaseModel):
 
 class BrowserConfig(BaseModel):
     enabled: bool = False
-    cdp_url: str = "ws://loki-browser:3000?token=loki-internal"
+    cdp_url: str = "ws://loki-browser:3000?token=loki-internal"  # Override token via BROWSER_TOKEN env var
     default_timeout_ms: int = 30000
     viewport_width: int = 1280
     viewport_height: int = 720

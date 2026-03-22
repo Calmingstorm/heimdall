@@ -39,6 +39,7 @@ def _get_tracked_test_files() -> list[str]:
         "tests/test_config.py",
         "tests/test_security_audit.py",
         "tests/test_full_verification.py",
+        "tests/test_final_security.py",
     }
     return [
         f for f in _get_tracked_files()

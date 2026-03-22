@@ -30,7 +30,7 @@ services:
       - TIMEOUT=30000
       - QUEUED=5
       - HEALTH=true
-      - TOKEN=loki-internal
+      - TOKEN=${BROWSER_TOKEN:-loki-internal}
     deploy:
       resources:
         limits:

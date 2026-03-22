@@ -96,4 +96,4 @@ voice:
 
 browser:
   enabled: false
-  cdp_url: "ws://loki-browser:3000?token=loki-internal"
+  cdp_url: "ws://loki-browser:3000?token=${BROWSER_TOKEN:-loki-internal}"
