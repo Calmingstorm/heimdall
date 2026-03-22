@@ -17,7 +17,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import AnsiblexBot  # noqa: E402
+from src.discord.client import LokiBot  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
@@ -26,7 +26,7 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Create a minimal AnsiblexBot stub."""
+    """Create a minimal LokiBot stub."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -117,7 +117,7 @@ class TestProcessWithToolsCodex:
         stub.codex_client.chat_with_tools = AsyncMock(
             return_value=LLMResponse(text="The disk is 42% full.", tool_calls=[], stop_reason="end_turn")
         )
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         text, already_sent, is_error, tools_used, handoff = await stub._process_with_tools(
             msg, [], system_prompt_override="test prompt",
@@ -146,7 +146,7 @@ class TestProcessWithToolsCodex:
             LLMResponse(text="The disk is 42% full on server.", tool_calls=[], stop_reason="end_turn"),
         ])
         stub.tool_executor.execute = AsyncMock(return_value="Filesystem  Size  Used\n/  50G  21G")
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.requires_approval", return_value=False), \
              patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
@@ -166,7 +166,7 @@ class TestProcessWithToolsCodex:
         msg = _make_message()
         embed_msg = AsyncMock()
         msg.channel.send = AsyncMock(return_value=embed_msg)
-        stub._build_tool_progress_embed = AnsiblexBot._build_tool_progress_embed
+        stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=[
             LLMResponse(
@@ -177,7 +177,7 @@ class TestProcessWithToolsCodex:
             LLMResponse(text="Done.", tool_calls=[], stop_reason="end_turn"),
         ])
         stub.tool_executor.execute = AsyncMock(return_value="ok")
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.requires_approval", return_value=False), \
              patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
@@ -206,7 +206,7 @@ class TestProcessWithToolsCodex:
             LLMResponse(text="Both disks are fine.", tool_calls=[], stop_reason="end_turn"),
         ])
         stub.tool_executor.execute = AsyncMock(return_value="ok")
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.requires_approval", return_value=False), \
              patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
@@ -237,7 +237,7 @@ class TestProcessWithToolsCodex:
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=capture_chat_with_tools)
         stub.tool_executor.execute = AsyncMock(return_value="disk ok")
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.requires_approval", return_value=False), \
              patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
@@ -265,7 +265,7 @@ class TestProcessWithToolsCodex:
         stub.codex_client.chat_with_tools = AsyncMock(
             return_value=LLMResponse(text="Just chatting.", tool_calls=[], stop_reason="end_turn")
         )
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         text, _, _, _, _ = await stub._process_with_tools(
             msg, [], system_prompt_override="test",
@@ -284,7 +284,7 @@ class TestTaskRouteCodex:
         """Task route should call _process_with_tools with system_prompt_override."""
         stub = _make_bot_stub()
         stub.classifier.classify = AsyncMock(return_value="task")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
@@ -298,7 +298,7 @@ class TestTaskRouteCodex:
     async def test_task_keyword_uses_codex(self):
         """Keyword-matched tasks should also call _process_with_tools."""
         stub = _make_bot_stub()
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
@@ -313,7 +313,7 @@ class TestTaskRouteCodex:
         stub = _make_bot_stub()
         stub.classifier.classify = AsyncMock(return_value="task")
         stub._process_with_tools = AsyncMock(side_effect=RuntimeError("Codex API down"))
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
@@ -327,7 +327,7 @@ class TestTaskRouteCodex:
         stub = _make_bot_stub()
         stub.codex_client = None
         stub.classifier.classify = AsyncMock(return_value="task")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
@@ -350,7 +350,7 @@ class TestChatRouteErrorHandling:
         """Chat should route to Codex successfully."""
         stub = _make_bot_stub()
         stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
@@ -364,7 +364,7 @@ class TestChatRouteErrorHandling:
         stub = _make_bot_stub()
         stub.codex_client.chat = AsyncMock(side_effect=Exception("Codex down"))
         stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
@@ -382,7 +382,7 @@ class TestChatRouteErrorHandling:
         stub = _make_bot_stub()
         stub.codex_client = None
         stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
@@ -407,7 +407,7 @@ class TestClaudeCodeFallbackCodex:
         stub.tool_executor._handle_claude_code = AsyncMock(
             return_value="Claude Code failed (exit 1): error"
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         with patch("src.discord.client.is_task_by_keyword", return_value=False), \
@@ -424,7 +424,7 @@ class TestClaudeCodeFallbackCodex:
         stub.tool_executor._handle_claude_code = AsyncMock(
             side_effect=RuntimeError("SSH failed")
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         with patch("src.discord.client.is_task_by_keyword", return_value=False), \
@@ -441,7 +441,7 @@ class TestClaudeCodeFallbackCodex:
         stub.tool_executor._handle_claude_code = AsyncMock(
             return_value="Claude Code failed (exit 1): error"
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         with patch("src.discord.client.is_task_by_keyword", return_value=False), \
@@ -463,7 +463,7 @@ class TestBudgetWithCodex:
         """Task route always calls _process_with_tools when codex_client is set."""
         stub = _make_bot_stub()
         stub.classifier.classify = AsyncMock(return_value="task")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
@@ -477,7 +477,7 @@ class TestBudgetWithCodex:
         stub = _make_bot_stub()
         stub.codex_client = None
         stub.classifier.classify = AsyncMock(return_value="task")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         with patch("src.discord.client.is_task_by_keyword", return_value=False):

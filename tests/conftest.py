@@ -1,4 +1,4 @@
-"""Shared fixtures for Ansiblex test suite."""
+"""Shared fixtures for Loki test suite."""
 from __future__ import annotations
 
 import tempfile

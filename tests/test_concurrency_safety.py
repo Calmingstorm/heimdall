@@ -17,7 +17,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import AnsiblexBot  # noqa: E402
+from src.discord.client import LokiBot  # noqa: E402
 from src.tools.executor import ToolExecutor  # noqa: E402
 
 
@@ -26,7 +26,7 @@ from src.tools.executor import ToolExecutor  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Minimal AnsiblexBot stub for concurrency tests."""
+    """Minimal LokiBot stub for concurrency tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -106,7 +106,7 @@ class TestSystemPromptNotMutated:
         msg = _make_message()
         original_prompt = stub._system_prompt
         stub._build_system_prompt = MagicMock(return_value="user-specific prompt")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -119,7 +119,7 @@ class TestSystemPromptNotMutated:
         stub = _make_bot_stub()
         msg = _make_message()
         stub._build_system_prompt = MagicMock(return_value="per-request prompt")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -131,7 +131,7 @@ class TestSystemPromptNotMutated:
     async def test_inject_tool_hints_returns_prompt_not_mutates(self):
         """_inject_tool_hints should return modified prompt, not mutate self."""
         stub = _make_bot_stub()
-        stub._inject_tool_hints = AnsiblexBot._inject_tool_hints.__get__(stub)
+        stub._inject_tool_hints = LokiBot._inject_tool_hints.__get__(stub)
         stub.tool_memory = MagicMock()
         stub.tool_memory.format_hints = AsyncMock(return_value="## Hints\nhint text")
 
@@ -157,7 +157,7 @@ class TestSystemPromptNotMutated:
             return ("ok", False, False, [], False)
 
         stub._process_with_tools = capture_process
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg1 = _make_message("chan-A", "user-1")
         msg2 = _make_message("chan-B", "user-2")
@@ -243,8 +243,8 @@ class TestUserIdPassedToExecute:
             return LLMResponse(text="Done.", stop_reason="end_turn")
 
         stub.codex_client.chat_with_tools = fake_chat_with_tools
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
-        stub._track_recent_action = AnsiblexBot._track_recent_action.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
 
         with patch("src.discord.client.requires_approval", return_value=False), \
              patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
@@ -271,7 +271,7 @@ class TestPendingFilesPerChannel:
     async def test_send_chunked_uses_channel_id(self):
         """_send_chunked should only consume pending files for its channel."""
         stub = _make_bot_stub()
-        stub._send_chunked = AnsiblexBot._send_chunked.__get__(stub)
+        stub._send_chunked = LokiBot._send_chunked.__get__(stub)
 
         # Pre-populate pending files for two channels
         stub._pending_files = {

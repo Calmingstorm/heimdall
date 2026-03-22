@@ -141,7 +141,7 @@ def truncate_tool_output(text: str, max_chars: int = TOOL_OUTPUT_MAX_CHARS) -> s
     )
 
 
-class AnsiblexBot(discord.Client):
+class LokiBot(discord.Client):
     def __init__(self, config: Config) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
@@ -508,7 +508,7 @@ class AnsiblexBot(discord.Client):
         self._last_tool_use[channel_id] = time.monotonic()
 
     def _register_commands(self) -> None:
-        @self.tree.command(name="status", description="Show Ansiblex bot status")
+        @self.tree.command(name="status", description="Show Loki bot status")
         async def cmd_status(interaction: discord.Interaction) -> None:
             if not self._is_allowed_user(interaction.user):
                 await interaction.response.send_message("Access denied.", ephemeral=True)
@@ -523,7 +523,7 @@ class AnsiblexBot(discord.Client):
             codex_status = "Codex: " + ("enabled" if self.codex_client else "not configured")
             classifier_status = "Classifier: Haiku"
             await interaction.response.send_message(
-                f"**Ansiblex Status**\n"
+                f"**Loki Status**\n"
                 f"{codex_status}\n"
                 f"{classifier_status}"
                 f"{voice_status}"

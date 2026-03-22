@@ -287,7 +287,7 @@ TOOLS: list[dict] = [
                     "description": (
                         "For webhook-triggered tasks: conditions to match against incoming webhooks. "
                         "All specified fields must match (AND logic). Omit for time-based tasks. "
-                        "Example: {\"source\": \"gitea\", \"event\": \"push\", \"repo\": \"ansiblex\"} fires on pushes to any repo containing 'ansiblex'."
+                        "Example: {\"source\": \"gitea\", \"event\": \"push\", \"repo\": \"myproject\"} fires on pushes to any repo containing 'myproject'."
                     ),
                     "properties": {
                         "source": {
@@ -1513,7 +1513,7 @@ TOOLS: list[dict] = [
                 },
                 "working_directory": {
                     "type": "string",
-                    "description": "Absolute path to the repo/directory to work in (e.g. '/root/ansiblex/')",
+                    "description": "Absolute path to the repo/directory to work in (e.g. '/root/project/')",
                 },
                 "prompt": {
                     "type": "string",

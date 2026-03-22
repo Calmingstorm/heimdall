@@ -22,7 +22,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import AnsiblexBot  # noqa: E402
+from src.discord.client import LokiBot  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -30,7 +30,7 @@ from src.discord.client import AnsiblexBot  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub(**overrides):
-    """Create a minimal AnsiblexBot stub with real _build_system_prompt/_build_chat_system_prompt."""
+    """Create a minimal LokiBot stub with real _build_system_prompt/_build_chat_system_prompt."""
     stub = MagicMock()
 
     # Config: hosts, services, playbooks
@@ -76,8 +76,8 @@ def _make_bot_stub(**overrides):
     stub._recent_actions_expiry = overrides.get("expiry", 3600)
 
     # Bind the real methods
-    stub._build_system_prompt = AnsiblexBot._build_system_prompt.__get__(stub)
-    stub._build_chat_system_prompt = AnsiblexBot._build_chat_system_prompt.__get__(stub)
+    stub._build_system_prompt = LokiBot._build_system_prompt.__get__(stub)
+    stub._build_chat_system_prompt = LokiBot._build_chat_system_prompt.__get__(stub)
 
     return stub
 
@@ -472,12 +472,12 @@ class TestBaseTemplateContent:
     def test_full_prompt_includes_identity(self):
         stub = _make_bot_stub()
         prompt = stub._build_system_prompt()
-        assert "Ansiblex" in prompt
+        assert "Loki" in prompt
 
     def test_chat_prompt_includes_identity(self):
         stub = _make_bot_stub()
         prompt = stub._build_chat_system_prompt()
-        assert "Ansiblex" in prompt
+        assert "Loki" in prompt
 
     def test_chat_prompt_omits_hosts(self):
         """Chat prompt should not include host details."""
@@ -569,7 +569,7 @@ class TestCombinedInjections:
         """Full prompt with no optional context should still be valid."""
         stub = _make_bot_stub()
         prompt = stub._build_system_prompt()
-        assert "Ansiblex" in prompt
+        assert "Loki" in prompt
         assert "## Persistent Memory" not in prompt
         assert "## Learned" not in prompt
         assert "## User-Created Skills" not in prompt
@@ -579,7 +579,7 @@ class TestCombinedInjections:
     def test_chat_prompt_no_injections(self):
         stub = _make_bot_stub()
         prompt = stub._build_chat_system_prompt()
-        assert "Ansiblex" in prompt
+        assert "Loki" in prompt
         assert "## Persistent Memory" not in prompt
         assert "## Learned" not in prompt
         assert "## Channel Personality" not in prompt

@@ -1,4 +1,4 @@
-# Ansiblex Code Audit Findings
+# Loki Code Audit Findings
 
 ## Session 1: `src/discord/client.py` — Central Hub (Routing, Tool Loop, Streaming, Attachments, Handoff)
 
@@ -337,13 +337,13 @@
 - **File**: `src/tools/skill_manager.py:124-128` vs `73-74`
 - **Severity**: medium
 - **Category**: bug
-- **Description**: `_load_skill` (line 74) creates the module name from the file stem: `f"ansiblex_skill_{path.stem}"`. `_unload_skill` (line 126) creates it from the skill name: `f"ansiblex_skill_{name}"`. If a skill file is manually placed in `data/skills/` (not through `create_skill`) where the filename stem differs from `SKILL_DEFINITION.name`, the module name won't match.
+- **Description**: `_load_skill` (line 74) creates the module name from the file stem: `f"loki_skill_{path.stem}"`. `_unload_skill` (line 126) creates it from the skill name: `f"loki_skill_{name}"`. If a skill file is manually placed in `data/skills/` (not through `create_skill`) where the filename stem differs from `SKILL_DEFINITION.name`, the module name won't match.
 
   For example: file `my_tool.py` with `SKILL_DEFINITION = {"name": "my_custom_tool", ...}`:
-  - `_load_skill` registers `ansiblex_skill_my_tool` in `sys.modules`
+  - `_load_skill` registers `loki_skill_my_tool` in `sys.modules`
   - `_skills["my_custom_tool"] = skill`
-  - `_unload_skill("my_custom_tool")` removes `ansiblex_skill_my_custom_tool` (wrong!) from `sys.modules`
-  - `ansiblex_skill_my_tool` remains in `sys.modules` forever
+  - `_unload_skill("my_custom_tool")` removes `loki_skill_my_custom_tool` (wrong!) from `sys.modules`
+  - `loki_skill_my_tool` remains in `sys.modules` forever
 - **Impact**: Module leak in `sys.modules`. On re-import, the stale module could be used instead of the new file contents.
 - **Suggested fix**: Store the module name on `LoadedSkill` and use it in `_unload_skill`, or enforce name-stem equality in `_load_all` like `create_skill` does.
 
@@ -1070,7 +1070,7 @@ Also covers: `src/llm/usage_tracker.py`, `src/llm/codex_auth.py`, `src/llm/syste
 | 11 | scheduler.py:82-83 | low | bug | Schedule ID `uuid.uuid4().hex[:8]` has no collision check |
 | 12 | scheduler.py:70-75 | low | bug | Workflow steps validation doesn't check tool names against any allowlist |
 | 13 | manager.py:78-90,92-102 | low | behavioral | `filter_tools` returns `None` for guest but `allowed_tool_names` returns empty set — inconsistent "no access" encoding |
-| 14 | routing.py:67-69 | low | behavioral | `/opt/` regex matches any message mentioning `/opt/` paths, not just ansiblex-related ones |
+| 14 | routing.py:67-69 | low | behavioral | `/opt/` regex matches any message mentioning `/opt/` paths, not just project-related ones |
 | 15 | server.py:92-106 | low | best-practice | `_send` exposes raw exception message in HTTP response body |
 
 ---
@@ -1316,11 +1316,11 @@ Also covers: `src/llm/usage_tracker.py`, `src/llm/codex_auth.py`, `src/llm/syste
 - **File**: `src/discord/routing.py:67-69`
 - **Severity**: low
 - **Category**: behavioral
-- **Description**: The `_SERVER_INDICATORS` regex includes `r"/opt/"` as a server indicator (line 69). This matches any message containing the string `/opt/` anywhere — not just `/opt/ansiblex`. A message like "install it to /opt/myapp" or "the config is in /opt/grafana" would route to server even if the user is discussing a different machine or a general concept.
+- **Description**: The `_SERVER_INDICATORS` regex includes `r"/opt/"` as a server indicator (line 69). This matches any message containing the string `/opt/` anywhere — not just `/opt/project`. A message like "install it to /opt/myapp" or "the config is in /opt/grafana" would route to server even if the user is discussing a different machine or a general concept.
 
-  The pattern `/opt/ansiblex` (line 68) is already included separately, so `/opt/` is a broader fallback. Since only the server and desktop hosts have Claude CLI installed, and `/opt/` is more commonly associated with server paths, this is a reasonable heuristic. But it could surprise users who mention `/opt/` in other contexts.
+  The pattern `/opt/project` (line 68) is already included separately, so `/opt/` is a broader fallback. Since only the server and desktop hosts have Claude CLI installed, and `/opt/` is more commonly associated with server paths, this is a reasonable heuristic. But it could surprise users who mention `/opt/` in other contexts.
 - **Impact**: Minor — messages mentioning any `/opt/` path route Claude Code to the server host. For a personal bot with known infrastructure, this is usually correct but could occasionally route to the wrong host.
-- **Suggested fix**: Consider removing the broad `/opt/` pattern and keeping only `/opt/ansiblex`. Or add a comment explaining the heuristic.
+- **Suggested fix**: Consider removing the broad `/opt/` pattern and keeping only `/opt/project`. Or add a comment explaining the heuristic.
 
 #### Issue 15: `_send` exposes raw exception message in HTTP response body
 - **File**: `src/health/server.py:104-106`

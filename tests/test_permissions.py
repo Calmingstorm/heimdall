@@ -21,7 +21,7 @@ import pytest  # noqa: E402
 from src.permissions.manager import PermissionManager, VALID_TIERS, USER_TIER_TOOLS  # noqa: E402
 from src.config.schema import PermissionsConfig, Config  # noqa: E402
 from src.tools.registry import TOOLS, get_tool_definitions  # noqa: E402
-from src.discord.client import AnsiblexBot  # noqa: E402
+from src.discord.client import LokiBot  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -230,8 +230,7 @@ class TestToolFiltering:
 class TestPermissionsConfig:
     def test_default_tiers(self):
         pc = PermissionsConfig()
-        assert pc.tiers["441602773310767105"] == "admin"
-        assert pc.tiers["757383353141035140"] == "admin"
+        assert pc.tiers == {}
 
     def test_default_tier_is_user(self):
         pc = PermissionsConfig()
@@ -292,8 +291,8 @@ class TestHandleSetPermission:
     @pytest.fixture
     def bot(self, config, tmp_dir):
         """Minimal bot mock with real PermissionManager."""
-        with patch.object(AnsiblexBot, "__init__", lambda self, *a, **k: None):
-            bot = AnsiblexBot.__new__(AnsiblexBot)
+        with patch.object(LokiBot, "__init__", lambda self, *a, **k: None):
+            bot = LokiBot.__new__(LokiBot)
         bot.permissions = PermissionManager(
             config_tiers={"111": "admin"},
             default_tier="user",
@@ -328,8 +327,8 @@ class TestToolFilteringIntegration:
     @pytest.fixture
     def bot(self, config, tmp_dir):
         """Minimal bot mock to test _process_with_tools tool filtering."""
-        with patch.object(AnsiblexBot, "__init__", lambda self, *a, **k: None):
-            bot = AnsiblexBot.__new__(AnsiblexBot)
+        with patch.object(LokiBot, "__init__", lambda self, *a, **k: None):
+            bot = LokiBot.__new__(LokiBot)
         bot.config = config
         bot.permissions = PermissionManager(
             config_tiers={"111": "admin"},

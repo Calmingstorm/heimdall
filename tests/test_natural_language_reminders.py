@@ -336,7 +336,7 @@ class TestSystemPromptReminders:
 
 
 class TestHandleParseTime:
-    """Test the handler logic (replicated here to avoid AnsiblexBot import chain)."""
+    """Test the handler logic (replicated here to avoid LokiBot import chain)."""
 
     @staticmethod
     def _handle(inp: dict) -> str:

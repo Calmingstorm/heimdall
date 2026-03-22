@@ -1,7 +1,7 @@
 """Tests for context-aware claude_code host/directory routing.
 
 Round 2, Session 8: The claude_code routing path hardcoded host='desktop'
-and working_directory='/root/ansiblex'. This meant all code analysis went
+and working_directory='/root/project'. This meant all code analysis went
 to the desktop even when the user asked about server files, production
 config, or server-hosted services.
 
@@ -13,7 +13,7 @@ Tests cover:
 - Default routing: generic code messages → desktop
 - Explicit server mentions: "on server", "on the server"
 - Server service config patterns: grafana/prometheus/loki/gitea/nginx + config
-- Server paths: /opt/ and /opt/ansiblex
+- Server paths: /opt/ and /opt/project
 - Production context: "production config", "deployed version"
 - False negatives: messages that look server-related but should stay on desktop
 - Case insensitivity
@@ -30,7 +30,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import AnsiblexBot  # noqa: E402
+from src.discord.client import LokiBot  # noqa: E402
 from src.discord.routing import (  # noqa: E402
     CLAUDE_CODE_DEFAULTS,
     resolve_claude_code_target,
@@ -56,9 +56,9 @@ class TestResolveClaudeCodeTargetDefaults:
         assert host == "desktop"
         assert directory == CLAUDE_CODE_DEFAULTS["desktop"]
 
-    def test_default_directory_is_root_ansiblex(self):
+    def test_default_directory_is_root_project(self):
         _, directory = resolve_claude_code_target("review the code")
-        assert directory == "/root/ansiblex"
+        assert directory == "/root/project"
 
 
 class TestResolveClaudeCodeTargetExplicitServer:
@@ -86,22 +86,22 @@ class TestResolveClaudeCodeTargetExplicitServer:
     def test_server_noun_phrases_route_to_server(self, msg):
         host, directory = resolve_claude_code_target(msg)
         assert host == "server"
-        assert directory == "/opt/ansiblex"
+        assert directory == "/opt/project"
 
 
 class TestResolveClaudeCodeTargetServerPaths:
     """Messages mentioning server-specific paths should route to server."""
 
     @pytest.mark.parametrize("msg", [
-        "read the file at /opt/ansiblex/config.yml",
-        "what's in /opt/ansiblex/docker-compose.yml?",
+        "read the file at /opt/project/config.yml",
+        "what's in /opt/project/docker-compose.yml?",
         "look at /opt/some-other-app/main.py",
         "check /opt/grafana/defaults.ini",
     ])
     def test_opt_paths_route_to_server(self, msg):
         host, directory = resolve_claude_code_target(msg)
         assert host == "server"
-        assert directory == "/opt/ansiblex"
+        assert directory == "/opt/project"
 
 
 class TestResolveClaudeCodeTargetServiceConfigs:
@@ -120,7 +120,7 @@ class TestResolveClaudeCodeTargetServiceConfigs:
     def test_service_config_routes_to_server(self, msg):
         host, directory = resolve_claude_code_target(msg)
         assert host == "server"
-        assert directory == "/opt/ansiblex"
+        assert directory == "/opt/project"
 
     @pytest.mark.parametrize("msg", [
         "config for grafana seems broken",
@@ -131,7 +131,7 @@ class TestResolveClaudeCodeTargetServiceConfigs:
     def test_config_for_service_routes_to_server(self, msg):
         host, directory = resolve_claude_code_target(msg)
         assert host == "server"
-        assert directory == "/opt/ansiblex"
+        assert directory == "/opt/project"
 
 
 class TestResolveClaudeCodeTargetProductionContext:
@@ -148,7 +148,7 @@ class TestResolveClaudeCodeTargetProductionContext:
     def test_production_context_routes_to_server(self, msg):
         host, directory = resolve_claude_code_target(msg)
         assert host == "server"
-        assert directory == "/opt/ansiblex"
+        assert directory == "/opt/project"
 
 
 class TestResolveClaudeCodeTargetFalseNegatives:
@@ -162,7 +162,7 @@ class TestResolveClaudeCodeTargetFalseNegatives:
         "what does loki do?",
         # Desktop-specific references
         "look at the code on desktop",
-        "check /root/ansiblex/src/main.py",
+        "check /root/project/src/main.py",
         # Generic code analysis (no host/service indicator)
         "review the routing module",
         "explain the session manager class",
@@ -183,7 +183,7 @@ class TestResolveClaudeCodeTargetCaseInsensitivity:
         "Check the code ON SERVER",
         "SERVER CONFIG needs review",
         "GRAFANA CONFIG is wrong",
-        "Read /OPT/ansiblex/config.yml",
+        "Read /OPT/project/config.yml",
         "PRODUCTION CONFIG check",
     ])
     def test_case_insensitive_matching(self, msg):
@@ -197,7 +197,7 @@ class TestResolveClaudeCodeTargetEdgeCases:
     def test_empty_message(self):
         host, directory = resolve_claude_code_target("")
         assert host == "desktop"
-        assert directory == "/root/ansiblex"
+        assert directory == "/root/project"
 
     def test_whitespace_only(self):
         host, _ = resolve_claude_code_target("   ")
@@ -210,7 +210,7 @@ class TestResolveClaudeCodeTargetEdgeCases:
 
     def test_multiple_indicators_still_routes_server(self):
         host, _ = resolve_claude_code_target(
-            "check the grafana config on the server at /opt/ansiblex"
+            "check the grafana config on the server at /opt/project"
         )
         assert host == "server"
 
@@ -224,10 +224,10 @@ class TestClaudeCodeDefaults:
     """CLAUDE_CODE_DEFAULTS dict is correct."""
 
     def test_desktop_default(self):
-        assert CLAUDE_CODE_DEFAULTS["desktop"] == "/root/ansiblex"
+        assert CLAUDE_CODE_DEFAULTS["desktop"] == "/root/project"
 
     def test_server_default(self):
-        assert CLAUDE_CODE_DEFAULTS["server"] == "/opt/ansiblex"
+        assert CLAUDE_CODE_DEFAULTS["server"] == "/opt/project"
 
     def test_only_two_hosts(self):
         assert set(CLAUDE_CODE_DEFAULTS.keys()) == {"desktop", "server"}
@@ -237,7 +237,7 @@ class TestClaudeCodeDefaults:
 
 
 def _make_bot_stub():
-    """Minimal AnsiblexBot stub for routing tests."""
+    """Minimal LokiBot stub for routing tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -298,7 +298,7 @@ class TestIntegrationServerRouting:
         """Message mentioning 'on server' should pass host='server'."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(
@@ -308,13 +308,13 @@ class TestIntegrationServerRouting:
         stub.tool_executor._handle_claude_code.assert_called_once()
         call_args = stub.tool_executor._handle_claude_code.call_args[0][0]
         assert call_args["host"] == "server"
-        assert call_args["working_directory"] == "/opt/ansiblex"
+        assert call_args["working_directory"] == "/opt/project"
 
     async def test_generic_message_routes_to_desktop_host(self):
         """Generic code analysis message should pass host='desktop'."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(
@@ -323,13 +323,13 @@ class TestIntegrationServerRouting:
 
         call_args = stub.tool_executor._handle_claude_code.call_args[0][0]
         assert call_args["host"] == "desktop"
-        assert call_args["working_directory"] == "/root/ansiblex"
+        assert call_args["working_directory"] == "/root/project"
 
     async def test_keyword_bypass_with_server_mention(self):
         """Keyword bypass path should also use resolved host."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         # "review code on server" — matches claude_code keyword AND server indicator
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
@@ -339,13 +339,13 @@ class TestIntegrationServerRouting:
 
         call_args = stub.tool_executor._handle_claude_code.call_args[0][0]
         assert call_args["host"] == "server"
-        assert call_args["working_directory"] == "/opt/ansiblex"
+        assert call_args["working_directory"] == "/opt/project"
 
     async def test_grafana_config_routes_to_server(self):
         """Message about grafana config should route to server."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(
@@ -359,22 +359,22 @@ class TestIntegrationServerRouting:
         """Message mentioning /opt/ path should route to server."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(
-                msg, "read /opt/ansiblex/docker-compose.yml", "chan-1"
+                msg, "read /opt/project/docker-compose.yml", "chan-1"
             )
 
         call_args = stub.tool_executor._handle_claude_code.call_args[0][0]
         assert call_args["host"] == "server"
-        assert call_args["working_directory"] == "/opt/ansiblex"
+        assert call_args["working_directory"] == "/opt/project"
 
     async def test_allow_edits_always_false_on_routing_path(self):
         """Routing path should always set allow_edits=False regardless of host."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(
@@ -388,7 +388,7 @@ class TestIntegrationServerRouting:
         """Routing path should still pass max_output_chars=8000 for both hosts."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(

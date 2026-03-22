@@ -17,7 +17,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import AnsiblexBot  # noqa: E402
+from src.discord.client import LokiBot  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
@@ -26,7 +26,7 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Minimal AnsiblexBot stub for approval cache tests."""
+    """Minimal LokiBot stub for approval cache tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -58,7 +58,7 @@ def _make_bot_stub():
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = AnsiblexBot._build_tool_progress_embed
+    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
     return stub
 
 
@@ -110,7 +110,7 @@ class TestApprovalCache:
             LLMResponse(text="Done!", tool_calls=[]),
         ])
 
-        result = await AnsiblexBot._process_with_tools(
+        result = await LokiBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "check resources"}]
         )
 
@@ -142,7 +142,7 @@ class TestApprovalCache:
             LLMResponse(text="Done!", tool_calls=[]),
         ])
 
-        result = await AnsiblexBot._process_with_tools(
+        result = await LokiBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "check and restart"}]
         )
 
@@ -175,7 +175,7 @@ class TestApprovalCache:
             LLMResponse(text="Done!", tool_calls=[]),
         ])
 
-        result = await AnsiblexBot._process_with_tools(
+        result = await LokiBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "clean up"}]
         )
 
@@ -201,7 +201,7 @@ class TestApprovalCache:
             LLMResponse(text="Done!", tool_calls=[]),
         ])
 
-        result = await AnsiblexBot._process_with_tools(
+        result = await LokiBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "check disks"}]
         )
 
@@ -226,7 +226,7 @@ class TestApprovalCache:
             LLMResponse(text="", tool_calls=[ToolCall(id="tc1", name="run_command", input={"command": "df -h"})]),
             LLMResponse(text="Done!", tool_calls=[]),
         ])
-        await AnsiblexBot._process_with_tools(
+        await LokiBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "check disk"}]
         )
         assert mock_request_approval.call_count == 1
@@ -237,7 +237,7 @@ class TestApprovalCache:
             LLMResponse(text="", tool_calls=[ToolCall(id="tc2", name="run_command", input={"command": "free -m"})]),
             LLMResponse(text="Done!", tool_calls=[]),
         ])
-        await AnsiblexBot._process_with_tools(
+        await LokiBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "check memory"}]
         )
         assert mock_request_approval.call_count == 1
@@ -266,7 +266,7 @@ class TestApprovalCache:
         # my_skill isn't in merged tools but the skill_manager handles it
         stub.skill_manager.has_skill = MagicMock(return_value=True)
 
-        result = await AnsiblexBot._process_with_tools(
+        result = await LokiBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "deploy and verify"}]
         )
 
@@ -297,7 +297,7 @@ class TestApprovalCache:
             LLMResponse(text="Done!", tool_calls=[]),
         ])
 
-        result = await AnsiblexBot._process_with_tools(
+        result = await LokiBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "check everything"}]
         )
 

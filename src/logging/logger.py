@@ -10,7 +10,7 @@ def setup_logging(level: str = "INFO", log_dir: str = "./data/logs") -> None:
     log_path = Path(log_dir)
     log_path.mkdir(parents=True, exist_ok=True)
 
-    root = logging.getLogger("ansiblex")
+    root = logging.getLogger("loki")
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
 
     fmt = logging.Formatter(
@@ -23,7 +23,7 @@ def setup_logging(level: str = "INFO", log_dir: str = "./data/logs") -> None:
     root.addHandler(console)
 
     file_handler = RotatingFileHandler(
-        log_path / "ansiblex.log",
+        log_path / "loki.log",
         maxBytes=100 * 1024 * 1024,  # 100 MB
         backupCount=19,  # ~2 GB total
     )
@@ -32,4 +32,4 @@ def setup_logging(level: str = "INFO", log_dir: str = "./data/logs") -> None:
 
 
 def get_logger(name: str) -> logging.Logger:
-    return logging.getLogger(f"ansiblex.{name}")
+    return logging.getLogger(f"loki.{name}")

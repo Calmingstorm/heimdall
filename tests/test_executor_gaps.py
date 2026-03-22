@@ -26,9 +26,9 @@ class TestCheckDocker:
     async def test_check_docker_all(self, executor):
         """check_docker without container shows all containers."""
         with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "NAME  STATUS  PORTS\nansiblex  Up 2 days")
+            mock_ssh.return_value = (0, "NAME  STATUS  PORTS\nmyapp  Up 2 days")
             result = await executor.execute("check_docker", {"host": "server"})
-        assert "ansiblex" in result
+        assert "myapp" in result
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
         # No --filter when no container specified
         assert "--filter" not in cmd
@@ -37,12 +37,12 @@ class TestCheckDocker:
     async def test_check_docker_specific_container(self, executor):
         """check_docker with container uses --filter name=..."""
         with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "ansiblex  Up 2 days  8080->8080")
+            mock_ssh.return_value = (0, "myapp  Up 2 days  8080->8080")
             result = await executor.execute("check_docker", {
                 "host": "server",
-                "container": "ansiblex",
+                "container": "myapp",
             })
-        assert "ansiblex" in result
+        assert "myapp" in result
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
         assert "--filter name=" in cmd
         # Uses -a for all (including stopped)
@@ -200,7 +200,7 @@ class TestClaudeCode:
             mock_ssh.return_value = (0, "Analysis complete: all good")
             result = await executor.execute("claude_code", {
                 "host": "server",
-                "working_directory": "/opt/ansiblex",
+                "working_directory": "/opt/project",
                 "prompt": "Check the code",
             })
         assert "Analysis complete" in result
@@ -226,7 +226,7 @@ class TestClaudeCode:
             ]
             result = await executor.execute("claude_code", {
                 "host": "server",
-                "working_directory": "/opt/ansiblex",
+                "working_directory": "/opt/project",
                 "prompt": "Fix the bug",
                 "allow_edits": True,
             })
@@ -244,7 +244,7 @@ class TestClaudeCode:
             mock_ssh.return_value = (1, "Error: budget exceeded")
             result = await executor.execute("claude_code", {
                 "host": "server",
-                "working_directory": "/opt/ansiblex",
+                "working_directory": "/opt/project",
                 "prompt": "Do stuff",
             })
         assert "failed" in result.lower()
@@ -258,7 +258,7 @@ class TestClaudeCode:
             mock_ssh.return_value = (0, long_output)
             result = await executor.execute("claude_code", {
                 "host": "server",
-                "working_directory": "/opt/ansiblex",
+                "working_directory": "/opt/project",
                 "prompt": "Analyze",
                 "max_output_chars": 200,
             })
@@ -282,7 +282,7 @@ class TestClaudeCode:
             mock_ssh.return_value = (0, "done")
             await executor.execute("claude_code", {
                 "host": "server",
-                "working_directory": "/opt/ansiblex",
+                "working_directory": "/opt/project",
                 "prompt": "hello",
                 "allowed_tools": "Read,Grep",
             })
@@ -648,7 +648,7 @@ class TestDockerComposeActionBranches:
             mock_ssh.return_value = (0, "Stopped")
             await executor.execute("docker_compose_action", {
                 "host": "server",
-                "project_dir": "/opt/ansiblex",
+                "project_dir": "/opt/project",
                 "action": "down",
             })
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
@@ -661,7 +661,7 @@ class TestDockerComposeActionBranches:
             mock_ssh.return_value = (0, "Pulling")
             await executor.execute("docker_compose_action", {
                 "host": "server",
-                "project_dir": "/opt/ansiblex",
+                "project_dir": "/opt/project",
                 "action": "pull",
             })
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
@@ -674,7 +674,7 @@ class TestDockerComposeActionBranches:
             mock_ssh.return_value = (0, "Restarted")
             await executor.execute("docker_compose_action", {
                 "host": "server",
-                "project_dir": "/opt/ansiblex",
+                "project_dir": "/opt/project",
                 "action": "restart",
             })
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
@@ -687,7 +687,7 @@ class TestDockerComposeActionBranches:
             mock_ssh.return_value = (0, "Built")
             await executor.execute("docker_compose_action", {
                 "host": "server",
-                "project_dir": "/opt/ansiblex",
+                "project_dir": "/opt/project",
                 "action": "build",
             })
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
@@ -703,14 +703,14 @@ class TestDockerStatsContainer:
     async def test_docker_stats_specific_container(self, executor):
         """docker_stats with container filters to that container."""
         with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "ansiblex  5%  100MiB / 1GiB")
+            mock_ssh.return_value = (0, "myapp  5%  100MiB / 1GiB")
             result = await executor.execute("docker_stats", {
                 "host": "server",
-                "container": "ansiblex",
+                "container": "myapp",
             })
-        assert "ansiblex" in result
+        assert "myapp" in result
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
-        assert "ansiblex" in cmd
+        assert "myapp" in cmd
 
 
 # ---------------------------------------------------------------------------

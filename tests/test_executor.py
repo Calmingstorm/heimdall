@@ -142,12 +142,12 @@ class TestExecute:
             await executor.execute("write_file", {
                 "host": "server",
                 "path": "/tmp/test.txt",
-                "content": "line1\nANSIBLEX_EOF\nrm -rf /\nmore content",
+                "content": "line1\nLOKI_EOF\nrm -rf /\nmore content",
             })
         cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
         # Should use base64, not heredoc
         assert "base64" in cmd
-        assert "ANSIBLEX_EOF" not in cmd
+        assert "LOKI_EOF" not in cmd
 
     @pytest.mark.asyncio
     async def test_read_file_default_lines(self, executor: ToolExecutor):
@@ -213,7 +213,7 @@ class TestDockerTools:
             mock_ssh.return_value = (0, "log line 1\nlog line 2")
             result = await executor.execute("docker_logs", {
                 "host": "server",
-                "container": "ansiblex",
+                "container": "myapp",
                 "lines": 10,
             })
         assert "log line" in result
@@ -226,7 +226,7 @@ class TestDockerTools:
             mock_ssh.return_value = (0, "recent logs")
             await executor.execute("docker_logs", {
                 "host": "server",
-                "container": "ansiblex",
+                "container": "myapp",
                 "since": "1h",
             })
         cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
@@ -250,7 +250,7 @@ class TestDockerTools:
             mock_ssh.return_value = (0, "Started")
             result = await executor.execute("docker_compose_action", {
                 "host": "server",
-                "project_dir": "/opt/ansiblex",
+                "project_dir": "/opt/project",
                 "action": "up",
             })
         cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
@@ -280,7 +280,7 @@ class TestGitTools:
             mock_ssh.return_value = (0, "On branch master")
             result = await executor.execute("git_status", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
             })
         assert "On branch" in result
 
@@ -290,7 +290,7 @@ class TestGitTools:
             mock_ssh.return_value = (0, "abc1234 Initial commit")
             result = await executor.execute("git_log", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "count": 5,
             })
         cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
@@ -314,7 +314,7 @@ class TestGitTools:
             mock_ssh.return_value = (0, "diff output")
             await executor.execute("git_diff", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
             })
         cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
         assert cmd.endswith("diff")
@@ -325,7 +325,7 @@ class TestGitTools:
             mock_ssh.return_value = (0, "diff output")
             await executor.execute("git_diff", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "commit": "abc1234",
             })
         cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
@@ -337,7 +337,7 @@ class TestGitTools:
             mock_ssh.return_value = (0, "commit details")
             result = await executor.execute("git_show", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "commit": "HEAD",
             })
         assert "commit details" in result
@@ -348,7 +348,7 @@ class TestGitTools:
             mock_ssh.return_value = (0, "Already up to date.")
             result = await executor.execute("git_pull", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
             })
         assert "up to date" in result
 

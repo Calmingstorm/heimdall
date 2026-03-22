@@ -20,7 +20,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import AnsiblexBot, _EMPTY_RESPONSE_FALLBACK  # noqa: E402
+from src.discord.client import LokiBot, _EMPTY_RESPONSE_FALLBACK  # noqa: E402
 from src.llm.types import LLMResponse  # noqa: E402
 
 
@@ -29,7 +29,7 @@ from src.llm.types import LLMResponse  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub(**overrides):
-    """Create a minimal AnsiblexBot stub for _handle_message_inner tests.
+    """Create a minimal LokiBot stub for _handle_message_inner tests.
 
     Uses the same pattern as test_chat_path_optimization.py but adds the
     extra attributes needed for task route and handoff paths.
@@ -107,7 +107,7 @@ def _make_bot_stub(**overrides):
     stub.voice_manager = None
 
     # Bind the real method under test
-    stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+    stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
     for k, v in overrides.items():
         setattr(stub, k, v)
@@ -286,7 +286,7 @@ class TestIssue5TaskRouteEmptyFallback:
         )
         stub._cancelled_tasks = set()
         # Bind the REAL _process_with_tools so fallback logic runs
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -308,7 +308,7 @@ class TestIssue5TaskRouteEmptyFallback:
         )
         stub._cancelled_tasks = set()
         # Bind the real _process_with_tools
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         text, already_sent, is_error, tools_used, handoff = await stub._process_with_tools(
             msg, [{"role": "user", "content": "hello"}], system_prompt_override="test",

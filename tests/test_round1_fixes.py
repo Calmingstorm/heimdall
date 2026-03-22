@@ -33,7 +33,7 @@ class TestScheduleTaskDefense:
 
     def _make_bot_stub(self, user_content: str):
         """Create a minimal stub with a Discord message containing user_content."""
-        from src.discord.client import AnsiblexBot
+        from src.discord.client import LokiBot
 
         stub = MagicMock()
         stub.scheduler = MagicMock()
@@ -43,9 +43,9 @@ class TestScheduleTaskDefense:
             "next_run": "soon",
         })
         # Bind the real _handle_schedule_task method
-        stub._handle_schedule_task = AnsiblexBot._handle_schedule_task.__get__(stub)
+        stub._handle_schedule_task = LokiBot._handle_schedule_task.__get__(stub)
         # Also bind the class attribute for the regex
-        stub._SCHEDULE_INTENT_RE = AnsiblexBot._SCHEDULE_INTENT_RE
+        stub._SCHEDULE_INTENT_RE = LokiBot._SCHEDULE_INTENT_RE
 
         msg = MagicMock()
         msg.content = user_content
@@ -211,7 +211,7 @@ class TestNonlocalSystemPromptBehavior:
     for subsequent tool loop iterations (the nonlocal fix)."""
 
     def _make_bot_stub(self):
-        from src.discord.client import AnsiblexBot
+        from src.discord.client import LokiBot
         from src.llm.types import LLMResponse, ToolCall
 
         stub = MagicMock()
@@ -250,8 +250,8 @@ class TestNonlocalSystemPromptBehavior:
         stub._build_system_prompt = MagicMock(return_value="Updated prompt with skills")
 
         # Bind real methods
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
-        stub._track_recent_action = AnsiblexBot._track_recent_action.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
         return stub
 
     def _make_message(self):
@@ -362,7 +362,7 @@ class TestClaudeCodeCodexDoubleFail:
     """When claude_code fails, budget is exceeded, AND Codex fallback also fails."""
 
     def _make_bot_stub(self):
-        from src.discord.client import AnsiblexBot
+        from src.discord.client import LokiBot
         stub = MagicMock()
         stub._recent_actions = {}
         stub._recent_actions_max = 10
@@ -400,7 +400,7 @@ class TestClaudeCodeCodexDoubleFail:
         stub.voice_manager = None
         stub._inject_tool_hints = AsyncMock(side_effect=lambda sp, *a, **kw: sp)
         stub._pending_files = {}
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
         return stub
 
     def _make_message(self):

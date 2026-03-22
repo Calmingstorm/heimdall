@@ -267,8 +267,8 @@ class TestSkillPromptRebuildUserContext:
         stub.tool_memory = MagicMock()
         stub.tool_memory.format_hints = MagicMock(return_value="")
 
-        from src.discord.client import AnsiblexBot
-        stub._build_system_prompt = AnsiblexBot._build_system_prompt.__get__(stub)
+        from src.discord.client import LokiBot
+        stub._build_system_prompt = LokiBot._build_system_prompt.__get__(stub)
         return stub
 
     async def test_create_skill_passes_user_id(self):

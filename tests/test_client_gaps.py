@@ -35,7 +35,7 @@ from src.config.schema import (  # noqa: E402
     WebhookConfig,
 )
 from src.discord.client import (  # noqa: E402
-    AnsiblexBot,
+    LokiBot,
     DISCORD_MAX_LEN,
     MAX_TOOL_ITERATIONS,
     scrub_response_secrets,
@@ -92,7 +92,7 @@ _CORE_PATCHES = [
 
 
 def _construct_bot(config, mock_overrides=None):
-    """Construct AnsiblexBot with all external deps mocked.
+    """Construct LokiBot with all external deps mocked.
 
     Returns (bot, mocks_dict) where mocks_dict maps class name to its mock.
     """
@@ -129,12 +129,12 @@ def _construct_bot(config, mock_overrides=None):
                         # Set on the return_value (instance) of the mock class
                         setattr(mocks[name].return_value, attr, val)
 
-        bot = AnsiblexBot(config)
+        bot = LokiBot(config)
         return bot, mocks
 
 
 def _make_bot_stub(**overrides):
-    """Create a minimal AnsiblexBot stub for method-level tests."""
+    """Create a minimal LokiBot stub for method-level tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -304,7 +304,7 @@ def _make_codex_mock(tool_name=None, tool_input=None, text="Done"):
 # __init__ tests (lines 100-259)
 # ---------------------------------------------------------------------------
 
-class TestAnsiblexBotInit:
+class TestLokiBotInit:
     """Test bot constructor with various config combinations."""
 
     def test_init_minimal_config(self, tmp_path):
@@ -455,7 +455,7 @@ class TestOnReady:
     async def test_on_ready_syncs_guilds(self):
         """on_ready should sync slash commands to each guild."""
         stub = _make_bot_stub()
-        stub.on_ready = AnsiblexBot.on_ready.__get__(stub)
+        stub.on_ready = LokiBot.on_ready.__get__(stub)
 
         guild1 = MagicMock()
         guild1.name = "TestGuild"
@@ -474,7 +474,7 @@ class TestOnReady:
     async def test_on_ready_prunes_stale_sessions(self):
         """on_ready should prune stale sessions and log if any were pruned."""
         stub = _make_bot_stub()
-        stub.on_ready = AnsiblexBot.on_ready.__get__(stub)
+        stub.on_ready = LokiBot.on_ready.__get__(stub)
         stub.sessions.prune = MagicMock(return_value=5)
         stub.guilds = []
         stub._vector_store = None
@@ -488,7 +488,7 @@ class TestOnReady:
     async def test_on_ready_starts_backfill_when_search_enabled(self):
         """on_ready should start backfill task when vector store and embedder are set."""
         stub = _make_bot_stub()
-        stub.on_ready = AnsiblexBot.on_ready.__get__(stub)
+        stub.on_ready = LokiBot.on_ready.__get__(stub)
         stub.guilds = []
         stub._vector_store = MagicMock()
         stub._embedder = MagicMock()
@@ -500,7 +500,7 @@ class TestOnReady:
     async def test_on_ready_starts_infra_watcher(self):
         """on_ready should start infrastructure watcher if configured."""
         stub = _make_bot_stub()
-        stub.on_ready = AnsiblexBot.on_ready.__get__(stub)
+        stub.on_ready = LokiBot.on_ready.__get__(stub)
         stub.guilds = []
         stub._vector_store = None
         stub._embedder = None
@@ -521,7 +521,7 @@ class TestBackfillArchives:
     async def test_backfill_with_counts(self):
         """Should log when sessions are backfilled."""
         stub = _make_bot_stub()
-        stub._backfill_archives = AnsiblexBot._backfill_archives.__get__(stub)
+        stub._backfill_archives = LokiBot._backfill_archives.__get__(stub)
         stub._vector_store = AsyncMock()
         stub._vector_store.backfill = AsyncMock(return_value=5)
         stub._embedder = MagicMock()
@@ -536,7 +536,7 @@ class TestBackfillArchives:
     async def test_backfill_zero_count(self):
         """Should handle zero backfill count (vector store up to date)."""
         stub = _make_bot_stub()
-        stub._backfill_archives = AnsiblexBot._backfill_archives.__get__(stub)
+        stub._backfill_archives = LokiBot._backfill_archives.__get__(stub)
         stub._vector_store = AsyncMock()
         stub._vector_store.backfill = AsyncMock(return_value=0)
         stub._embedder = MagicMock()
@@ -550,7 +550,7 @@ class TestBackfillArchives:
     async def test_backfill_exception(self):
         """Should catch and log exceptions during backfill."""
         stub = _make_bot_stub()
-        stub._backfill_archives = AnsiblexBot._backfill_archives.__get__(stub)
+        stub._backfill_archives = LokiBot._backfill_archives.__get__(stub)
         stub._vector_store = AsyncMock()
         stub._vector_store.backfill = AsyncMock(side_effect=RuntimeError("chromadb down"))
         stub._embedder = MagicMock()
@@ -569,7 +569,7 @@ class TestOnVoiceStateUpdate:
     async def test_no_voice_manager(self):
         """Should return immediately if voice_manager is None."""
         stub = _make_bot_stub()
-        stub.on_voice_state_update = AnsiblexBot.on_voice_state_update.__get__(stub)
+        stub.on_voice_state_update = LokiBot.on_voice_state_update.__get__(stub)
         stub.voice_manager = None
         stub.config.voice.auto_join = True
 
@@ -583,7 +583,7 @@ class TestOnVoiceStateUpdate:
     async def test_auto_join_disabled(self):
         """Should return immediately if auto_join is False."""
         stub = _make_bot_stub()
-        stub.on_voice_state_update = AnsiblexBot.on_voice_state_update.__get__(stub)
+        stub.on_voice_state_update = LokiBot.on_voice_state_update.__get__(stub)
         stub.voice_manager = MagicMock()
         stub.config.voice.auto_join = False
 
@@ -596,7 +596,7 @@ class TestOnVoiceStateUpdate:
     async def test_ignores_bot_users(self):
         """Should ignore bot users."""
         stub = _make_bot_stub()
-        stub.on_voice_state_update = AnsiblexBot.on_voice_state_update.__get__(stub)
+        stub.on_voice_state_update = LokiBot.on_voice_state_update.__get__(stub)
         stub.voice_manager = MagicMock()
         stub.config.voice.auto_join = True
 
@@ -608,7 +608,7 @@ class TestOnVoiceStateUpdate:
     async def test_ignores_disallowed_users(self):
         """Should ignore users not in allowed_users."""
         stub = _make_bot_stub()
-        stub.on_voice_state_update = AnsiblexBot.on_voice_state_update.__get__(stub)
+        stub.on_voice_state_update = LokiBot.on_voice_state_update.__get__(stub)
         stub.voice_manager = MagicMock()
         stub.config.voice.auto_join = True
         stub._is_allowed_user = MagicMock(return_value=False)
@@ -621,7 +621,7 @@ class TestOnVoiceStateUpdate:
     async def test_auto_join_user_joins_channel(self):
         """Should auto-join when an allowed user joins a voice channel."""
         stub = _make_bot_stub()
-        stub.on_voice_state_update = AnsiblexBot.on_voice_state_update.__get__(stub)
+        stub.on_voice_state_update = LokiBot.on_voice_state_update.__get__(stub)
         stub.voice_manager = MagicMock()
         stub.voice_manager.is_connected = False
         stub.voice_manager.join_channel = AsyncMock()
@@ -643,7 +643,7 @@ class TestOnVoiceStateUpdate:
     async def test_auto_leave_empty_channel(self):
         """Should auto-leave when all humans leave the voice channel."""
         stub = _make_bot_stub()
-        stub.on_voice_state_update = AnsiblexBot.on_voice_state_update.__get__(stub)
+        stub.on_voice_state_update = LokiBot.on_voice_state_update.__get__(stub)
         stub.voice_manager = MagicMock()
         stub.voice_manager.is_connected = True
         stub.voice_manager.leave_channel = AsyncMock()
@@ -669,7 +669,7 @@ class TestOnVoiceStateUpdate:
     async def test_no_auto_leave_when_humans_remain(self):
         """Should not leave when other humans are still in the channel."""
         stub = _make_bot_stub()
-        stub.on_voice_state_update = AnsiblexBot.on_voice_state_update.__get__(stub)
+        stub.on_voice_state_update = LokiBot.on_voice_state_update.__get__(stub)
         stub.voice_manager = MagicMock()
         stub.voice_manager.is_connected = True
         stub.voice_manager.leave_channel = AsyncMock()
@@ -703,7 +703,7 @@ class TestOnVoiceTranscription:
     async def test_routes_transcription_to_message_pipeline(self):
         """Should post transcription and route through _handle_message."""
         stub = _make_bot_stub()
-        stub._on_voice_transcription = AnsiblexBot._on_voice_transcription.__get__(stub)
+        stub._on_voice_transcription = LokiBot._on_voice_transcription.__get__(stub)
         stub.voice_manager = MagicMock()
         stub.voice_manager.speak = AsyncMock()
 
@@ -731,7 +731,7 @@ class TestOnVoiceTranscription:
     async def test_voice_callback_calls_speak(self):
         """The voice_callback should call voice_manager.speak."""
         stub = _make_bot_stub()
-        stub._on_voice_transcription = AnsiblexBot._on_voice_transcription.__get__(stub)
+        stub._on_voice_transcription = LokiBot._on_voice_transcription.__get__(stub)
         stub.voice_manager = MagicMock()
         stub.voice_manager.speak = AsyncMock()
 
@@ -761,7 +761,7 @@ class TestToolDispatchBranches:
 
     async def _run_dispatch(self, stub, tool_name, tool_input=None):
         """Helper: run _process_with_tools with a single tool call."""
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
         stub.codex_client.chat_with_tools = _make_codex_mock(
             tool_name=tool_name,
             tool_input=tool_input or {},
@@ -957,7 +957,7 @@ class TestMiscCoverageGaps:
     async def test_dedup_overflow_popitem(self):
         """Should pop oldest entries when processed_messages exceeds max (line 620)."""
         stub = _make_bot_stub()
-        stub.on_message = AnsiblexBot.on_message.__get__(stub)
+        stub.on_message = LokiBot.on_message.__get__(stub)
         stub._processed_messages = collections.OrderedDict()
         stub._processed_messages_max = 2
 
@@ -984,7 +984,7 @@ class TestMiscCoverageGaps:
     async def test_attachment_text_merged_with_content(self):
         """Should merge attachment text with message content (line 631)."""
         stub = _make_bot_stub()
-        stub.on_message = AnsiblexBot.on_message.__get__(stub)
+        stub.on_message = LokiBot.on_message.__get__(stub)
         stub._processed_messages = collections.OrderedDict()
         stub._processed_messages_max = 100
         stub._process_attachments = AsyncMock(
@@ -1011,7 +1011,7 @@ class TestMiscCoverageGaps:
     async def test_voice_callback_set_when_connected(self):
         """Should set vc_callback when voice_manager is connected (lines 683-684)."""
         stub = _make_bot_stub()
-        stub.on_message = AnsiblexBot.on_message.__get__(stub)
+        stub.on_message = LokiBot.on_message.__get__(stub)
         stub._processed_messages = collections.OrderedDict()
         stub._processed_messages_max = 100
         stub._process_attachments = AsyncMock(return_value=("", []))
@@ -1044,7 +1044,7 @@ class TestMiscCoverageGaps:
     async def test_attachment_read_error(self):
         """Should handle attachment read errors gracefully (lines 771-772)."""
         stub = _make_bot_stub()
-        stub._process_attachments = AnsiblexBot._process_attachments.__get__(stub)
+        stub._process_attachments = LokiBot._process_attachments.__get__(stub)
 
         att = MagicMock()
         att.content_type = "text/plain"
@@ -1062,7 +1062,7 @@ class TestMiscCoverageGaps:
     async def test_thread_no_summary_inherits_context(self):
         """Thread with no existing summary gets parent context (line 888)."""
         stub = _make_bot_stub()
-        stub._handle_message = AnsiblexBot._handle_message.__get__(stub)
+        stub._handle_message = LokiBot._handle_message.__get__(stub)
         stub._handle_message_inner = AsyncMock()
 
         thread = MagicMock()
@@ -1104,7 +1104,7 @@ class TestMiscCoverageGaps:
     async def test_thread_context_uses_channel_lock(self):
         """Thread context inheritance should run inside the channel lock."""
         stub = _make_bot_stub()
-        stub._handle_message = AnsiblexBot._handle_message.__get__(stub)
+        stub._handle_message = LokiBot._handle_message.__get__(stub)
         stub._handle_message_inner = AsyncMock()
 
         thread = MagicMock()
@@ -1140,7 +1140,7 @@ class TestMiscCoverageGaps:
     async def test_channel_lock_uses_setdefault(self):
         """Channel lock should use setdefault for atomic creation."""
         stub = _make_bot_stub()
-        stub._handle_message = AnsiblexBot._handle_message.__get__(stub)
+        stub._handle_message = LokiBot._handle_message.__get__(stub)
         stub._handle_message_inner = AsyncMock()
 
         msg = _make_message()
@@ -1154,7 +1154,7 @@ class TestMiscCoverageGaps:
     async def test_thread_parent_no_messages_no_summary_skips(self):
         """Thread should not inherit from parent with no messages and no summary."""
         stub = _make_bot_stub()
-        stub._handle_message = AnsiblexBot._handle_message.__get__(stub)
+        stub._handle_message = LokiBot._handle_message.__get__(stub)
         stub._handle_message_inner = AsyncMock()
 
         thread = MagicMock()
@@ -1189,7 +1189,7 @@ class TestMiscCoverageGaps:
     async def test_parse_time_value_error(self):
         """parse_time handler should return error on ValueError (lines 1703-1704)."""
         stub = _make_bot_stub()
-        stub._handle_parse_time = AnsiblexBot._handle_parse_time.__get__(stub)
+        stub._handle_parse_time = LokiBot._handle_parse_time.__get__(stub)
 
         with patch("src.tools.time_parser.parse_time", side_effect=ValueError("bad expr")):
             result = stub._handle_parse_time({"expression": "gibberish"})
@@ -1200,7 +1200,7 @@ class TestMiscCoverageGaps:
     async def test_background_task_pruning(self):
         """Should prune old completed tasks when over limit (lines 1997-1998)."""
         stub = _make_bot_stub()
-        stub._handle_delegate_task = AnsiblexBot._handle_delegate_task.__get__(stub)
+        stub._handle_delegate_task = LokiBot._handle_delegate_task.__get__(stub)
         stub._background_tasks_max = 2
 
         # Pre-fill with completed tasks beyond the max
@@ -1229,7 +1229,7 @@ class TestMiscCoverageGaps:
     async def test_list_tasks_truncation(self):
         """Should truncate detailed task view when over 3800 chars (line 2045)."""
         stub = _make_bot_stub()
-        stub._handle_list_tasks = AnsiblexBot._handle_list_tasks.__get__(stub)
+        stub._handle_list_tasks = LokiBot._handle_list_tasks.__get__(stub)
 
         # Create a task with many results that produce long output
         task = MagicMock()
@@ -1253,7 +1253,7 @@ class TestMiscCoverageGaps:
     async def test_workflow_post_failure(self):
         """Should catch exception when posting workflow results (lines 2124-2125)."""
         stub = _make_bot_stub()
-        stub._run_scheduled_workflow = AnsiblexBot._run_scheduled_workflow.__get__(stub)
+        stub._run_scheduled_workflow = LokiBot._run_scheduled_workflow.__get__(stub)
         stub.skill_manager.has_skill = MagicMock(return_value=False)
 
         channel = AsyncMock()
@@ -1270,7 +1270,7 @@ class TestMiscCoverageGaps:
     async def test_post_file_generic_exception(self):
         """post_file should handle generic exceptions during SSH (lines 1610-1611)."""
         stub = _make_bot_stub()
-        stub._handle_post_file = AnsiblexBot._handle_post_file.__get__(stub)
+        stub._handle_post_file = LokiBot._handle_post_file.__get__(stub)
 
         msg = _make_message()
 
@@ -1285,7 +1285,7 @@ class TestMiscCoverageGaps:
     async def test_post_file_empty_file(self):
         """post_file should handle empty files (line 1614)."""
         stub = _make_bot_stub()
-        stub._handle_post_file = AnsiblexBot._handle_post_file.__get__(stub)
+        stub._handle_post_file = LokiBot._handle_post_file.__get__(stub)
         stub.tool_executor._resolve_host = MagicMock(
             return_value=("192.168.1.13", "root", "linux"),
         )
@@ -1316,7 +1316,7 @@ class TestMiscCoverageGaps:
     async def test_post_file_too_large(self):
         """post_file should reject files over 25MB (line 1618)."""
         stub = _make_bot_stub()
-        stub._handle_post_file = AnsiblexBot._handle_post_file.__get__(stub)
+        stub._handle_post_file = LokiBot._handle_post_file.__get__(stub)
         stub.tool_executor._resolve_host = MagicMock(
             return_value=("192.168.1.13", "root", "linux"),
         )
@@ -1345,7 +1345,7 @@ class TestMiscCoverageGaps:
     async def test_post_file_discord_upload_failure(self):
         """post_file should handle Discord upload failure (lines 1625-1626)."""
         stub = _make_bot_stub()
-        stub._handle_post_file = AnsiblexBot._handle_post_file.__get__(stub)
+        stub._handle_post_file = LokiBot._handle_post_file.__get__(stub)
         stub.tool_executor._resolve_host = MagicMock(
             return_value=("192.168.1.13", "root", "linux"),
         )
@@ -1377,7 +1377,7 @@ class TestMiscCoverageGaps:
     async def test_background_task_crash(self):
         """Background task crash should be caught and status set to failed (lines 2010-2012)."""
         stub = _make_bot_stub()
-        stub._handle_delegate_task = AnsiblexBot._handle_delegate_task.__get__(stub)
+        stub._handle_delegate_task = LokiBot._handle_delegate_task.__get__(stub)
 
         task_mock = MagicMock()
         task_mock.task_id = "crash-1"
@@ -1409,7 +1409,7 @@ class TestMiscCoverageGaps:
         """When permission filter returns empty list, tools should become None (line 1224)."""
         from src.llm.types import LLMResponse
         stub = _make_bot_stub()
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         # filter_tools returns empty list (guest with no allowed tools)
         stub.permissions.filter_tools = MagicMock(return_value=[])

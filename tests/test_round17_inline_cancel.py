@@ -17,7 +17,7 @@ import discord  # noqa: E402
 import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
-    AnsiblexBot,
+    LokiBot,
     MAX_TOOL_ITERATIONS,
     ToolLoopCancelView,
 )
@@ -36,7 +36,7 @@ def _no_approval():
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Minimal AnsiblexBot stub for cancellation tests."""
+    """Minimal LokiBot stub for cancellation tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -68,8 +68,8 @@ def _make_bot_stub():
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = AnsiblexBot._build_tool_progress_embed
-    stub._build_partial_completion_report = AnsiblexBot._build_partial_completion_report
+    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
+    stub._build_partial_completion_report = LokiBot._build_partial_completion_report
     return stub
 
 
@@ -209,7 +209,7 @@ class TestCancelDuringToolLoop:
 
         msg.channel.send = AsyncMock(side_effect=send_with_cancel_capture)
 
-        text, already_sent, is_error, tools_used, handoff = await AnsiblexBot._process_with_tools(
+        text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "check disk"}],
         )
 
@@ -235,7 +235,7 @@ class TestCancelDuringToolLoop:
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=mock_chat)
 
         # Don't set cancel — verify normal completion
-        text, _, is_error, _, _ = await AnsiblexBot._process_with_tools(
+        text, _, is_error, _, _ = await LokiBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "test"}],
         )
 
@@ -284,7 +284,7 @@ class TestCancelDuringToolLoop:
 
         embed_msg.edit = AsyncMock(side_effect=edit_and_cancel)
 
-        text, _, is_error, tools_used, _ = await AnsiblexBot._process_with_tools(
+        text, _, is_error, tools_used, _ = await LokiBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "test"}],
         )
 
@@ -319,7 +319,7 @@ class TestCancelDuringToolLoop:
 
         msg.channel.send = AsyncMock(side_effect=send_and_cancel)
 
-        text, _, is_error, _, handoff = await AnsiblexBot._process_with_tools(
+        text, _, is_error, _, handoff = await LokiBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "test"}],
         )
 
@@ -372,7 +372,7 @@ class TestCancelEmbedUpdates:
 
         embed_msg.edit = AsyncMock(side_effect=edit_and_cancel)
 
-        text, _, is_error, _, _ = await AnsiblexBot._process_with_tools(
+        text, _, is_error, _, _ = await LokiBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "test"}],
         )
 
@@ -420,7 +420,7 @@ class TestCancelEmbedUpdates:
 
         embed_msg.edit = AsyncMock(side_effect=edit_and_cancel)
 
-        await AnsiblexBot._process_with_tools(
+        await LokiBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "test"}],
         )
 
@@ -452,7 +452,7 @@ class TestCancelViewAttachedToEmbed:
         embed_msg = AsyncMock()
         msg.channel.send = AsyncMock(return_value=embed_msg)
 
-        await AnsiblexBot._process_with_tools(
+        await LokiBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "test"}],
         )
 
@@ -482,7 +482,7 @@ class TestCancelViewAttachedToEmbed:
 
         msg.channel.send = AsyncMock(side_effect=capture_send)
 
-        await AnsiblexBot._process_with_tools(
+        await LokiBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "test"}],
         )
 
@@ -503,7 +503,7 @@ class TestCancelViewAttachedToEmbed:
             return_value=_tool_response("Just text."),
         )
 
-        await AnsiblexBot._process_with_tools(
+        await LokiBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "hello"}],
         )
 
@@ -536,7 +536,7 @@ class TestCancelNoRegression:
         embed_msg = AsyncMock()
         msg.channel.send = AsyncMock(return_value=embed_msg)
 
-        text, _, is_error, tools_used, _ = await AnsiblexBot._process_with_tools(
+        text, _, is_error, tools_used, _ = await LokiBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "test"}],
         )
 
@@ -566,7 +566,7 @@ class TestCancelNoRegression:
 
         msg.channel.send = AsyncMock(side_effect=capture_send)
 
-        await AnsiblexBot._process_with_tools(
+        await LokiBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "test"}],
         )
 

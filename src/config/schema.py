@@ -92,26 +92,23 @@ class SearchConfig(BaseModel):
 
 class VoiceConfig(BaseModel):
     enabled: bool = False
-    voice_service_url: str = "ws://ansiblex-voice:3940/ws"
+    voice_service_url: str = "ws://loki-voice:3940/ws"
     auto_join: bool = False
     transcript_channel_id: str = ""
     default_voice: str = "en_US-lessac-medium"
-    wake_word: str = "ansiblex"
+    wake_word: str = "loki"
 
 
 class BrowserConfig(BaseModel):
     enabled: bool = False
-    cdp_url: str = "ws://ansiblex-browser:3000?token=ansiblex-internal"
+    cdp_url: str = "ws://loki-browser:3000?token=loki-internal"
     default_timeout_ms: int = 30000
     viewport_width: int = 1280
     viewport_height: int = 720
 
 
 class PermissionsConfig(BaseModel):
-    tiers: dict[str, str] = Field(default_factory=lambda: {
-        "441602773310767105": "admin",  # Aaron (Calmingstorm)
-        "757383353141035140": "admin",  # Audrastaia (Jessica)
-    })
+    tiers: dict[str, str] = Field(default_factory=dict)
     default_tier: str = "user"
     overrides_path: str = "./data/permissions.json"
 

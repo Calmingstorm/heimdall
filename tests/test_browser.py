@@ -101,7 +101,7 @@ class TestBrowserManagerInit:
     async def test_defaults(self):
         """Default values are set correctly."""
         mgr = BrowserManager()
-        assert mgr._cdp_url == "ws://ansiblex-browser:3000?token=ansiblex-internal"
+        assert mgr._cdp_url == "ws://loki-browser:3000?token=loki-internal"
         assert mgr._default_timeout_ms == 30000
         assert mgr._viewport == {"width": 1280, "height": 720}
         assert mgr._playwright is None

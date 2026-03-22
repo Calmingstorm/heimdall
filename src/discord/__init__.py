@@ -1,3 +1,3 @@
-from .client import AnsiblexBot
+from .client import LokiBot
 
-__all__ = ["AnsiblexBot"]
+__all__ = ["LokiBot"]

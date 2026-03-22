@@ -16,7 +16,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import AnsiblexBot  # noqa: E402
+from src.discord.client import LokiBot  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
@@ -25,7 +25,7 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Minimal AnsiblexBot stub for typing indicator tests."""
+    """Minimal LokiBot stub for typing indicator tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -90,7 +90,7 @@ class TestTypingDuringLLMCall:
         stub.codex_client.chat_with_tools = AsyncMock(
             return_value=LLMResponse(text="Disk is 42% full.", tool_calls=[], stop_reason="end_turn")
         )
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         text, _, _, _, _ = await stub._process_with_tools(msg, [])
 
@@ -116,7 +116,7 @@ class TestTypingDuringLLMCall:
         stub.codex_client.chat_with_tools = AsyncMock(
             side_effect=[tool_response, text_response]
         )
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         text, _, _, tools_used, _ = await stub._process_with_tools(msg, [])
 
@@ -142,7 +142,7 @@ class TestTypingDuringLLMCall:
         stub.codex_client.chat_with_tools = AsyncMock(
             side_effect=[tool_call_1, tool_call_2, final]
         )
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         text, _, _, tools_used, _ = await stub._process_with_tools(msg, [])
 
@@ -157,7 +157,7 @@ class TestTypingDuringLLMCall:
         stub.codex_client.chat_with_tools = AsyncMock(
             return_value=LLMResponse(text="Done.", tool_calls=[], stop_reason="end_turn")
         )
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         await stub._process_with_tools(msg, [])
 
@@ -213,7 +213,7 @@ class TestTypingDuringLLMCall:
             return "OK"
         stub.tool_executor.execute = mock_execute
 
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         await stub._process_with_tools(msg, [])
 
@@ -237,7 +237,7 @@ class TestTypingDuringLLMCall:
         stub.codex_client.chat_with_tools = AsyncMock(
             return_value=LLMResponse(text="No tools.", tool_calls=[], stop_reason="end_turn")
         )
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         text, _, _, _, _ = await stub._process_with_tools(msg, [])
 

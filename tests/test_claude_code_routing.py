@@ -17,7 +17,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import AnsiblexBot  # noqa: E402
+from src.discord.client import LokiBot  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -25,7 +25,7 @@ from src.discord.client import AnsiblexBot  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Create a minimal AnsiblexBot stub for _handle_message_inner tests."""
+    """Create a minimal LokiBot stub for _handle_message_inner tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -92,7 +92,7 @@ class TestClaudeCodeRouting:
         """claude_code messages should invoke tool_executor._handle_claude_code."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "what does check_service do?", "chan-1")
@@ -100,7 +100,7 @@ class TestClaudeCodeRouting:
         stub.tool_executor._handle_claude_code.assert_called_once()
         call_args = stub.tool_executor._handle_claude_code.call_args[0][0]
         assert call_args["host"] == "desktop"
-        assert call_args["working_directory"] == "/root/ansiblex"
+        assert call_args["working_directory"] == "/root/project"
         assert call_args["prompt"] == "what does check_service do?"
         assert call_args["allow_edits"] is False
 
@@ -111,7 +111,7 @@ class TestClaudeCodeRouting:
         stub.tool_executor._handle_claude_code = AsyncMock(
             return_value="The function checks if a systemd service is running."
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "what does check_service do?", "chan-1")
@@ -124,7 +124,7 @@ class TestClaudeCodeRouting:
         """Successful claude_code responses should be saved to session history."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "explain the code", "chan-1")
@@ -138,7 +138,7 @@ class TestClaudeCodeRouting:
         """claude_code path should NOT call _build_system_prompt."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "review this code", "chan-1")
@@ -150,7 +150,7 @@ class TestClaudeCodeRouting:
         """claude_code path should NOT use the Codex tool loop."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "explain the function", "chan-1")
@@ -174,7 +174,7 @@ class TestClaudeCodeFallback:
         stub.tool_executor._handle_claude_code = AsyncMock(
             return_value="Claude Code failed (exit 1):\ncommand not found"
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "review the code", "chan-1")
@@ -192,7 +192,7 @@ class TestClaudeCodeFallback:
         stub.tool_executor._handle_claude_code = AsyncMock(
             return_value="Unknown or disallowed host: desktop"
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "review the code", "chan-1")
@@ -208,7 +208,7 @@ class TestClaudeCodeFallback:
         stub.tool_executor._handle_claude_code = AsyncMock(
             side_effect=Exception("SSH connection refused")
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "review the code", "chan-1")
@@ -225,7 +225,7 @@ class TestClaudeCodeFallback:
         stub.tool_executor._handle_claude_code = AsyncMock(
             return_value="Claude Code failed (exit 1):\nerror"
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "review the code", "chan-1")
@@ -241,7 +241,7 @@ class TestClaudeCodeFallback:
         stub.tool_executor._handle_claude_code = AsyncMock(
             side_effect=Exception("SSH timeout")
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "review the code", "chan-1")
@@ -268,7 +268,7 @@ class TestClassificationRouting:
         stub = _make_bot_stub()
         msg = _make_message()
         stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "explain the code", "chan-1")
@@ -285,7 +285,7 @@ class TestClassificationRouting:
         stub.codex_client.chat = AsyncMock(return_value="Chat response")
         stub.classifier.classify = AsyncMock(return_value="task")
         stub._process_with_tools = AsyncMock(return_value=("Tool result", False, False, ["check_disk"], False))
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "check the server metrics", "chan-1")
@@ -302,7 +302,7 @@ class TestClassificationRouting:
         msg = _make_message()
         stub.codex_client = None
         stub.classifier.classify = AsyncMock(return_value="task")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "restart apache", "chan-1")
@@ -317,7 +317,7 @@ class TestClassificationRouting:
         stub = _make_bot_stub()
         msg = _make_message()
         stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "hello", "chan-1")
@@ -341,7 +341,7 @@ class TestKeywordBypassUnchanged:
         stub._process_with_tools = AsyncMock(
             return_value=("Done", False, False, [], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "deploy the latest code", "chan-1")
@@ -358,7 +358,7 @@ class TestKeywordBypassUnchanged:
         stub._process_with_tools = AsyncMock(
             return_value=("I see the image", False, False, [], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(
@@ -385,7 +385,7 @@ class TestClaudeCodeConversationContext:
         stub.sessions.get_history_with_compaction = AsyncMock(
             return_value=[{"role": "user", "content": "explain the function"}]
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "explain the function", "chan-1")
@@ -398,7 +398,7 @@ class TestClaudeCodeConversationContext:
         stub = _make_bot_stub()
         msg = _make_message()
         # Default mock returns []
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "what does check_service do?", "chan-1")
@@ -417,7 +417,7 @@ class TestClaudeCodeConversationContext:
                 {"role": "user", "content": "what about error handling?"},
             ]
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "what about error handling?", "chan-1")
@@ -441,7 +441,7 @@ class TestClaudeCodeConversationContext:
                 {"role": "user", "content": "follow-up"},
             ]
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "follow-up", "chan-1")
@@ -462,7 +462,7 @@ class TestClaudeCodeConversationContext:
                 {"role": "user", "content": "summarize that"},
             ]
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "summarize that", "chan-1")
@@ -483,7 +483,7 @@ class TestClaudeCodeConversationContext:
             history.append({"role": "assistant", "content": f"answer_{i}"})
         history.append({"role": "user", "content": "latest question"})
         stub.sessions.get_history_with_compaction = AsyncMock(return_value=history)
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "latest question", "chan-1")
@@ -512,7 +512,7 @@ class TestClaudeCodeConversationContext:
                 {"role": "user", "content": "explain the topology"},
             ]
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "explain the topology", "chan-1")
@@ -539,7 +539,7 @@ class TestClaudeCodeConversationContext:
         stub.tool_executor._handle_claude_code = AsyncMock(
             return_value="Claude Code failed (exit 1):\ncommand not found"
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "review the code", "chan-1")
@@ -561,7 +561,7 @@ class TestClaudeCodeConversationContext:
                 {"role": "user", "content": "explain the router"},
             ]
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "explain the router", "chan-1")
@@ -584,7 +584,7 @@ class TestClaudeCodeConversationContext:
         stub.tool_executor._handle_claude_code = AsyncMock(
             return_value="The classifier is quite accurate."
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "how accurate is it?", "chan-1")

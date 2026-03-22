@@ -20,7 +20,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import AnsiblexBot  # noqa: E402
+from src.discord.client import LokiBot  # noqa: E402
 from src.llm.openai_codex import CodexChatClient  # noqa: E402
 from src.llm.system_prompt import CHAT_SYSTEM_PROMPT_TEMPLATE  # noqa: E402
 
@@ -30,7 +30,7 @@ from src.llm.system_prompt import CHAT_SYSTEM_PROMPT_TEMPLATE  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Create a minimal AnsiblexBot stub for _handle_message_inner tests."""
+    """Create a minimal LokiBot stub for _handle_message_inner tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -94,7 +94,7 @@ class TestChatPathSkipsFullPromptBuild:
         stub.codex_client = MagicMock()
         stub.codex_client.chat = AsyncMock(return_value="Hey!")
         stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "hey whats up", "chan-1")
@@ -109,7 +109,7 @@ class TestChatPathSkipsFullPromptBuild:
         msg = _make_message()
         stub.codex_client = None
         stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "hey whats up", "chan-1")
@@ -131,7 +131,7 @@ class TestChatPathSkipsFullPromptBuild:
         stub._process_with_tools = AsyncMock(
             return_value=("Fallback response", False, False, [], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "hey whats up", "chan-1")
@@ -145,7 +145,7 @@ class TestChatPathSkipsFullPromptBuild:
         msg = _make_message()
         stub.codex_client = MagicMock()
         stub.codex_client.chat = AsyncMock(return_value="Chat response")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "hey whats up", "chan-1")
@@ -168,7 +168,7 @@ class TestTaskPathBuildsFullPrompt:
         stub._process_with_tools = AsyncMock(
             return_value=("Disk is 42% full.", False, False, ["check_disk"], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -182,7 +182,7 @@ class TestTaskPathBuildsFullPrompt:
         stub._process_with_tools = AsyncMock(
             return_value=("Server is up.", False, False, [], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check the server", "chan-1")
@@ -195,7 +195,7 @@ class TestTaskPathBuildsFullPrompt:
         stub = _make_bot_stub()
         msg = _make_message()
         stub.codex_client = None
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -216,7 +216,7 @@ class TestTaskPathBuildsFullPrompt:
             return ("result", False, False, [], False)
 
         stub._process_with_tools = capture_process
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -237,7 +237,7 @@ class TestImagePathBuildsFullPrompt:
         stub._process_with_tools = AsyncMock(
             return_value=("I see a cat!", False, False, [], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(
             msg, "what is this?", "chan-1",
@@ -304,7 +304,7 @@ class TestChatPromptChannelPassthrough:
         stub.codex_client = MagicMock()
         stub.codex_client.chat = AsyncMock(return_value="Hi!")
         stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "hello", "chan-1")
@@ -317,7 +317,7 @@ class TestChatPromptChannelPassthrough:
         msg = _make_message()
         stub.codex_client = None
         stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "hello", "chan-1")
@@ -342,7 +342,7 @@ class TestChatPromptOverride:
         msg = _make_message()
         stub.codex_client = None
         stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "hello", "chan-1")
@@ -357,7 +357,7 @@ class TestChatPromptOverride:
         stub.codex_client = MagicMock()
         stub.codex_client.chat = AsyncMock(side_effect=Exception("fail"))
         stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "hello", "chan-1")

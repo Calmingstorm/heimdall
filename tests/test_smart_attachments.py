@@ -10,7 +10,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import AnsiblexBot  # noqa: E402
+from src.discord.client import LokiBot  # noqa: E402
 
 
 # --- _get_attachment_hint tests (static method, no mocking needed) ---
@@ -18,124 +18,124 @@ from src.discord.client import AnsiblexBot  # noqa: E402
 
 class TestGetAttachmentHintPython:
     def test_python_file_suggests_skill(self):
-        hint = AnsiblexBot._get_attachment_hint("my_tool.py", ".py", 1000)
+        hint = LokiBot._get_attachment_hint("my_tool.py", ".py", 1000)
         assert "create_skill" in hint
         assert "SKILL_DEFINITION" in hint
 
     def test_python_file_suggests_ingest_fallback(self):
-        hint = AnsiblexBot._get_attachment_hint("utils.py", ".py", 1000)
+        hint = LokiBot._get_attachment_hint("utils.py", ".py", 1000)
         assert "ingest" in hint.lower()
 
     def test_python_large_file_both_hints(self):
-        hint = AnsiblexBot._get_attachment_hint("big.py", ".py", 60_000)
+        hint = LokiBot._get_attachment_hint("big.py", ".py", 60_000)
         assert "create_skill" in hint
         assert "large" in hint.lower()
 
 
 class TestGetAttachmentHintConfig:
     def test_yaml_suggests_deploy_or_ingest(self):
-        hint = AnsiblexBot._get_attachment_hint("config.yml", ".yml", 500)
+        hint = LokiBot._get_attachment_hint("config.yml", ".yml", 500)
         assert "write_file" in hint
         assert "ingest_document" in hint
 
     def test_json_suggests_deploy_or_ingest(self):
-        hint = AnsiblexBot._get_attachment_hint("settings.json", ".json", 500)
+        hint = LokiBot._get_attachment_hint("settings.json", ".json", 500)
         assert "configuration" in hint.lower()
         assert "write_file" in hint
 
     def test_toml_suggests_deploy_or_ingest(self):
-        hint = AnsiblexBot._get_attachment_hint("pyproject.toml", ".toml", 500)
+        hint = LokiBot._get_attachment_hint("pyproject.toml", ".toml", 500)
         assert "configuration" in hint.lower()
 
     def test_ini_suggests_deploy_or_ingest(self):
-        hint = AnsiblexBot._get_attachment_hint("config.ini", ".ini", 500)
+        hint = LokiBot._get_attachment_hint("config.ini", ".ini", 500)
         assert "configuration" in hint.lower()
 
     def test_conf_suggests_deploy_or_ingest(self):
-        hint = AnsiblexBot._get_attachment_hint("nginx.conf", ".conf", 500)
+        hint = LokiBot._get_attachment_hint("nginx.conf", ".conf", 500)
         assert "configuration" in hint.lower()
 
     def test_cfg_suggests_deploy_or_ingest(self):
-        hint = AnsiblexBot._get_attachment_hint("setup.cfg", ".cfg", 500)
+        hint = LokiBot._get_attachment_hint("setup.cfg", ".cfg", 500)
         assert "configuration" in hint.lower()
 
     def test_yaml_extension(self):
-        hint = AnsiblexBot._get_attachment_hint("docker-compose.yaml", ".yaml", 500)
+        hint = LokiBot._get_attachment_hint("docker-compose.yaml", ".yaml", 500)
         assert "configuration" in hint.lower()
 
 
 class TestGetAttachmentHintShellScript:
     def test_sh_suggests_deploy_or_run(self):
-        hint = AnsiblexBot._get_attachment_hint("setup.sh", ".sh", 500)
+        hint = LokiBot._get_attachment_hint("setup.sh", ".sh", 500)
         assert "write_file" in hint
         assert "run_command" in hint
 
     def test_bash_suggests_deploy_or_run(self):
-        hint = AnsiblexBot._get_attachment_hint("deploy.bash", ".bash", 500)
+        hint = LokiBot._get_attachment_hint("deploy.bash", ".bash", 500)
         assert "shell script" in hint.lower()
 
 
 class TestGetAttachmentHintSystemd:
     def test_service_suggests_deploy(self):
-        hint = AnsiblexBot._get_attachment_hint("myapp.service", ".service", 500)
+        hint = LokiBot._get_attachment_hint("myapp.service", ".service", 500)
         assert "systemd" in hint.lower()
         assert "write_file" in hint
 
     def test_timer_suggests_deploy(self):
-        hint = AnsiblexBot._get_attachment_hint("backup.timer", ".timer", 500)
+        hint = LokiBot._get_attachment_hint("backup.timer", ".timer", 500)
         assert "systemd" in hint.lower()
 
 
 class TestGetAttachmentHintDocumentation:
     def test_markdown_suggests_ingest(self):
-        hint = AnsiblexBot._get_attachment_hint("README.md", ".md", 2000)
+        hint = LokiBot._get_attachment_hint("README.md", ".md", 2000)
         assert "documentation" in hint.lower()
         assert "ingest_document" in hint
 
     def test_txt_suggests_ingest(self):
-        hint = AnsiblexBot._get_attachment_hint("notes.txt", ".txt", 2000)
+        hint = LokiBot._get_attachment_hint("notes.txt", ".txt", 2000)
         assert "documentation" in hint.lower()
         assert "ingest_document" in hint
 
 
 class TestGetAttachmentHintLargeFile:
     def test_large_file_suggests_ingest(self):
-        hint = AnsiblexBot._get_attachment_hint("data.csv", ".csv", 60_000)
+        hint = LokiBot._get_attachment_hint("data.csv", ".csv", 60_000)
         assert "large" in hint.lower()
         assert "ingest" in hint.lower()
 
     def test_small_file_no_large_hint(self):
-        hint = AnsiblexBot._get_attachment_hint("data.csv", ".csv", 10_000)
+        hint = LokiBot._get_attachment_hint("data.csv", ".csv", 10_000)
         assert "large" not in hint.lower()
 
     def test_exactly_50kb_no_large_hint(self):
-        hint = AnsiblexBot._get_attachment_hint("data.csv", ".csv", 50_000)
+        hint = LokiBot._get_attachment_hint("data.csv", ".csv", 50_000)
         assert "large" not in hint.lower()
 
     def test_just_over_50kb_has_large_hint(self):
-        hint = AnsiblexBot._get_attachment_hint("data.csv", ".csv", 50_001)
+        hint = LokiBot._get_attachment_hint("data.csv", ".csv", 50_001)
         assert "large" in hint.lower()
 
 
 class TestGetAttachmentHintNoHint:
     def test_generic_code_no_special_hint(self):
-        hint = AnsiblexBot._get_attachment_hint("main.js", ".js", 1000)
+        hint = LokiBot._get_attachment_hint("main.js", ".js", 1000)
         assert hint == ""
 
     def test_css_no_special_hint(self):
-        hint = AnsiblexBot._get_attachment_hint("style.css", ".css", 1000)
+        hint = LokiBot._get_attachment_hint("style.css", ".css", 1000)
         assert hint == ""
 
     def test_go_no_special_hint(self):
-        hint = AnsiblexBot._get_attachment_hint("main.go", ".go", 1000)
+        hint = LokiBot._get_attachment_hint("main.go", ".go", 1000)
         assert hint == ""
 
     def test_unknown_extension_no_hint(self):
-        hint = AnsiblexBot._get_attachment_hint("file.xyz", ".xyz", 1000)
+        hint = LokiBot._get_attachment_hint("file.xyz", ".xyz", 1000)
         assert hint == ""
 
     def test_no_extension_no_hint(self):
-        hint = AnsiblexBot._get_attachment_hint("Makefile", "", 1000)
+        hint = LokiBot._get_attachment_hint("Makefile", "", 1000)
         assert hint == ""
 
 
@@ -165,9 +165,9 @@ def bot():
     """Create a minimal stub with real _process_attachments and _get_attachment_hint."""
     stub = MagicMock()
     # Bind the real instance method and static methods to the stub
-    stub._process_attachments = AnsiblexBot._process_attachments.__get__(stub)
-    stub._get_attachment_hint = AnsiblexBot._get_attachment_hint
-    stub._detect_image_type = AnsiblexBot._detect_image_type
+    stub._process_attachments = LokiBot._process_attachments.__get__(stub)
+    stub._get_attachment_hint = LokiBot._get_attachment_hint
+    stub._detect_image_type = LokiBot._detect_image_type
     return stub
 
 

@@ -179,21 +179,21 @@ class TestTriggerMatching:
 
     def test_repo_substring_match(self):
         assert Scheduler._trigger_matches(
-            {"repo": "ansiblex"},
+            {"repo": "myproject"},
             "gitea",
-            {"event": "push", "repo": "calmingstorm/ansiblex"},
+            {"event": "push", "repo": "user/myproject"},
         ) is True
 
     def test_repo_case_insensitive(self):
         assert Scheduler._trigger_matches(
-            {"repo": "Ansiblex"},
+            {"repo": "MyProject"},
             "gitea",
-            {"event": "push", "repo": "calmingstorm/ansiblex"},
+            {"event": "push", "repo": "user/myproject"},
         ) is True
 
     def test_repo_mismatch(self):
         assert Scheduler._trigger_matches(
-            {"repo": "ansiblex"},
+            {"repo": "myproject"},
             "gitea",
             {"event": "push", "repo": "calmingstorm/other-project"},
         ) is False
@@ -221,22 +221,22 @@ class TestTriggerMatching:
 
     def test_multiple_conditions_all_match(self):
         assert Scheduler._trigger_matches(
-            {"source": "gitea", "event": "push", "repo": "ansiblex"},
+            {"source": "gitea", "event": "push", "repo": "myproject"},
             "gitea",
-            {"event": "push", "repo": "calmingstorm/ansiblex"},
+            {"event": "push", "repo": "user/myproject"},
         ) is True
 
     def test_multiple_conditions_one_fails(self):
         assert Scheduler._trigger_matches(
-            {"source": "gitea", "event": "push", "repo": "ansiblex"},
+            {"source": "gitea", "event": "push", "repo": "myproject"},
             "gitea",
-            {"event": "pull_request", "repo": "calmingstorm/ansiblex"},
+            {"event": "pull_request", "repo": "user/myproject"},
         ) is False
 
     def test_empty_event_data_fields(self):
         """Missing event_data fields don't match non-empty trigger conditions."""
         assert Scheduler._trigger_matches(
-            {"repo": "ansiblex"}, "gitea", {"event": "push"}
+            {"repo": "myproject"}, "gitea", {"event": "push"}
         ) is False
 
     def test_no_conditions_matches_everything(self):
@@ -259,21 +259,21 @@ class TestFireTriggers:
         scheduler.start(callback)
 
         scheduler.add(
-            description="On ansiblex push",
+            description="On myproject push",
             action="reminder",
             channel_id="ch1",
             message="Push detected!",
-            trigger={"source": "gitea", "event": "push", "repo": "ansiblex"},
+            trigger={"source": "gitea", "event": "push", "repo": "myproject"},
         )
 
         fired = await scheduler.fire_triggers(
-            "gitea", {"event": "push", "repo": "calmingstorm/ansiblex"}
+            "gitea", {"event": "push", "repo": "user/myproject"}
         )
         assert fired == 1
         callback.assert_called_once()
         # The schedule dict was passed to the callback
         schedule_arg = callback.call_args[0][0]
-        assert schedule_arg["description"] == "On ansiblex push"
+        assert schedule_arg["description"] == "On myproject push"
         assert schedule_arg["last_run"] is not None
 
     @pytest.mark.asyncio
@@ -460,7 +460,7 @@ class TestHealthServerTriggers:
 
         from aiohttp.test_utils import make_mocked_request
         payload = json.dumps({
-            "repository": {"full_name": "calmingstorm/ansiblex"},
+            "repository": {"full_name": "user/myproject"},
             "pusher": {"login": "aaron"},
             "commits": [{"id": "abc1234", "message": "test commit"}],
             "ref": "refs/heads/main",
@@ -484,7 +484,7 @@ class TestHealthServerTriggers:
 
         trigger_cb.assert_called_once_with(
             "gitea",
-            {"event": "push", "repo": "calmingstorm/ansiblex"},
+            {"event": "push", "repo": "user/myproject"},
         )
 
     @pytest.mark.asyncio
@@ -630,18 +630,18 @@ class TestEndToEnd:
         scheduler.start(callback)
 
         scheduler.add(
-            description="Run tests on push to ansiblex",
+            description="Run tests on push to myproject",
             action="check",
             channel_id="ch1",
             tool_name="check_service",
             tool_input={"host": "server", "service": "docker"},
-            trigger={"source": "gitea", "event": "push", "repo": "ansiblex"},
+            trigger={"source": "gitea", "event": "push", "repo": "myproject"},
         )
 
         # Simulate what HealthServer does: call fire_triggers
         fired = await scheduler.fire_triggers(
             "gitea",
-            {"event": "push", "repo": "calmingstorm/ansiblex"},
+            {"event": "push", "repo": "user/myproject"},
         )
 
         assert fired == 1
@@ -685,11 +685,11 @@ class TestEndToEnd:
         scheduler.start(callback)
 
         scheduler.add(
-            description="Only ansiblex pushes",
+            description="Only myproject pushes",
             action="reminder",
             channel_id="ch1",
             message="hi",
-            trigger={"source": "gitea", "event": "push", "repo": "ansiblex"},
+            trigger={"source": "gitea", "event": "push", "repo": "myproject"},
         )
 
         fired = await scheduler.fire_triggers(

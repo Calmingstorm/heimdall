@@ -84,14 +84,14 @@ class TestDockerComposeStatusExecutor:
     @pytest.mark.asyncio
     async def test_runs_compose_ps(self, executor: ToolExecutor):
         with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "NAME  STATUS  PORTS\nansiblex  running  8080->8080")
+            mock_ssh.return_value = (0, "NAME  STATUS  PORTS\nmyapp  running  8080->8080")
             result = await executor.execute("docker_compose_status", {
                 "host": "server",
-                "project_dir": "/opt/ansiblex",
+                "project_dir": "/opt/project",
             })
         cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
         assert "docker compose ps -a" in cmd
-        assert "ansiblex" in result
+        assert "myapp" in result
 
     @pytest.mark.asyncio
     async def test_uses_project_dir(self, executor: ToolExecutor):
@@ -137,7 +137,7 @@ class TestDockerComposeLogsExecutor:
             mock_ssh.return_value = (0, "log output")
             await executor.execute("docker_compose_logs", {
                 "host": "server",
-                "project_dir": "/opt/ansiblex",
+                "project_dir": "/opt/project",
             })
         cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
         assert "--tail 50" in cmd
@@ -148,7 +148,7 @@ class TestDockerComposeLogsExecutor:
             mock_ssh.return_value = (0, "logs")
             await executor.execute("docker_compose_logs", {
                 "host": "server",
-                "project_dir": "/opt/ansiblex",
+                "project_dir": "/opt/project",
                 "lines": 100,
             })
         cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
@@ -160,7 +160,7 @@ class TestDockerComposeLogsExecutor:
             mock_ssh.return_value = (0, "logs")
             await executor.execute("docker_compose_logs", {
                 "host": "server",
-                "project_dir": "/opt/ansiblex",
+                "project_dir": "/opt/project",
                 "lines": 999,
             })
         cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
@@ -172,7 +172,7 @@ class TestDockerComposeLogsExecutor:
             mock_ssh.return_value = (0, "web logs")
             result = await executor.execute("docker_compose_logs", {
                 "host": "server",
-                "project_dir": "/opt/ansiblex",
+                "project_dir": "/opt/project",
                 "service": "web",
             })
         cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
@@ -185,7 +185,7 @@ class TestDockerComposeLogsExecutor:
             mock_ssh.return_value = (0, "recent logs")
             await executor.execute("docker_compose_logs", {
                 "host": "server",
-                "project_dir": "/opt/ansiblex",
+                "project_dir": "/opt/project",
                 "since": "1h",
             })
         cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
@@ -221,7 +221,7 @@ class TestDockerComposeLogsExecutor:
             mock_ssh.return_value = (0, "filtered logs")
             result = await executor.execute("docker_compose_logs", {
                 "host": "server",
-                "project_dir": "/opt/ansiblex",
+                "project_dir": "/opt/project",
                 "service": "bot",
                 "lines": 25,
                 "since": "30m",
@@ -266,7 +266,7 @@ class TestDockerComposeActionBuildExecutor:
             mock_ssh.return_value = (0, "Building web...")
             result = await executor.execute("docker_compose_action", {
                 "host": "server",
-                "project_dir": "/opt/ansiblex",
+                "project_dir": "/opt/project",
                 "action": "build",
             })
         cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]

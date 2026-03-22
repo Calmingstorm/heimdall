@@ -19,7 +19,7 @@ import discord  # noqa: E402
 import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
-    AnsiblexBot,
+    LokiBot,
     MAX_TOOL_ITERATIONS,
     ToolLoopCancelView,
 )
@@ -39,7 +39,7 @@ def _no_approval():
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Minimal AnsiblexBot stub for integration tests."""
+    """Minimal LokiBot stub for integration tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -71,8 +71,8 @@ def _make_bot_stub():
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = AnsiblexBot._build_tool_progress_embed
-    stub._build_partial_completion_report = AnsiblexBot._build_partial_completion_report
+    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
+    stub._build_partial_completion_report = LokiBot._build_partial_completion_report
     return stub
 
 
@@ -148,7 +148,7 @@ class TestCircuitBreakerWithCancel:
 
         msg.channel.send = AsyncMock(side_effect=intercept_send)
 
-        text, _, is_error, tools_used, _ = await AnsiblexBot._process_with_tools(
+        text, _, is_error, tools_used, _ = await LokiBot._process_with_tools(
             stub, msg, [], system_prompt_override="test",
         )
 
@@ -177,7 +177,7 @@ class TestCircuitBreakerWithCancel:
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
 
-        text, _, is_error, tools_used, _ = await AnsiblexBot._process_with_tools(
+        text, _, is_error, tools_used, _ = await LokiBot._process_with_tools(
             stub, msg, [], system_prompt_override="test",
         )
 
@@ -218,7 +218,7 @@ class TestTimeoutWithProgressEmbed:
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
 
-        text, _, is_error, tools_used, _ = await AnsiblexBot._process_with_tools(
+        text, _, is_error, tools_used, _ = await LokiBot._process_with_tools(
             stub, msg, [], system_prompt_override="test",
         )
 
@@ -258,7 +258,7 @@ class TestCheckpointContinuity:
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
 
-        text, _, is_error, _, _ = await AnsiblexBot._process_with_tools(
+        text, _, is_error, _, _ = await LokiBot._process_with_tools(
             stub, msg, [], system_prompt_override="test",
         )
 
@@ -284,7 +284,7 @@ class TestAllTerminalPaths:
             return_value=_tool_resp("Hello!"),
         )
 
-        text, already_sent, is_error, tools_used, handoff = await AnsiblexBot._process_with_tools(
+        text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
             stub, msg, [], system_prompt_override="test",
         )
 
@@ -309,7 +309,7 @@ class TestAllTerminalPaths:
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
 
-        text, _, is_error, tools_used, handoff = await AnsiblexBot._process_with_tools(
+        text, _, is_error, tools_used, handoff = await LokiBot._process_with_tools(
             stub, msg, [], system_prompt_override="test",
         )
 
@@ -326,7 +326,7 @@ class TestAllTerminalPaths:
             side_effect=RuntimeError("server down"),
         )
 
-        text, _, is_error, _, handoff = await AnsiblexBot._process_with_tools(
+        text, _, is_error, _, handoff = await LokiBot._process_with_tools(
             stub, msg, [], system_prompt_override="test",
         )
 
@@ -342,7 +342,7 @@ class TestAllTerminalPaths:
             side_effect=CircuitOpenError("codex", 0.01),
         )
 
-        text, _, is_error, _, handoff = await AnsiblexBot._process_with_tools(
+        text, _, is_error, _, handoff = await LokiBot._process_with_tools(
             stub, msg, [], system_prompt_override="test",
         )
 
@@ -378,7 +378,7 @@ class TestAllTerminalPaths:
 
         msg.channel.send = AsyncMock(side_effect=intercept_send)
 
-        text, _, is_error, _, handoff = await AnsiblexBot._process_with_tools(
+        text, _, is_error, _, handoff = await LokiBot._process_with_tools(
             stub, msg, [], system_prompt_override="test",
         )
 
@@ -395,7 +395,7 @@ class TestAllTerminalPaths:
             return_value=_tool_resp("Another step", [_tool_call("check_disk", "tc1")]),
         )
 
-        text, _, is_error, tools_used, handoff = await AnsiblexBot._process_with_tools(
+        text, _, is_error, tools_used, handoff = await LokiBot._process_with_tools(
             stub, msg, [], system_prompt_override="test",
         )
 
@@ -416,7 +416,7 @@ class TestAllTerminalPaths:
             return_value=_tool_resp("Using skill", [_tool_call("my_skill", "tc1")]),
         )
 
-        text, _, is_error, tools_used, handoff = await AnsiblexBot._process_with_tools(
+        text, _, is_error, tools_used, handoff = await LokiBot._process_with_tools(
             stub, msg, [], system_prompt_override="test",
         )
 

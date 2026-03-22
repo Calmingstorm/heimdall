@@ -16,7 +16,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 import pytest  # noqa: E402
 
 from src.config.schema import AnthropicConfig, Config, DiscordConfig  # noqa: E402
-from src.discord.client import AnsiblexBot  # noqa: E402
+from src.discord.client import LokiBot  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
@@ -111,9 +111,9 @@ def _make_bot_stub():
     stub.tool_memory.get_hint = AsyncMock(return_value=None)
     stub._embedder = None
     # Bind real methods
-    stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
-    stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
-    stub._track_recent_action = AnsiblexBot._track_recent_action.__get__(stub)
+    stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+    stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+    stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
     return stub
 
 

@@ -54,9 +54,8 @@ def is_task_by_keyword(content: str) -> bool:
 
 
 # --- Claude Code host/directory routing ---
-# Only server and desktop have claude CLI installed.
-# Desktop is default (source repo at /root/ansiblex).
-# Route to server when message clearly refers to production/server-specific files.
+# Routes to the first configured host with claude CLI by default.
+# Route to a secondary host when message indicates production/server-specific files.
 _SERVER_INDICATORS = re.compile(
     r"|".join([
         # Explicit "on server" / "on the server"
@@ -64,7 +63,6 @@ _SERVER_INDICATORS = re.compile(
         # "server config/logs/files/setup/version"
         r"\bserver\s+(?:config|logs?|files?|setup|version)\b",
         # Server-specific absolute paths
-        r"/opt/ansiblex",
         r"/opt/",
         # Server-hosted service + file/config analysis context (either order)
         r"\b(?:grafana|prometheus|loki|gitea|nginx)\s+(?:config|conf|setup|rules?|dashboard)\b",
@@ -76,17 +74,17 @@ _SERVER_INDICATORS = re.compile(
 )
 
 # Default targets for claude -p on each host.
+# Users should override these via config or context files.
 CLAUDE_CODE_DEFAULTS = {
-    "desktop": "/root/ansiblex",
-    "server": "/opt/ansiblex",
+    "desktop": "/root/project",
+    "server": "/opt/project",
 }
 
 
 def resolve_claude_code_target(message: str) -> tuple[str, str]:
     """Determine host and working directory for claude -p routing.
 
-    Only server and desktop have claude CLI installed.
-    Desktop is default (source repo at /root/ansiblex).
+    Routes to the first configured host by default.
     Routes to server when message indicates production/server-specific analysis.
 
     Returns (host, working_directory) tuple.

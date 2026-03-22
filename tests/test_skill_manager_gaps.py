@@ -161,7 +161,7 @@ class TestLoadSkillEdgeCases:
         assert "failed to load" in result.lower()
         assert not skill_mgr.has_skill("broken")
         # Module should be cleaned up from sys.modules
-        assert "ansiblex_skill_broken" not in sys.modules
+        assert "loki_skill_broken" not in sys.modules
 
 
 class TestCreateSkillEdgeCases:
@@ -262,15 +262,15 @@ class TestUnloadSkillModuleName:
         """LoadedSkill should track the actual module_name from load."""
         skill_mgr.create_skill("test_skill", VALID_SKILL_CODE)
         skill = skill_mgr._skills["test_skill"]
-        assert skill.module_name == "ansiblex_skill_test_skill"
+        assert skill.module_name == "loki_skill_test_skill"
 
     def test_unload_cleans_correct_module(self, skill_mgr: SkillManager):
         """_unload_skill removes the correct module from sys.modules."""
         skill_mgr.create_skill("test_skill", VALID_SKILL_CODE)
-        assert "ansiblex_skill_test_skill" in sys.modules
+        assert "loki_skill_test_skill" in sys.modules
 
         skill_mgr._unload_skill("test_skill")
-        assert "ansiblex_skill_test_skill" not in sys.modules
+        assert "loki_skill_test_skill" not in sys.modules
         assert "test_skill" not in skill_mgr._skills
 
     def test_unload_uses_stored_module_name(self, tmp_dir: Path, tools_config: ToolsConfig):
@@ -297,14 +297,14 @@ async def execute(inp, context):
         # Load manually
         skill = mgr._load_skill(path)
         assert skill is not None
-        assert skill.module_name == "ansiblex_skill_my_tool_file"
+        assert skill.module_name == "loki_skill_my_tool_file"
         mgr._skills[skill.name] = skill
 
         # Verify module is in sys.modules under the file-stem-based name
-        assert "ansiblex_skill_my_tool_file" in sys.modules
+        assert "loki_skill_my_tool_file" in sys.modules
 
         # Unload using the skill name ("my_tool")
         mgr._unload_skill("my_tool")
 
         # Should have cleaned up the correct module
-        assert "ansiblex_skill_my_tool_file" not in sys.modules
+        assert "loki_skill_my_tool_file" not in sys.modules

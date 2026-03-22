@@ -22,7 +22,7 @@ import pytest  # noqa: E402
 from src.discord.client import (  # noqa: E402
     scrub_response_secrets,
     _RESPONSE_EXTRA_PATTERNS,
-    AnsiblexBot,
+    LokiBot,
 )
 from src.llm.secret_scrubber import OUTPUT_SECRET_PATTERNS  # noqa: E402
 
@@ -168,7 +168,7 @@ class TestPatternCoverage:
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Create a minimal AnsiblexBot stub for routing tests."""
+    """Create a minimal LokiBot stub for routing tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -229,7 +229,7 @@ class TestHandleMessageInnerScrubbing:
             return_value="The password: supersecretvalue99"
         )
         stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "what's the server password?", "chan-1")
@@ -248,7 +248,7 @@ class TestHandleMessageInnerScrubbing:
             return_value="Found api_key=sk-ant-abc123xyz456def789ghi in config"
         )
         stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "check the config", "chan-1")
@@ -265,7 +265,7 @@ class TestHandleMessageInnerScrubbing:
         original = "The server is running fine. CPU at 23%, disk at 45%."
         stub.codex_client.chat = AsyncMock(return_value=original)
         stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "how's the server?", "chan-1")
@@ -282,7 +282,7 @@ class TestHandleMessageInnerScrubbing:
             return_value="The config contains password: admin1234567"
         )
         stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "check the config", "chan-1")
@@ -298,7 +298,7 @@ class TestHandleMessageInnerScrubbing:
         stub._process_with_tools = AsyncMock(
             return_value=("The database URL is postgres://admin:secret@host/db", False, False, [], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "show me the database config", "chan-1")
@@ -314,7 +314,7 @@ class TestHandleMessageInnerScrubbing:
         stub._process_with_tools = AsyncMock(
             return_value=("API overloaded", False, True, [], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -348,7 +348,7 @@ class TestStreamIterationScrubbing:
         stub._process_with_tools = AsyncMock(
             return_value=(secret_text, False, False, [], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check the API key", "chan-1")
@@ -367,7 +367,7 @@ class TestStreamIterationScrubbing:
         stub._process_with_tools = AsyncMock(
             return_value=(secret_text, False, False, [], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "show config", "chan-1")

@@ -272,12 +272,12 @@ class TestCodexChatMaxTokens:
 class TestClientWiresCompaction:
     def test_codex_sets_compaction_fn(self):
         """When Codex client is created, sessions.set_compaction_fn is called."""
-        from src.discord.client import AnsiblexBot
+        from src.discord.client import LokiBot
 
         with (
-            patch.object(AnsiblexBot, "__init__", lambda self, *a, **kw: None),
+            patch.object(LokiBot, "__init__", lambda self, *a, **kw: None),
         ):
-            bot = AnsiblexBot.__new__(AnsiblexBot)
+            bot = LokiBot.__new__(LokiBot)
 
         # Simulate the relevant __init__ wiring
         bot.sessions = MagicMock()

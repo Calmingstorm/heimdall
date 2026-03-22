@@ -19,7 +19,7 @@ import discord  # noqa: E402
 import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
-    AnsiblexBot,
+    LokiBot,
     MAX_TOOL_ITERATIONS,
     ToolLoopCancelView,
 )
@@ -39,7 +39,7 @@ def _no_approval():
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Minimal AnsiblexBot stub."""
+    """Minimal LokiBot stub."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -71,8 +71,8 @@ def _make_bot_stub():
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = AnsiblexBot._build_tool_progress_embed
-    stub._build_partial_completion_report = AnsiblexBot._build_partial_completion_report
+    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
+    stub._build_partial_completion_report = LokiBot._build_partial_completion_report
     return stub
 
 
@@ -133,7 +133,7 @@ class TestCancelViewDuringCircuitBreakerRecovery:
 
         with patch("src.discord.client.asyncio.sleep", new_callable=AsyncMock):
             text, already_sent, is_error, tools_used, handoff = (
-                await AnsiblexBot._process_with_tools(
+                await LokiBot._process_with_tools(
                     stub, msg, [{"role": "user", "content": "check disk"}]
                 )
             )
@@ -203,7 +203,7 @@ class TestCancelViewDuringCircuitBreakerRecovery:
         with patch("src.discord.client.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             mock_sleep.side_effect = _sleep_and_cancel
             text, already_sent, is_error, tools_used, handoff = (
-                await AnsiblexBot._process_with_tools(
+                await LokiBot._process_with_tools(
                     stub, msg, [{"role": "user", "content": "check disk"}]
                 )
             )
@@ -267,7 +267,7 @@ class TestDisableCallsStop:
         msg.channel.send = AsyncMock(side_effect=_capture_send)
 
         text, already_sent, is_error, tools_used, handoff = (
-            await AnsiblexBot._process_with_tools(
+            await LokiBot._process_with_tools(
                 stub, msg, [{"role": "user", "content": "check disk"}]
             )
         )
@@ -304,7 +304,7 @@ class TestDisableCallsStop:
         msg.channel.send = AsyncMock(side_effect=_capture_send)
 
         text, already_sent, is_error, tools_used, handoff = (
-            await AnsiblexBot._process_with_tools(
+            await LokiBot._process_with_tools(
                 stub, msg, [{"role": "user", "content": "check disk"}]
             )
         )

@@ -18,7 +18,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 import pytest  # noqa: E402
 
 from src.sessions.manager import SessionManager, Message, Session  # noqa: E402
-from src.discord.client import AnsiblexBot  # noqa: E402
+from src.discord.client import LokiBot  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ class TestRemoveLastMessage:
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Create a minimal AnsiblexBot stub."""
+    """Create a minimal LokiBot stub."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -159,7 +159,7 @@ class TestOrphanCleanupOnGenericException:
         msg = _make_message()
 
         stub._process_with_tools = AsyncMock(side_effect=RuntimeError("boom"))
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -179,7 +179,7 @@ class TestOrphanCleanupOnGenericException:
         msg = _make_message()
 
         stub._process_with_tools = AsyncMock(side_effect=RuntimeError("boom"))
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -199,7 +199,7 @@ class TestOrphanCleanupOnIsError:
         stub._process_with_tools = AsyncMock(
             return_value=("API overloaded", False, True, [], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -221,7 +221,7 @@ class TestOrphanCleanupOnIsError:
         stub._process_with_tools = AsyncMock(
             return_value=("API overloaded", False, True, [], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -239,7 +239,7 @@ class TestNoOrphanCleanupOnSuccess:
         stub._process_with_tools = AsyncMock(
             return_value=("Disk is 42% full.", False, False, ["check_disk"], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -253,7 +253,7 @@ class TestNoOrphanCleanupOnSuccess:
         stub._process_with_tools = AsyncMock(
             return_value=("Disk is 42% full.", False, False, ["check_disk"], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -273,7 +273,7 @@ class TestNoOrphanCleanupOnSuccess:
         stub.codex_client.chat = AsyncMock(return_value="Hey there!")
         stub.classifier.classify = AsyncMock(return_value="chat")
 
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "hey whats up", "chan-1")
@@ -291,7 +291,7 @@ class TestNoOrphanCleanupOnSuccess:
         stub._process_with_tools = AsyncMock(
             return_value=("Here you go!", False, False, ["check_disk"], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", "chan-1")

@@ -57,21 +57,21 @@ class TestSecretScanning:
     def test_warns_on_password(self, context_dir: Path, caplog):
         (context_dir / "bad.md").write_text("password: hunter2")
         loader = ContextLoader(str(context_dir))
-        with caplog.at_level(logging.WARNING, logger="ansiblex.context"):
+        with caplog.at_level(logging.WARNING, logger="loki.context"):
             loader.load()
         assert any("secret" in r.message.lower() for r in caplog.records)
 
     def test_warns_on_api_key(self, context_dir: Path, caplog):
         (context_dir / "bad.md").write_text("api_key: sk-1234567890abcdef1234")
         loader = ContextLoader(str(context_dir))
-        with caplog.at_level(logging.WARNING, logger="ansiblex.context"):
+        with caplog.at_level(logging.WARNING, logger="loki.context"):
             loader.load()
         assert any("secret" in r.message.lower() for r in caplog.records)
 
     def test_no_warning_on_clean(self, context_dir: Path, caplog):
         (context_dir / "clean.md").write_text("## Infrastructure\nNo secrets here.")
         loader = ContextLoader(str(context_dir))
-        with caplog.at_level(logging.WARNING, logger="ansiblex.context"):
+        with caplog.at_level(logging.WARNING, logger="loki.context"):
             loader.load()
         secret_warnings = [r for r in caplog.records if "secret" in r.message.lower()]
         assert len(secret_warnings) == 0

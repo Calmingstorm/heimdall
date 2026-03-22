@@ -105,12 +105,12 @@ usage:
 
 voice:
   enabled: true
-  voice_service_url: "ws://ansiblex-voice:3940/ws"
+  voice_service_url: "ws://loki-voice:3940/ws"
   auto_join: false
   transcript_channel_id: "1482174235743879249"
   default_voice: "en-US-AvaMultilingualNeural"
-  wake_word: "ansiblex"
+  wake_word: "loki"
 
 browser:
   enabled: true
-  cdp_url: "ws://ansiblex-browser:3000?token=ansiblex-internal"
+  cdp_url: "ws://loki-browser:3000?token=loki-internal"

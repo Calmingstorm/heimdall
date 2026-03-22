@@ -276,8 +276,8 @@ class TestPrepareQuery:
 
     async def test_path_quoted(self):
         """Path (contains slashes) gets quoted."""
-        result = _prepare_query("/opt/ansiblex/data")
-        assert result == '"/opt/ansiblex/data"'
+        result = _prepare_query("/opt/project/data")
+        assert result == '"/opt/project/data"'
 
     async def test_special_chars_quoted(self):
         """FTS5 special characters trigger quoting."""

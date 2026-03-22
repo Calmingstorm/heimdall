@@ -1,7 +1,7 @@
 services:
-  ansiblex:
+  loki-bot:
     build: .
-    container_name: ansiblex
+    container_name: loki-bot
     restart: unless-stopped
     env_file: .env
     environment:
@@ -18,9 +18,9 @@ services:
     networks:
       - default
 
-  ansiblex-browser:
+  loki-browser:
     image: ghcr.io/browserless/chromium
-    container_name: ansiblex-browser
+    container_name: loki-browser
     restart: unless-stopped
     profiles:
       - browser
@@ -29,7 +29,7 @@ services:
       - TIMEOUT=30000
       - QUEUED=5
       - HEALTH=true
-      - TOKEN=ansiblex-internal
+      - TOKEN=loki-internal
     deploy:
       resources:
         limits:
@@ -37,9 +37,9 @@ services:
     networks:
       - default
 
-  ansiblex-voice:
+  loki-voice:
     build: ./voice-service
-    container_name: ansiblex-voice
+    container_name: loki-voice
     restart: unless-stopped
     profiles:
       - voice

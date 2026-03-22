@@ -15,7 +15,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import AnsiblexBot  # noqa: E402
+from src.discord.client import LokiBot  # noqa: E402
 
 
 class TestTrackRecentActionChannel:
@@ -23,13 +23,13 @@ class TestTrackRecentActionChannel:
 
     def _make_bot_stub(self):
         """Create a minimal stub with the fields _track_recent_action needs."""
-        # We can't instantiate AnsiblexBot (needs Config + discord), so build
+        # We can't instantiate LokiBot (needs Config + discord), so build
         # a stub object with the relevant attributes and bind the real method.
         stub = MagicMock()
         stub._recent_actions = {}
         stub._recent_actions_max = 10
         stub._last_tool_use = {}
-        stub._track_recent_action = AnsiblexBot._track_recent_action.__get__(stub)
+        stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
         return stub
 
     def test_sets_last_tool_use_for_channel(self):

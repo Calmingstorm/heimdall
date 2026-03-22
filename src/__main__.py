@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from .config import load_config
-from .discord import AnsiblexBot
+from .discord import LokiBot
 from .health import HealthServer
 from .logging import setup_logging, get_logger
 
@@ -22,10 +22,10 @@ def main() -> None:
     setup_logging(level=config.logging.level, log_dir=config.logging.directory)
     log = get_logger("main")
 
-    log.info("Starting Ansiblex")
+    log.info("Starting Loki")
 
     health = HealthServer(webhook_config=config.webhook)
-    bot = AnsiblexBot(config)
+    bot = LokiBot(config)
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -78,7 +78,7 @@ def main() -> None:
         loop.run_until_complete(shutdown())
     finally:
         loop.close()
-        log.info("Ansiblex stopped")
+        log.info("Loki stopped")
 
 
 if __name__ == "__main__":

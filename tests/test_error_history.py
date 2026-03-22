@@ -18,7 +18,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import AnsiblexBot  # noqa: E402
+from src.discord.client import LokiBot  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
@@ -27,7 +27,7 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Create a minimal AnsiblexBot stub with the fields _process_with_tools
+    """Create a minimal LokiBot stub with the fields _process_with_tools
     and _handle_message_inner need."""
     stub = MagicMock()
     stub._recent_actions = {}
@@ -93,14 +93,14 @@ class TestProcessWithToolsErrorFlag:
         """When codex_client.chat_with_tools raises, _process_with_tools catches it
         and returns an error message with is_error=True (Round 13: partial completion)."""
         stub = _make_bot_stub()
-        stub._build_tool_progress_embed = AnsiblexBot._build_tool_progress_embed
-        stub._build_partial_completion_report = AnsiblexBot._build_partial_completion_report
+        stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
+        stub._build_partial_completion_report = LokiBot._build_partial_completion_report
         msg = _make_message()
 
         stub.codex_client.chat_with_tools = AsyncMock(
             side_effect=RuntimeError("The AI service is temporarily overloaded.")
         )
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         # Round 13 changed _process_with_tools to catch API errors and return
         # them as error messages instead of re-raising.
@@ -117,7 +117,7 @@ class TestProcessWithToolsErrorFlag:
         stub.codex_client.chat_with_tools = AsyncMock(
             return_value=LLMResponse(text="Hello! How can I help?", stop_reason="end_turn")
         )
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
         text, already_sent, is_error, _tools, _handoff = await stub._process_with_tools(msg, [])
         assert is_error is False
@@ -145,8 +145,8 @@ class TestProcessWithToolsErrorFlag:
         stub.skill_manager.requires_approval = MagicMock(return_value=False)
         stub.tool_executor.execute = AsyncMock(return_value="OK")
 
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
-        stub._track_recent_action = AnsiblexBot._track_recent_action.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
 
         with patch("src.discord.client.requires_approval", return_value=False), \
              patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
@@ -162,7 +162,7 @@ class TestProcessWithToolsErrorFlag:
 
         # Task route: _process_with_tools raises → caught by inner except
         stub._process_with_tools = AsyncMock(side_effect=RuntimeError("Rate limited"))
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
@@ -190,7 +190,7 @@ class TestHistorySaveOnError:
         stub.classifier.classify = AsyncMock(return_value="task")
 
         stub._process_with_tools = AsyncMock(return_value=process_return)
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(
@@ -269,7 +269,7 @@ class TestHistorySaveOnError:
         stub._process_with_tools = AsyncMock(
             return_value=("Service overloaded.", False, True, [], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(
@@ -295,7 +295,7 @@ class TestErrorHistoryEdgeCases:
         stub._process_with_tools = AsyncMock(
             return_value=("(no response)", False, True, [], False)
         )
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(
@@ -313,7 +313,7 @@ class TestErrorHistoryEdgeCases:
         stub.codex_client = MagicMock()
         stub.codex_client.chat = AsyncMock(side_effect=Exception("Codex down"))
         stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = AnsiblexBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(

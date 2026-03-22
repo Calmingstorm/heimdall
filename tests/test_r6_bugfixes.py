@@ -42,8 +42,8 @@ class TestToolsUsedLocalVariable:
     """Verify _process_with_tools returns tools_used as 4th tuple element."""
 
     def _make_bot_stub(self):
-        """Minimal AnsiblexBot stub for _process_with_tools."""
-        from src.discord.client import AnsiblexBot  # noqa
+        """Minimal LokiBot stub for _process_with_tools."""
+        from src.discord.client import LokiBot  # noqa
 
         stub = SimpleNamespace()
         stub._system_prompt = "test prompt"
@@ -63,13 +63,13 @@ class TestToolsUsedLocalVariable:
         stub._merged_tool_definitions = MagicMock(return_value=[])
         stub.skill_manager = MagicMock()
         stub.skill_manager.requires_approval = MagicMock(return_value=None)
-        stub._build_tool_progress_embed = AnsiblexBot._build_tool_progress_embed
+        stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
 
         msg = MagicMock()
         msg.author.id = 441602773310767105
         msg.channel.id = 123
 
-        stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
         return stub, msg
 
     async def test_returns_5_tuple(self):

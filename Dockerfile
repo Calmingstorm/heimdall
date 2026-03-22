@@ -6,7 +6,7 @@ RUN apt-get update && \
         ffmpeg libffi-dev libsodium-dev libopus0 && \
     rm -rf /var/lib/apt/lists/*
 
-RUN useradd -m -s /bin/bash ansiblex
+RUN useradd -m -s /bin/bash loki
 
 WORKDIR /app
 
@@ -17,9 +17,9 @@ COPY src/ src/
 COPY config.yml .
 
 RUN mkdir -p data/context data/sessions data/logs data/usage data/skills data/chromadb && \
-    chown -R ansiblex:ansiblex /app
+    chown -R loki:loki /app
 
-USER ansiblex
+USER loki
 
 HEALTHCHECK --interval=3m --timeout=10s --start-period=15s \
     CMD curl -f http://localhost:3000/health || exit 1

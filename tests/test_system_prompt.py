@@ -66,8 +66,8 @@ class TestBuildSystemPrompt:
 class TestBuildChatSystemPrompt:
     def test_includes_identity(self):
         prompt = build_chat_system_prompt()
-        assert "Ansiblex" in prompt
-        assert "Calmingstorm" in prompt
+        assert "Loki" in prompt
+        assert "not Claude or ChatGPT" in prompt
 
     def test_includes_datetime(self):
         prompt = build_chat_system_prompt()
@@ -156,8 +156,8 @@ class TestSystemPromptQuality:
             context="", hosts={}, services=[], playbooks=[],
         )
         # Identity
-        assert "Ansiblex" in prompt
-        assert "Calmingstorm" in prompt
+        assert "Loki" in prompt
+        assert "not Claude or ChatGPT" in prompt
         # Key rules
         assert "emojis" in prompt.lower()
         assert "approval" in prompt.lower() or "approve" in prompt.lower()

@@ -87,7 +87,7 @@ class TestGitCommit:
             mock_ssh.return_value = (0, "[master abc1234] Fix bug\n 1 file changed")
             result = await executor.execute("git_commit", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "message": "Fix bug",
             })
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
@@ -102,7 +102,7 @@ class TestGitCommit:
             mock_ssh.return_value = (0, "[master def5678] Add feature\n 2 files changed")
             result = await executor.execute("git_commit", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "message": "Add feature",
                 "files": ["src/main.py", "tests/test_main.py"],
             })
@@ -118,7 +118,7 @@ class TestGitCommit:
             mock_ssh.return_value = (0, "committed")
             await executor.execute("git_commit", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "message": "Fix: handle 'quoted' strings & special $chars",
             })
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
@@ -144,7 +144,7 @@ class TestGitCommit:
             mock_ssh.return_value = (0, "committed")
             await executor.execute("git_commit", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "message": "test",
                 "files": ["file with space.py"],
             })
@@ -157,7 +157,7 @@ class TestGitCommit:
             mock_ssh.return_value = (0, "nothing to commit, working tree clean")
             result = await executor.execute("git_commit", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "message": "empty",
             })
         assert "nothing to commit" in result
@@ -170,10 +170,10 @@ class TestGitPush:
     @pytest.mark.asyncio
     async def test_push_default(self, executor: ToolExecutor):
         with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "To http://192.168.1.13:3300/calmingstorm/ansiblex\n   abc..def  master -> master")
+            mock_ssh.return_value = (0, "To https://gitea.example.com/user/myproject\n   abc..def  master -> master")
             result = await executor.execute("git_push", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
             })
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
         assert "push" in cmd
@@ -186,7 +186,7 @@ class TestGitPush:
             mock_ssh.return_value = (0, "pushed")
             await executor.execute("git_push", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "remote": "upstream",
             })
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
@@ -198,7 +198,7 @@ class TestGitPush:
             mock_ssh.return_value = (0, "pushed")
             await executor.execute("git_push", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "branch": "feature/new-tools",
             })
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
@@ -210,7 +210,7 @@ class TestGitPush:
             mock_ssh.return_value = (0, "pushed")
             await executor.execute("git_push", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "remote": "gitea",
                 "branch": "develop",
             })
@@ -224,7 +224,7 @@ class TestGitPush:
             mock_ssh.return_value = (0, "pushed")
             await executor.execute("git_push", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "remote": "my remote",
             })
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
@@ -237,7 +237,7 @@ class TestGitPush:
             mock_ssh.return_value = (0, "pushed")
             await executor.execute("git_push", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
             })
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
         # Should end with just the remote, no branch arg
@@ -254,7 +254,7 @@ class TestGitBranch:
             mock_ssh.return_value = (0, "* master\n  feature/foo\n  remotes/origin/master")
             result = await executor.execute("git_branch", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "action": "list",
             })
         cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
@@ -268,7 +268,7 @@ class TestGitBranch:
             mock_ssh.return_value = (0, "Switched to a new branch 'feature/bar'")
             result = await executor.execute("git_branch", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "action": "create",
                 "branch_name": "feature/bar",
             })
@@ -283,7 +283,7 @@ class TestGitBranch:
             mock_ssh.return_value = (0, "Switched to branch 'develop'")
             result = await executor.execute("git_branch", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "action": "switch",
                 "branch_name": "develop",
             })
@@ -298,7 +298,7 @@ class TestGitBranch:
         with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
             result = await executor.execute("git_branch", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "action": "create",
             })
         assert "branch_name is required" in result
@@ -309,7 +309,7 @@ class TestGitBranch:
         with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
             result = await executor.execute("git_branch", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "action": "switch",
             })
         assert "branch_name is required" in result
@@ -321,7 +321,7 @@ class TestGitBranch:
             mock_ssh.return_value = (0, "* master")
             await executor.execute("git_branch", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "action": "list",
                 "branch_name": "ignored",
             })
@@ -334,7 +334,7 @@ class TestGitBranch:
         with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
             result = await executor.execute("git_branch", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "action": "delete",
                 "branch_name": "old-branch",
             })
@@ -347,7 +347,7 @@ class TestGitBranch:
             mock_ssh.return_value = (0, "created")
             await executor.execute("git_branch", {
                 "host": "desktop",
-                "repo_path": "/root/ansiblex",
+                "repo_path": "/root/project",
                 "action": "create",
                 "branch_name": "feature/special branch",
             })

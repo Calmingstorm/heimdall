@@ -1,6 +1,6 @@
 """Tests for per-user profiles: scoped memory, learned context, and system prompt injection.
 
-Session 40 (R6 S2): Adds per-user profile support to Ansiblex so that memory
+Session 40 (R6 S2): Adds per-user profile support to Loki so that memory
 notes, learned preferences, and system prompt context are scoped per user.
 
 Tests cover:
@@ -600,9 +600,9 @@ class TestSystemPromptPerUserMemory:
         stub._recent_actions_max = 10
         stub._recent_actions_expiry = 3600
 
-        from src.discord.client import AnsiblexBot
-        stub._build_system_prompt = AnsiblexBot._build_system_prompt.__get__(stub)
-        stub._build_chat_system_prompt = AnsiblexBot._build_chat_system_prompt.__get__(stub)
+        from src.discord.client import LokiBot
+        stub._build_system_prompt = LokiBot._build_system_prompt.__get__(stub)
+        stub._build_chat_system_prompt = LokiBot._build_chat_system_prompt.__get__(stub)
         return stub
 
     def test_full_prompt_passes_user_id_to_memory(self):

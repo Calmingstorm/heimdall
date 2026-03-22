@@ -232,9 +232,9 @@ class TestProcessWithToolsFallback:
         )
 
         # Minimal bot setup — _process_with_tools reads several attrs
-        from src.discord.client import AnsiblexBot
-        with patch.object(AnsiblexBot, "__init__", lambda self, *a, **kw: None):
-            bot = AnsiblexBot.__new__(AnsiblexBot)
+        from src.discord.client import LokiBot
+        with patch.object(LokiBot, "__init__", lambda self, *a, **kw: None):
+            bot = LokiBot.__new__(LokiBot)
 
         bot.codex_client = mock_codex
         bot._cancelled_tasks = set()
@@ -290,10 +290,10 @@ class TestLastToolUseAfterTaskRoute:
 
     async def test_set_after_task_success_no_tool_calls(self):
         """When Codex responds text-only (no tool calls), _last_tool_use is still set."""
-        from src.discord.client import AnsiblexBot
+        from src.discord.client import LokiBot
 
-        with patch.object(AnsiblexBot, "__init__", lambda self, *a, **kw: None):
-            bot = AnsiblexBot.__new__(AnsiblexBot)
+        with patch.object(LokiBot, "__init__", lambda self, *a, **kw: None):
+            bot = LokiBot.__new__(LokiBot)
 
         bot._last_tool_use = {}
         channel_id = "test_channel_999"

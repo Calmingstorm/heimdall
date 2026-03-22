@@ -23,7 +23,7 @@ class TestSetupLogging:
     def test_sets_root_logger_level(self, tmp_path: Path):
         """setup_logging sets the root logger level (lines 13-14)."""
         # Clean up any existing handlers first
-        root = logging.getLogger("ansiblex")
+        root = logging.getLogger("loki")
         original_handlers = root.handlers.copy()
         root.handlers.clear()
 
@@ -36,7 +36,7 @@ class TestSetupLogging:
 
     def test_adds_console_handler(self, tmp_path: Path):
         """setup_logging adds a StreamHandler (lines 21-23)."""
-        root = logging.getLogger("ansiblex")
+        root = logging.getLogger("loki")
         original_handlers = root.handlers.copy()
         root.handlers.clear()
 
@@ -52,7 +52,7 @@ class TestSetupLogging:
         """setup_logging adds a RotatingFileHandler (lines 25-31)."""
         from logging.handlers import RotatingFileHandler
 
-        root = logging.getLogger("ansiblex")
+        root = logging.getLogger("loki")
         original_handlers = root.handlers.copy()
         root.handlers.clear()
 
@@ -62,13 +62,13 @@ class TestSetupLogging:
             file_handlers = [h for h in root.handlers if isinstance(h, RotatingFileHandler)]
             assert len(file_handlers) >= 1
             # Verify the log file path
-            assert "ansiblex.log" in file_handlers[0].baseFilename
+            assert "loki.log" in file_handlers[0].baseFilename
         finally:
             root.handlers = original_handlers
 
     def test_invalid_level_defaults_to_info(self, tmp_path: Path):
         """Invalid level string defaults to INFO via getattr fallback (line 14)."""
-        root = logging.getLogger("ansiblex")
+        root = logging.getLogger("loki")
         original_handlers = root.handlers.copy()
         root.handlers.clear()
 
@@ -81,6 +81,6 @@ class TestSetupLogging:
 
 class TestGetLogger:
     def test_returns_namespaced_logger(self):
-        """get_logger returns logger under ansiblex namespace."""
+        """get_logger returns logger under loki namespace."""
         logger = get_logger("test_module")
-        assert logger.name == "ansiblex.test_module"
+        assert logger.name == "loki.test_module"

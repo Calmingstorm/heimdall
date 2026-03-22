@@ -19,7 +19,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
-    AnsiblexBot,
+    LokiBot,
     MAX_TOOL_ITERATIONS,
     TOOL_OUTPUT_MAX_CHARS,
     truncate_tool_output,
@@ -32,7 +32,7 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Minimal AnsiblexBot stub for _process_with_tools."""
+    """Minimal LokiBot stub for _process_with_tools."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -63,8 +63,8 @@ def _make_bot_stub():
     stub._build_system_prompt = MagicMock(return_value="You are a bot.")
     stub._pending_files = {}
     # Bind real methods
-    stub._process_with_tools = AnsiblexBot._process_with_tools.__get__(stub)
-    stub._track_recent_action = AnsiblexBot._track_recent_action.__get__(stub)
+    stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+    stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
     return stub
 
 
@@ -264,7 +264,7 @@ class TestProgressMessages:
         msg = _make_message()
         embed_msg = AsyncMock()
         msg.channel.send = AsyncMock(return_value=embed_msg)
-        stub._build_tool_progress_embed = AnsiblexBot._build_tool_progress_embed
+        stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
 
         tc = ToolCall(id="tool-1", name="check_disk", input={})
         stub.codex_client.chat_with_tools = AsyncMock(
@@ -286,7 +286,7 @@ class TestProgressMessages:
         msg = _make_message()
         embed_msg = AsyncMock()
         msg.channel.send = AsyncMock(return_value=embed_msg)
-        stub._build_tool_progress_embed = AnsiblexBot._build_tool_progress_embed
+        stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
 
         tc = ToolCall(id="tool-1", name="run_command", input={})
         stub.codex_client.chat_with_tools = AsyncMock(
@@ -307,7 +307,7 @@ class TestProgressMessages:
         msg = _make_message()
         embed_msg = AsyncMock()
         msg.channel.send = AsyncMock(return_value=embed_msg)
-        stub._build_tool_progress_embed = AnsiblexBot._build_tool_progress_embed
+        stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
 
         tc1 = ToolCall(id="t1", name="check_disk", input={})
         tc2 = ToolCall(id="t2", name="check_memory", input={})
