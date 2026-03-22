@@ -141,6 +141,37 @@ def truncate_tool_output(text: str, max_chars: int = TOOL_OUTPUT_MAX_CHARS) -> s
     )
 
 
+def combine_bot_messages(parts: list[str]) -> str:
+    """Combine buffered bot messages, intelligently merging code blocks.
+
+    Handles:
+    - Split code blocks (open in one message, close in later one) — joined
+      with a single newline so no extra blank lines appear inside the block.
+    - Adjacent code blocks (close fence then immediately open fence) — merged
+      into one continuous block by removing the redundant fence pair.
+    - Regular text between code blocks — joined with double newline as usual.
+    """
+    if len(parts) <= 1:
+        return parts[0] if parts else ""
+
+    # Join parts, using \n (not \n\n) when the previous part has an unclosed
+    # code block — meaning the next part is a continuation of the same block.
+    result = parts[0]
+    for i in range(1, len(parts)):
+        fence_count = result.count("```")
+        if fence_count % 2 == 1:
+            # Inside an unclosed code block — continuation, single newline
+            result += "\n" + parts[i]
+        else:
+            result += "\n\n" + parts[i]
+
+    # Merge adjacent code blocks: \n```<ws>\n\n```<lang>\n → \n
+    # This collapses e.g. "\n```\n\n```bash\n" into a single block.
+    result = re.sub(r"\n```[ \t]*\n\n```(\w*)[ \t]*\n", "\n", result)
+
+    return result
+
+
 class LokiBot(discord.Client):
     def __init__(self, config: Config) -> None:
         intents = discord.Intents.default()
@@ -755,7 +786,7 @@ class LokiBot(discord.Client):
                 self._bot_msg_tasks.pop(key, None)
                 if not parts:
                     return
-                combined = "\n\n".join(parts)
+                combined = combine_bot_messages(parts)
                 log.info("Bot buffer flushed: %d messages from %s combined", len(parts), orig_msg.author)
                 # Strip mention from combined content
                 if self.user:
