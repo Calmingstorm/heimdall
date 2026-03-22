@@ -31,7 +31,7 @@ class TestIsTaskByKeyword:
         "how's the disk looking?",
         "show me prometheus metrics",
         "open grafana dashboard",
-        "check the siglos dashboard",
+        "what's the cpu usage on the host?",
         "create an incus container",
         "run journalctl on the server",
         "systemctl status nginx",

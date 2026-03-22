@@ -13,7 +13,7 @@ _TASK_KEYWORD_PATTERNS = re.compile(
         # Infrastructure-specific (never appear in casual chat)
         r"\brestart\b", r"\bdeploy\b", r"\bansible\b", r"\bssh\b",
         r"\bplaybook\b", r"\bdocker\b", r"\bprometheus\b", r"\bgrafana\b",
-        r"\bsiglos\b", r"\bcpu\b", r"\bdisk\b", r"\bincus\b",
+        r"\bcpu\b", r"\bdisk\b", r"\bincus\b",
         r"\bjournalctl\b", r"\bsystemctl\b",
         # Multi-word infra phrases (unambiguous even though individual words are not)
         r"\bcheck disk\b", r"\bcheck memory\b", r"\bcheck service\b",
