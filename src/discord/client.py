@@ -1279,8 +1279,10 @@ class LokiBot(discord.Client):
             # the response may be a fabrication. Save a neutral marker instead
             # to prevent poisoning future requests.
             if msg_type == "task" and not tools_used and not handoff:
-                sanitized = "[Response provided without tool use.]"
-                self.sessions.add_message(channel_id, "assistant", sanitized)
+                # Don't save tool-less task responses at all — they pollute
+                # history and teach the model that text-only responses are normal
+                # for the task route. The user still sees the response in Discord.
+                pass
             else:
                 self.sessions.add_message(channel_id, "assistant", response)
             self.sessions.prune()
