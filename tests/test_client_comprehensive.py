@@ -1721,7 +1721,7 @@ class TestResolveMentions:
         """Should replace @username with proper Discord mention."""
         stub = _make_bot_stub()
         member = MagicMock()
-        member.name = "aaron"
+        member.name = "testuser"
         member.nick = None
         member.id = 12345
         guild = MagicMock()
@@ -1729,7 +1729,7 @@ class TestResolveMentions:
         stub.guilds = [guild]
         stub._resolve_mentions = LokiBot._resolve_mentions.__get__(stub)
 
-        result = stub._resolve_mentions("Hey @aaron check this out")
+        result = stub._resolve_mentions("Hey @testuser check this out")
         assert "<@12345>" in result
 
     def test_resolve_nickname(self):

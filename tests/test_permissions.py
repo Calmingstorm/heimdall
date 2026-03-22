@@ -62,7 +62,7 @@ class TestTierResolution:
     def test_admin_from_config(self, pm: PermissionManager):
         assert pm.get_tier("100000000000000001") == "admin"
 
-    def test_admin_audrastaia(self, pm: PermissionManager):
+    def test_admin_secondary(self, pm: PermissionManager):
         assert pm.get_tier("100000000000000002") == "admin"
 
     def test_unknown_user_defaults_to_user(self, pm: PermissionManager):

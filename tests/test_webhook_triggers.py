@@ -461,7 +461,7 @@ class TestHealthServerTriggers:
         from aiohttp.test_utils import make_mocked_request
         payload = json.dumps({
             "repository": {"full_name": "user/myproject"},
-            "pusher": {"login": "aaron"},
+            "pusher": {"login": "testuser"},
             "commits": [{"id": "abc1234", "message": "test commit"}],
             "ref": "refs/heads/main",
         }).encode()
