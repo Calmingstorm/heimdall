@@ -1083,6 +1083,9 @@ class LokiBot(discord.Client):
             if image_blocks:
                 msg_type = "task"
                 log.info("Message has images, forcing task route (vision)")
+            elif message.author.bot and self.config.discord.respond_to_bots:
+                msg_type = "task"
+                log.info("Bot message with respond_to_bots enabled, forcing task route")
             elif is_task_by_keyword(content):
                 msg_type = "task"
                 log.info("Message matched task keyword, forcing 'task' route")
