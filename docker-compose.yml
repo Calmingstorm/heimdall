@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      - TZ=America/New_York
+      - TZ=${TZ:-UTC}
     volumes:
       - ./config.yml:/app/config.yml:ro
       - ./data:/app/data

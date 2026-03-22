@@ -63,7 +63,7 @@ tools:
 
 webhook:
   enabled: false
-  secret: "${WEBHOOK_SECRET}"
+  secret: "${WEBHOOK_SECRET:-}"
   channel_id: ""        # Default channel for webhook notifications
   gitea_channel_id: ""  # Channel for Gitea webhooks (falls back to channel_id)
   grafana_channel_id: "" # Channel for Grafana alerts (falls back to channel_id)

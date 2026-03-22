@@ -16,8 +16,9 @@ RUN pip install --no-cache-dir .
 COPY src/ src/
 COPY config.yml .
 
-RUN mkdir -p data/context data/sessions data/logs data/usage data/skills data/chromadb && \
-    chown -R loki:loki /app
+RUN mkdir -p data/context data/sessions data/logs data/usage data/skills data/chromadb .ssh && \
+    chown -R loki:loki /app && \
+    chmod 700 .ssh
 
 USER loki
 

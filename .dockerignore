@@ -9,3 +9,5 @@ tests/
 data/sessions/
 data/logs/
 data/usage/
+ssh/
+*.md

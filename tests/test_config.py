@@ -99,6 +99,95 @@ class TestLoadConfig:
         assert "ansiblex" not in raw.lower()
 
 
+class TestEnvVarDefaults:
+    """Round 7: ${VAR:-default} env var substitution syntax."""
+
+    def test_default_value_when_unset(self):
+        os.environ.pop("_TEST_UNSET_VAR_99", None)
+        result = _substitute_env_vars("val: ${_TEST_UNSET_VAR_99:-fallback}")
+        assert result == "val: fallback"
+
+    def test_default_value_empty_string(self):
+        os.environ.pop("_TEST_UNSET_VAR_99", None)
+        result = _substitute_env_vars("val: ${_TEST_UNSET_VAR_99:-}")
+        assert result == "val: "
+
+    def test_env_var_overrides_default(self, monkeypatch):
+        monkeypatch.setenv("_TEST_SET_VAR_99", "real")
+        result = _substitute_env_vars("val: ${_TEST_SET_VAR_99:-fallback}")
+        assert result == "val: real"
+
+    def test_required_var_still_raises(self):
+        os.environ.pop("_TEST_UNSET_VAR_99", None)
+        with pytest.raises(ValueError, match="_TEST_UNSET_VAR_99"):
+            _substitute_env_vars("${_TEST_UNSET_VAR_99}")
+
+    def test_mixed_required_and_optional(self, monkeypatch):
+        monkeypatch.setenv("_TEST_REQ_VAR", "hello")
+        os.environ.pop("_TEST_OPT_VAR", None)
+        result = _substitute_env_vars("${_TEST_REQ_VAR} ${_TEST_OPT_VAR:-world}")
+        assert result == "hello world"
+
+
+class TestConfigWithoutWebhookSecret:
+    """Round 7: config.yml loads without WEBHOOK_SECRET env var."""
+
+    def test_loads_without_webhook_secret(self, monkeypatch):
+        monkeypatch.setenv("DISCORD_TOKEN", "test-token")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+        monkeypatch.delenv("WEBHOOK_SECRET", raising=False)
+        cfg = load_config("config.yml")
+        assert cfg.webhook.secret == ""
+        assert cfg.webhook.enabled is False
+
+    def test_loads_with_webhook_secret(self, monkeypatch):
+        monkeypatch.setenv("DISCORD_TOKEN", "test-token")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+        monkeypatch.setenv("WEBHOOK_SECRET", "my-secret")
+        cfg = load_config("config.yml")
+        assert cfg.webhook.secret == "my-secret"
+
+
+class TestDeploymentFiles:
+    """Round 7: Docker and deployment files are generic."""
+
+    def test_docker_compose_no_hardcoded_timezone(self):
+        content = Path("docker-compose.yml").read_text()
+        assert "America/New_York" not in content
+        assert "${TZ:-UTC}" in content
+
+    def test_docker_compose_service_names(self):
+        content = Path("docker-compose.yml").read_text()
+        assert "ansiblex" not in content.lower()
+        assert "loki-bot" in content
+        assert "loki-browser" in content
+        assert "loki-voice" in content
+
+    def test_dockerfile_uses_loki_user(self):
+        content = Path("Dockerfile").read_text()
+        assert "useradd" in content and "loki" in content
+        assert "USER loki" in content
+        assert "ansiblex" not in content.lower()
+
+    def test_dockerfile_creates_ssh_dir(self):
+        content = Path("Dockerfile").read_text()
+        assert ".ssh" in content
+
+    def test_dockerignore_excludes_ssh(self):
+        content = Path(".dockerignore").read_text()
+        assert "ssh/" in content
+
+    def test_env_example_has_required_vars(self):
+        content = Path(".env.example").read_text()
+        assert "DISCORD_TOKEN" in content
+        assert "ANTHROPIC_API_KEY" in content
+
+    def test_env_example_no_personal_data(self):
+        content = Path(".env.example").read_text()
+        assert "192.168.1" not in content
+        assert "ansiblex" not in content.lower()
+
+
 class TestToolsConfig:
     def test_host_resolution(self):
         tc = ToolsConfig(

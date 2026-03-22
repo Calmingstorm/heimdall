@@ -157,14 +157,21 @@ class Config(BaseModel):
 
 
 def _substitute_env_vars(text: str) -> str:
-    """Replace ${VAR} patterns with environment variable values."""
+    """Replace ${VAR} and ${VAR:-default} patterns with environment variable values.
+
+    ${VAR} — required, raises ValueError if not set.
+    ${VAR:-default} — optional, uses *default* when VAR is unset.
+    """
     def replacer(match: re.Match) -> str:
         var_name = match.group(1)
+        default = match.group(2)  # None when no :- syntax used
         value = os.environ.get(var_name)
         if value is None:
+            if default is not None:
+                return default
             raise ValueError(f"Environment variable {var_name} is not set")
         return value
-    return re.sub(r"\$\{(\w+)}", replacer, text)
+    return re.sub(r"\$\{(\w+)(?::-([^}]*))?\}", replacer, text)
 
 
 def load_config(path: str | Path = "config.yml") -> Config:
