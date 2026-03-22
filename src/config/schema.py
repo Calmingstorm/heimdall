@@ -12,6 +12,8 @@ class DiscordConfig(BaseModel):
     token: str
     allowed_users: list[str] = Field(default_factory=list)
     channels: list[str] = Field(default_factory=list)
+    respond_to_bots: bool = False
+    require_mention: bool = False
 
 
 class AnthropicConfig(BaseModel):

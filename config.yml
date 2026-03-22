@@ -2,6 +2,8 @@ discord:
   token: "${DISCORD_TOKEN}"
   allowed_users: []  # Discord user IDs that can interact with the bot (empty = allow all)
   channels: []  # Channel IDs the bot responds in (empty = all channels)
+  respond_to_bots: false  # Whether to respond to messages from other bots/webhooks
+  require_mention: false  # Only respond when the bot is @mentioned
 
 anthropic:
   api_key: "${ANTHROPIC_API_KEY}"

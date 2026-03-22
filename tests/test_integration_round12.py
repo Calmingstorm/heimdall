@@ -47,6 +47,8 @@ def _make_bot_stub():
     stub.config.tools.tool_timeout_seconds = 300
     stub.config.discord.allowed_users = ["12345"]
     stub.config.discord.channels = ["67890"]
+    stub.config.discord.respond_to_bots = False
+    stub.config.discord.require_mention = False
     stub.config.tools.approval_timeout_seconds = 30
     stub.config.monitoring.alert_channel_id = "67890"
     stub.sessions = MagicMock()

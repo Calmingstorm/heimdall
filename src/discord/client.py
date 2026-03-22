@@ -671,15 +671,28 @@ class LokiBot(discord.Client):
                     await self.voice_manager.leave_channel()
 
     async def on_message(self, message: discord.Message) -> None:
+        # Never respond to our own messages
+        if message.author == self.user:
+            return
+
         if message.author.bot:
-            # Allow specific webhooks for testing
-            if not (message.webhook_id and str(message.webhook_id) in _ALLOWED_WEBHOOK_IDS):
+            # Allow specific webhooks (via ALLOWED_WEBHOOK_IDS env var)
+            is_allowed_webhook = message.webhook_id and str(message.webhook_id) in _ALLOWED_WEBHOOK_IDS
+            if not is_allowed_webhook and not self.config.discord.respond_to_bots:
                 return
+
         is_test_webhook = message.webhook_id and str(message.webhook_id) in _ALLOWED_WEBHOOK_IDS
         if not is_test_webhook and not self._is_allowed_user(message.author):
             return
         if not self._is_allowed_channel(message.channel.id):
             return
+
+        # require_mention: only respond when the bot is @mentioned (or in DMs)
+        if self.config.discord.require_mention:
+            is_dm = not hasattr(message.channel, "guild") or message.channel.guild is None
+            is_mentioned = self.user and self.user.mentioned_in(message)
+            if not is_dm and not is_mentioned:
+                return
 
         log.info(
             "on_message fired: msg_id=%s channel=%s content=%r",
