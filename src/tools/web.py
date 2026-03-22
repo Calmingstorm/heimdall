@@ -71,7 +71,7 @@ async def fetch_url(url: str, max_chars: int = MAX_CONTENT_CHARS) -> str:
                 url,
                 headers={"User-Agent": USER_AGENT},
                 allow_redirects=True,
-                ssl=False,  # Allow self-signed certs on internal infrastructure
+                ssl=False,  # Disable SSL verification — internal infra may use self-signed certs
             ) as resp:
                 if resp.status != 200:
                     return f"HTTP {resp.status}: {resp.reason}"

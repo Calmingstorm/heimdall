@@ -9,7 +9,7 @@ import asyncio
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Callable, Awaitable
+from collections.abc import Awaitable, Callable
 
 from ..config.schema import MonitoringConfig, MonitorCheck
 from ..logging import get_logger

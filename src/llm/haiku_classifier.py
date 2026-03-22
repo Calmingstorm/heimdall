@@ -23,8 +23,7 @@ _RETRYABLE_STATUSES = frozenset((408, 429, 500, 502, 503, 504, 529))
 class HaikuClassifier:
     """Classify messages using Anthropic's Haiku model via raw HTTP.
 
-    Drop-in replacement for OllamaClassifier. Same interface:
-    classify(content, has_recent_tool_use, skill_hints) -> str
+    Interface: classify(content, has_recent_tool_use, skill_hints) -> str
 
     Features:
     - Raw HTTP POST to Anthropic Messages API (no SDK, no streaming)
@@ -59,11 +58,7 @@ class HaikuClassifier:
         has_recent_tool_use: bool = False,
         skill_hints: str = "",
     ) -> str:
-        """Build the classification system prompt.
-
-        IDENTICAL to OllamaClassifier._build_system_prompt() — same
-        classification logic, same results.
-        """
+        """Build the classification system prompt."""
         system = (
             "Classify the user message as 'chat', 'claude_code', or 'task'. "
             "Reply with ONLY one word.\n"

@@ -86,7 +86,7 @@ class PermissionManager:
             return tools
         if tier == "guest":
             return None
-        # User tier: only whitelisted read-only tools
+        # User tier: only allowlisted read-only tools
         return [t for t in tools if t["name"] in USER_TIER_TOOLS]
 
     def allowed_tool_names(self, user_id: str) -> set[str] | None:

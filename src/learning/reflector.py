@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from ..sessions.manager import Message, Session
 
 # Type alias: async (messages: list[dict], system: str) -> str
-TextFn = Callable[[list[dict], str], str]
+TextFn = Callable[[list[dict], str], Awaitable[str]]
 
 log = get_logger("learning")
 

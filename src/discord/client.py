@@ -7,7 +7,7 @@ import io
 import os
 import re
 import time
-from typing import Callable
+from collections.abc import Callable
 
 import discord
 from discord import app_commands

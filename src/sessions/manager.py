@@ -4,7 +4,7 @@ import asyncio
 import copy
 import json
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 # Type alias for the compaction callable:
 #   async (messages: list[dict], system: str) -> str
-CompactionFn = Callable[[list[dict], str], str]
+CompactionFn = Callable[[list[dict], str], Awaitable[str]]
 
 log = get_logger("sessions")
 COMPACTION_THRESHOLD = 40  # compact when history exceeds this

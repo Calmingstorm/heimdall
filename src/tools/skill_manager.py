@@ -7,7 +7,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
+from collections.abc import Callable
 
 from ..logging import get_logger
 from .executor import ToolExecutor
