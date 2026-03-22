@@ -30,7 +30,7 @@ sessions:
 
 tools:
   enabled: true
-  ssh_key_path: "/app/.ssh/id_ed25519"
+  ssh_key_path: "/app/.ssh/id_ed25519"       # Docker/Incus: /app/.ssh/  Bare metal: ~/.ssh/
   ssh_known_hosts_path: "/app/.ssh/known_hosts"
   hosts: {}
   # Example host config:
@@ -75,7 +75,7 @@ learning:
 
 search:
   enabled: true
-  ollama_url: "http://host.docker.internal:11434"
+  ollama_url: "${OLLAMA_URL:-http://localhost:11434}"
   embed_model: "nomic-embed-text"
   chromadb_path: "./data/chromadb"
 

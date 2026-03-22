@@ -6,6 +6,7 @@ services:
     env_file: .env
     environment:
       - TZ=${TZ:-UTC}
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
     volumes:
       - ./config.yml:/app/config.yml:ro
       - ./data:/app/data
