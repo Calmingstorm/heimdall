@@ -52,6 +52,7 @@ tools:
   #   - check-services.yml
   #   - system-info.yml
   ansible_directory: "/ansible"
+  auto_approve: false             # Skip approval prompts for destructive tools (use with caution)
   approval_timeout_seconds: 120
   command_timeout_seconds: 30
   # prometheus_host: "myserver"   # Host alias to run Prometheus queries on

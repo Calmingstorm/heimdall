@@ -37,6 +37,7 @@ def _make_bot_stub():
     stub.config = MagicMock()
     stub.config.tools.enabled = True
     stub.config.tools.tool_timeout_seconds = 300
+    stub.config.tools.auto_approve = False
     stub.config.discord.allowed_users = ["user-1"]
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False

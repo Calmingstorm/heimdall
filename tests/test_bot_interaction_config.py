@@ -348,3 +348,123 @@ class TestRequireMention:
 
         await stub.on_message(msg)
         stub._handle_message.assert_not_called()
+
+
+class TestAutoApproveConfig:
+    def test_auto_approve_defaults_false(self):
+        from src.config.schema import ToolsConfig
+        cfg = ToolsConfig()
+        assert cfg.auto_approve is False
+
+    def test_auto_approve_set_true(self):
+        from src.config.schema import ToolsConfig
+        cfg = ToolsConfig(auto_approve=True)
+        assert cfg.auto_approve is True
+
+
+class TestAutoApproveSkipsPrompt:
+    """When auto_approve is True, destructive tools execute without approval prompt."""
+
+    async def test_auto_approve_skips_approval_prompt(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from src.discord.client import LokiBot
+
+        stub = MagicMock(spec=LokiBot)
+        stub.config = MagicMock()
+        stub.config.tools.auto_approve = True
+        stub.config.tools.enabled = True
+        stub.config.discord.allowed_users = []
+        stub.config.discord.respond_to_bots = False
+        stub.config.discord.require_mention = False
+        stub.skill_manager = MagicMock()
+        stub.skill_manager.requires_approval.return_value = None
+        stub.permissions = MagicMock()
+        stub.permissions.filter_tools.return_value = [
+            {"name": "run_command", "requires_approval": True}
+        ]
+        stub.sessions = MagicMock()
+        stub.sessions.get_task_history = AsyncMock(return_value=[
+            {"role": "user", "content": "run echo test on localhost"}
+        ])
+        stub.codex_client = MagicMock()
+
+        from src.llm.types import LLMResponse, ToolCall
+        stub.codex_client.chat_with_tools = AsyncMock(
+            return_value=LLMResponse(
+                text="Done",
+                tool_calls=[],
+                stop_reason="end_turn",
+            )
+        )
+        stub._merged_tool_definitions = MagicMock(return_value=[
+            {"name": "run_command", "requires_approval": True}
+        ])
+        stub._build_system_prompt = MagicMock(return_value="system")
+        stub._inject_tool_hints = AsyncMock(return_value="system")
+
+        # The key assertion: request_approval should never be called
+        with patch("src.discord.client.request_approval") as mock_approval:
+            msg = MagicMock()
+            msg.author.id = 12345
+            msg.webhook_id = None
+            msg.channel.id = 99999
+
+            result = await LokiBot._process_with_tools(
+                stub, msg,
+                [{"role": "user", "content": "run echo test"}],
+                system_prompt_override="system",
+            )
+            mock_approval.assert_not_called()
+
+    async def test_auto_approve_false_calls_approval(self):
+        from unittest.mock import AsyncMock, MagicMock, patch
+        from src.discord.client import LokiBot
+        from src.llm.types import LLMResponse, ToolCall
+
+        stub = MagicMock(spec=LokiBot)
+        stub.config = MagicMock()
+        stub.config.tools.auto_approve = False
+        stub.config.tools.enabled = True
+        stub.config.tools.approval_timeout_seconds = 60
+        stub.config.tools.tool_timeout_seconds = 300
+        stub.config.discord.allowed_users = ["12345"]
+        stub.config.discord.respond_to_bots = False
+        stub.config.discord.require_mention = False
+        stub.skill_manager = MagicMock()
+        stub.skill_manager.requires_approval.return_value = None
+        stub.permissions = MagicMock()
+        stub.permissions.filter_tools.return_value = [
+            {"name": "run_command", "requires_approval": True}
+        ]
+        stub.sessions = MagicMock()
+        stub.sessions.get_task_history = AsyncMock(return_value=[
+            {"role": "user", "content": "run echo test"}
+        ])
+        stub.codex_client = MagicMock()
+        stub.codex_client.chat_with_tools = AsyncMock(
+            return_value=LLMResponse(
+                text="",
+                tool_calls=[ToolCall(id="tc1", name="run_command", input={"host": "localhost", "command": "echo test"})],
+                stop_reason="tool_use",
+            )
+        )
+        stub._merged_tool_definitions = MagicMock(return_value=[
+            {"name": "run_command", "requires_approval": True}
+        ])
+        stub.audit = MagicMock()
+        stub.audit.log_execution = AsyncMock()
+        stub._send_with_retry = AsyncMock()
+
+        with patch("src.discord.client.request_approval", new_callable=AsyncMock, return_value=False) as mock_approval:
+            msg = MagicMock()
+            msg.author.id = 12345
+            msg.webhook_id = None
+            msg.channel.id = 99999
+            msg.channel.send = AsyncMock()
+
+            result = await LokiBot._process_with_tools(
+                stub, msg,
+                [{"role": "user", "content": "run echo test"}],
+                system_prompt_override="system",
+            )
+            assert mock_approval.call_count >= 1

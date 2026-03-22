@@ -1489,7 +1489,7 @@ class LokiBot(discord.Client):
                 # Check skill manager first for approval, fall through to registry
                 skill_approval = self.skill_manager.requires_approval(tool_name)
                 needs_approval = skill_approval if skill_approval is not None else requires_approval(tool_name)
-                if needs_approval and tool_name not in approved_tools and not is_test_wh:
+                if needs_approval and tool_name not in approved_tools and not is_test_wh and not self.config.tools.auto_approve:
                     approved = await request_approval(
                         bot=self,
                         channel=message.channel,

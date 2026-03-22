@@ -49,6 +49,7 @@ class ToolsConfig(BaseModel):
     allowed_services: list[str] = Field(default_factory=list)
     allowed_playbooks: list[str] = Field(default_factory=list)
     ansible_directory: str = "/ansible"
+    auto_approve: bool = False
     approval_timeout_seconds: int = 60
     command_timeout_seconds: int = 30
     tool_timeout_seconds: int = 300

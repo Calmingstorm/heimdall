@@ -46,6 +46,7 @@ def _make_bot_stub():
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
     stub.config.tools.approval_timeout_seconds = 30
+    stub.config.tools.auto_approve = False
     stub.codex_client = MagicMock()
     stub.codex_client.chat_with_tools = AsyncMock()
     stub.skill_manager = MagicMock()
