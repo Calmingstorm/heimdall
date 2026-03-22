@@ -6,7 +6,7 @@ from ..logging import get_logger
 
 log = get_logger("ssh")
 
-MAX_OUTPUT_CHARS = 4000
+MAX_OUTPUT_CHARS = 16000
 
 
 async def run_ssh_command(
@@ -41,7 +41,8 @@ async def run_ssh_command(
         output = stdout.decode("utf-8", errors="replace")
 
         if len(output) > MAX_OUTPUT_CHARS:
-            output = output[:MAX_OUTPUT_CHARS] + "\n... (output truncated)"
+            half = MAX_OUTPUT_CHARS // 2
+            output = output[:half] + "\n\n... (output truncated) ...\n\n" + output[-half:]
 
         return proc.returncode or 0, output
 
