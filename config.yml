@@ -1,0 +1,116 @@
+discord:
+  token: "${DISCORD_TOKEN}"
+  allowed_users:
+    - "441602773310767105"   # Calmingstorm (Aaron)
+    - "757383353141035140"   # Audrastaia (Jess)
+  channels: []  # Leave empty to allow all channels in the server
+
+anthropic:
+  api_key: "${ANTHROPIC_API_KEY}"
+  model: "claude-sonnet-4-20250514"
+  max_tokens: 16384
+  daily_budget_tokens: 0
+
+openai_codex:
+  enabled: true
+  model: "gpt-5.3-codex"
+  max_tokens: 4096
+  credentials_path: "./data/codex_auth.json"
+
+context:
+  directory: "./data/context"
+  max_system_prompt_tokens: 32000
+
+sessions:
+  max_history: 50
+  max_age_hours: 24
+  persist_directory: "./data/sessions"
+
+tools:
+  enabled: true
+  ssh_key_path: "/app/.ssh/id_ed25519"
+  ssh_known_hosts_path: "/app/.ssh/known_hosts"
+  hosts:
+    desktop:
+      address: "192.168.1.3"
+      ssh_user: "root"
+    server:
+      address: "192.168.1.13"
+      ssh_user: "root"
+    dns-server:
+      address: "192.168.1.20"
+      ssh_user: "root"
+    jessica-pc:
+      address: "192.168.1.9"
+      ssh_user: "root"
+    macbook:
+      address: "192.168.1.27"
+      ssh_user: "calmingstorm"
+      os: "macos"
+  allowed_services:
+    - apache2
+    - mariadb
+    - mongod
+    - redis-server
+    - prometheus
+    - grafana-server
+    - loki
+    - promtail
+    - node_exporter
+    - ollama
+    - gitea
+    - discordrpg
+    - plexmediaserver
+    - pihole-FTL
+    - unbound
+    - comfyui
+    - filter-chain
+    - pipewire
+    - docker
+    - monitor-layout-fix
+  allowed_playbooks:
+    - check-services.yml
+    - system-info.yml
+    - update-all.yml
+    - deploy-promtail.yml
+  ansible_directory: "/ansible"
+  approval_timeout_seconds: 120
+  command_timeout_seconds: 30
+  incus_host: desktop
+
+webhook:
+  enabled: true
+  secret: "9a37d251362a6fe1dd0a041530744d11e09b61cdeca02aa6a61784c7cc0d14c5"
+  channel_id: "1481679552181698610"        # #notifications (default for all webhooks)
+  gitea_channel_id: "1481679552181698610"   # #notifications
+  grafana_channel_id: "1481679552181698610" # #notifications
+
+learning:
+  enabled: true
+  max_entries: 30
+  consolidation_target: 20
+
+search:
+  enabled: true
+  ollama_url: "http://host.docker.internal:11434"
+  embed_model: "nomic-embed-text"
+  chromadb_path: "./data/chromadb"
+
+logging:
+  level: "INFO"
+  directory: "./data/logs"
+
+usage:
+  directory: "./data/usage"
+
+voice:
+  enabled: true
+  voice_service_url: "ws://ansiblex-voice:3940/ws"
+  auto_join: false
+  transcript_channel_id: "1482174235743879249"
+  default_voice: "en-US-AvaMultilingualNeural"
+  wake_word: "ansiblex"
+
+browser:
+  enabled: true
+  cdp_url: "ws://ansiblex-browser:3000?token=ansiblex-internal"

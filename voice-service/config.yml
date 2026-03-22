@@ -1,0 +1,30 @@
+whisper:
+  model_size: "medium"
+  device: "cuda"
+  compute_type: "float16"
+  idle_unload_seconds: 0  # 0 = never unload, keep in VRAM
+  vad_filter: true
+  language: "en"
+
+tts:
+  default_voice: "en-US-AvaMultilingualNeural"
+  voices_directory: "./voices"
+  output_sample_rate: 48000
+  output_channels: 2
+
+listen:
+  mode: "continuous"  # "continuous" or "wake_word"
+  energy_threshold: 150
+  silence_duration: 0.8
+  min_speech_duration: 0.5
+  max_speech_duration: 10.0
+
+wake_word:
+  model_path: ""  # empty = built-in "hey_jarvis" fallback
+  threshold: 0.5
+  inference_framework: "onnx"
+
+server:
+  host: "0.0.0.0"
+  port: 3940
+  log_level: "info"

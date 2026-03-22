@@ -1,0 +1,58 @@
+services:
+  ansiblex:
+    build: .
+    container_name: ansiblex
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TZ=America/New_York
+    volumes:
+      - ./config.yml:/app/config.yml:ro
+      - ./data:/app/data
+      - ./data/context:/app/data/context:ro
+      - ./ssh:/app/.ssh:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:3939:3000"
+    networks:
+      - default
+
+  ansiblex-browser:
+    image: ghcr.io/browserless/chromium
+    container_name: ansiblex-browser
+    restart: unless-stopped
+    profiles:
+      - browser
+    environment:
+      - CONCURRENT=2
+      - TIMEOUT=30000
+      - QUEUED=5
+      - HEALTH=true
+      - TOKEN=ansiblex-internal
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    networks:
+      - default
+
+  ansiblex-voice:
+    build: ./voice-service
+    container_name: ansiblex-voice
+    restart: unless-stopped
+    profiles:
+      - voice
+    volumes:
+      - ./voice-service/config.yml:/app/config.yml:ro
+      - ./voice-service/voices:/app/voices
+      - ./voice-service/models:/app/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - default

@@ -1,0 +1,11 @@
+faster-whisper>=1.0.0
+openwakeword>=0.6.0
+piper-tts>=1.2.0
+pathvalidate>=3.0
+edge-tts>=6.1.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+websockets>=12.0
+numpy>=1.26.0
+pyyaml>=6.0
+pydantic>=2.10.0
