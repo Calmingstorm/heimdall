@@ -13,6 +13,8 @@ data/memory.json
 data/schedules.json
 data/learned.json
 data/grocery_list.json
+data/context/*.md
+data/skills/*.py
 data/skills/__pycache__/
 data/chromadb/
 data/fts.db
@@ -29,5 +31,6 @@ build_log*.txt
 BUILD_STATUS.md
 RESEARCH_PROPOSALS.md
 build-loop.sh
+AUDIT_FINDINGS.md
 PRODUCTION_LOGS.txt
 CURRENT_LEARNED.json

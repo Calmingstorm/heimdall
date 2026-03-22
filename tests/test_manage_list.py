@@ -150,7 +150,7 @@ class TestGroceryMigration:
     def test_migrates_grocery_items(self, tmp_path):
         old_data = {"items": [
             {"name": "Milk", "added_by": "TestUser", "added_at": "2026-03-10T12:00:00"},
-            {"name": "Eggs", "added_by": "Jessica", "added_at": "2026-03-11T09:00:00"},
+            {"name": "Eggs", "added_by": "TestUser2", "added_at": "2026-03-11T09:00:00"},
         ]}
         executor = make_executor(tmp_path, grocery_data=old_data)
         result = executor._load_lists()

@@ -1,0 +1,35 @@
+# Example Context File
+
+Context files provide environment-specific information to Loki's system prompt.
+Place `.md` files in this directory and they will be loaded automatically.
+Use `/reload` in Discord to reload context files without restarting.
+
+Rename this file to `example.md` (remove `.template`) to activate it.
+
+## Hosts
+
+Describe your infrastructure so Loki knows what's available:
+
+- **webserver** (10.0.0.1): Ubuntu 24.04, runs nginx and the app stack
+- **dbserver** (10.0.0.2): PostgreSQL 16, Redis, runs backups at 2am
+
+## Services
+
+Key services Loki should know about:
+
+- `nginx` — reverse proxy on webserver
+- `postgresql` — database on dbserver
+- `redis` — cache on dbserver
+
+## Git Repos
+
+Repos Loki can interact with:
+
+- `/home/deploy/myapp` on webserver — main application repo
+- `/home/deploy/infra` on webserver — infrastructure configs
+
+## Notes
+
+- Backups run at 2:00 AM via cron on dbserver
+- SSL certs auto-renew via certbot on webserver
+- Monitoring alerts go to #alerts channel

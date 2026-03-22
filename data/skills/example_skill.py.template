@@ -1,0 +1,41 @@
+"""
+Example Loki skill — rename this file to example_skill.py to activate it.
+
+Skills are Python files that add new tools to Loki at runtime.
+Each skill must define:
+  1. SKILL_DEFINITION — a dict describing the tool (name, description, input_schema)
+  2. execute(ctx, params) — an async function that runs when the tool is called
+
+The `ctx` (SkillContext) object provides:
+  - ctx.run_ssh(host, command) — run a shell command on a remote host
+  - ctx.read_file(host, path) — read a file from a remote host
+  - ctx.write_file(host, path, content) — write a file on a remote host
+  - ctx.search_knowledge(query) — search the knowledge base
+  - ctx.get_memory(key) / ctx.set_memory(key, value) — persistent key-value storage
+  - ctx.http_get(url) / ctx.http_post(url, data) — make HTTP requests
+  - ctx.log(message) — log a message
+
+See src/tools/skill_context.py for the full API.
+"""
+
+SKILL_DEFINITION = {
+    "name": "hello_world",
+    "description": "A simple example skill that greets the user",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "Name to greet (optional)",
+            },
+        },
+        "required": [],
+    },
+    "requires_approval": False,
+}
+
+
+async def execute(ctx, params):
+    """Called when the hello_world tool is invoked."""
+    name = params.get("name", "world")
+    return f"Hello, {name}! This is an example skill running on Loki."
