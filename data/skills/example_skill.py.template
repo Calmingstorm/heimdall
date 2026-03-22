@@ -4,18 +4,44 @@ Example Loki skill — rename this file to example_skill.py to activate it.
 Skills are Python files that add new tools to Loki at runtime.
 Each skill must define:
   1. SKILL_DEFINITION — a dict describing the tool (name, description, input_schema)
-  2. execute(ctx, params) — an async function that runs when the tool is called
+  2. async def execute(inp, context) -> str — runs when the tool is called
 
-The `ctx` (SkillContext) object provides:
-  - ctx.run_ssh(host, command) — run a shell command on a remote host
-  - ctx.read_file(host, path) — read a file from a remote host
-  - ctx.write_file(host, path, content) — write a file on a remote host
-  - ctx.search_knowledge(query) — search the knowledge base
-  - ctx.get_memory(key) / ctx.set_memory(key, value) — persistent key-value storage
-  - ctx.http_get(url) / ctx.http_post(url, data) — make HTTP requests
-  - ctx.log(message) — log a message
+The `context` (SkillContext) object provides:
 
-See src/tools/skill_context.py for the full API.
+  SSH & Infrastructure:
+    await context.run_on_host(alias, command)     — run a shell command on a managed host
+    await context.read_file(host, path, lines=200) — read a file from a managed host
+    await context.query_prometheus(query)          — run a PromQL instant query
+    await context.execute_tool(name, input)        — call any safe built-in tool
+
+  HTTP:
+    await context.http_get(url, params=None, timeout=15)
+    await context.http_post(url, json=None, data=None, timeout=15)
+
+  Messaging:
+    await context.post_message(text)               — send text to the invoking channel
+    await context.post_file(data, filename, caption) — send a binary file
+
+  Knowledge & History:
+    await context.search_knowledge(query, limit=5) — search the knowledge base
+    await context.ingest_document(content, source) — add text to the knowledge base
+    await context.search_history(query, limit=10)  — search conversation history
+
+  Scheduling:
+    context.schedule_task(description, action, channel_id, **kwargs)
+    context.list_schedules()
+    context.delete_schedule(schedule_id)
+
+  Memory & Config:
+    context.remember(key, value)   — save to persistent memory
+    context.recall(key)            — retrieve from memory (returns str or None)
+    context.get_hosts()            — list available host aliases
+    context.get_services()         — list allowed service names
+
+  Logging:
+    context.log(message)           — write a log message
+
+See src/tools/skill_context.py for the full API reference.
 """
 
 SKILL_DEFINITION = {
@@ -35,7 +61,8 @@ SKILL_DEFINITION = {
 }
 
 
-async def execute(ctx, params):
+async def execute(inp, context):
     """Called when the hello_world tool is invoked."""
-    name = params.get("name", "world")
+    name = inp.get("name", "world")
+    context.log(f"Greeting {name}")
     return f"Hello, {name}! This is an example skill running on Loki."

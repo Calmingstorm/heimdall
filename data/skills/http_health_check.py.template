@@ -1,0 +1,59 @@
+"""
+HTTP Health Check skill — rename to http_health_check.py to activate.
+
+Checks whether a URL is reachable and reports status code and response time.
+Remembers the last status for each URL so it can report changes. Demonstrates:
+  - context.http_get() for HTTP requests
+  - context.remember() / context.recall() for persistent memory
+  - context.post_message() for sending results to the channel
+  - Error handling for network failures
+"""
+
+import time
+
+SKILL_DEFINITION = {
+    "name": "http_health_check",
+    "description": "Check if a URL is reachable and report its HTTP status and response time",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "url": {
+                "type": "string",
+                "description": "The URL to check (e.g. https://example.com)",
+            },
+        },
+        "required": ["url"],
+    },
+    "requires_approval": False,
+}
+
+
+async def execute(inp, context):
+    """Check URL health and compare with last known status."""
+    url = inp.get("url", "")
+    if not url:
+        return "Please provide a URL to check."
+
+    context.log(f"Checking health of {url}")
+    start = time.monotonic()
+
+    try:
+        result = await context.http_get(url, timeout=10)
+        elapsed_ms = (time.monotonic() - start) * 1000
+        status = "UP"
+        details = f"Response time: {elapsed_ms:.0f}ms"
+    except Exception as e:
+        elapsed_ms = (time.monotonic() - start) * 1000
+        status = "DOWN"
+        details = f"Error: {e}"
+
+    # Check previous status for change detection
+    memory_key = f"health:{url}"
+    previous = context.recall(memory_key)
+    context.remember(memory_key, status)
+
+    change_note = ""
+    if previous and previous != status:
+        change_note = f" (changed from {previous})"
+
+    return f"{url} is {status}{change_note}. {details}"

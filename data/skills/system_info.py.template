@@ -1,0 +1,47 @@
+"""
+System Info skill — rename to system_info.py to activate.
+
+Gathers basic system information (hostname, uptime, load, memory, disk)
+from a managed host via SSH. Demonstrates:
+  - context.run_on_host() for SSH commands
+  - context.get_hosts() to list configured hosts
+  - Handling missing/empty host parameters
+"""
+
+SKILL_DEFINITION = {
+    "name": "system_info",
+    "description": "Gather system information (uptime, load, memory, disk) from a managed host",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "host": {
+                "type": "string",
+                "description": "Host alias to query (use list_hosts to see available hosts)",
+            },
+        },
+        "required": ["host"],
+    },
+    "requires_approval": False,
+}
+
+
+async def execute(inp, context):
+    """Collect system info from the specified host."""
+    host = inp.get("host", "")
+    if not host:
+        hosts = context.get_hosts()
+        if not hosts:
+            return "No hosts configured. Add hosts to config.yml first."
+        return f"Please specify a host. Available: {', '.join(hosts)}"
+
+    # Run a single compound command to minimize SSH round-trips
+    command = " && ".join([
+        "echo '=== Hostname ===' && hostname",
+        "echo '=== Uptime ===' && uptime",
+        "echo '=== Memory ===' && free -h | head -3",
+        "echo '=== Disk ===' && df -h / | tail -1",
+    ])
+
+    context.log(f"Gathering system info from {host}")
+    output = await context.run_on_host(host, command)
+    return output
