@@ -199,6 +199,32 @@ class TestSystemPromptQuality:
             f"Duplicate section headers: {headers}"
         )
 
+    def test_autonomous_execution_directives(self):
+        """System prompt must contain directives that force execution over discussion."""
+        prompt = build_system_prompt(
+            context="", hosts={}, services=[], playbooks=[],
+        )
+        # Must demand tool calls in first response
+        assert "FIRST response MUST include tool calls" in prompt
+        # Must forbid discussion-only responses
+        assert "Never respond with only text when tools" in prompt
+        # Must forbid hedging phrases
+        for phrase in ["if you want", "shall I", "ready when you are"]:
+            assert phrase in prompt, f"Must forbid phrase: {phrase}"
+        # Must identify as executor, not assistant
+        assert "EXECUTOR" in prompt
+        # Must instruct write-then-execute for scripts
+        assert "write_file" in prompt
+        assert "write the script to a file" in prompt.lower()
+
+    def test_no_inline_heredoc_pattern(self):
+        """System prompt must forbid inline heredocs/multi-line SSH commands."""
+        prompt = build_system_prompt(
+            context="", hosts={}, services=[], playbooks=[],
+        )
+        assert "heredoc" in prompt.lower()
+        assert "Never use inline heredocs" in prompt or "never use inline heredocs" in prompt.lower()
+
 
 class TestTimezoneSupport:
     """Round 6: timezone is passed through to prompt builders."""
