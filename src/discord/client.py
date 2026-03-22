@@ -24,7 +24,6 @@ from ..learning import ConversationReflector
 from ..llm import CircuitOpenError, CodexAuth, CodexChatClient
 from ..llm.haiku_classifier import HaikuClassifier
 from ..llm.secret_scrubber import scrub_output_secrets
-from ..llm.types import LLMResponse
 from ..llm.system_prompt import build_system_prompt, build_chat_system_prompt
 from ..logging import get_logger
 from ..scheduler import Scheduler
@@ -318,6 +317,7 @@ class LokiBot(discord.Client):
         self._register_commands()
         self._init_routing_defaults()
         self._init_allowed_webhook_ids()
+        self._log_startup_config()
 
     def _init_routing_defaults(self) -> None:
         """Populate CLAUDE_CODE_DEFAULTS from config for claude -p routing."""
@@ -334,6 +334,24 @@ class LokiBot(discord.Client):
         raw = os.environ.get("ALLOWED_WEBHOOK_IDS", "")
         if raw:
             _ALLOWED_WEBHOOK_IDS = {wid.strip() for wid in raw.split(",") if wid.strip()}
+
+    def _log_startup_config(self) -> None:
+        """Log configuration summary at startup to help users verify setup."""
+        cfg = self.config
+        if not cfg.tools.hosts:
+            log.warning("No hosts configured — SSH tools will not work until hosts are added to config.yml")
+        else:
+            log.info("Configured hosts: %s", ", ".join(cfg.tools.hosts.keys()))
+        if not cfg.tools.claude_code_host:
+            log.info("claude_code_host not set — claude -p code generation requires a configured host")
+        if not cfg.anthropic.api_key:
+            log.warning("No Anthropic API key — message classification will not work")
+        if cfg.openai_codex.enabled and not self.codex_client:
+            log.warning("Codex enabled but not configured — session compaction and learning reflection disabled")
+        if cfg.discord.respond_to_bots:
+            log.info("Bot interaction enabled — will respond to other bots")
+        if cfg.discord.require_mention:
+            log.info("Mention-only mode — will only respond when @mentioned")
 
     def _build_system_prompt(
         self, channel: discord.abc.GuildChannel | None = None,

@@ -177,6 +177,25 @@ def _substitute_env_vars(text: str) -> str:
 def load_config(path: str | Path = "config.yml") -> Config:
     path = Path(path)
     raw = path.read_text()
-    raw = _substitute_env_vars(raw)
-    data = yaml.safe_load(raw)
+    try:
+        raw = _substitute_env_vars(raw)
+    except ValueError as exc:
+        raise SystemExit(
+            f"Configuration error: {exc}\n"
+            "Set the variable in your .env file or shell environment.\n"
+            "See .env.example for required variables."
+        ) from exc
+    try:
+        data = yaml.safe_load(raw)
+    except yaml.YAMLError as exc:
+        raise SystemExit(
+            f"Failed to parse {path}: {exc}\n"
+            "Check your YAML syntax (indentation, colons, quotes)."
+        ) from exc
+    if not isinstance(data, dict):
+        raise SystemExit(
+            f"Config file {path} is empty or invalid.\n"
+            "It must contain a YAML mapping with at least a 'discord' section.\n"
+            "See config.yml comments for examples."
+        )
     return Config(**data)
