@@ -164,6 +164,11 @@ class LokiBot(discord.Client):
         # Track recently processed message IDs to prevent duplicate handling
         self._processed_messages: collections.OrderedDict[int, None] = collections.OrderedDict()
         self._processed_messages_max = 100
+        # Bot message buffer: accumulate rapid-fire bot messages before processing
+        # Key: (channel_id, author_id) → list of content strings
+        self._bot_msg_buffer: dict[tuple[str, str], list[str]] = {}
+        self._bot_msg_tasks: dict[tuple[str, str], asyncio.Task] = {}
+        self._bot_msg_buffer_delay: float = 2.0  # seconds to wait for more bot messages
         # Recent tool executions for conversational context (injected into system prompt)
         # Per-channel: {channel_id: [(timestamp, entry_text), ...]}
         self._recent_actions: dict[str, list[tuple[float, str]]] = {}
@@ -731,6 +736,39 @@ class LokiBot(discord.Client):
         while len(self._processed_messages) > self._processed_messages_max:
             self._processed_messages.popitem(last=False)
 
+        # Buffer rapid-fire bot messages (e.g. code blocks split across messages)
+        # Wait 2s after each bot message to see if more follow, then process all at once
+        if message.author.bot and self.config.discord.respond_to_bots:
+            buf_key = (str(message.channel.id), str(message.author.id))
+            if buf_key not in self._bot_msg_buffer:
+                self._bot_msg_buffer[buf_key] = []
+            self._bot_msg_buffer[buf_key].append(message.content)
+
+            # Cancel previous timer for this bot+channel
+            if buf_key in self._bot_msg_tasks:
+                self._bot_msg_tasks[buf_key].cancel()
+
+            # Set new timer — process after delay of silence
+            async def _flush_bot_buffer(key, orig_msg):
+                await asyncio.sleep(self._bot_msg_buffer_delay)
+                parts = self._bot_msg_buffer.pop(key, [])
+                self._bot_msg_tasks.pop(key, None)
+                if not parts:
+                    return
+                combined = "\n\n".join(parts)
+                log.info("Bot buffer flushed: %d messages from %s combined", len(parts), orig_msg.author)
+                # Strip mention from combined content
+                if self.user:
+                    combined = combined.replace(f"<@{self.user.id}>", "").strip()
+                    combined = combined.replace(f"<@!{self.user.id}>", "").strip()
+                if combined:
+                    await self._handle_message(orig_msg, combined, image_blocks=[])
+
+            self._bot_msg_tasks[buf_key] = asyncio.create_task(
+                _flush_bot_buffer(buf_key, message)
+            )
+            return
+
         content = message.content
         # Strip the bot mention from the message if present
         if self.user and self.user.mentioned_in(message):
@@ -1177,7 +1215,7 @@ class LokiBot(discord.Client):
                 _sp = await self._inject_tool_hints(_sp, content, user_id)
                 log.info("Task route: using Codex with tools")
                 # Use abbreviated history to reduce poisoning from stale responses
-                task_history = await self.sessions.get_task_history(channel_id, max_messages=10)
+                task_history = await self.sessions.get_task_history(channel_id, max_messages=20)
                 # Re-inject images into task history (they were added to `history` above
                 # but get_task_history returns fresh history without them)
                 if image_blocks and task_history and task_history[-1]["role"] == "user":

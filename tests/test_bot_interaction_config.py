@@ -1,6 +1,7 @@
 """Tests for respond_to_bots and require_mention config features (Round 3)."""
 from __future__ import annotations
 
+import asyncio
 import time
 from unittest.mock import AsyncMock, MagicMock
 
@@ -154,7 +155,7 @@ class TestRespondToBots:
         stub._handle_message.assert_not_called()
 
     async def test_processes_bots_when_enabled(self):
-        """With respond_to_bots=True, bot messages are processed."""
+        """With respond_to_bots=True, bot messages are buffered then processed."""
         stub = _make_bot_stub()
         stub.config.discord.respond_to_bots = True
         stub._is_allowed_user = MagicMock(return_value=True)
@@ -163,6 +164,9 @@ class TestRespondToBots:
         stub._check_for_secrets = MagicMock(return_value=False)
         stub._handle_message = AsyncMock()
         stub.user.mentioned_in = MagicMock(return_value=False)
+        stub._bot_msg_buffer = {}
+        stub._bot_msg_tasks = {}
+        stub._bot_msg_buffer_delay = 0
         stub.on_message = LokiBot.on_message.__get__(stub)
 
         msg = _make_message(content="hello from another bot")
@@ -170,6 +174,8 @@ class TestRespondToBots:
         msg.id = int(time.time() * 1000) + 101
 
         await stub.on_message(msg)
+        # Buffer flushes asynchronously — give event loop a tick
+        await asyncio.sleep(0.1)
         stub._handle_message.assert_awaited_once()
 
     async def test_never_responds_to_self(self):
@@ -312,7 +318,7 @@ class TestRequireMention:
         stub._handle_message.assert_awaited_once()
 
     async def test_require_mention_with_respond_to_bots(self):
-        """Both flags together: bot @mentions the bot, should be processed."""
+        """Both flags together: bot @mentions the bot, should be buffered then processed."""
         stub = _make_bot_stub()
         stub.config.discord.respond_to_bots = True
         stub.config.discord.require_mention = True
@@ -322,6 +328,9 @@ class TestRequireMention:
         stub._check_for_secrets = MagicMock(return_value=False)
         stub._handle_message = AsyncMock()
         stub.user.mentioned_in = MagicMock(return_value=True)
+        stub._bot_msg_buffer = {}
+        stub._bot_msg_tasks = {}
+        stub._bot_msg_buffer_delay = 0
         stub.on_message = LokiBot.on_message.__get__(stub)
 
         msg = _make_message(content=f"<@111> hello from bot")
@@ -329,6 +338,7 @@ class TestRequireMention:
         msg.id = int(time.time() * 1000) + 204
 
         await stub.on_message(msg)
+        await asyncio.sleep(0.1)
         stub._handle_message.assert_awaited_once()
 
     async def test_require_mention_bot_no_mention_ignored(self):
