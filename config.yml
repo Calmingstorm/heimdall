@@ -1,3 +1,5 @@
+timezone: "UTC"  # IANA timezone (e.g. "America/New_York", "Europe/London", "Asia/Tokyo")
+
 discord:
   token: "${DISCORD_TOKEN}"
   allowed_users: []  # Discord user IDs that can interact with the bot (empty = allow all)

@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from src.tools.time_parser import parse_time, _parse_time_of_day, _next_weekday, ET
+from src.tools.time_parser import parse_time, _parse_time_of_day, _next_weekday, _default_tz, set_default_timezone
 from src.tools.registry import TOOLS
 
 # ── Fixtures ──────────────────────────────────────────────────────────
@@ -14,8 +14,8 @@ from src.tools.registry import TOOLS
 
 @pytest.fixture
 def now() -> datetime:
-    """Fixed reference time: Wednesday March 18 2026, 2:30 PM ET."""
-    return datetime(2026, 3, 18, 14, 30, 0, tzinfo=ET)
+    """Fixed reference time: Wednesday March 18 2026, 2:30 PM UTC."""
+    return datetime(2026, 3, 18, 14, 30, 0, tzinfo=_default_tz)
 
 
 # ── _parse_time_of_day ───────────────────────────────────────────────
@@ -87,27 +87,27 @@ class TestNextWeekday:
 class TestParseTimeRelative:
     def test_in_30_minutes(self, now):
         result = parse_time("in 30 minutes", now)
-        assert result == "2026-03-18T15:00:00-04:00"
+        assert result == "2026-03-18T15:00:00+00:00"
 
     def test_in_2_hours(self, now):
         result = parse_time("in 2 hours", now)
-        assert result == "2026-03-18T16:30:00-04:00"
+        assert result == "2026-03-18T16:30:00+00:00"
 
     def test_in_1_day(self, now):
         result = parse_time("in 1 day", now)
-        assert result == "2026-03-19T14:30:00-04:00"
+        assert result == "2026-03-19T14:30:00+00:00"
 
     def test_in_1_week(self, now):
         result = parse_time("in 1 week", now)
-        assert result == "2026-03-25T14:30:00-04:00"
+        assert result == "2026-03-25T14:30:00+00:00"
 
     def test_in_5_mins(self, now):
         result = parse_time("in 5 mins", now)
-        assert result == "2026-03-18T14:35:00-04:00"
+        assert result == "2026-03-18T14:35:00+00:00"
 
     def test_in_3_hrs(self, now):
         result = parse_time("in 3 hrs", now)
-        assert result == "2026-03-18T17:30:00-04:00"
+        assert result == "2026-03-18T17:30:00+00:00"
 
     def test_unknown_unit_raises(self, now):
         with pytest.raises(ValueError, match="Unknown time unit"):
@@ -120,19 +120,19 @@ class TestParseTimeRelative:
 class TestParseTimeTomorrow:
     def test_tomorrow_at_9am(self, now):
         result = parse_time("tomorrow at 9am", now)
-        assert result == "2026-03-19T09:00:00-04:00"
+        assert result == "2026-03-19T09:00:00+00:00"
 
     def test_tomorrow_at_3_30pm(self, now):
         result = parse_time("tomorrow at 3:30pm", now)
-        assert result == "2026-03-19T15:30:00-04:00"
+        assert result == "2026-03-19T15:30:00+00:00"
 
     def test_tomorrow_no_time_defaults_9am(self, now):
         result = parse_time("tomorrow", now)
-        assert result == "2026-03-19T09:00:00-04:00"
+        assert result == "2026-03-19T09:00:00+00:00"
 
     def test_tomorrow_without_at(self, now):
         result = parse_time("tomorrow 9am", now)
-        assert result == "2026-03-19T09:00:00-04:00"
+        assert result == "2026-03-19T09:00:00+00:00"
 
 
 # ── parse_time: "today" ─────────────────────────────────────────────
@@ -141,7 +141,7 @@ class TestParseTimeTomorrow:
 class TestParseTimeToday:
     def test_today_at_5pm(self, now):
         result = parse_time("today at 5pm", now)
-        assert result == "2026-03-18T17:00:00-04:00"
+        assert result == "2026-03-18T17:00:00+00:00"
 
     def test_today_no_time_raises(self, now):
         with pytest.raises(ValueError, match="requires a time"):
@@ -154,19 +154,19 @@ class TestParseTimeToday:
 class TestParseTimeNextDay:
     def test_next_monday_at_3pm(self, now):
         result = parse_time("next monday at 3pm", now)
-        assert result == "2026-03-23T15:00:00-04:00"
+        assert result == "2026-03-23T15:00:00+00:00"
 
     def test_next_friday(self, now):
         result = parse_time("next friday", now)
-        assert result == "2026-03-20T09:00:00-04:00"  # defaults 9am
+        assert result == "2026-03-20T09:00:00+00:00"  # defaults 9am
 
     def test_next_sunday_at_10am(self, now):
         result = parse_time("next sunday at 10am", now)
-        assert result == "2026-03-22T10:00:00-04:00"
+        assert result == "2026-03-22T10:00:00+00:00"
 
     def test_abbreviated_day(self, now):
         result = parse_time("next fri at 2pm", now)
-        assert result == "2026-03-20T14:00:00-04:00"
+        assert result == "2026-03-20T14:00:00+00:00"
 
 
 # ── parse_time: bare "DAY [at TIME]" ────────────────────────────────
@@ -175,11 +175,11 @@ class TestParseTimeNextDay:
 class TestParseTimeBareDay:
     def test_friday_at_3pm(self, now):
         result = parse_time("friday at 3pm", now)
-        assert result == "2026-03-20T15:00:00-04:00"
+        assert result == "2026-03-20T15:00:00+00:00"
 
     def test_monday_no_time(self, now):
         result = parse_time("monday", now)
-        assert result == "2026-03-23T09:00:00-04:00"
+        assert result == "2026-03-23T09:00:00+00:00"
 
 
 # ── parse_time: "at TIME" ───────────────────────────────────────────
@@ -188,16 +188,16 @@ class TestParseTimeBareDay:
 class TestParseTimeAtTime:
     def test_at_5pm_future(self, now):
         result = parse_time("at 5pm", now)
-        assert result == "2026-03-18T17:00:00-04:00"
+        assert result == "2026-03-18T17:00:00+00:00"
 
     def test_at_9am_past_wraps_to_tomorrow(self, now):
         # 9am is before 2:30pm, so wraps to tomorrow
         result = parse_time("at 9am", now)
-        assert result == "2026-03-19T09:00:00-04:00"
+        assert result == "2026-03-19T09:00:00+00:00"
 
     def test_at_1700(self, now):
         result = parse_time("at 17:00", now)
-        assert result == "2026-03-18T17:00:00-04:00"
+        assert result == "2026-03-18T17:00:00+00:00"
 
 
 # ── parse_time: bare time ───────────────────────────────────────────
@@ -206,11 +206,11 @@ class TestParseTimeAtTime:
 class TestParseTimeBare:
     def test_5pm(self, now):
         result = parse_time("5pm", now)
-        assert result == "2026-03-18T17:00:00-04:00"
+        assert result == "2026-03-18T17:00:00+00:00"
 
     def test_9am_wraps(self, now):
         result = parse_time("9am", now)
-        assert result == "2026-03-19T09:00:00-04:00"
+        assert result == "2026-03-19T09:00:00+00:00"
 
 
 # ── parse_time: edge cases ──────────────────────────────────────────
@@ -219,11 +219,11 @@ class TestParseTimeBare:
 class TestParseTimeEdgeCases:
     def test_whitespace_stripped(self, now):
         result = parse_time("  in 30 minutes  ", now)
-        assert result == "2026-03-18T15:00:00-04:00"
+        assert result == "2026-03-18T15:00:00+00:00"
 
     def test_case_insensitive(self, now):
         result = parse_time("Tomorrow At 9AM", now)
-        assert result == "2026-03-19T09:00:00-04:00"
+        assert result == "2026-03-19T09:00:00+00:00"
 
     def test_unparseable_raises(self, now):
         with pytest.raises(ValueError, match="Cannot parse"):
@@ -241,7 +241,7 @@ class TestParseTimeEdgeCases:
     def test_naive_now_gets_tz(self):
         naive = datetime(2026, 3, 18, 14, 30, 0)
         result = parse_time("in 1 hour", naive)
-        assert result == "2026-03-18T15:30:00-04:00"
+        assert result == "2026-03-18T15:30:00+00:00"
 
 
 # ── Tool registry ───────────────────────────────────────────────────
@@ -378,3 +378,47 @@ class TestHandleParseTime:
         client_src = Path("src/discord/client.py").read_text()
         assert 'tool_name == "parse_time"' in client_src
         assert "_handle_parse_time" in client_src
+
+
+# ── Timezone configurability ────────────────────────────────────────
+
+
+class TestTimeParserTimezone:
+    """Round 6: time parser uses configurable default timezone."""
+
+    def test_set_default_timezone(self):
+        from src.tools.time_parser import set_default_timezone, _default_tz
+        import src.tools.time_parser as tp
+        original = tp._default_tz
+        try:
+            set_default_timezone("Asia/Tokyo")
+            assert str(tp._default_tz) == "Asia/Tokyo"
+        finally:
+            tp._default_tz = original
+
+    def test_default_timezone_is_utc(self):
+        import src.tools.time_parser as tp
+        assert str(tp._default_tz) == "UTC"
+
+    def test_parse_time_respects_configured_tz(self):
+        """parse_time with no explicit now uses the configured default timezone."""
+        import src.tools.time_parser as tp
+        original = tp._default_tz
+        try:
+            set_default_timezone("Asia/Tokyo")
+            result = parse_time("in 1 hour")
+            # Tokyo is UTC+9, so offset should be +09:00
+            assert "+09:00" in result
+        finally:
+            tp._default_tz = original
+
+    def test_parse_time_tool_description_no_eastern(self):
+        """Tool description should not hardcode 'Eastern Time'."""
+        tool = next(t for t in TOOLS if t["name"] == "parse_time")
+        assert "Eastern Time" not in tool["description"]
+
+    def test_set_default_timezone_called_in_client_init(self):
+        """Verify client.py calls set_default_timezone during init."""
+        from pathlib import Path
+        client_src = Path("src/discord/client.py").read_text()
+        assert "set_default_timezone" in client_src

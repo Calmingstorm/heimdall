@@ -596,6 +596,7 @@ class TestSystemPromptPerUserMemory:
         stub.reflector.get_prompt_section = MagicMock(return_value=learned)
         stub.skill_manager = MagicMock()
         stub.skill_manager.list_skills = MagicMock(return_value=[])
+        stub.config.timezone = "UTC"
         stub._recent_actions = {}
         stub._recent_actions_max = 10
         stub._recent_actions_expiry = 3600

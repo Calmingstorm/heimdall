@@ -154,6 +154,10 @@ class LokiBot(discord.Client):
         self.config = config
         self.tree = app_commands.CommandTree(self)
 
+        # Configure timezone for time parser module
+        from ..tools.time_parser import set_default_timezone
+        set_default_timezone(config.timezone)
+
         # Per-channel lock to prevent concurrent processing of the same message
         self._channel_locks: dict[str, asyncio.Lock] = {}
         # Pending file attachments from skills — per-channel to avoid cross-channel leaks
@@ -365,6 +369,7 @@ class LokiBot(discord.Client):
             services=self.config.tools.allowed_services,
             playbooks=self.config.tools.allowed_playbooks,
             voice_info=voice_info,
+            tz=self.config.timezone,
         )
 
         # Inject persistent memory into the system prompt (per-user + global)
@@ -457,7 +462,7 @@ class LokiBot(discord.Client):
                     "are spoken aloud. Keep voice responses concise and conversational."
                 )
 
-        prompt = build_chat_system_prompt(voice_info=voice_info)
+        prompt = build_chat_system_prompt(voice_info=voice_info, tz=self.config.timezone)
 
         # Inject persistent memory (per-user + global, personalization matters for chat)
         memory = self.tool_executor._load_memory_for_user(user_id)

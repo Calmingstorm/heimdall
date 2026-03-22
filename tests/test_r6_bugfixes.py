@@ -22,7 +22,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.tools.time_parser import parse_time, ET  # noqa: E402
+from src.tools.time_parser import parse_time, _default_tz  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
@@ -31,8 +31,8 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 @pytest.fixture
 def now() -> datetime:
-    """Fixed reference time: Wednesday March 18 2026, 2:30 PM ET."""
-    return datetime(2026, 3, 18, 14, 30, 0, tzinfo=ET)
+    """Fixed reference time: Wednesday March 18 2026, 2:30 PM UTC."""
+    return datetime(2026, 3, 18, 14, 30, 0, tzinfo=_default_tz)
 
 
 # ── Bug 1: tools_used is now a local variable ─────────────────────────
@@ -137,31 +137,31 @@ class TestParseTimeTimezonePreservation:
 
     def test_relative_time_has_offset(self, now):
         result = parse_time("in 30 minutes", now)
-        assert "-04:00" in result
+        assert "+00:00" in result
 
     def test_tomorrow_has_offset(self, now):
         result = parse_time("tomorrow at 9am", now)
-        assert "-04:00" in result
+        assert "+00:00" in result
 
     def test_today_has_offset(self, now):
         result = parse_time("today at 5pm", now)
-        assert "-04:00" in result
+        assert "+00:00" in result
 
     def test_next_day_has_offset(self, now):
         result = parse_time("next friday", now)
-        assert "-04:00" in result
+        assert "+00:00" in result
 
     def test_bare_day_has_offset(self, now):
         result = parse_time("friday at 3pm", now)
-        assert "-04:00" in result
+        assert "+00:00" in result
 
     def test_at_time_has_offset(self, now):
         result = parse_time("at 5pm", now)
-        assert "-04:00" in result
+        assert "+00:00" in result
 
     def test_bare_time_has_offset(self, now):
         result = parse_time("5pm", now)
-        assert "-04:00" in result
+        assert "+00:00" in result
 
     def test_roundtrip_preserves_tz(self, now):
         """Returned ISO string should roundtrip through fromisoformat with tz."""
@@ -170,9 +170,11 @@ class TestParseTimeTimezonePreservation:
         assert parsed.tzinfo is not None
         assert parsed.hour == 9
 
-    def test_est_winter_offset(self):
-        """In January (EST), offset should be -05:00."""
-        winter_now = datetime(2026, 1, 15, 14, 0, 0, tzinfo=ET)
+    def test_configured_tz_offset(self):
+        """When default tz is configured, offset should match that timezone."""
+        from zoneinfo import ZoneInfo
+        # Use a tz-aware now in America/New_York (winter = EST = -05:00)
+        winter_now = datetime(2026, 1, 15, 14, 0, 0, tzinfo=ZoneInfo("America/New_York"))
         result = parse_time("tomorrow at 9am", winter_now)
         assert "-05:00" in result
 
@@ -180,5 +182,5 @@ class TestParseTimeTimezonePreservation:
         """Output should never be a naive datetime string."""
         result = parse_time("in 1 hour", now)
         # Naive ISO strings end with seconds: 2026-03-18T15:30:00
-        # TZ-aware ones continue: 2026-03-18T15:30:00-04:00
+        # TZ-aware ones continue: 2026-03-18T15:30:00+00:00
         assert len(result) > len("2026-03-18T15:30:00")

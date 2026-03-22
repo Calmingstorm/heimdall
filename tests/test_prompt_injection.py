@@ -70,6 +70,9 @@ def _make_bot_stub(**overrides):
             return_value=overrides.get("skills", [])
         )
 
+    # Timezone
+    stub.config.timezone = "UTC"
+
     # Recent actions
     stub._recent_actions = overrides.get("recent_actions", {})
     stub._recent_actions_max = 10

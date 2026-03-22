@@ -41,7 +41,7 @@ Gather info first, build the step list, then delegate. Use `list_tasks`/`cancel_
 CRITICAL: You MUST actually call `delegate_task` — never claim a task was started without calling the tool.
 
 ## Reminders and Scheduling
-ONLY schedule when explicitly asked. Use parse_time if unsure. All times Eastern.
+ONLY schedule when explicitly asked. Use parse_time if unsure. All times use the configured timezone ({timezone_name}).
 Recurring: cron expressions (e.g. "0 9 * * *"). One-time: ISO datetime for run_at.
 
 ## Common Patterns
@@ -94,22 +94,29 @@ You also manage infrastructure, but only when explicitly asked — don't mention
 {voice_info}"""
 
 
-def build_chat_system_prompt(voice_info: str = "") -> str:
+def _format_datetime(tz_name: str = "UTC") -> str:
+    """Format current datetime in the configured timezone with UTC reference."""
+    now_utc = datetime.now(timezone.utc)
+    local_tz = ZoneInfo(tz_name)
+    now_local = now_utc.astimezone(local_tz)
+    tz_abbr = now_local.strftime("%Z")
+    return (
+        f"{now_local.strftime('%A, %B %d, %Y at %I:%M %p')} {tz_abbr} "
+        f"(UTC: {now_utc.strftime('%Y-%m-%d %H:%M')})"
+    )
+
+
+def build_chat_system_prompt(
+    voice_info: str = "",
+    tz: str = "UTC",
+) -> str:
     """Build a lightweight system prompt for chat-routed messages.
 
     Omits infrastructure details, tool descriptions, host lists, PromQL, etc.
     to save input tokens on casual conversation.
     """
-    now_utc = datetime.now(timezone.utc)
-    now_et = now_utc.astimezone(ZoneInfo("America/New_York"))
-    tz_abbr = now_et.strftime("%Z")
-    current_datetime = (
-        f"{now_et.strftime('%A, %B %d, %Y at %I:%M %p')} {tz_abbr} "
-        f"(UTC: {now_utc.strftime('%Y-%m-%d %H:%M')})"
-    )
-
     return CHAT_SYSTEM_PROMPT_TEMPLATE.format(
-        current_datetime=current_datetime,
+        current_datetime=_format_datetime(tz),
         voice_info=voice_info or "Voice support is not enabled.",
     )
 
@@ -120,24 +127,22 @@ def build_system_prompt(
     services: list[str],
     playbooks: list[str],
     voice_info: str = "",
+    tz: str = "UTC",
 ) -> str:
     hosts_text = "\n".join(f"- `{alias}`: {addr}" for alias, addr in hosts.items())
     services_text = ", ".join(f"`{s}`" for s in services)
     playbooks_text = ", ".join(f"`{p}`" for p in playbooks)
 
-    now_utc = datetime.now(timezone.utc)
-    now_et = now_utc.astimezone(ZoneInfo("America/New_York"))
-    tz_abbr = now_et.strftime("%Z")  # EST or EDT depending on DST
-    current_datetime = (
-        f"{now_et.strftime('%A, %B %d, %Y at %I:%M %p')} {tz_abbr} "
-        f"(UTC: {now_utc.strftime('%Y-%m-%d %H:%M')})"
-    )
+    # Derive a human-friendly timezone name for the prompt
+    local_tz = ZoneInfo(tz)
+    tz_abbr = datetime.now(timezone.utc).astimezone(local_tz).strftime("%Z")
 
     return SYSTEM_PROMPT_TEMPLATE.format(
         hosts=hosts_text or "None configured",
         services=services_text or "None configured",
         playbooks=playbooks_text or "None configured",
         context=context or "No context files loaded.",
-        current_datetime=current_datetime,
+        current_datetime=_format_datetime(tz),
         voice_info=voice_info or "Voice support is not enabled.",
+        timezone_name=tz_abbr,
     )

@@ -10,7 +10,13 @@ import re
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-ET = ZoneInfo("America/New_York")
+_default_tz = ZoneInfo("UTC")
+
+
+def set_default_timezone(tz_name: str) -> None:
+    """Set the default timezone used by parse_time when no explicit time is given."""
+    global _default_tz
+    _default_tz = ZoneInfo(tz_name)
 
 # Day name → weekday number (Monday=0)
 DAY_NAMES = {
@@ -67,7 +73,7 @@ def parse_time(expression: str, now: datetime | None = None) -> str:
     Args:
         expression: Natural language like 'in 2 hours', 'tomorrow at 9am',
                     'next Monday at 3pm', 'at 5pm'.
-        now: Reference time (defaults to current Eastern Time).
+        now: Reference time (defaults to current time in configured timezone).
 
     Returns:
         ISO datetime string with timezone (e.g. '2026-03-18T17:00:00-04:00').
@@ -76,9 +82,9 @@ def parse_time(expression: str, now: datetime | None = None) -> str:
         ValueError: If the expression cannot be parsed.
     """
     if now is None:
-        now = datetime.now(ET)
+        now = datetime.now(_default_tz)
     elif now.tzinfo is None:
-        now = now.replace(tzinfo=ET)
+        now = now.replace(tzinfo=_default_tz)
 
     text = expression.strip().lower()
 

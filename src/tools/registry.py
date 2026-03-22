@@ -391,7 +391,7 @@ TOOLS: list[dict] = [
         "description": (
             "Convert a natural language time expression to an ISO datetime string. "
             "Handles: 'in 30 minutes', 'in 2 hours', 'tomorrow at 9am', 'next Monday at 3pm', "
-            "'at 5pm', 'friday at noon'. All times are Eastern Time. "
+            "'at 5pm', 'friday at noon'. Times use the bot's configured timezone. "
             "Use this before schedule_task if you are unsure about the time conversion."
         ),
         "input_schema": {

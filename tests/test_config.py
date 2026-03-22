@@ -78,6 +78,8 @@ class TestLoadConfig:
         # Webhook disabled by default
         assert cfg.webhook.enabled is False
         assert cfg.webhook.secret == "test-secret"
+        # Round 6: timezone defaults to UTC
+        assert cfg.timezone == "UTC"
 
     def test_actual_config_no_personal_data(self, monkeypatch):
         """Verify config.yml contains no personal IPs, user IDs, or hostnames."""
@@ -138,3 +140,33 @@ class TestToolsConfig:
         assert tc.claude_code_user == "deploy"
         assert tc.claude_code_dir == "/home/deploy/project"
         assert tc.incus_host == "vmhost"
+
+
+class TestTimezoneConfig:
+    """Round 6: timezone is configurable at the top level."""
+
+    def test_default_timezone_is_utc(self):
+        cfg = Config(discord=DiscordConfig(token="t"))
+        assert cfg.timezone == "UTC"
+
+    def test_custom_timezone(self):
+        cfg = Config(discord=DiscordConfig(token="t"), timezone="America/New_York")
+        assert cfg.timezone == "America/New_York"
+
+    def test_timezone_in_actual_config(self, monkeypatch):
+        """config.yml has timezone field set to UTC."""
+        monkeypatch.setenv("DISCORD_TOKEN", "t")
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+        monkeypatch.setenv("WEBHOOK_SECRET", "s")
+        cfg = load_config("config.yml")
+        assert cfg.timezone == "UTC"
+
+    def test_no_hardcoded_america_new_york_in_source(self):
+        """No source files should hardcode America/New_York anymore."""
+        from pathlib import Path
+        src_dir = Path("src")
+        for py_file in src_dir.rglob("*.py"):
+            content = py_file.read_text()
+            assert "America/New_York" not in content, (
+                f"{py_file} still contains hardcoded America/New_York"
+            )

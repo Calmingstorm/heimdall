@@ -138,6 +138,7 @@ class MonitoringConfig(BaseModel):
 
 
 class Config(BaseModel):
+    timezone: str = "UTC"
     discord: DiscordConfig
     anthropic: AnthropicConfig = AnthropicConfig()
     openai_codex: OpenAICodexConfig = OpenAICodexConfig()

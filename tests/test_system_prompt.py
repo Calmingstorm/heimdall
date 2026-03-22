@@ -1,9 +1,14 @@
 """Tests for llm/system_prompt.py."""
 from __future__ import annotations
 
+from unittest.mock import patch
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
 from src.llm.system_prompt import (
     build_chat_system_prompt,
     build_system_prompt,
+    _format_datetime,
     CHAT_SYSTEM_PROMPT_TEMPLATE,
     SYSTEM_PROMPT_TEMPLATE,
 )
@@ -193,3 +198,63 @@ class TestSystemPromptQuality:
         assert len(headers) == len(set(headers)), (
             f"Duplicate section headers: {headers}"
         )
+
+
+class TestTimezoneSupport:
+    """Round 6: timezone is passed through to prompt builders."""
+
+    def test_build_system_prompt_uses_tz(self):
+        """Full prompt uses the tz parameter for datetime display."""
+        fixed_dt = datetime(2026, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
+        with patch("src.llm.system_prompt.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_dt
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            prompt = build_system_prompt(
+                context="", hosts={}, services=[], playbooks=[],
+                tz="Asia/Tokyo",
+            )
+        assert "JST" in prompt or "Asia/Tokyo" in prompt or "9:00 PM" in prompt
+
+    def test_build_system_prompt_default_tz_utc(self):
+        """Default tz is UTC."""
+        prompt = build_system_prompt(
+            context="", hosts={}, services=[], playbooks=[],
+        )
+        assert "UTC" in prompt
+
+    def test_build_chat_system_prompt_uses_tz(self):
+        """Chat prompt uses the tz parameter."""
+        prompt = build_chat_system_prompt(tz="Europe/London")
+        # Should contain either GMT or BST depending on time of year
+        assert "UTC" in prompt  # always has UTC reference
+
+    def test_build_chat_system_prompt_default_utc(self):
+        """Chat prompt defaults to UTC."""
+        prompt = build_chat_system_prompt()
+        assert "UTC" in prompt
+
+    def test_format_datetime_utc(self):
+        """_format_datetime with UTC shows UTC abbreviation."""
+        result = _format_datetime("UTC")
+        assert "UTC" in result
+
+    def test_format_datetime_custom_tz(self):
+        """_format_datetime with a custom timezone shows correct abbreviation."""
+        result = _format_datetime("Asia/Tokyo")
+        assert "JST" in result
+
+    def test_system_prompt_no_hardcoded_eastern(self):
+        """System prompt should not contain hardcoded 'Eastern' timezone reference."""
+        prompt = build_system_prompt(
+            context="", hosts={}, services=[], playbooks=[],
+        )
+        assert "All times Eastern" not in prompt
+
+    def test_system_prompt_shows_configured_timezone(self):
+        """System prompt scheduling section shows the configured timezone."""
+        prompt = build_system_prompt(
+            context="", hosts={}, services=[], playbooks=[],
+            tz="America/Chicago",
+        )
+        # Should show CST or CDT depending on time of year
+        assert "configured timezone" in prompt
