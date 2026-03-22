@@ -115,9 +115,9 @@ class TestPostMessage:
 class TestRememberRecall:
     def test_remember_and_recall(self, ctx_with_memory):
         """remember saves a key-value pair that can be recalled."""
-        ctx_with_memory.remember("server_ip", "192.168.1.13")
+        ctx_with_memory.remember("server_ip", "10.0.0.1")
         value = ctx_with_memory.recall("server_ip")
-        assert value == "192.168.1.13"
+        assert value == "10.0.0.1"
 
     def test_recall_nonexistent_key(self, ctx_with_memory):
         """recall returns None for nonexistent key."""
@@ -506,7 +506,7 @@ class TestSkillMemoryIsolation:
         """Skill memory uses a separate file from executor memory."""
         # Set up executor with scoped memory
         executor._memory_path = tmp_dir / "memory.json"
-        scoped_data = {"global": {"server_ip": "192.168.1.13"}, "user_123": {"pref": "dark"}}
+        scoped_data = {"global": {"server_ip": "10.0.0.1"}, "user_123": {"pref": "dark"}}
         executor._save_all_memory(scoped_data)
 
         # Skill uses a different path (skill_memory.json)

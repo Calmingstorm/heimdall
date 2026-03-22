@@ -41,11 +41,11 @@ class TestMemoryFormatMigration:
     def test_flat_dict_migrated_to_global(self, tmp_path):
         """Old flat dict {key: value} becomes {"global": {key: value}}."""
         mem_file = tmp_path / "memory.json"
-        mem_file.write_text(json.dumps({"owner": "Aaron", "timezone": "ET"}))
+        mem_file.write_text(json.dumps({"owner": "TestUser", "timezone": "ET"}))
         executor = ToolExecutor(MagicMock(), memory_path=str(mem_file))
         result = executor._load_all_memory()
         assert "global" in result
-        assert result["global"]["owner"] == "Aaron"
+        assert result["global"]["owner"] == "TestUser"
         assert result["global"]["timezone"] == "ET"
 
     def test_flat_dict_migration_persists(self, tmp_path):
@@ -583,7 +583,7 @@ class TestSystemPromptPerUserMemory:
         stub = MagicMock()
         host_mock = MagicMock()
         host_mock.ssh_user = "root"
-        host_mock.address = "192.168.1.3"
+        host_mock.address = "10.0.0.2"
         stub.config.tools.hosts = {"desktop": host_mock}
         stub.config.tools.allowed_services = ["nginx"]
         stub.config.tools.allowed_playbooks = ["update.yml"]

@@ -19,7 +19,7 @@ def executor(tools_config: ToolsConfig, tmp_dir: Path) -> ToolExecutor:
 class TestHostResolution:
     def test_known_host(self, executor: ToolExecutor):
         result = executor._resolve_host("server")
-        assert result == ("192.168.1.13", "root", "linux")
+        assert result == ("10.0.0.1", "root", "linux")
 
     def test_unknown_host(self, executor: ToolExecutor):
         assert executor._resolve_host("nonexistent") is None

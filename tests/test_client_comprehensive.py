@@ -108,7 +108,7 @@ def _make_bot_stub(**overrides):
     stub.tool_executor = MagicMock()
     stub.tool_executor.execute = AsyncMock(return_value="tool result")
     stub.tool_executor.set_user_context = MagicMock()
-    stub.tool_executor._resolve_host = MagicMock(return_value=("192.168.1.13", "root", "linux"))
+    stub.tool_executor._resolve_host = MagicMock(return_value=("10.0.0.1", "root", "linux"))
     stub.tool_executor._load_memory_for_user = MagicMock(return_value={})
     stub.tool_memory = MagicMock()
     stub.tool_memory.record = AsyncMock()
@@ -1024,7 +1024,7 @@ class TestHandleListKnowledge:
         stub = _make_bot_stub()
         stub._knowledge_store = MagicMock()
         stub._knowledge_store.list_sources = MagicMock(return_value=[
-            {"source": "readme.md", "chunks": 5, "uploader": "Aaron",
+            {"source": "readme.md", "chunks": 5, "uploader": "TestUser",
              "ingested_at": "2026-03-18T12:00:00"},
             {"source": "config.yml", "chunks": 3, "uploader": "Bot",
              "ingested_at": "2026-03-17T08:00:00"},
@@ -1095,7 +1095,7 @@ class TestHandleSearchAudit:
         stub.audit.search = AsyncMock(return_value=[{
             "timestamp": "2026-03-18T12:00:00",
             "tool_name": "check_disk",
-            "user_name": "Aaron",
+            "user_name": "TestUser",
             "approved": True,
             "execution_time_ms": 150,
             "result_summary": "Disk: 42% used",
@@ -1114,7 +1114,7 @@ class TestHandleSearchAudit:
         stub.audit.search = AsyncMock(return_value=[{
             "timestamp": "2026-03-18T12:00:00",
             "tool_name": "run_command",
-            "user_name": "Aaron",
+            "user_name": "TestUser",
             "approved": True,
             "execution_time_ms": 50,
             "result_summary": "",

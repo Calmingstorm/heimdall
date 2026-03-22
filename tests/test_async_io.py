@@ -76,7 +76,7 @@ class TestExecutorMemoryAsyncIO:
         """End-to-end: memory save/load works correctly through asyncio.to_thread."""
         executor = make_executor(tmp_path)
         result = await executor._handle_memory_manage(
-            {"action": "save", "key": "server", "value": "192.168.1.1"},
+            {"action": "save", "key": "server", "value": "10.0.0.99"},
             user_id="u1",
         )
         assert "Saved" in result
@@ -84,7 +84,7 @@ class TestExecutorMemoryAsyncIO:
         result = await executor._handle_memory_manage(
             {"action": "list"}, user_id="u1",
         )
-        assert "192.168.1.1" in result
+        assert "10.0.0.99" in result
 
         result = await executor._handle_memory_manage(
             {"action": "delete", "key": "server"}, user_id="u1",

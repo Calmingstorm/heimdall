@@ -9,7 +9,7 @@ TOOLS: list[dict] = [
             "properties": {
                 "host": {
                     "type": "string",
-                    "description": "Host alias from config (e.g. 'server', 'desktop', 'dns-server', 'jessica-pc')",
+                    "description": "Host alias from config (e.g. 'myserver', 'webhost')",
                 },
                 "service": {
                     "type": "string",
@@ -161,7 +161,7 @@ TOOLS: list[dict] = [
             "properties": {
                 "host": {
                     "type": "string",
-                    "description": "Host alias from config (e.g. 'server', 'desktop')",
+                    "description": "Host alias from config (e.g. 'myserver', 'webhost')",
                 },
                 "command": {
                     "type": "string",
@@ -240,7 +240,7 @@ TOOLS: list[dict] = [
             "properties": {
                 "host": {
                     "type": "string",
-                    "description": "Host alias from config (e.g. 'desktop', 'server')",
+                    "description": "Host alias from config (e.g. 'myserver', 'webhost')",
                 },
                 "path": {
                     "type": "string",
@@ -324,7 +324,7 @@ TOOLS: list[dict] = [
                 },
                 "tool_input": {
                     "type": "object",
-                    "description": "For checks: the tool input parameters (e.g. {\"host\": \"server\"})",
+                    "description": "For checks: the tool input parameters (e.g. {\"host\": \"myserver\"})",
                 },
                 "steps": {
                     "type": "array",
@@ -1509,7 +1509,7 @@ TOOLS: list[dict] = [
             "properties": {
                 "host": {
                     "type": "string",
-                    "description": "Host to run on — 'server' or 'desktop' (default: desktop, where source repos live)",
+                    "description": "Host alias to run on (defaults to claude_code_host from config)",
                 },
                 "working_directory": {
                     "type": "string",
@@ -1545,7 +1545,7 @@ TOOLS: list[dict] = [
             "properties": {
                 "user_id": {
                     "type": "string",
-                    "description": "Discord user ID (numeric string, e.g. '441602773310767105')",
+                    "description": "Discord user ID (numeric string, e.g. '123456789012345678')",
                 },
                 "tier": {
                     "type": "string",

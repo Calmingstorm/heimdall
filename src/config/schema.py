@@ -50,7 +50,12 @@ class ToolsConfig(BaseModel):
     approval_timeout_seconds: int = 60
     command_timeout_seconds: int = 30
     tool_timeout_seconds: int = 300
-    incus_host: str = "desktop"
+    prometheus_host: str = ""
+    ansible_host: str = ""
+    claude_code_host: str = ""
+    claude_code_user: str = ""
+    claude_code_dir: str = "/opt/project"
+    incus_host: str = ""
 
 
 class LoggingConfig(BaseModel):

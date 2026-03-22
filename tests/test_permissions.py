@@ -30,11 +30,11 @@ from src.discord.client import LokiBot  # noqa: E402
 
 @pytest.fixture
 def pm(tmp_dir: Path) -> PermissionManager:
-    """PermissionManager with default config (Aaron + Audrastaia = admin)."""
+    """PermissionManager with default config (test users = admin)."""
     return PermissionManager(
         config_tiers={
-            "441602773310767105": "admin",
-            "757383353141035140": "admin",
+            "100000000000000001": "admin",
+            "100000000000000002": "admin",
         },
         default_tier="user",
         overrides_path=str(tmp_dir / "permissions.json"),
@@ -60,22 +60,22 @@ def sample_tools() -> list[dict]:
 
 class TestTierResolution:
     def test_admin_from_config(self, pm: PermissionManager):
-        assert pm.get_tier("441602773310767105") == "admin"
+        assert pm.get_tier("100000000000000001") == "admin"
 
     def test_admin_audrastaia(self, pm: PermissionManager):
-        assert pm.get_tier("757383353141035140") == "admin"
+        assert pm.get_tier("100000000000000002") == "admin"
 
     def test_unknown_user_defaults_to_user(self, pm: PermissionManager):
         assert pm.get_tier("999999999999") == "user"
 
     def test_is_admin_true(self, pm: PermissionManager):
-        assert pm.is_admin("441602773310767105") is True
+        assert pm.is_admin("100000000000000001") is True
 
     def test_is_admin_false(self, pm: PermissionManager):
         assert pm.is_admin("999999999999") is False
 
     def test_is_guest_false_for_admin(self, pm: PermissionManager):
-        assert pm.is_guest("441602773310767105") is False
+        assert pm.is_guest("100000000000000001") is False
 
     def test_is_guest_false_for_user(self, pm: PermissionManager):
         assert pm.is_guest("999999999999") is False
@@ -108,8 +108,8 @@ class TestRuntimeOverrides:
 
     def test_set_tier_overrides_admin(self, pm: PermissionManager):
         """Runtime override can demote an admin."""
-        pm.set_tier("441602773310767105", "user")
-        assert pm.get_tier("441602773310767105") == "user"
+        pm.set_tier("100000000000000001", "user")
+        assert pm.get_tier("100000000000000001") == "user"
 
     def test_set_tier_invalid_raises(self, pm: PermissionManager):
         with pytest.raises(ValueError, match="Invalid tier"):
@@ -171,9 +171,9 @@ class TestRuntimeOverrides:
 
     def test_overrides_take_precedence(self, pm: PermissionManager):
         """Runtime overrides take precedence over config tiers."""
-        assert pm.get_tier("441602773310767105") == "admin"
-        pm.set_tier("441602773310767105", "guest")
-        assert pm.get_tier("441602773310767105") == "guest"
+        assert pm.get_tier("100000000000000001") == "admin"
+        pm.set_tier("100000000000000001", "guest")
+        assert pm.get_tier("100000000000000001") == "guest"
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +182,7 @@ class TestRuntimeOverrides:
 
 class TestToolFiltering:
     def test_admin_gets_all_tools(self, pm: PermissionManager, sample_tools: list):
-        result = pm.filter_tools("441602773310767105", sample_tools)
+        result = pm.filter_tools("100000000000000001", sample_tools)
         assert result == sample_tools
 
     def test_user_gets_only_whitelisted(self, pm: PermissionManager, sample_tools: list):

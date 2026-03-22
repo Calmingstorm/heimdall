@@ -66,7 +66,7 @@ class TestToolsUsedLocalVariable:
         stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
 
         msg = MagicMock()
-        msg.author.id = 441602773310767105
+        msg.author.id = 100000000000000001
         msg.channel.id = 123
 
         stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)

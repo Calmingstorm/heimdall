@@ -36,7 +36,7 @@ def _make_bot_stub(**overrides):
     # Config: hosts, services, playbooks
     host_mock = MagicMock()
     host_mock.ssh_user = "root"
-    host_mock.address = "192.168.1.3"
+    host_mock.address = "10.0.0.2"
     stub.config.tools.hosts = {"desktop": host_mock}
     stub.config.tools.allowed_services = ["nginx", "docker"]
     stub.config.tools.allowed_playbooks = ["update.yml"]
@@ -98,17 +98,17 @@ class TestMemoryInjection:
     """Persistent memory should be injected into both full and chat prompts."""
 
     def test_full_prompt_includes_memory(self):
-        stub = _make_bot_stub(memory={"owner": "Aaron", "timezone": "ET"})
+        stub = _make_bot_stub(memory={"owner": "TestUser", "timezone": "ET"})
         prompt = stub._build_system_prompt()
         assert "## Persistent Memory" in prompt
-        assert "- **owner**: Aaron" in prompt
+        assert "- **owner**: TestUser" in prompt
         assert "- **timezone**: ET" in prompt
 
     def test_chat_prompt_includes_memory(self):
-        stub = _make_bot_stub(memory={"owner": "Aaron"})
+        stub = _make_bot_stub(memory={"owner": "TestUser"})
         prompt = stub._build_chat_system_prompt()
         assert "## Persistent Memory" in prompt
-        assert "- **owner**: Aaron" in prompt
+        assert "- **owner**: TestUser" in prompt
 
     def test_full_prompt_no_memory_section_when_empty(self):
         stub = _make_bot_stub(memory={})
@@ -451,7 +451,7 @@ class TestBaseTemplateContent:
     def test_full_prompt_includes_host_info(self):
         stub = _make_bot_stub()
         prompt = stub._build_system_prompt()
-        assert "`desktop`: root@192.168.1.3" in prompt
+        assert "`desktop`: root@10.0.0.2" in prompt
 
     def test_full_prompt_includes_services(self):
         stub = _make_bot_stub()
@@ -483,7 +483,7 @@ class TestBaseTemplateContent:
         """Chat prompt should not include host details."""
         stub = _make_bot_stub()
         prompt = stub._build_chat_system_prompt()
-        assert "192.168.1.3" not in prompt
+        assert "10.0.0.2" not in prompt
 
     def test_chat_prompt_omits_services(self):
         stub = _make_bot_stub()
@@ -510,7 +510,7 @@ class TestCombinedInjections:
         vm.is_connected = True
         vm.current_channel.name = "voice-chan"
         stub = _make_bot_stub(
-            memory={"owner": "Aaron"},
+            memory={"owner": "TestUser"},
             learned="## Learned Behaviors\n- Be concise",
             skills=[{"name": "test_skill", "description": "A test"}],
             recent_actions={"ch1": [(now, "- [14:00] `check_disk` → OK")]},

@@ -32,8 +32,8 @@ from src.tools.registry import TOOLS, get_tool_definitions  # noqa: E402
 def pm(tmp_path: Path) -> PermissionManager:
     return PermissionManager(
         config_tiers={
-            "441602773310767105": "admin",
-            "757383353141035140": "admin",
+            "100000000000000001": "admin",
+            "100000000000000002": "admin",
         },
         default_tier="user",
         overrides_path=str(tmp_path / "permissions.json"),
@@ -89,7 +89,7 @@ class TestSetPermissionDescription:
 class TestAllowedToolNames:
     async def test_admin_returns_none(self, pm):
         """Admin gets None (no restriction)."""
-        result = pm.allowed_tool_names("441602773310767105")
+        result = pm.allowed_tool_names("100000000000000001")
         assert result is None
 
     async def test_user_returns_user_tier_tools(self, pm):
@@ -246,7 +246,7 @@ class TestSkillPromptRebuildUserContext:
         stub = MagicMock()
         host_mock = MagicMock()
         host_mock.ssh_user = "root"
-        host_mock.address = "192.168.1.3"
+        host_mock.address = "10.0.0.2"
         stub.config.tools.hosts = {"desktop": host_mock}
         stub.config.tools.allowed_services = ["nginx"]
         stub.config.tools.allowed_playbooks = ["update.yml"]
@@ -278,7 +278,7 @@ class TestSkillPromptRebuildUserContext:
         channel = MagicMock()
         channel.id = 12345
         channel.topic = None
-        user_id = "441602773310767105"
+        user_id = "100000000000000001"
 
         prompt = stub._build_system_prompt(channel=channel, user_id=user_id)
         stub.tool_executor._load_memory_for_user.assert_called_with(user_id)
@@ -290,7 +290,7 @@ class TestSkillPromptRebuildUserContext:
         channel = MagicMock()
         channel.id = 12345
         channel.topic = "Be helpful and friendly"
-        user_id = "441602773310767105"
+        user_id = "100000000000000001"
 
         prompt = stub._build_system_prompt(channel=channel, user_id=user_id)
         assert "Be helpful and friendly" in prompt
@@ -323,7 +323,7 @@ class TestSkillPromptRebuildUserContext:
         stub.reflector.get_prompt_section = MagicMock(
             return_value="## Learned\n- User prefers verbose output"
         )
-        user_id = "441602773310767105"
+        user_id = "100000000000000001"
         prompt = stub._build_system_prompt(user_id=user_id)
         stub.reflector.get_prompt_section.assert_called_with(user_id=user_id)
         assert "verbose output" in prompt

@@ -33,15 +33,21 @@ def tools_config(tmp_dir: Path) -> ToolsConfig:
         ssh_key_path=str(tmp_dir / "id_ed25519"),
         ssh_known_hosts_path=str(tmp_dir / "known_hosts"),
         hosts={
-            "server": ToolHost(address="192.168.1.13", ssh_user="root", os="linux"),
-            "desktop": ToolHost(address="192.168.1.3", ssh_user="root", os="linux"),
-            "macbook": ToolHost(address="192.168.1.27", ssh_user="calmingstorm", os="macos"),
+            "server": ToolHost(address="10.0.0.1", ssh_user="root", os="linux"),
+            "desktop": ToolHost(address="10.0.0.2", ssh_user="root", os="linux"),
+            "macbook": ToolHost(address="10.0.0.3", ssh_user="deploy", os="macos"),
         },
         allowed_services=["apache2", "prometheus", "grafana-server"],
         allowed_playbooks=["check-services.yml", "update-all.yml"],
         ansible_directory="/ansible",
         approval_timeout_seconds=10,
         command_timeout_seconds=5,
+        prometheus_host="server",
+        ansible_host="desktop",
+        claude_code_host="desktop",
+        claude_code_user="deploy",
+        claude_code_dir="/opt/project",
+        incus_host="desktop",
     )
 
 

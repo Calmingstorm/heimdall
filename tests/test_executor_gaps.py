@@ -235,7 +235,7 @@ class TestClaudeCode:
         claude_call = mock_ssh.call_args_list[1]
         cmd = claude_call[1].get("command") or claude_call[0][1]
         assert "--dangerously-skip-permissions" in cmd
-        assert "su - calmingstorm" in cmd
+        assert "su - deploy" in cmd
 
     @pytest.mark.asyncio
     async def test_claude_code_failure(self, executor):
@@ -722,7 +722,7 @@ class TestRunCommandMultiErrors:
     async def test_run_command_multi_partial_failure(self, executor):
         """run_command_multi handles exceptions from individual hosts."""
         async def selective_ssh(**kwargs):
-            if kwargs.get("host") == "192.168.1.13":
+            if kwargs.get("host") == "10.0.0.1":
                 raise ConnectionError("Connection refused")
             return (0, "uptime: up 5 days")
 

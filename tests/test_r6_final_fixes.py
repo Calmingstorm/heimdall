@@ -78,7 +78,7 @@ class TestSessionLoadLastUserId:
         )
         mgr1.add_message("ch1", "user", "hello")
         session = mgr1._sessions["ch1"]
-        session.last_user_id = "441602773310767105"
+        session.last_user_id = "100000000000000001"
         mgr1.save()
 
         mgr2 = SessionManager(
@@ -86,7 +86,7 @@ class TestSessionLoadLastUserId:
         )
         mgr2.load()
         loaded = mgr2._sessions["ch1"]
-        assert loaded.last_user_id == "441602773310767105"
+        assert loaded.last_user_id == "100000000000000001"
 
     def test_last_user_id_none_when_absent(self, tmp_dir):
         """Old session files without last_user_id field default to None."""
@@ -151,7 +151,7 @@ class TestConsolidationUserIdPreservation:
         """The consolidation prompt schema must include user_id."""
         entries = [
             {"key": f"k{i}", "category": "preference", "content": f"pref {i}",
-             "user_id": "441602773310767105",
+             "user_id": "100000000000000001",
              "created_at": "2026-01-01", "updated_at": "2026-01-01"}
             for i in range(6)
         ]
@@ -168,10 +168,10 @@ class TestConsolidationUserIdPreservation:
         """If LLM output lacks user_id, it should be restored from originals."""
         entries = [
             {"key": "aaron_tz", "category": "preference",
-             "content": "prefers Eastern Time", "user_id": "441602773310767105",
+             "content": "prefers Eastern Time", "user_id": "100000000000000001",
              "created_at": "2026-01-01", "updated_at": "2026-01-01"},
             {"key": "aaron_emoji", "category": "preference",
-             "content": "dislikes emoji", "user_id": "441602773310767105",
+             "content": "dislikes emoji", "user_id": "100000000000000001",
              "created_at": "2026-01-01", "updated_at": "2026-01-01"},
         ]
 
@@ -184,7 +184,7 @@ class TestConsolidationUserIdPreservation:
         result = await reflector._consolidate(entries)
 
         assert len(result) == 1
-        assert result[0]["user_id"] == "441602773310767105"
+        assert result[0]["user_id"] == "100000000000000001"
 
     async def test_user_id_kept_when_llm_includes_it(
         self, reflector, mock_text_fn,
@@ -210,12 +210,12 @@ class TestConsolidationUserIdPreservation:
     ):
         """Global entries (no user_id) should NOT get a user_id after consolidation."""
         entries = [
-            {"key": "server_ip", "category": "fact", "content": "192.168.1.13",
+            {"key": "server_ip", "category": "fact", "content": "10.0.0.1",
              "created_at": "2026-01-01", "updated_at": "2026-01-01"},
         ]
 
         mock_text_fn.return_value = json.dumps([
-            {"key": "server_ip", "category": "fact", "content": "192.168.1.13"},
+            {"key": "server_ip", "category": "fact", "content": "10.0.0.1"},
         ])
 
         result = await reflector._consolidate(entries)

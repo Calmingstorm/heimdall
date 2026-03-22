@@ -271,8 +271,8 @@ class TestPrepareQuery:
 
     async def test_ip_address_quoted(self):
         """IP address (contains dots) gets quoted."""
-        result = _prepare_query("192.168.1.13")
-        assert result == '"192.168.1.13"'
+        result = _prepare_query("10.0.0.1")
+        assert result == '"10.0.0.1"'
 
     async def test_path_quoted(self):
         """Path (contains slashes) gets quoted."""

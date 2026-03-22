@@ -289,10 +289,13 @@ class TestClaudeCodeCpReturnCode:
     def executor(self):
         from src.tools.executor import ToolExecutor
         config = MagicMock()
-        config.hosts = {"desktop": MagicMock(address="192.168.1.3", ssh_user="root", os="linux")}
+        config.hosts = {"desktop": MagicMock(address="10.0.0.2", ssh_user="root", os="linux")}
         config.ssh_key_path = "/app/.ssh/id_ed25519"
         config.ssh_known_hosts_path = "/app/.ssh/known_hosts"
         config.command_timeout_seconds = 30
+        config.claude_code_host = "desktop"
+        config.claude_code_user = "deploy"
+        config.claude_code_dir = "/opt/project"
         config.memory_path = None
         return ToolExecutor(config)
 
@@ -379,10 +382,13 @@ class TestClaudeCodeTimeoutWrapper:
     def executor(self):
         from src.tools.executor import ToolExecutor
         config = MagicMock()
-        config.hosts = {"desktop": MagicMock(address="192.168.1.3", ssh_user="root", os="linux")}
+        config.hosts = {"desktop": MagicMock(address="10.0.0.2", ssh_user="root", os="linux")}
         config.ssh_key_path = "/app/.ssh/id_ed25519"
         config.ssh_known_hosts_path = "/app/.ssh/known_hosts"
         config.command_timeout_seconds = 30
+        config.claude_code_host = "desktop"
+        config.claude_code_user = "deploy"
+        config.claude_code_dir = "/opt/project"
         config.memory_path = None
         return ToolExecutor(config)
 

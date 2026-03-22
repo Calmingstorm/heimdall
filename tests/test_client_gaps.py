@@ -197,7 +197,7 @@ def _make_bot_stub(**overrides):
     stub.tool_executor = MagicMock()
     stub.tool_executor.execute = AsyncMock(return_value="tool result")
     stub.tool_executor._resolve_host = MagicMock(
-        return_value=("192.168.1.13", "root", "linux")
+        return_value=("10.0.0.1", "root", "linux")
     )
     stub.tool_executor._load_memory_for_user = MagicMock(return_value={})
     stub.tool_memory = MagicMock()
@@ -1287,7 +1287,7 @@ class TestMiscCoverageGaps:
         stub = _make_bot_stub()
         stub._handle_post_file = LokiBot._handle_post_file.__get__(stub)
         stub.tool_executor._resolve_host = MagicMock(
-            return_value=("192.168.1.13", "root", "linux"),
+            return_value=("10.0.0.1", "root", "linux"),
         )
         stub.config.tools.ssh_key_path = "/app/.ssh/id"
         stub.config.tools.ssh_known_hosts_path = "/app/.ssh/known_hosts"
@@ -1318,7 +1318,7 @@ class TestMiscCoverageGaps:
         stub = _make_bot_stub()
         stub._handle_post_file = LokiBot._handle_post_file.__get__(stub)
         stub.tool_executor._resolve_host = MagicMock(
-            return_value=("192.168.1.13", "root", "linux"),
+            return_value=("10.0.0.1", "root", "linux"),
         )
         stub.config.tools.ssh_key_path = "/app/.ssh/id"
         stub.config.tools.ssh_known_hosts_path = "/app/.ssh/known_hosts"
@@ -1347,7 +1347,7 @@ class TestMiscCoverageGaps:
         stub = _make_bot_stub()
         stub._handle_post_file = LokiBot._handle_post_file.__get__(stub)
         stub.tool_executor._resolve_host = MagicMock(
-            return_value=("192.168.1.13", "root", "linux"),
+            return_value=("10.0.0.1", "root", "linux"),
         )
         stub.config.tools.ssh_key_path = "/app/.ssh/id"
         stub.config.tools.ssh_known_hosts_path = "/app/.ssh/known_hosts"

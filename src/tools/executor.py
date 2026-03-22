@@ -251,9 +251,12 @@ class ToolExecutor:
     async def _handle_query_prometheus(self, inp: dict) -> str:
         query = inp["query"]
         safe_query = url_quote(query)
-        resolved = self._resolve_host("server")
+        prom_host = self.config.prometheus_host
+        if not prom_host:
+            return "prometheus_host not configured in tools config"
+        resolved = self._resolve_host(prom_host)
         if not resolved:
-            return "Server host not configured"
+            return f"Prometheus host '{prom_host}' not found in configured hosts"
         address, ssh_user, _os = resolved
         code, output = await run_ssh_command(
             host=address,
@@ -297,10 +300,13 @@ class ToolExecutor:
 
         cmd = " && ".join(cmd_parts)
 
-        # Ansible runs from the desktop where the repo lives
-        resolved = self._resolve_host("desktop")
+        # Ansible runs from the configured ansible_host
+        ansible_host = self.config.ansible_host
+        if not ansible_host:
+            return "ansible_host not configured in tools config"
+        resolved = self._resolve_host(ansible_host)
         if not resolved:
-            return "Desktop host not configured"
+            return f"Ansible host '{ansible_host}' not found in configured hosts"
         address, ssh_user, _os = resolved
         code, output = await run_ssh_command(
             host=address,
@@ -502,9 +508,12 @@ class ToolExecutor:
         safe_query = url_quote(query)
         safe_step = url_quote(step)
 
-        resolved = self._resolve_host("server")
+        prom_host = self.config.prometheus_host
+        if not prom_host:
+            return "prometheus_host not configured in tools config"
+        resolved = self._resolve_host(prom_host)
         if not resolved:
-            return "Server host not configured"
+            return f"Prometheus host '{prom_host}' not found in configured hosts"
         address, ssh_user, _os = resolved
 
         # Calculate start/end times
@@ -573,7 +582,9 @@ class ToolExecutor:
     # --- Claude Code ---
 
     async def _handle_claude_code(self, inp: dict) -> str:
-        host = inp.get("host", "server")
+        host = inp.get("host") or self.config.claude_code_host
+        if not host:
+            return "claude_code_host not configured in tools config"
         working_dir = inp["working_directory"]
         prompt = inp["prompt"]
         allowed_tools = inp.get("allowed_tools")
@@ -590,15 +601,19 @@ class ToolExecutor:
             "ssh_user": ssh_user,
         }
 
-        # When allow_edits is true, claude -p runs as calmingstorm in a temp
+        # When allow_edits is true, claude -p runs as a non-root user in a temp
         # dir (no permission issues). Files are then copied to the real target
         # as root. The prompt is rewritten to use relative paths so claude -p
         # writes into the temp dir, not to absolute paths it can't access.
+        claude_user = self.config.claude_code_user
         tmpdir = ""
         if allow_edits:
+            if not claude_user:
+                return "claude_code_user not configured — required for allow_edits=true"
+            safe_user = shlex.quote(claude_user)
             _, tmpdir = await run_ssh_command(
                 host=address,
-                command="su - calmingstorm -c 'mktemp -d /tmp/claude_code_XXXXXXXX'",
+                command=f"su - {safe_user} -c 'mktemp -d /tmp/claude_code_XXXXXXXX'",
                 timeout=10, **ssh_kwargs,
             )
             tmpdir = tmpdir.strip()
@@ -633,7 +648,7 @@ class ToolExecutor:
         if allow_edits:
             safe_tmpdir = shlex.quote(tmpdir)
             inner = f"cd {safe_tmpdir} && echo '{encoded_prompt}' | base64 -d | timeout 280 {claude_cmd}"
-            cmd = f"su - calmingstorm -c {shlex.quote(inner)}"
+            cmd = f"su - {safe_user} -c {shlex.quote(inner)}"
         else:
             safe_wd = shlex.quote(working_dir)
             cmd = f"cd {safe_wd} && echo '{encoded_prompt}' | base64 -d | timeout 280 {claude_cmd}"

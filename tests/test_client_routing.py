@@ -147,7 +147,7 @@ class TestIsTaskByKeyword:
         "the definite article in English is 'the'",
         # "digest": non-bot
         # "my name": casual introduction
-        "my name is Aaron",
+        "my name is TestUser",
     ])
     def test_false_positives_eliminated(self, msg):
         """These messages should NOT match — they're casual chat, not tasks.

@@ -18,6 +18,18 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 import pytest  # noqa: E402
 
 from src.discord.client import LokiBot  # noqa: E402
+from src.discord.routing import CLAUDE_CODE_DEFAULTS  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _setup_routing_defaults():
+    """Set up test routing defaults before each test, restore after."""
+    old = dict(CLAUDE_CODE_DEFAULTS)
+    CLAUDE_CODE_DEFAULTS["primary"] = ("desktop", "/root/project")
+    CLAUDE_CODE_DEFAULTS["secondary"] = ("server", "/opt/project")
+    yield
+    CLAUDE_CODE_DEFAULTS.clear()
+    CLAUDE_CODE_DEFAULTS.update(old)
 
 
 # ---------------------------------------------------------------------------

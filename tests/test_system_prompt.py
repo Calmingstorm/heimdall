@@ -12,10 +12,10 @@ from src.llm.system_prompt import (
 class TestBuildSystemPrompt:
     def test_includes_hosts(self):
         prompt = build_system_prompt(
-            context="", hosts={"server": "root@192.168.1.13"}, services=[], playbooks=[],
+            context="", hosts={"server": "root@10.0.0.1"}, services=[], playbooks=[],
         )
         assert "server" in prompt
-        assert "192.168.1.13" in prompt
+        assert "10.0.0.1" in prompt
 
     def test_includes_services(self):
         prompt = build_system_prompt(

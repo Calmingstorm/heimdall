@@ -73,22 +73,23 @@ _SERVER_INDICATORS = re.compile(
     re.IGNORECASE,
 )
 
-# Default targets for claude -p on each host.
-# Users should override these via config or context files.
-CLAUDE_CODE_DEFAULTS = {
-    "desktop": "/root/project",
-    "server": "/opt/project",
+# Default targets for claude -p routing.
+# "primary" is the default host; "secondary" is used for server/production context.
+# Populated from config at startup by LokiBot._init_routing_defaults().
+CLAUDE_CODE_DEFAULTS: dict[str, tuple[str, str]] = {
+    "primary": ("", "/opt/project"),
+    "secondary": ("", "/opt/project"),
 }
 
 
 def resolve_claude_code_target(message: str) -> tuple[str, str]:
     """Determine host and working directory for claude -p routing.
 
-    Routes to the first configured host by default.
-    Routes to server when message indicates production/server-specific analysis.
+    Routes to the primary host by default.
+    Routes to secondary when message indicates production/server-specific analysis.
 
     Returns (host, working_directory) tuple.
     """
     if _SERVER_INDICATORS.search(message):
-        return ("server", CLAUDE_CODE_DEFAULTS["server"])
-    return ("desktop", CLAUDE_CODE_DEFAULTS["desktop"])
+        return CLAUDE_CODE_DEFAULTS["secondary"]
+    return CLAUDE_CODE_DEFAULTS["primary"]

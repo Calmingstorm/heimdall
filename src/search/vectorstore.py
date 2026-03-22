@@ -56,7 +56,7 @@ class SessionVectorStore:
             log.error("Failed to read archive %s: %s", archive_path, e)
             return False
 
-        doc_id = archive_path.stem  # e.g. "1469135502115606792_1773264847"
+        doc_id = archive_path.stem  # e.g. "channelid_timestamp"
         doc_text = self._build_document_text(data)
         if not doc_text:
             return False

@@ -1,13 +1,11 @@
 discord:
   token: "${DISCORD_TOKEN}"
-  allowed_users:
-    - "441602773310767105"   # Calmingstorm (Aaron)
-    - "757383353141035140"   # Audrastaia (Jess)
-  channels: []  # Leave empty to allow all channels in the server
+  allowed_users: []  # Discord user IDs that can interact with the bot (empty = allow all)
+  channels: []  # Channel IDs the bot responds in (empty = all channels)
 
 anthropic:
   api_key: "${ANTHROPIC_API_KEY}"
-  model: "claude-sonnet-4-20250514"
+  model: "claude-haiku-4-5-20251001"
   max_tokens: 16384
   daily_budget_tokens: 0
 
@@ -30,60 +28,41 @@ tools:
   enabled: true
   ssh_key_path: "/app/.ssh/id_ed25519"
   ssh_known_hosts_path: "/app/.ssh/known_hosts"
-  hosts:
-    desktop:
-      address: "192.168.1.3"
-      ssh_user: "root"
-    server:
-      address: "192.168.1.13"
-      ssh_user: "root"
-    dns-server:
-      address: "192.168.1.20"
-      ssh_user: "root"
-    jessica-pc:
-      address: "192.168.1.9"
-      ssh_user: "root"
-    macbook:
-      address: "192.168.1.27"
-      ssh_user: "calmingstorm"
-      os: "macos"
-  allowed_services:
-    - apache2
-    - mariadb
-    - mongod
-    - redis-server
-    - prometheus
-    - grafana-server
-    - loki
-    - promtail
-    - node_exporter
-    - ollama
-    - gitea
-    - discordrpg
-    - plexmediaserver
-    - pihole-FTL
-    - unbound
-    - comfyui
-    - filter-chain
-    - pipewire
-    - docker
-    - monitor-layout-fix
-  allowed_playbooks:
-    - check-services.yml
-    - system-info.yml
-    - update-all.yml
-    - deploy-promtail.yml
+  hosts: {}
+  # Example host config:
+  #   myhost:
+  #     address: "10.0.0.1"
+  #     ssh_user: "root"
+  #   myserver:
+  #     address: "10.0.0.2"
+  #     ssh_user: "deploy"
+  #     os: "linux"
+  allowed_services: []
+  # Example services:
+  #   - nginx
+  #   - postgresql
+  #   - docker
+  #   - prometheus
+  allowed_playbooks: []
+  # Example playbooks:
+  #   - check-services.yml
+  #   - system-info.yml
   ansible_directory: "/ansible"
   approval_timeout_seconds: 120
   command_timeout_seconds: 30
-  incus_host: desktop
+  # prometheus_host: "myserver"   # Host alias to run Prometheus queries on
+  # ansible_host: "myhost"       # Host alias to run Ansible playbooks from
+  # claude_code_host: "myhost"   # Default host for claude -p
+  # claude_code_user: ""         # Non-root user for claude -p edits (e.g. "deploy")
+  # claude_code_dir: "/opt/project"  # Default working directory for claude -p
+  # incus_host: "myhost"         # Host alias where Incus runs
 
 webhook:
-  enabled: true
-  secret: "9a37d251362a6fe1dd0a041530744d11e09b61cdeca02aa6a61784c7cc0d14c5"
-  channel_id: "1481679552181698610"        # #notifications (default for all webhooks)
-  gitea_channel_id: "1481679552181698610"   # #notifications
-  grafana_channel_id: "1481679552181698610" # #notifications
+  enabled: false
+  secret: "${WEBHOOK_SECRET}"
+  channel_id: ""        # Default channel for webhook notifications
+  gitea_channel_id: ""  # Channel for Gitea webhooks (falls back to channel_id)
+  grafana_channel_id: "" # Channel for Grafana alerts (falls back to channel_id)
 
 learning:
   enabled: true
@@ -104,13 +83,13 @@ usage:
   directory: "./data/usage"
 
 voice:
-  enabled: true
+  enabled: false
   voice_service_url: "ws://loki-voice:3940/ws"
   auto_join: false
-  transcript_channel_id: "1482174235743879249"
+  transcript_channel_id: ""
   default_voice: "en-US-AvaMultilingualNeural"
   wake_word: "loki"
 
 browser:
-  enabled: true
+  enabled: false
   cdp_url: "ws://loki-browser:3000?token=loki-internal"

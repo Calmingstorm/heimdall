@@ -195,7 +195,7 @@ class TestTriggerMatching:
         assert Scheduler._trigger_matches(
             {"repo": "myproject"},
             "gitea",
-            {"event": "push", "repo": "calmingstorm/other-project"},
+            {"event": "push", "repo": "testuser/other-project"},
         ) is False
 
     def test_alert_name_match(self):
@@ -694,7 +694,7 @@ class TestEndToEnd:
 
         fired = await scheduler.fire_triggers(
             "gitea",
-            {"event": "push", "repo": "calmingstorm/other-project"},
+            {"event": "push", "repo": "testuser/other-project"},
         )
         assert fired == 0
         callback.assert_not_called()

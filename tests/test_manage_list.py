@@ -149,7 +149,7 @@ class TestGroceryMigration:
 
     def test_migrates_grocery_items(self, tmp_path):
         old_data = {"items": [
-            {"name": "Milk", "added_by": "Aaron", "added_at": "2026-03-10T12:00:00"},
+            {"name": "Milk", "added_by": "TestUser", "added_at": "2026-03-10T12:00:00"},
             {"name": "Eggs", "added_by": "Jessica", "added_at": "2026-03-11T09:00:00"},
         ]}
         executor = make_executor(tmp_path, grocery_data=old_data)
@@ -239,9 +239,9 @@ class TestManageListAdd:
     @pytest.mark.asyncio
     async def test_add_records_user_id(self, tmp_path):
         executor = make_executor(tmp_path)
-        await executor._handle_manage_list({"action": "add", "list_name": "todo", "items": ["test"]}, user_id="441602773310767105")
+        await executor._handle_manage_list({"action": "add", "list_name": "todo", "items": ["test"]}, user_id="100000000000000001")
         loaded = json.loads((tmp_path / "lists.json").read_text())
-        assert loaded["todo"]["items"][0]["added_by"] == "441602773310767105"
+        assert loaded["todo"]["items"][0]["added_by"] == "100000000000000001"
 
     @pytest.mark.asyncio
     async def test_add_records_timestamp(self, tmp_path):
@@ -260,9 +260,9 @@ class TestManageListAdd:
     @pytest.mark.asyncio
     async def test_add_creates_personal_list(self, tmp_path):
         executor = make_executor(tmp_path)
-        await executor._handle_manage_list({"action": "add", "list_name": "my todo", "items": ["rest"], "owner": "personal"}, user_id="441602773310767105")
+        await executor._handle_manage_list({"action": "add", "list_name": "my todo", "items": ["rest"], "owner": "personal"}, user_id="100000000000000001")
         loaded = json.loads((tmp_path / "lists.json").read_text())
-        assert loaded["my todo"]["owner"] == "441602773310767105"
+        assert loaded["my todo"]["owner"] == "100000000000000001"
 
     @pytest.mark.asyncio
     async def test_add_normalizes_list_name(self, tmp_path):
@@ -369,7 +369,7 @@ class TestManageListShow:
     @pytest.mark.asyncio
     async def test_show_list(self, tmp_path):
         data = {"grocery": {"owner": "shared", "items": [
-            {"name": "milk", "added_by": "Aaron", "added_at": "2026-03-10T12:00:00", "done": False},
+            {"name": "milk", "added_by": "TestUser", "added_at": "2026-03-10T12:00:00", "done": False},
         ]}}
         executor = make_executor(tmp_path, lists_data=data)
         result = await executor._handle_manage_list({"action": "show", "list_name": "grocery"})
@@ -574,17 +574,17 @@ class TestManageListAll:
             "secret": {"owner": "other_user_123", "items": []},
         }
         executor = make_executor(tmp_path, lists_data=data)
-        result = await executor._handle_manage_list({"action": "list_all"}, user_id="441602773310767105")
+        result = await executor._handle_manage_list({"action": "list_all"}, user_id="100000000000000001")
         assert "grocery" in result
         assert "secret" not in result
 
     @pytest.mark.asyncio
     async def test_list_all_shows_own_personal(self, tmp_path):
         data = {
-            "my todo": {"owner": "441602773310767105", "items": []},
+            "my todo": {"owner": "100000000000000001", "items": []},
         }
         executor = make_executor(tmp_path, lists_data=data)
-        result = await executor._handle_manage_list({"action": "list_all"}, user_id="441602773310767105")
+        result = await executor._handle_manage_list({"action": "list_all"}, user_id="100000000000000001")
         assert "my todo" in result
         assert "personal" in result
 
@@ -600,16 +600,16 @@ class TestListOwnership:
     async def test_cannot_access_other_users_list(self, tmp_path):
         data = {"secret": {"owner": "other_user_123", "items": [{"name": "x", "added_by": "", "added_at": "", "done": False}]}}
         executor = make_executor(tmp_path, lists_data=data)
-        result = await executor._handle_manage_list({"action": "show", "list_name": "secret"}, user_id="441602773310767105")
+        result = await executor._handle_manage_list({"action": "show", "list_name": "secret"}, user_id="100000000000000001")
         assert "don't have access" in result
 
     @pytest.mark.asyncio
     async def test_can_access_own_personal_list(self, tmp_path):
-        data = {"my todo": {"owner": "441602773310767105", "items": [
+        data = {"my todo": {"owner": "100000000000000001", "items": [
             {"name": "rest", "added_by": "", "added_at": "", "done": False},
         ]}}
         executor = make_executor(tmp_path, lists_data=data)
-        result = await executor._handle_manage_list({"action": "show", "list_name": "my todo"}, user_id="441602773310767105")
+        result = await executor._handle_manage_list({"action": "show", "list_name": "my todo"}, user_id="100000000000000001")
         assert "rest" in result
 
     @pytest.mark.asyncio
@@ -618,7 +618,7 @@ class TestListOwnership:
             {"name": "milk", "added_by": "", "added_at": "", "done": False},
         ]}}
         executor = make_executor(tmp_path, lists_data=data)
-        result = await executor._handle_manage_list({"action": "show", "list_name": "grocery"}, user_id="441602773310767105")
+        result = await executor._handle_manage_list({"action": "show", "list_name": "grocery"}, user_id="100000000000000001")
         assert "milk" in result
 
 
@@ -661,12 +661,12 @@ class TestFormatList:
 
     def test_format_with_items(self):
         lst = {"items": [
-            {"name": "milk", "added_by": "Aaron", "added_at": "2026-03-10T12:00:00", "done": False},
+            {"name": "milk", "added_by": "TestUser", "added_at": "2026-03-10T12:00:00", "done": False},
         ]}
         result = ToolExecutor._format_list("grocery", lst)
         assert "Grocery List" in result
         assert "1. milk" in result
-        assert "Aaron" in result
+        assert "TestUser" in result
         assert "Mar 10" in result
 
     def test_format_done_item(self):

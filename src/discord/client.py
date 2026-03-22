@@ -35,7 +35,7 @@ from ..tools.tool_memory import ToolMemory
 from ..search import OllamaEmbedder, SessionVectorStore
 from ..permissions import PermissionManager
 from .approval import request_approval
-from .routing import is_task_by_keyword, resolve_claude_code_target
+from .routing import is_task_by_keyword, resolve_claude_code_target, CLAUDE_CODE_DEFAULTS
 from .voice import VoiceManager, VoiceMessageProxy
 
 log = get_logger("discord")
@@ -43,8 +43,9 @@ log = get_logger("discord")
 # Friendly fallback when Codex returns an empty response after retries
 _EMPTY_RESPONSE_FALLBACK = "I couldn't generate a response. Please try again."
 
-# Webhook IDs allowed to bypass the bot-author check (for testing)
-_ALLOWED_WEBHOOK_IDS = {"1485046995650482406"}
+# Webhook IDs allowed to bypass the bot-author check.
+# Populated from ALLOWED_WEBHOOK_IDS env var (comma-separated) at startup.
+_ALLOWED_WEBHOOK_IDS: set[str] = set()
 
 # Patterns that might indicate a secret was pasted
 SECRET_SCRUB_PATTERNS = [
@@ -311,6 +312,24 @@ class LokiBot(discord.Client):
 
         self._system_prompt = self._build_system_prompt()
         self._register_commands()
+        self._init_routing_defaults()
+        self._init_allowed_webhook_ids()
+
+    def _init_routing_defaults(self) -> None:
+        """Populate CLAUDE_CODE_DEFAULTS from config for claude -p routing."""
+        tc = self.config.tools
+        host = tc.claude_code_host
+        directory = tc.claude_code_dir
+        if host:
+            CLAUDE_CODE_DEFAULTS["primary"] = (host, directory)
+            CLAUDE_CODE_DEFAULTS["secondary"] = (host, directory)
+
+    def _init_allowed_webhook_ids(self) -> None:
+        """Populate _ALLOWED_WEBHOOK_IDS from ALLOWED_WEBHOOK_IDS env var."""
+        global _ALLOWED_WEBHOOK_IDS
+        raw = os.environ.get("ALLOWED_WEBHOOK_IDS", "")
+        if raw:
+            _ALLOWED_WEBHOOK_IDS = {wid.strip() for wid in raw.split(",") if wid.strip()}
 
     def _build_system_prompt(
         self, channel: discord.abc.GuildChannel | None = None,
