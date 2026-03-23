@@ -124,6 +124,9 @@ class TestCompaction:
         # Wait for background reflection task
         await asyncio.sleep(0.1)
         mock_reflector.reflect_on_compacted.assert_called_once()
+        # Await pending tasks to avoid "coroutine never awaited" warning
+        if mgr._reflection_tasks:
+            await asyncio.gather(*list(mgr._reflection_tasks), return_exceptions=True)
 
     @pytest.mark.asyncio
     async def test_compaction_failure_fallback(self, tmp_dir):
@@ -171,6 +174,9 @@ class TestArchiveSession:
 
         await asyncio.sleep(0.1)
         mock_reflector.reflect_on_session.assert_called_once()
+        # Await pending tasks to avoid "coroutine never awaited" warning
+        if mgr._reflection_tasks:
+            await asyncio.gather(*list(mgr._reflection_tasks), return_exceptions=True)
 
     @pytest.mark.asyncio
     async def test_archive_triggers_vector_indexing(self, tmp_dir):
@@ -272,6 +278,9 @@ class TestSafeReflect:
         await asyncio.sleep(0.1)
         # Should have been called despite the error
         mock_reflector.reflect_on_session.assert_called_once()
+        # Await pending tasks to avoid "coroutine never awaited" warning
+        if mgr._reflection_tasks:
+            await asyncio.gather(*list(mgr._reflection_tasks), return_exceptions=True)
 
     @pytest.mark.asyncio
     async def test_safe_reflect_compacted_catches_errors(self, tmp_dir):
@@ -295,6 +304,9 @@ class TestSafeReflect:
         await asyncio.sleep(0.1)
         # Should have been called
         mock_reflector.reflect_on_compacted.assert_called_once()
+        # Await pending tasks to avoid "coroutine never awaited" warning
+        if mgr._reflection_tasks:
+            await asyncio.gather(*list(mgr._reflection_tasks), return_exceptions=True)
 
 
 # ---------------------------------------------------------------------------

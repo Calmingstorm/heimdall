@@ -491,9 +491,15 @@ class TestOnReady:
         stub._vector_store = MagicMock()
         stub._embedder = MagicMock()
 
-        with patch("asyncio.create_task") as mock_create_task:
+        calls = []
+        def _close_and_track(coro):
+            calls.append(coro)
+            coro.close()
+            return MagicMock()
+
+        with patch("asyncio.create_task", side_effect=_close_and_track):
             await stub.on_ready()
-            mock_create_task.assert_called_once()
+            assert len(calls) == 1
 
     async def test_on_ready_starts_infra_watcher(self):
         """on_ready should start infrastructure watcher if configured."""
@@ -1209,10 +1215,15 @@ class TestMiscCoverageGaps:
             task.results = []
             stub._background_tasks[f"old-{i}"] = task
 
+        def _close_coro(coro):
+            """Mock create_task that closes the coroutine to avoid warnings."""
+            coro.close()
+            return MagicMock()
+
         with patch("src.discord.client.BackgroundTask") as MockTask, \
              patch("src.discord.client.create_task_id", return_value="new-1"), \
              patch("src.discord.client.run_background_task", new_callable=AsyncMock), \
-             patch("asyncio.create_task"):
+             patch("asyncio.create_task", side_effect=_close_coro):
             MockTask.return_value = MagicMock()
             MockTask.return_value.task_id = "new-1"
 
@@ -1296,18 +1307,16 @@ class TestMiscCoverageGaps:
         proc.returncode = 0
 
         msg = _make_message()
-        with patch("asyncio.create_subprocess_exec", return_value=proc), \
-             patch("asyncio.wait_for", return_value=(base64.b64encode(b""), b"")):
-            proc_mock = AsyncMock()
-            proc_mock.returncode = 0
-            proc_mock.communicate = AsyncMock(
-                return_value=(base64.b64encode(b""), b""),
-            )
-            with patch("asyncio.create_subprocess_exec", return_value=proc_mock):
-                result = await stub._handle_post_file(msg, {
-                    "host": "server",
-                    "path": "/tmp/test.txt",
-                })
+        proc_mock = AsyncMock()
+        proc_mock.returncode = 0
+        proc_mock.communicate = AsyncMock(
+            return_value=(base64.b64encode(b""), b""),
+        )
+        with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc_mock)):
+            result = await stub._handle_post_file(msg, {
+                "host": "server",
+                "path": "/tmp/test.txt",
+            })
 
         assert "not found or empty" in result or "Posted" in result
 
@@ -1331,8 +1340,7 @@ class TestMiscCoverageGaps:
         proc_mock.communicate = AsyncMock(return_value=(encoded, b""))
 
         msg = _make_message()
-        with patch("asyncio.create_subprocess_exec", return_value=proc_mock), \
-             patch("asyncio.wait_for", return_value=(encoded, b"")):
+        with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc_mock)):
             result = await stub._handle_post_file(msg, {
                 "host": "server",
                 "path": "/tmp/huge.bin",
@@ -1363,8 +1371,7 @@ class TestMiscCoverageGaps:
             side_effect=discord.HTTPException(MagicMock(), "upload failed"),
         )
 
-        with patch("asyncio.create_subprocess_exec", return_value=proc_mock), \
-             patch("asyncio.wait_for", return_value=(encoded, b"")):
+        with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc_mock)):
             result = await stub._handle_post_file(msg, {
                 "host": "server",
                 "path": "/tmp/test.txt",
@@ -1381,13 +1388,12 @@ class TestMiscCoverageGaps:
         task_mock.task_id = "crash-1"
         task_mock.status = "pending"
 
+        async def _crash(*args, **kwargs):
+            raise RuntimeError("task exploded")
+
         with patch("src.discord.client.BackgroundTask", return_value=task_mock), \
              patch("src.discord.client.create_task_id", return_value="crash-1"), \
-             patch(
-                 "src.discord.client.run_background_task",
-                 new_callable=AsyncMock,
-                 side_effect=RuntimeError("task exploded"),
-             ):
+             patch("src.discord.client.run_background_task", new=_crash):
             msg = _make_message()
             result = await stub._handle_delegate_task(msg, {
                 "description": "crashy task",

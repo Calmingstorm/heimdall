@@ -313,8 +313,11 @@ class TestPruneWithReflector:
         mgr._sessions["ch1"].last_active = time.time() - 7200
 
         # Patch asyncio.create_task since we're not in an async context
-        with patch("asyncio.create_task") as mock_task:
-            mock_task.return_value = MagicMock()
+        def _close_coro(coro):
+            coro.close()
+            return MagicMock()
+
+        with patch("asyncio.create_task", side_effect=_close_coro):
             mgr.prune()
 
         assert not session_file.exists(), "File should be deleted even with reflector"

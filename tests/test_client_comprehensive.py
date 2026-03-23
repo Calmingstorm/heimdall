@@ -653,11 +653,10 @@ class TestHandlePostFile:
         mock_proc.communicate = AsyncMock(return_value=(file_data, b""))
 
         with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=mock_proc)):
-            with patch("asyncio.wait_for", new=AsyncMock(return_value=(file_data, b""))):
-                result = await stub._handle_post_file(msg, {
-                    "host": "server", "path": "/tmp/test.txt", "caption": "test file",
-                })
-                assert "Posted" in result or "test.txt" in result
+            result = await stub._handle_post_file(msg, {
+                "host": "server", "path": "/tmp/test.txt", "caption": "test file",
+            })
+            assert "Posted" in result or "test.txt" in result
 
     async def test_post_file_ssh_failure(self):
         """Should handle SSH failure gracefully."""
@@ -672,11 +671,10 @@ class TestHandlePostFile:
         mock_proc.communicate = AsyncMock(return_value=(b"", b"No such file"))
 
         with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=mock_proc)):
-            with patch("asyncio.wait_for", new=AsyncMock(return_value=(b"", b"No such file"))):
-                result = await stub._handle_post_file(msg, {
-                    "host": "server", "path": "/nonexistent",
-                })
-                assert "Failed" in result or "not found" in result.lower() or "No such file" in result
+            result = await stub._handle_post_file(msg, {
+                "host": "server", "path": "/nonexistent",
+            })
+            assert "Failed" in result or "not found" in result.lower() or "No such file" in result
 
     async def test_post_file_timeout(self):
         """Should handle SSH timeout."""
@@ -1219,6 +1217,14 @@ class TestHandleDelegateTask:
         assert "Background task started" in result
         assert "2 steps" in result
         assert len(stub._background_tasks) == 1
+        # Clean up background asyncio task to avoid "coroutine never awaited" warning
+        for task in stub._background_tasks.values():
+            if hasattr(task, '_asyncio_task') and task._asyncio_task:
+                task._asyncio_task.cancel()
+                try:
+                    await task._asyncio_task
+                except asyncio.CancelledError:
+                    pass
 
 
 class TestHandleListTasks:

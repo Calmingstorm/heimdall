@@ -1,12 +1,11 @@
-"""Round 4 verification: confirm Rounds 1-3 removals are complete and routing works.
+"""Round 4 verification: confirm routing works.
 
 Tests verify:
-1. No approval system remnants in source code
-2. No classifier remnants in source code
-3. All messages (human + bot) route to _process_with_tools (Codex with tools)
-4. claude_code tool is available for delegation
-5. No requires_approval on any tool
-6. No _SCHEDULE_INTENT_RE guard
+1. All messages (human + bot) route to _process_with_tools (Codex with tools)
+2. Single routing path (no 3-way branching)
+
+Note: Removal checks (approval, classifier, schedule guard, claude_code registry)
+are consolidated into test_round10_verification.py.
 """
 from __future__ import annotations
 
@@ -15,11 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
-import pytest  # noqa: E402
-
 from src.discord.client import LokiBot  # noqa: E402
-from src.tools.registry import TOOLS, get_tool_definitions  # noqa: E402
-from src.llm.system_prompt import SYSTEM_PROMPT_TEMPLATE  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -90,34 +85,7 @@ def _make_message(is_bot=False):
 
 
 # ===========================================================================
-# 1. Approval system fully removed
-# ===========================================================================
-
-class TestApprovalFullyRemoved:
-    """Verify no approval system remnants in registry or client."""
-
-    def test_no_requires_approval_in_tools(self):
-        """No tool definition should have a requires_approval field."""
-        for tool in TOOLS:
-            assert "requires_approval" not in tool, f"Tool {tool['name']} still has requires_approval"
-
-    def test_no_approval_module(self):
-        """approval.py should not be importable."""
-        with pytest.raises(ModuleNotFoundError):
-            import src.discord.approval  # noqa: F401
-
-    def test_no_classifier_module(self):
-        """haiku_classifier.py should not be importable."""
-        with pytest.raises(ModuleNotFoundError):
-            import src.llm.haiku_classifier  # noqa: F401
-
-    def test_no_schedule_intent_guard(self):
-        """_SCHEDULE_INTENT_RE should not exist on LokiBot."""
-        assert not hasattr(LokiBot, "_SCHEDULE_INTENT_RE")
-
-
-# ===========================================================================
-# 2. Human message → tools available → executes
+# 1. Human message routing
 # ===========================================================================
 
 class TestHumanMessageRouting:
@@ -163,7 +131,7 @@ class TestHumanMessageRouting:
 
 
 # ===========================================================================
-# 3. Bot message → tools available → executes
+# 2. Bot message routing
 # ===========================================================================
 
 class TestBotMessageRouting:
@@ -198,43 +166,11 @@ class TestBotMessageRouting:
 
 
 # ===========================================================================
-# 4. claude_code tool available for delegation
-# ===========================================================================
-
-class TestClaudeCodeDelegation:
-    """Verify claude_code tool exists and is available for Codex to delegate to."""
-
-    def test_claude_code_in_registry(self):
-        """claude_code tool must exist in TOOLS registry."""
-        tool_names = [t["name"] for t in TOOLS]
-        assert "claude_code" in tool_names
-
-    def test_claude_code_no_approval(self):
-        """claude_code tool must not have requires_approval."""
-        claude_code = next(t for t in TOOLS if t["name"] == "claude_code")
-        assert "requires_approval" not in claude_code
-
-    def test_claude_code_in_definitions(self):
-        """claude_code must appear in get_tool_definitions()."""
-        defs = get_tool_definitions()
-        tool_names = [d["name"] for d in defs]
-        assert "claude_code" in tool_names
-
-    def test_system_prompt_mentions_claude_code(self):
-        """System prompt should reference claude_code for delegation."""
-        assert "claude_code" in SYSTEM_PROMPT_TEMPLATE
-
-    def test_system_prompt_under_5000_chars(self):
-        """System prompt template must stay under 5000 chars."""
-        assert len(SYSTEM_PROMPT_TEMPLATE) < 5000
-
-
-# ===========================================================================
-# 5. Single routing path (no branching)
+# 3. Single routing path (no branching)
 # ===========================================================================
 
 class TestSingleRoutingPath:
-    """Verify there's only one routing path: guest → chat, everyone else → tools."""
+    """Verify there's only one routing path: guest -> chat, everyone else -> tools."""
 
     async def test_no_msg_type_variable(self):
         """_handle_message_inner should not set msg_type (removed in Round 3)."""

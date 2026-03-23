@@ -1340,6 +1340,7 @@ class TestToolTimeoutHandling:
 
         async def _capture_wait_for(coro, *, timeout):
             recorded_timeouts.append(timeout)
+            coro.close()  # Prevent "coroutine was never awaited" warning
             raise asyncio.TimeoutError()
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \

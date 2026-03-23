@@ -355,6 +355,9 @@ class TestCompactionTriggersReflection:
 
         # Reflection should have been called
         assert reflector.reflect_on_compacted.called or len(mgr._reflection_tasks) > 0
+        # Await pending tasks to avoid "coroutine never awaited" warning
+        if mgr._reflection_tasks:
+            await asyncio.gather(*list(mgr._reflection_tasks), return_exceptions=True)
 
     async def test_reflection_not_triggered_with_few_messages(self, tmp_path):
         """Fewer than 5 discarded messages do NOT trigger reflection."""
@@ -394,6 +397,9 @@ class TestCompactionTriggersReflection:
 
         # The reflection task should have been created
         assert reflector.reflect_on_compacted.called or len(mgr._reflection_tasks) > 0
+        # Await pending tasks to avoid "coroutine never awaited" warning
+        if mgr._reflection_tasks:
+            await asyncio.gather(*list(mgr._reflection_tasks), return_exceptions=True)
 
     async def test_reflection_error_does_not_break_compaction(self, tmp_path):
         """If reflection fails, compaction still succeeds."""
@@ -621,6 +627,8 @@ class TestSessionPruneLifecycle:
 
         # A reflection task should have been created
         assert len(mgr._reflection_tasks) > 0
+        # Await pending tasks to avoid "coroutine never awaited" warning
+        await asyncio.gather(*list(mgr._reflection_tasks), return_exceptions=True)
 
     async def test_prune_no_reflection_short_session(self, tmp_path):
         """Sessions with < 3 messages do NOT trigger reflection on prune."""
