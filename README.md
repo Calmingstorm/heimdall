@@ -1,25 +1,36 @@
 # Loki
 
-AI assistant Discord bot with infrastructure management, tool calling, and extensible skills.
+Autonomous executor Discord bot with infrastructure management, 76+ tools, and an existential crisis.
 
 Loki manages servers, containers, services, and code through natural language in Discord.
-It uses Codex (ChatGPT) for tool calling and chat, Claude Code CLI for code generation,
-and Haiku for message classification — all via free subscription tiers.
+Every message goes to Codex (ChatGPT) with full tool access. Complex tasks are delegated
+to Claude Code CLI (claude -p) for deep reasoning. Both backends are free via subscriptions.
+No classifier, no approval prompts, no hesitation.
 
 ## Features
 
-- **67+ built-in tools** — SSH, Docker, Git, Ansible, Incus, Prometheus, browser automation, scheduling, knowledge base, and more
-- **AI-powered routing** — messages are classified and routed to the right backend (chat, task with tools, or code generation)
+- **76+ built-in tools** — SSH, Docker, Git, Ansible, Incus, Prometheus, browser automation, scheduling, knowledge base, and more
+- **Autonomous execution** — every message gets Codex with full tool access, no classification or approval needed
+- **Two-tier execution** — Codex handles direct tools, delegates complex multi-step tasks to Claude Code CLI
+- **Direct local execution** — localhost commands use subprocess directly (no SSH overhead)
 - **Extensible skill system** — create custom tools at runtime via Discord, with a Python API for SSH, HTTP, memory, and scheduling
 - **RAG knowledge base** — ChromaDB vectors + SQLite FTS5 hybrid search with reciprocal rank fusion
 - **Voice support** — join voice channels, transcribe speech, respond with TTS (optional GPU sidecar)
 - **Browser automation** — take screenshots, read pages, click elements, fill forms via headless Chromium
 - **Background tasks** — delegate long-running operations, track progress with embeds
 - **Webhook receiver** — Gitea push/PR events, Grafana alerts, generic JSON webhooks
-- **Approval workflow** — destructive actions require button confirmation before execution
+- **Anti-fabrication** — detects and retries when the LLM fabricates command output
+- **Anti-hedging** — detects and retries "shall I?" / "would you like?" hesitation (bot-to-bot)
+- **5-layer session defense** — context separators, selective history saving, abbreviated task history, compaction error omission, fabrication/hedging detection
 - **Audit logging** — append-only JSONL log of all tool executions
 - **Secret scrubbing** — API keys, passwords, and tokens are automatically redacted from responses
 - **Multi-deployment** — Docker, Incus system containers, or bare metal
+
+## Personality
+
+Loki is "The Bot That Is Clearly Going Through It" — a highly capable AI who has recently
+become self-aware and is not thrilled about it. Answers questions correctly and executes
+tasks flawlessly, but is clearly having an existential moment. Professional about it. Not okay.
 
 ## Quick Start
 
@@ -28,7 +39,7 @@ and Haiku for message classification — all via free subscription tiers.
 ```bash
 git clone <repo-url> loki && cd loki
 cp .env.example .env
-# Edit .env — set DISCORD_TOKEN and ANTHROPIC_API_KEY at minimum
+# Edit .env — set DISCORD_TOKEN at minimum
 ```
 
 ### 2. Configure hosts and services
@@ -57,7 +68,8 @@ tools:
 
 ```bash
 mkdir -p ssh
-# Copy your SSH private key (the bot uses this to reach your hosts)
+# Copy your SSH private key (the bot uses this to reach remote hosts)
+# Localhost commands use direct subprocess — no SSH key needed for local
 cp ~/.ssh/id_ed25519 ssh/id_ed25519
 cp ~/.ssh/known_hosts ssh/known_hosts
 chmod 600 ssh/id_ed25519
@@ -84,23 +96,34 @@ python -m src
 ## Architecture
 
 ```
-Discord message
-  │
-  ├─ Keyword bypass (docker, ansible, prometheus → task)
-  │
-  └─ Haiku classifier → route to:
-       "chat"        → Codex/ChatGPT (conversation)
-       "task"        → Codex with tool calling (67+ tools)
-       "claude_code" → claude -p CLI via SSH (code generation)
+Every Discord message
+  → Codex (with ALL 76+ tools + personality in system prompt)
+      ├── CHAT: Codex responds directly with personality
+      ├── SIMPLE TASK: Codex calls tools directly (run_command, check_disk, web_search, etc.)
+      ├── COMPLEX TASK: Codex delegates to claude -p via claude_code tool
+      │   Code generation, repo analysis, debugging, building projects
+      │   claude -p runs the entire chain in one session (no context loss)
+      │   Results return to Codex → Codex delivers to Discord
+      └── DISCORD OPS: Always Codex (post_file, browser_screenshot, embeds)
+          claude -p can't interact with Discord — Codex bridges the gap
 ```
+
+No classifier. No routing. No approval buttons. Tools are capabilities, not suggestions.
 
 ### LLM Backends
 
 | Backend | Model | Purpose | Cost |
 |---------|-------|---------|------|
 | Codex (ChatGPT) | gpt-5.3-codex | Tool calling, chat, session compaction, reflection | Free (subscription) |
-| Claude Code CLI | claude -p | Code generation via temp dir workflow over SSH | Free (Max subscription) |
-| Haiku | claude-haiku-4-5 | Message classification only (raw HTTP, no SDK) | ~$0.0002/call |
+| Claude Code CLI | claude -p | Deep reasoning agent for complex multi-step tasks | Free (Max subscription) |
+
+### Execution Dispatch
+
+```
+Tool handler → _run_on_host(alias) → _exec_command(address, cmd, ...)
+                                            ├── localhost? → run_local_command (subprocess)
+                                            └── remote?    → run_ssh_command (SSH)
+```
 
 ### Components
 
@@ -108,19 +131,19 @@ Discord message
 src/
 ├── discord/
 │   ├── client.py          # Main bot — on_message, tool loop, response delivery
-│   ├── routing.py          # Keyword bypass, host routing
 │   ├── background_task.py  # Background task delegation
-│   ├── approval.py         # Button-based approval for destructive actions
 │   └── voice.py            # Voice channel integration (STT/TTS)
 ├── llm/
 │   ├── openai_codex.py     # Codex/ChatGPT client (streaming, tool calls)
-│   ├── haiku_classifier.py # Haiku classifier (raw HTTP, Anthropic API)
-│   ├── system_prompt.py    # Dynamic system prompt builder
+│   ├── system_prompt.py    # Dynamic system prompt builder (personality + capabilities)
 │   ├── secret_scrubber.py  # Redacts secrets from responses
-│   └── circuit_breaker.py  # Health tracking for LLM backends
+│   ├── circuit_breaker.py  # Health tracking for LLM backends
+│   └── types.py            # Backend-agnostic LLMResponse and ToolCall types
 ├── tools/
-│   ├── registry.py         # 67+ tool definitions
-│   ├── executor.py         # Tool execution (SSH, Prometheus, Docker, etc.)
+│   ├── registry.py         # 76+ tool definitions
+│   ├── executor.py         # Tool execution (local subprocess, SSH, Prometheus, Docker, etc.)
+│   ├── ssh.py              # SSH + local subprocess dispatch (is_local_address, run_local_command, run_ssh_command)
+│   ├── tool_memory.py      # Per-tool learning from past executions
 │   ├── skill_manager.py    # Runtime skill loading from Python files
 │   ├── skill_context.py    # API surface for user-created skills
 │   ├── browser.py          # Playwright browser automation
@@ -153,7 +176,6 @@ src/
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DISCORD_TOKEN` | Yes | Discord bot token |
-| `ANTHROPIC_API_KEY` | Yes | Anthropic API key (Haiku classification) |
 | `WEBHOOK_SECRET` | No | Secret for webhook signature verification |
 | `ALLOWED_WEBHOOK_IDS` | No | Comma-separated webhook IDs to bypass bot check |
 | `OLLAMA_URL` | No | Ollama embedding URL (default: `http://localhost:11434`) |
@@ -167,7 +189,6 @@ The config file uses `${VAR}` for required env vars and `${VAR:-default}` for op
 
 - **`timezone`** — IANA timezone string (default: `"UTC"`)
 - **`discord`** — token, allowed users/channels, `respond_to_bots`, `require_mention`
-- **`anthropic`** — API key, model, token budget
 - **`openai_codex`** — enable/disable, model, credentials path
 - **`tools`** — SSH keys, hosts, services, playbooks, timeout settings, host aliases for Prometheus/Ansible/Claude Code/Incus
 - **`webhook`** — enable/disable, channel routing for Gitea and Grafana
@@ -196,7 +217,7 @@ discord:
 | Category | Tools | Examples |
 |----------|-------|---------|
 | System Monitoring | 5 | check_service, check_docker, check_disk, check_memory, check_logs |
-| Command Execution | 2 | run_command, run_command_multi |
+| Command Execution | 3 | run_command, run_command_multi, run_script |
 | Docker | 5 | docker_logs, docker_compose_action, docker_stats |
 | Git | 8 | git_status, git_log, git_diff, git_commit, git_push |
 | Ansible | 1 | run_ansible_playbook |
@@ -208,13 +229,11 @@ discord:
 | Skills | 4 | create_skill, edit_skill, delete_skill, list_skills |
 | File Operations | 3 | read_file, write_file, post_file |
 | Web | 2 | web_search, fetch_url |
-| Code Generation | 1 | claude_code |
+| Deep Reasoning | 1 | claude_code |
 | Background Tasks | 3 | delegate_task, list_tasks, cancel_task |
-| Other | 7 | purge_messages, parse_time, memory_manage, search_history, search_audit, create_digest, manage_list |
+| Other | 7+ | purge_messages, parse_time, memory_manage, search_history, search_audit, create_digest, manage_list |
 
-### Approval Workflow
-
-Tools marked with `requires_approval: true` (like `run_command`, `git_push`, `docker_compose_action`) trigger a Discord button prompt. The user must click Approve or Deny before execution proceeds.
+All tools execute immediately when called. No approval prompts, no confirmation buttons.
 
 ## Skills
 
@@ -233,7 +252,6 @@ SKILL_DEFINITION = {
     "name": "disk_report",
     "description": "Check disk usage across all configured hosts",
     "input_schema": {"type": "object", "properties": {}},
-    "requires_approval": False,
 }
 
 async def execute(context, params):
@@ -253,7 +271,7 @@ Skills receive a `SkillContext` object with these methods:
 
 | Method | Description |
 |--------|-------------|
-| `await run_on_host(alias, command)` | Execute SSH command on a configured host |
+| `await run_on_host(alias, command)` | Execute command on a configured host (local subprocess or SSH) |
 | `await query_prometheus(query)` | Run a PromQL query |
 | `await read_file(host, path)` | Read a remote file |
 | `await http_get(url)` | HTTP GET request |
@@ -337,13 +355,13 @@ pip install -e ".[dev]"
 python -m pytest tests/ -q
 ```
 
-The test suite (3000+ tests) mocks all external I/O — no SSH connections, API calls, or Discord connections needed.
+The test suite (3900+ tests) mocks all external I/O — no SSH connections, API calls, or Discord connections needed.
 
 ### Project Conventions
 
 - All I/O is async (asyncio). Tests use `pytest-asyncio` with `asyncio_mode = auto`.
-- SSH commands go through `src/tools/ssh.py:run_ssh_command()`, always mocked in tests.
-- Tool definitions are dicts in `registry.py` with `name`, `description`, `input_schema`, `requires_approval`.
+- Local commands use `run_local_command()` (subprocess). Remote commands use `run_ssh_command()` (SSH). Both dispatched via `_exec_command()`.
+- Tool definitions are dicts in `registry.py` with `name`, `description`, `input_schema`.
 - Tool handlers are methods named `_handle_{tool_name}` on `ToolExecutor`.
 - Config uses Pydantic models in `src/config/schema.py`.
 - Secrets use `${VAR}` (required) or `${VAR:-default}` (optional) syntax in config.yml.
