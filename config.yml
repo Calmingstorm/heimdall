@@ -7,12 +7,6 @@ discord:
   respond_to_bots: false  # Whether to respond to messages from other bots/webhooks
   require_mention: false  # Only respond when the bot is @mentioned
 
-anthropic:
-  api_key: "${ANTHROPIC_API_KEY}"
-  model: "claude-haiku-4-5-20251001"
-  max_tokens: 16384
-  daily_budget_tokens: 0
-
 openai_codex:
   enabled: true
   model: "gpt-5.3-codex"
