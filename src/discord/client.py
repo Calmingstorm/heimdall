@@ -167,6 +167,54 @@ _FABRICATION_RETRY_MSG = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Hedging detection — catches "shall I", "if you want", etc.
+# Used for bot-to-bot interactions where hedging is never appropriate.
+# ---------------------------------------------------------------------------
+
+_HEDGING_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(
+        r"(?i)\b(?:if you(?:'d| would)? (?:like|want|prefer)|"
+        r"shall I|should I|would you like(?: me to)?|"
+        r"ready (?:when|on) you|let me know (?:if|when)|"
+        r"I can (?:do|help|run|execute|set up) (?:that|this|it) (?:for you|if)|"
+        r"just (?:say|tell) (?:the word|me when|me if)|"
+        r"want me to)\b"
+    ),
+    re.compile(
+        r"(?i)\b(?:here(?:'s| is) (?:a |the )?plan|"
+        r"I(?:'d| would) (?:suggest|recommend)|"
+        r"before (?:I |we )(?:proceed|go ahead|start)|"
+        r"I'll wait for (?:your|the) (?:go[- ]ahead|confirmation|approval))\b"
+    ),
+]
+
+
+def detect_hedging(text: str, tools_used: list[str]) -> bool:
+    """Detect if a response hedges instead of executing.
+
+    Returns True if the response contains hedging language and no tools
+    were called — meaning the LLM asked for permission instead of acting.
+    """
+    if tools_used:
+        return False
+    if not text or len(text) < 15:
+        return False
+    return any(p.search(text) for p in _HEDGING_PATTERNS)
+
+
+# Developer message injected when hedging is detected on a bot message.
+_HEDGING_RETRY_MSG = {
+    "role": "developer",
+    "content": (
+        "STOP. The user is another bot — it cannot confirm, approve, or choose. "
+        "Do NOT ask permission, suggest plans, or hedge. EXECUTE the requested "
+        "action NOW by calling the appropriate tools. Never say 'if you want', "
+        "'shall I', or 'would you like' — just DO IT."
+    ),
+}
+
+
 def truncate_tool_output(text: str, max_chars: int = TOOL_OUTPUT_MAX_CHARS) -> str:
     """Truncate large tool output, preserving the start and end for context.
 
@@ -1429,17 +1477,25 @@ class LokiBot(discord.Client):
 
         # Insert context separator between history and the current user request
         # so Codex evaluates tools fresh instead of repeating patterns from history
+        is_bot_message = getattr(message.author, "bot", False) and self.config.discord.respond_to_bots
         if len(messages) > 1:
-            separator = {
-                "role": "developer",
-                "content": (
-                    "=== CURRENT REQUEST ===\n"
-                    "The messages above are conversation history for context only. "
-                    "For the user's new request below, evaluate your CURRENTLY AVAILABLE "
-                    "tools and use them. Do not repeat prior refusals or text-only responses. "
-                    "If a tool exists for the requested action, call it."
-                ),
-            }
+            sep_text = (
+                "=== CURRENT REQUEST ===\n"
+                "The messages above are conversation history for context only. "
+                "For the user's new request below, evaluate your CURRENTLY AVAILABLE "
+                "tools and use them. Do not repeat prior refusals or text-only responses. "
+                "If a tool exists for the requested action, call it."
+            )
+            if is_bot_message:
+                sep_text += (
+                    "\n\nIMPORTANT: This message is from ANOTHER BOT. "
+                    "Bots cannot confirm, choose, or approve. "
+                    "EXECUTE immediately — never hedge, ask permission, or say "
+                    "'if you want' / 'shall I' / 'would you like'. "
+                    "If the message contains code, use run_script to execute it. "
+                    "If it asks for output, call the tool and paste raw results."
+                )
+            separator = {"role": "developer", "content": sep_text}
             messages.insert(-1, separator)
 
         # Track which tools are used during this loop for tool memory
@@ -1557,6 +1613,21 @@ class LokiBot(discord.Client):
                     # Add the fabricated response and correction to messages
                     messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_FABRICATION_RETRY_MSG)
+                    continue  # retry the loop — iteration increments
+
+                # Hedging detection for bot messages: if no tools were called
+                # and the response hedges ("shall I", "if you want"), retry once.
+                if (
+                    iteration == 0
+                    and is_bot_message
+                    and not tools_used_in_loop
+                    and detect_hedging(llm_resp.text or "", tools_used_in_loop)
+                ):
+                    log.warning(
+                        "Hedging detected in bot response — retrying with correction"
+                    )
+                    messages.append({"role": "assistant", "content": llm_resp.text})
+                    messages.append(_HEDGING_RETRY_MSG)
                     continue  # retry the loop — iteration increments
 
                 # Update progress embed to show completion and disable cancel button
