@@ -183,6 +183,12 @@ _HEDGING_PATTERNS: list[re.Pattern[str]] = [
         r"before (?:I |we )(?:proceed|go ahead|start)|"
         r"I'll wait for (?:your|the) (?:go[- ]ahead|confirmation|approval))\b"
     ),
+    re.compile(
+        r"(?i)^Plan:|"
+        r"I can(?:'t| not) directly|"
+        r"I (?:need|have) to .{0,30} (?:first|before)|"
+        r"I'm (?:going to|about to|proceeding to)"
+    ),
 ]
 
 
