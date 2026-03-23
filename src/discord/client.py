@@ -122,6 +122,51 @@ def scrub_response_secrets(text: str) -> str:
     return text
 
 
+# Patterns that suggest fabricated tool output when no tools were actually called.
+# Each is (compiled_regex, description) for testability.
+_FABRICATION_PATTERNS: list[re.Pattern[str]] = [
+    # Claims of running/executing commands
+    re.compile(
+        r"(?i)\b(?:I\s+(?:ran|executed|checked|performed|ran\s+a)|"
+        r"running|executing|here(?:'s| is) the (?:output|result)|"
+        r"the (?:command|output|result) (?:returned|shows?|is)|"
+        r"I (?:can see|found) (?:that )?(?:the |your )?)"
+    ),
+    # Fake command output patterns (``` followed by lines that look like terminal output)
+    re.compile(
+        r"```(?:bash|shell|console|text|output)?\s*\n"
+        r"(?:[\$#>].*\n|(?:total |drwx|Filesystem|CONTAINER|NAME |PID |USER ))",
+    ),
+]
+
+
+def detect_fabrication(text: str, tools_used: list[str]) -> bool:
+    """Detect if a text-only response fabricates tool results.
+
+    Returns True if the response contains patterns suggesting the LLM claimed
+    to run commands or check systems without actually calling any tools.
+
+    Only meaningful when tools_used is empty — if tools were called, the
+    response is based on real results.
+    """
+    if tools_used:
+        return False
+    if not text or len(text) < 20:
+        return False
+    return any(p.search(text) for p in _FABRICATION_PATTERNS)
+
+
+# Developer message injected when fabrication is detected, prompting a retry.
+_FABRICATION_RETRY_MSG = {
+    "role": "developer",
+    "content": (
+        "STOP. Your previous response claimed results but you did NOT call any tools. "
+        "That is a fabrication. You MUST call the appropriate tool to get real results. "
+        "Do NOT respond with text only — call the tool NOW."
+    ),
+}
+
+
 def truncate_tool_output(text: str, max_chars: int = TOOL_OUTPUT_MAX_CHARS) -> str:
     """Truncate large tool output, preserving the start and end for context.
 
@@ -1498,6 +1543,22 @@ class LokiBot(discord.Client):
                     error_msg = f"{report}\n\n{error_msg}"
                 return error_msg, False, True, tools_used_in_loop, False
             if not llm_resp.is_tool_use:
+                # Fabrication detection: if no tools were called on the FIRST
+                # iteration and the response looks like it fabricated results,
+                # inject a correction and retry once.
+                if (
+                    iteration == 0
+                    and not tools_used_in_loop
+                    and detect_fabrication(llm_resp.text or "", tools_used_in_loop)
+                ):
+                    log.warning(
+                        "Fabrication detected on first response — retrying with correction"
+                    )
+                    # Add the fabricated response and correction to messages
+                    messages.append({"role": "assistant", "content": llm_resp.text})
+                    messages.append(_FABRICATION_RETRY_MSG)
+                    continue  # retry the loop — iteration increments
+
                 # Update progress embed to show completion and disable cancel button
                 if progress_embed_msg and progress_steps:
                     try:
