@@ -11,7 +11,7 @@ from urllib.parse import quote as url_quote
 
 from ..config.schema import ToolsConfig
 from ..logging import get_logger
-from .ssh import run_ssh_command
+from .ssh import is_local_address, run_local_command, run_ssh_command
 
 log = get_logger("tools")
 
@@ -186,19 +186,37 @@ class ToolExecutor:
         host = self.config.hosts.get(alias)
         return host.os if host else "linux"
 
+    async def _exec_command(
+        self,
+        address: str,
+        command: str,
+        ssh_user: str = "root",
+        timeout: int | None = None,
+    ) -> tuple[int, str]:
+        """Execute a command locally or via SSH depending on host address.
+
+        Local hosts (127.0.0.1, localhost, ::1) use direct subprocess —
+        no SSH key needed, no network overhead.
+        """
+        if timeout is None:
+            timeout = self.config.command_timeout_seconds
+        if is_local_address(address):
+            return await run_local_command(command, timeout=timeout)
+        return await run_ssh_command(
+            host=address,
+            command=command,
+            ssh_key_path=self.config.ssh_key_path,
+            known_hosts_path=self.config.ssh_known_hosts_path,
+            timeout=timeout,
+            ssh_user=ssh_user,
+        )
+
     async def _run_on_host(self, alias: str, command: str) -> str:
         resolved = self._resolve_host(alias)
         if not resolved:
             return f"Unknown or disallowed host: {alias}"
         address, ssh_user, _os = resolved
-        code, output = await run_ssh_command(
-            host=address,
-            command=command,
-            ssh_key_path=self.config.ssh_key_path,
-            known_hosts_path=self.config.ssh_known_hosts_path,
-            timeout=self.config.command_timeout_seconds,
-            ssh_user=ssh_user,
-        )
+        code, output = await self._exec_command(address, command, ssh_user)
         if code != 0:
             return f"Command failed (exit {code}):\n{output}"
         return output
@@ -258,13 +276,10 @@ class ToolExecutor:
         if not resolved:
             return f"Prometheus host '{prom_host}' not found in configured hosts"
         address, ssh_user, _os = resolved
-        code, output = await run_ssh_command(
-            host=address,
-            command=f"curl -s 'http://127.0.0.1:9090/api/v1/query?query={safe_query}'",
-            ssh_key_path=self.config.ssh_key_path,
-            known_hosts_path=self.config.ssh_known_hosts_path,
-            timeout=self.config.command_timeout_seconds,
-            ssh_user=ssh_user,
+        code, output = await self._exec_command(
+            address,
+            f"curl -s 'http://127.0.0.1:9090/api/v1/query?query={safe_query}'",
+            ssh_user,
         )
         if code != 0:
             return f"Prometheus query failed:\n{output}"
@@ -308,13 +323,8 @@ class ToolExecutor:
         if not resolved:
             return f"Ansible host '{ansible_host}' not found in configured hosts"
         address, ssh_user, _os = resolved
-        code, output = await run_ssh_command(
-            host=address,
-            command=cmd,
-            ssh_key_path=self.config.ssh_key_path,
-            known_hosts_path=self.config.ssh_known_hosts_path,
-            timeout=120,  # Ansible can take longer
-            ssh_user=ssh_user,
+        code, output = await self._exec_command(
+            address, cmd, ssh_user, timeout=120,  # Ansible can take longer
         )
         if code != 0:
             return f"Ansible playbook failed (exit {code}):\n{output}"
@@ -361,14 +371,7 @@ class ToolExecutor:
             f"rm -f \"$TMPF\"; exit $EXIT"
         )
 
-        code, output = await run_ssh_command(
-            host=address,
-            command=cmd,
-            ssh_key_path=self.config.ssh_key_path,
-            known_hosts_path=self.config.ssh_known_hosts_path,
-            timeout=self.config.command_timeout_seconds,
-            ssh_user=ssh_user,
-        )
+        code, output = await self._exec_command(address, cmd, ssh_user)
         if code != 0:
             return f"Script failed (exit {code}):\n{_truncate_lines(output)}"
         return _truncate_lines(output)
@@ -573,14 +576,7 @@ class ToolExecutor:
             f"&end='$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
             f"&step={safe_step}'"
         )
-        code, output = await run_ssh_command(
-            host=address,
-            command=cmd,
-            ssh_key_path=self.config.ssh_key_path,
-            known_hosts_path=self.config.ssh_known_hosts_path,
-            timeout=self.config.command_timeout_seconds,
-            ssh_user=ssh_user,
-        )
+        code, output = await self._exec_command(address, cmd, ssh_user)
         if code != 0:
             return f"Prometheus range query failed:\n{output}"
         return format_prometheus_response(output)
@@ -644,12 +640,6 @@ class ToolExecutor:
             return f"Unknown or disallowed host: {host}"
         address, ssh_user, _os = resolved
 
-        ssh_kwargs = {
-            "ssh_key_path": self.config.ssh_key_path,
-            "known_hosts_path": self.config.ssh_known_hosts_path,
-            "ssh_user": ssh_user,
-        }
-
         # When allow_edits is true, claude -p runs as a non-root user in a temp
         # dir (no permission issues). Files are then copied to the real target
         # as root. The prompt is rewritten to use relative paths so claude -p
@@ -660,10 +650,10 @@ class ToolExecutor:
             if not claude_user:
                 return "claude_code_user not configured — required for allow_edits=true"
             safe_user = shlex.quote(claude_user)
-            _, tmpdir = await run_ssh_command(
-                host=address,
-                command=f"su - {safe_user} -c 'mktemp -d /tmp/claude_code_XXXXXXXX'",
-                timeout=10, **ssh_kwargs,
+            _, tmpdir = await self._exec_command(
+                address,
+                f"su - {safe_user} -c 'mktemp -d /tmp/claude_code_XXXXXXXX'",
+                ssh_user, timeout=10,
             )
             tmpdir = tmpdir.strip()
             if not tmpdir or not tmpdir.startswith("/tmp/claude_code_"):
@@ -702,8 +692,8 @@ class ToolExecutor:
             safe_wd = shlex.quote(working_dir)
             cmd = f"cd {safe_wd} && echo '{encoded_prompt}' | base64 -d | timeout 280 {claude_cmd}"
 
-        code, output = await run_ssh_command(
-            host=address, command=cmd, timeout=300, **ssh_kwargs,
+        code, output = await self._exec_command(
+            address, cmd, ssh_user, timeout=300,
         )
 
         file_manifest = ""
@@ -711,19 +701,19 @@ class ToolExecutor:
         if allow_edits:
             if code == 0:
                 # Check what claude -p wrote in the temp dir
-                _, file_list = await run_ssh_command(
-                    host=address,
-                    command=f"find {safe_tmpdir} -type f -not -path '*/.git/*' -not -name '*.pyc' | sort",
-                    timeout=10, **ssh_kwargs,
+                _, file_list = await self._exec_command(
+                    address,
+                    f"find {safe_tmpdir} -type f -not -path '*/.git/*' -not -name '*.pyc' | sort",
+                    ssh_user, timeout=10,
                 )
                 files_found = file_list.strip()
                 if files_found:
                     # Copy files to target as root, preserving structure
                     safe_target = shlex.quote(working_dir)
-                    cp_code, cp_output = await run_ssh_command(
-                        host=address,
-                        command=f"mkdir -p {safe_target} && cp -a {safe_tmpdir}/. {safe_target}/",
-                        timeout=30, **ssh_kwargs,
+                    cp_code, cp_output = await self._exec_command(
+                        address,
+                        f"mkdir -p {safe_target} && cp -a {safe_tmpdir}/. {safe_target}/",
+                        ssh_user, timeout=30,
                     )
                     if cp_code != 0:
                         file_manifest = (
@@ -740,9 +730,8 @@ class ToolExecutor:
                             f"{target_files}"
                         )
             # Clean up temp dir
-            await run_ssh_command(
-                host=address, command=f"rm -rf {safe_tmpdir}",
-                timeout=10, **ssh_kwargs,
+            await self._exec_command(
+                address, f"rm -rf {safe_tmpdir}", ssh_user, timeout=10,
             )
 
         if code != 0:
@@ -907,14 +896,7 @@ class ToolExecutor:
         if not resolved:
             return f"Unknown or disallowed host: {self._incus_host()}"
         address, ssh_user, _os = resolved
-        code, output = await run_ssh_command(
-            host=address,
-            command=cmd,
-            ssh_key_path=self.config.ssh_key_path,
-            known_hosts_path=self.config.ssh_known_hosts_path,
-            timeout=60,
-            ssh_user=ssh_user,
-        )
+        code, output = await self._exec_command(address, cmd, ssh_user, timeout=60)
         if code != 0:
             return f"Launch failed (exit {code}):\n{output}"
         return output if output.strip() else f"Instance '{inp['name']}' launched from {inp['image']}."

@@ -8,6 +8,50 @@ log = get_logger("ssh")
 
 MAX_OUTPUT_CHARS = 16000
 
+# Addresses considered "local" — commands run via subprocess, not SSH.
+_LOCAL_ADDRESSES = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+def is_local_address(address: str) -> bool:
+    """Return True if *address* points to the local machine."""
+    return address in _LOCAL_ADDRESSES
+
+
+def _truncate_output(output: str) -> str:
+    """Truncate output exceeding MAX_OUTPUT_CHARS, keeping head and tail."""
+    if len(output) <= MAX_OUTPUT_CHARS:
+        return output
+    half = MAX_OUTPUT_CHARS // 2
+    return output[:half] + "\n\n... (output truncated) ...\n\n" + output[-half:]
+
+
+async def run_local_command(
+    command: str,
+    timeout: int = 30,
+) -> tuple[int, str]:
+    """Run a command locally via subprocess. Returns (exit_code, output).
+
+    Used for localhost hosts — no SSH overhead, no key needed.
+    """
+    log.info("Local exec: %s", command)
+
+    try:
+        proc = await asyncio.create_subprocess_shell(
+            command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        output = stdout.decode("utf-8", errors="replace")
+        return proc.returncode or 0, _truncate_output(output)
+
+    except asyncio.TimeoutError:
+        proc.kill()
+        return 1, f"Command timed out after {timeout} seconds"
+    except Exception as e:
+        log.error("Local command failed: %s", e)
+        return 1, f"Local exec error: {e}"
+
 
 async def run_ssh_command(
     host: str,
@@ -39,12 +83,7 @@ async def run_ssh_command(
         )
         stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         output = stdout.decode("utf-8", errors="replace")
-
-        if len(output) > MAX_OUTPUT_CHARS:
-            half = MAX_OUTPUT_CHARS // 2
-            output = output[:half] + "\n\n... (output truncated) ...\n\n" + output[-half:]
-
-        return proc.returncode or 0, output
+        return proc.returncode or 0, _truncate_output(output)
 
     except asyncio.TimeoutError:
         proc.kill()

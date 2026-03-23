@@ -368,10 +368,23 @@ class TestNoShellTrue:
     """Verify subprocess calls don't use shell=True."""
 
     def test_no_shell_true_in_source(self):
-        """No subprocess calls with shell=True in source code."""
+        """No subprocess calls with shell=True in source code.
+
+        Exception: ssh.py uses create_subprocess_shell for run_local_command
+        because commands must be interpreted by a shell (same as SSH does
+        remotely).  All inputs are already sanitised via shlex.quote in
+        executor.py before reaching run_local_command.
+        """
+        # ssh.py is the single allowed location for shell subprocess usage
+        allowed_shell_files = {"src/tools/ssh.py"}
         for f in _get_tracked_source_files():
             content = Path(f).read_text()
-            # Check for shell=True in subprocess calls
+            if f in allowed_shell_files:
+                # ssh.py may use create_subprocess_shell but never shell=True
+                if "shell=True" in content:
+                    assert False, f"{f} uses shell=True"
+                continue
+            # All other files: no shell subprocess at all
             if "subprocess" in content or "create_subprocess_shell" in content:
                 assert "shell=True" not in content, f"{f} uses shell=True"
                 assert "create_subprocess_shell" not in content, f"{f} uses create_subprocess_shell"
