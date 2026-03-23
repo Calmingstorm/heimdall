@@ -331,6 +331,7 @@ class TestToolFilteringIntegration:
         )
         bot.skill_manager = MagicMock()
         bot.skill_manager.get_tool_definitions.return_value = []
+        bot._cached_merged_tools = None
         return bot
 
     def test_merged_tools_filtered_for_user(self, bot):

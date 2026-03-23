@@ -2456,6 +2456,7 @@ class TestMergedToolDefinitions:
     def test_builtin_tools_only(self):
         """Should return all builtin tools when no skills."""
         stub = _make_bot_stub()
+        stub._cached_merged_tools = None
         stub._merged_tool_definitions = LokiBot._merged_tool_definitions.__get__(stub)
 
         result = stub._merged_tool_definitions()
@@ -2465,6 +2466,7 @@ class TestMergedToolDefinitions:
     def test_skill_deduplicated(self):
         """Should exclude skills that shadow builtin tool names."""
         stub = _make_bot_stub()
+        stub._cached_merged_tools = None
         stub.skill_manager.get_tool_definitions = MagicMock(return_value=[
             {"name": "check_disk", "description": "custom check_disk"},
             {"name": "my_custom_skill", "description": "custom skill"},

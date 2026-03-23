@@ -26,6 +26,9 @@ class CodexChatClient:
         self.max_tokens = max_tokens
         self.breaker = CircuitBreaker("codex_api")
         self._session: aiohttp.ClientSession | None = None
+        # Tool conversion cache — avoids re-converting same tools across tool loop iterations
+        self._last_tools_list: list[dict] | None = None
+        self._last_tools_converted: list[dict] = []
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
@@ -268,6 +271,17 @@ class CodexChatClient:
 
         return codex_input
 
+    def _convert_tools_cached(self, tools: list[dict]) -> list[dict]:
+        """Convert tools with identity-based caching.
+
+        Within a tool loop, the same tools list object is passed on every
+        iteration. This avoids re-converting 70+ tool definitions each time.
+        """
+        if tools is not self._last_tools_list:
+            self._last_tools_converted = self._convert_tools(tools)
+            self._last_tools_list = tools
+        return self._last_tools_converted
+
     async def chat_with_tools(
         self,
         messages: list[dict],
@@ -298,7 +312,7 @@ class CodexChatClient:
             "model": self.model,
             "instructions": system,
             "input": self._convert_messages_with_tools(messages),
-            "tools": self._convert_tools(tools),
+            "tools": self._convert_tools_cached(tools),
             "tool_choice": "auto",
             "store": False,
             "stream": True,

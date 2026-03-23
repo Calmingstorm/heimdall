@@ -297,6 +297,11 @@ class LokiBot(discord.Client):
         # Background task tracking
         self._background_tasks: dict[str, BackgroundTask] = {}
         self._background_tasks_max = 20
+        # Cached merged tool definitions — invalidated on skill create/edit/delete
+        self._cached_merged_tools: list[dict] | None = None
+        # Throttled cache cleanup
+        self._last_cache_cleanup: float = 0.0
+        self._cache_cleanup_interval: float = 300.0  # every 5 minutes
 
         self.context_loader = ContextLoader(config.context.directory)
         self.context_loader.load()
@@ -616,14 +621,53 @@ class LokiBot(discord.Client):
         """Merge built-in and skill tool definitions, deduplicating by name.
 
         Built-in tools take priority over skills with the same name.
+        Cached — invalidated on skill create/edit/delete.
         """
+        if self._cached_merged_tools is not None:
+            return self._cached_merged_tools
         builtin = get_tool_definitions()
         builtin_names = {t["name"] for t in builtin}
         skill_defs = [
             t for t in self.skill_manager.get_tool_definitions()
             if t["name"] not in builtin_names
         ]
-        return builtin + skill_defs
+        self._cached_merged_tools = builtin + skill_defs
+        return self._cached_merged_tools
+
+    def _cleanup_stale_caches(self) -> None:
+        """Remove stale entries from per-channel caches to prevent memory leaks.
+
+        Called periodically (every _cache_cleanup_interval seconds) after session prune.
+        Removes expired entries from _recent_actions and _channel_locks for
+        channels that no longer have active sessions.
+        """
+        now = time.time()
+        # Clean up _recent_actions: remove channels with all expired entries
+        expired_channels = []
+        for channel_id, actions in self._recent_actions.items():
+            actions[:] = [(ts, entry) for ts, entry in actions if now - ts < self._recent_actions_expiry]
+            if not actions:
+                expired_channels.append(channel_id)
+        for channel_id in expired_channels:
+            del self._recent_actions[channel_id]
+
+        # Clean up _channel_locks for channels no longer in active sessions
+        active_channels = set(self.sessions._sessions.keys())
+        stale_locks = [cid for cid in self._channel_locks if cid not in active_channels]
+        for cid in stale_locks:
+            del self._channel_locks[cid]
+
+    def _maybe_cleanup_caches(self) -> None:
+        """Run cache cleanup if enough time has passed since the last run."""
+        try:
+            now = time.time()
+            interval = getattr(self, "_cache_cleanup_interval", 300.0)
+            last = getattr(self, "_last_cache_cleanup", 0.0)
+            if now - last > interval:
+                self._cleanup_stale_caches()
+                self._last_cache_cleanup = now
+        except Exception:
+            pass  # Non-critical — don't break message processing
 
     def _track_recent_action(
         self, tool_name: str, tool_input: dict, result_preview: str,
@@ -1156,23 +1200,6 @@ class LokiBot(discord.Client):
         tagged_content = f"[{display_name}]: {content}"
         self.sessions.add_message(channel_id, "user", tagged_content, user_id=user_id)
 
-        # Compact history if needed before sending to Claude
-        history = await self.sessions.get_history_with_compaction(channel_id)
-
-        # If images are attached, inject them into the last user message for Claude
-        # (stored as text-only in session to avoid bloating history with base64)
-        if image_blocks:
-            history = list(history)  # don't mutate the original
-            if history and history[-1]["role"] == "user":
-                last_msg = history[-1]
-                text_content = last_msg["content"] if isinstance(last_msg["content"], str) else str(last_msg["content"])
-                # Build multimodal content: images first, then text
-                history[-1] = {
-                    "role": "user",
-                    "content": image_blocks + [{"type": "text", "text": text_content}],
-                }
-            log.info("Attached %d image(s) to message for Claude vision", len(image_blocks))
-
         try:
             is_guest = self.permissions.is_guest(str(message.author.id))
             already_sent = False
@@ -1183,6 +1210,18 @@ class LokiBot(discord.Client):
             if is_guest:
                 # Guest tier: chat only, no tools
                 log.info("Guest tier user %s, chat route (no tools)", message.author.id)
+                # Guests use full history (with compaction)
+                history = await self.sessions.get_history_with_compaction(channel_id)
+                if image_blocks:
+                    history = list(history)
+                    if history and history[-1]["role"] == "user":
+                        last_msg = history[-1]
+                        text_content = last_msg["content"] if isinstance(last_msg["content"], str) else str(last_msg["content"])
+                        history[-1] = {
+                            "role": "user",
+                            "content": image_blocks + [{"type": "text", "text": text_content}],
+                        }
+                    log.info("Attached %d image(s) to message for Claude vision", len(image_blocks))
                 if self.codex_client:
                     chat_prompt = self._build_chat_system_prompt(channel=message.channel, user_id=user_id)
                     try:
@@ -1214,9 +1253,8 @@ class LokiBot(discord.Client):
                 _sp = await self._inject_tool_hints(_sp, content, user_id)
                 log.info("Routing to Codex with tools")
                 # Use abbreviated history to reduce poisoning from stale responses
+                # (get_task_history handles compaction internally)
                 task_history = await self.sessions.get_task_history(channel_id, max_messages=20)
-                # Re-inject images into task history (they were added to `history` above
-                # but get_task_history returns fresh history without them)
                 if image_blocks and task_history and task_history[-1]["role"] == "user":
                     last = task_history[-1]
                     text = last["content"] if isinstance(last["content"], str) else str(last["content"])
@@ -1224,6 +1262,7 @@ class LokiBot(discord.Client):
                         "role": "user",
                         "content": image_blocks + [{"type": "text", "text": text}],
                     }
+                    log.info("Attached %d image(s) to message for Claude vision", len(image_blocks))
                 try:
                     response, already_sent, is_error, tools_used, handoff = await self._process_with_tools(
                         message, task_history, system_prompt_override=_sp,
@@ -1238,6 +1277,8 @@ class LokiBot(discord.Client):
                     log.info("Skill handoff to Codex for response")
                     _skill_response = response  # Save before overwriting
                     chat_prompt = self._build_chat_system_prompt(channel=message.channel, user_id=user_id)
+                    # Fetch full history for handoff (compaction already ran in get_task_history)
+                    history = self.sessions.get_history(channel_id)
                     codex_messages = list(history) + [
                         {"role": "assistant", "content": f"[Tool result: {response}]"},
                         {"role": "user", "content": "Respond to the user based on the tool result above. Be conversational and helpful."},
@@ -1280,6 +1321,7 @@ class LokiBot(discord.Client):
             else:
                 self.sessions.add_message(channel_id, "assistant", response)
             self.sessions.prune()
+            self._maybe_cleanup_caches()
             await asyncio.to_thread(self.sessions.save)
 
             # Record tool use pattern for future hints
@@ -1604,16 +1646,19 @@ class LokiBot(discord.Client):
                         result = await asyncio.to_thread(
                             self.skill_manager.create_skill, tool_input["name"], tool_input["code"],
                         )
+                        self._cached_merged_tools = None  # invalidate tool cache
                         system_prompt = self._build_system_prompt(channel=message.channel, user_id=user_id)
                     elif tool_name == "edit_skill":
                         result = await asyncio.to_thread(
                             self.skill_manager.edit_skill, tool_input["name"], tool_input["code"],
                         )
+                        self._cached_merged_tools = None  # invalidate tool cache
                         system_prompt = self._build_system_prompt(channel=message.channel, user_id=user_id)
                     elif tool_name == "delete_skill":
                         result = await asyncio.to_thread(
                             self.skill_manager.delete_skill, tool_input["name"],
                         )
+                        self._cached_merged_tools = None  # invalidate tool cache
                         system_prompt = self._build_system_prompt(channel=message.channel, user_id=user_id)
                     elif tool_name == "list_skills":
                         skills = self.skill_manager.list_skills()
