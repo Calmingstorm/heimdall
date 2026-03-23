@@ -31,7 +31,6 @@ from ..tools import ToolExecutor, SkillManager, get_tool_definitions
 from ..tools.tool_memory import ToolMemory
 from ..search import OllamaEmbedder, SessionVectorStore
 from ..permissions import PermissionManager
-from .routing import resolve_claude_code_target, CLAUDE_CODE_DEFAULTS
 from .voice import VoiceManager, VoiceMessageProxy
 
 log = get_logger("discord")
@@ -434,18 +433,8 @@ class LokiBot(discord.Client):
 
         self._system_prompt = self._build_system_prompt()
         self._register_commands()
-        self._init_routing_defaults()
         self._init_allowed_webhook_ids()
         self._log_startup_config()
-
-    def _init_routing_defaults(self) -> None:
-        """Populate CLAUDE_CODE_DEFAULTS from config for claude -p routing."""
-        tc = self.config.tools
-        host = tc.claude_code_host
-        directory = tc.claude_code_dir
-        if host:
-            CLAUDE_CODE_DEFAULTS["primary"] = (host, directory)
-            CLAUDE_CODE_DEFAULTS["secondary"] = (host, directory)
 
     def _init_allowed_webhook_ids(self) -> None:
         """Populate _ALLOWED_WEBHOOK_IDS from ALLOWED_WEBHOOK_IDS env var."""

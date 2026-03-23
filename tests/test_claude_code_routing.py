@@ -12,7 +12,7 @@ Tests cover:
 from __future__ import annotations
 
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 # Stub out heavy discord extension before any src.discord imports
 sys.modules.setdefault("discord.ext.voice_recv", MagicMock())

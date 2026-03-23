@@ -36,11 +36,6 @@ from src.tools.tool_memory import ToolMemory, EXPIRY_DAYS  # noqa: E402
 # ── Fixtures ──────────────────────────────────────────────────────────
 
 @pytest.fixture
-def tmp_dir(tmp_path):
-    return tmp_path
-
-
-@pytest.fixture
 def mock_claude():
     client = MagicMock()
     client.usage = MagicMock()

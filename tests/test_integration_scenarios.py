@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import sys
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 

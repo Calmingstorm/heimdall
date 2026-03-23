@@ -287,31 +287,6 @@ class TestSystemPrompt:
 
 
 # ---------------------------------------------------------------------------
-# 6. Routing verification
-# ---------------------------------------------------------------------------
-
-class TestRouting:
-    """Verify message routing logic."""
-
-    def test_claude_code_defaults_empty(self):
-        """CLAUDE_CODE_DEFAULTS should have empty hosts by default."""
-        from src.discord.routing import CLAUDE_CODE_DEFAULTS
-        assert CLAUDE_CODE_DEFAULTS["primary"][0] == ""  # empty host
-        assert CLAUDE_CODE_DEFAULTS["secondary"][0] == ""
-
-    def test_server_indicators_route_to_secondary(self):
-        from src.discord.routing import resolve_claude_code_target, CLAUDE_CODE_DEFAULTS
-        # Set up distinct secondary for testing
-        old_secondary = CLAUDE_CODE_DEFAULTS["secondary"]
-        CLAUDE_CODE_DEFAULTS["secondary"] = ("server-host", "/opt/app")
-        try:
-            host, d = resolve_claude_code_target("check the server config")
-            assert host == "server-host"
-        finally:
-            CLAUDE_CODE_DEFAULTS["secondary"] = old_secondary
-
-
-# ---------------------------------------------------------------------------
 # 7. Search subsystem verification
 # ---------------------------------------------------------------------------
 
@@ -494,7 +469,6 @@ class TestModuleImports:
 
     MODULES = [
         "src.discord.client",
-        "src.discord.routing",
         "src.discord.background_task",
         "src.discord.voice",
         "src.llm.system_prompt",

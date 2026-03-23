@@ -8,6 +8,8 @@ from __future__ import annotations
 import ast
 import re
 
+import pytest
+
 from src.llm.system_prompt import (
     build_system_prompt,
     build_chat_system_prompt,
@@ -90,11 +92,11 @@ class TestNoRemovedSystemLeaks:
         import src.config.schema as schema
         assert not hasattr(schema, "AnthropicConfig")
 
-    def test_no_keyword_bypass_in_routing(self):
-        """routing.py should not have keyword bypass patterns."""
-        import src.discord.routing as routing
-        assert not hasattr(routing, "is_task_by_keyword")
-        assert not hasattr(routing, "_TASK_KEYWORD_PATTERNS")
+    def test_routing_module_removed(self):
+        """routing.py should be completely removed (dead code cleanup)."""
+        import importlib
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module("src.discord.routing")
 
 
 # ---------------------------------------------------------------------------

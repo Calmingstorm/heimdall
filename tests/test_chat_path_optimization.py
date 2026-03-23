@@ -12,9 +12,8 @@ Note: Chat path tests removed — all messages now route to "task" (no classifie
 """
 from __future__ import annotations
 
-import json
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock
 
 # Stub out heavy discord extension before any src.discord imports
 sys.modules.setdefault("discord.ext.voice_recv", MagicMock())

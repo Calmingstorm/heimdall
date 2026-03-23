@@ -76,10 +76,3 @@ def config(tmp_dir: Path, tools_config: ToolsConfig) -> Config:
     )
 
 
-@pytest.fixture
-def mock_ssh():
-    """Return a mock for run_ssh_command that returns (0, 'ok')."""
-    mock = AsyncMock(return_value=(0, "ok"))
-    return mock
-
-
