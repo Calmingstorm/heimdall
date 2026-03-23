@@ -35,7 +35,6 @@ def _make_bot_stub():
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
-    stub._last_tool_use = {}
     stub._system_prompt = "initial system prompt"
     stub.config = MagicMock()
     stub.config.tools.enabled = True
@@ -97,8 +96,7 @@ class TestTaskPathBuildsFullPrompt:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub._build_system_prompt.assert_called_once_with(channel=msg.channel, user_id=str(msg.author.id), query="check disk")
 
@@ -111,8 +109,7 @@ class TestTaskPathBuildsFullPrompt:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check the server", "chan-1")
+        await stub._handle_message_inner(msg, "check the server", "chan-1")
 
         stub._build_system_prompt.assert_called_once()
 
@@ -124,8 +121,7 @@ class TestTaskPathBuildsFullPrompt:
         stub.codex_client = None
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub._build_system_prompt.assert_not_called()
 
@@ -145,8 +141,7 @@ class TestTaskPathBuildsFullPrompt:
         stub._process_with_tools = capture_process
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         assert captured_prompt == ["fresh task prompt"]
 

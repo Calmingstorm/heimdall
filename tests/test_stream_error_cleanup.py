@@ -1,13 +1,9 @@
-"""Tests for stream error preview cleanup and time.monotonic() boot bug fix.
+"""Tests for stream error preview cleanup.
 
-Bug 1: When streaming fails after a Discord preview was created, the preview
+Bug: When streaming fails after a Discord preview was created, the preview
 was left as a frozen partial response with "..." — the error message was never
 shown because already_sent=True skipped _send_chunked. Fix: delete the preview
 and return already_sent=False so the error message is delivered normally.
-
-Bug 2: _last_tool_use.get(channel_id, 0) defaults to 0, so in the first ~5
-minutes after boot (time.monotonic() < 300), ALL channels appeared to have
-recent tool use. Fix: use `channel_id in` check instead of defaulting to 0.
 """
 from __future__ import annotations
 
@@ -35,7 +31,6 @@ def _make_bot_stub():
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
-    stub._last_tool_use = {}
     stub._system_prompt = "You are a bot."
     stub.config = MagicMock()
     stub.config.tools.enabled = True
@@ -100,8 +95,7 @@ class TestStreamErrorPreviewCleanup:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
+        await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
 
         # Error should be sent via _send_chunked (already_sent=False)
         stub._send_chunked.assert_called_once()
@@ -114,8 +108,7 @@ class TestStreamErrorPreviewCleanup:
         stub._process_with_tools = AsyncMock(side_effect=RuntimeError("Codex API down"))
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
+        await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
 
         # Inner except catches it, sends error via _send_chunked
         stub._send_chunked.assert_called_once()
@@ -132,8 +125,7 @@ class TestStreamErrorPreviewCleanup:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
+        await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
 
         stub._send_chunked.assert_called_once()
         sent_text = stub._send_chunked.call_args[0][1]
@@ -149,8 +141,7 @@ class TestStreamErrorPreviewCleanup:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
+        await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
 
         # Error should be sent via _send_chunked since already_sent=False
         stub._send_chunked.assert_called_once()
@@ -167,48 +158,13 @@ class TestStreamErrorPreviewCleanup:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
+        await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
 
         stub._send_chunked.assert_called_once()
         sent_text = stub._send_chunked.call_args[0][1]
         assert "Here are the results." in sent_text
 
 
-# ---------------------------------------------------------------------------
-# time.monotonic() boot bug — _last_tool_use default-0
-# ---------------------------------------------------------------------------
-
-class TestMonotonicBootBug:
-    """time.monotonic() defaults to 0 for unknown channels, causing false
-    positives in the first ~5 minutes after boot."""
-
-    def test_fresh_boot_no_false_positive(self):
-        """On fresh boot with empty _last_tool_use, no channel should appear
-        to have recent tool use, regardless of time.monotonic() value."""
-        last_tool_use = {}
-        channel_id = "chan-1"
-
-        # New formula: check membership first
-        recent = (
-            channel_id in last_tool_use
-            and time.monotonic() - last_tool_use[channel_id] < 300
-        )
-        assert recent is False
-
-    def test_fresh_boot_low_monotonic_no_false_positive(self):
-        """Even when time.monotonic() is very small (< 300), unknown channels
-        should NOT be considered to have recent tool use."""
-        last_tool_use = {}
-
-        # Simulate low monotonic (e.g., 10 seconds after boot)
-        with patch("time.monotonic", return_value=10.0):
-            channel_id = "chan-1"
-            recent = (
-                channel_id in last_tool_use
-                and time.monotonic() - last_tool_use[channel_id] < 300
-            )
-            assert recent is False
 
     def test_old_formula_would_fail_on_boot(self):
         """Demonstrate that the old formula (default=0) produces a false positive

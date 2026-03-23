@@ -56,7 +56,6 @@ def _make_bot_stub(**overrides):
     stub._recent_actions = {}
     stub._recent_actions_max = 10
     stub._recent_actions_expiry = 3600
-    stub._last_tool_use = {}
     stub._system_prompt = "test system prompt"
     stub._channel_locks = {}
     stub._processed_messages = MagicMock()
@@ -2205,8 +2204,7 @@ class TestHandleMessageInnerErrors:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "67890")
+        await stub._handle_message_inner(msg, "check disk", "67890")
 
         # The inner except (line ~1075) catches it, sets is_error=True and response to error
         # The response goes to _send_chunked (not _send_with_retry) since already_sent=False
@@ -2221,8 +2219,7 @@ class TestHandleMessageInnerErrors:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "67890")
+        await stub._handle_message_inner(msg, "check disk", "67890")
 
         stub._send_with_retry.assert_awaited()
         call_text = stub._send_with_retry.call_args[0][1]
@@ -2238,8 +2235,7 @@ class TestHandleMessageInnerErrors:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "67890")
+        await stub._handle_message_inner(msg, "check disk", "67890")
 
         stub.sessions.remove_last_message.assert_not_called()
         assistant_saves = [
@@ -2257,8 +2253,7 @@ class TestHandleMessageInnerErrors:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "hello", "67890")
+        await stub._handle_message_inner(msg, "hello", "67890")
 
         stub._send_with_retry.assert_awaited()
         call_text = stub._send_with_retry.call_args[0][1]
@@ -2275,10 +2270,9 @@ class TestHandleMessageInnerErrors:
         msg = _make_message()
         voice_cb = AsyncMock()
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(
-                msg, "check disk", "67890", voice_callback=voice_cb,
-            )
+        await stub._handle_message_inner(
+            msg, "check disk", "67890", voice_callback=voice_cb,
+        )
         voice_cb.assert_awaited_once()
 
     async def test_tool_memory_recording(self):
@@ -2290,8 +2284,7 @@ class TestHandleMessageInnerErrors:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "67890")
+        await stub._handle_message_inner(msg, "check disk", "67890")
 
         stub.tool_memory.record.assert_awaited_once()
 
@@ -2304,8 +2297,7 @@ class TestHandleMessageInnerErrors:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "67890")
+        await stub._handle_message_inner(msg, "check disk", "67890")
 
         stub.sessions.remove_last_message.assert_not_called()
         assistant_saves = [
@@ -2331,8 +2323,7 @@ class TestTaskNoCodex:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "67890")
+        await stub._handle_message_inner(msg, "check disk", "67890")
 
         stub._send_with_retry.assert_awaited()
         call_text = stub._send_with_retry.call_args[0][1]
@@ -2629,8 +2620,7 @@ class TestGuestTierForcing:
 
         msg = _make_message()
         # Even with task keyword, guest should get chat
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "67890")
+        await stub._handle_message_inner(msg, "check disk", "67890")
 
         # Should use chat prompt via Codex, not full system prompt
         stub._build_chat_system_prompt.assert_called()
@@ -2651,8 +2641,7 @@ class TestTaskRouteWithCodex:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "check status", "67890")
+        await stub._handle_message_inner(msg, "check status", "67890")
 
         # Should use Codex tool calling via _process_with_tools
         stub._process_with_tools.assert_awaited()

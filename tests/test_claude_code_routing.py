@@ -31,7 +31,6 @@ def _make_bot_stub():
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
-    stub._last_tool_use = {}
     stub._system_prompt = "initial system prompt"
     stub.config = MagicMock()
     stub.config.tools.enabled = True
@@ -99,8 +98,7 @@ class TestTaskRouting:
         stub._process_with_tools = AsyncMock(return_value=("Tool result", False, False, ["check_disk"], False))
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "check the server metrics", "chan-1")
+        await stub._handle_message_inner(msg, "check the server metrics", "chan-1")
 
         # Should route to Codex tool calling
         stub._process_with_tools.assert_called_once()
@@ -115,8 +113,7 @@ class TestTaskRouting:
         stub.codex_client = None
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "restart apache", "chan-1")
+        await stub._handle_message_inner(msg, "restart apache", "chan-1")
 
         # Should send "no tool backend" message
         stub._send_with_retry.assert_called_once()
@@ -129,8 +126,7 @@ class TestTaskRouting:
         msg = _make_message()
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hello there", "chan-1")
+        await stub._handle_message_inner(msg, "hello there", "chan-1")
 
         # Should go to _process_with_tools (task route), not _handle_claude_code
         stub._process_with_tools.assert_called_once()
@@ -153,8 +149,7 @@ class TestKeywordBypassUnchanged:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "deploy the latest code", "chan-1")
+        await stub._handle_message_inner(msg, "deploy the latest code", "chan-1")
 
         # Keyword match -> task -> Codex tool loop
         stub.tool_executor._handle_claude_code.assert_not_called()
@@ -169,11 +164,10 @@ class TestKeywordBypassUnchanged:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(
-                msg, "what is this?", "chan-1",
-                image_blocks=[{"type": "image", "source": {"data": "base64data"}}],
-            )
+        await stub._handle_message_inner(
+            msg, "what is this?", "chan-1",
+            image_blocks=[{"type": "image", "source": {"data": "base64data"}}],
+        )
 
         stub.tool_executor._handle_claude_code.assert_not_called()
         stub._process_with_tools.assert_called_once()

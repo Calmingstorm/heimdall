@@ -1,7 +1,6 @@
 """Tests for Round 1-5 routing and prompt fixes.
 
 Covers:
-- P2: schedule_task proactive defense (requires scheduling intent in user message)
 - P3: nonlocal system_prompt in _run_tool (skill CRUD updates prompt)
 - P3: Compaction routed through compaction_fn (Codex)
 - Round 3: nonlocal system_prompt behavioral test (prompt updates across iterations)
@@ -19,132 +18,6 @@ from src.sessions.manager import (  # noqa: E402
     COMPACTION_THRESHOLD,
     SessionManager,
 )
-
-
-# ---------------------------------------------------------------------------
-# P2: schedule_task proactive defense
-# ---------------------------------------------------------------------------
-
-class TestScheduleTaskDefense:
-    """_handle_schedule_task rejects calls when user message lacks scheduling intent."""
-
-    def _make_bot_stub(self, user_content: str):
-        """Create a minimal stub with a Discord message containing user_content."""
-        from src.discord.client import LokiBot
-
-        stub = MagicMock()
-        stub.scheduler = MagicMock()
-        stub.scheduler.add = MagicMock(return_value={
-            "id": "sched-1",
-            "description": "Test task",
-            "next_run": "soon",
-        })
-        # Bind the real _handle_schedule_task method
-        stub._handle_schedule_task = LokiBot._handle_schedule_task.__get__(stub)
-        # Also bind the class attribute for the regex
-        stub._SCHEDULE_INTENT_RE = LokiBot._SCHEDULE_INTENT_RE
-
-        msg = MagicMock()
-        msg.content = user_content
-        msg.channel = MagicMock()
-        msg.channel.id = "67890"
-        return stub, msg
-
-    def test_allows_explicit_schedule_request(self):
-        """schedule_task proceeds when user message says 'schedule'."""
-        stub, msg = self._make_bot_stub("schedule a disk check every hour")
-        result = stub._handle_schedule_task(msg, {
-            "description": "Disk check",
-            "action": "tool",
-            "cron": "0 * * * *",
-        })
-        assert "Scheduled" in result
-        stub.scheduler.add.assert_called_once()
-
-    def test_allows_remind_request(self):
-        """schedule_task proceeds when user message says 'remind me'."""
-        stub, msg = self._make_bot_stub("remind me to check the logs tomorrow")
-        result = stub._handle_schedule_task(msg, {
-            "description": "Check logs",
-            "action": "reminder",
-        })
-        assert "Scheduled" in result
-
-    def test_allows_every_n_pattern(self):
-        """schedule_task proceeds when user message says 'every 5 minutes'."""
-        stub, msg = self._make_bot_stub("run this every 5 minutes")
-        result = stub._handle_schedule_task(msg, {
-            "description": "Recurring task",
-            "action": "tool",
-            "cron": "*/5 * * * *",
-        })
-        assert "Scheduled" in result
-
-    def test_allows_at_time_pattern(self):
-        """schedule_task proceeds when user message says 'at 3pm'."""
-        stub, msg = self._make_bot_stub("run a backup at 3pm")
-        result = stub._handle_schedule_task(msg, {
-            "description": "Backup",
-            "action": "tool",
-        })
-        assert "Scheduled" in result
-
-    def test_allows_daily_pattern(self):
-        """schedule_task proceeds when user message says 'daily'."""
-        stub, msg = self._make_bot_stub("send me a daily digest")
-        result = stub._handle_schedule_task(msg, {
-            "description": "Daily digest",
-            "action": "reminder",
-        })
-        assert "Scheduled" in result
-
-    def test_blocks_proactive_scheduling(self):
-        """schedule_task blocked when user message has no scheduling intent."""
-        stub, msg = self._make_bot_stub("what's the CPU usage on the server?")
-        result = stub._handle_schedule_task(msg, {
-            "description": "CPU monitor",
-            "action": "tool",
-            "cron": "*/5 * * * *",
-        })
-        assert "doesn't appear to request scheduling" in result
-        stub.scheduler.add.assert_not_called()
-
-    def test_blocks_casual_conversation(self):
-        """schedule_task blocked for casual conversation."""
-        stub, msg = self._make_bot_stub("hey how's it going?")
-        result = stub._handle_schedule_task(msg, {
-            "description": "Random",
-            "action": "reminder",
-        })
-        assert "doesn't appear to request scheduling" in result
-        stub.scheduler.add.assert_not_called()
-
-    def test_blocks_pizza_ordering_misroute(self):
-        """schedule_task blocked for the 'pizza photo' misroute example."""
-        stub, msg = self._make_bot_stub("look at this pizza photo")
-        result = stub._handle_schedule_task(msg, {
-            "description": "Pizza delivery",
-            "action": "reminder",
-        })
-        assert "doesn't appear to request scheduling" in result
-
-    def test_allows_in_n_minutes(self):
-        """schedule_task proceeds when user says 'in 30 minutes'."""
-        stub, msg = self._make_bot_stub("restart nginx in 30 minutes")
-        result = stub._handle_schedule_task(msg, {
-            "description": "Restart nginx",
-            "action": "tool",
-        })
-        assert "Scheduled" in result
-
-    def test_allows_tomorrow(self):
-        """schedule_task proceeds when user says 'tomorrow'."""
-        stub, msg = self._make_bot_stub("deploy the update tomorrow")
-        result = stub._handle_schedule_task(msg, {
-            "description": "Deploy update",
-            "action": "tool",
-        })
-        assert "Scheduled" in result
 
 
 # ---------------------------------------------------------------------------
@@ -215,7 +88,6 @@ class TestNonlocalSystemPromptBehavior:
         stub._recent_actions = {}
         stub._recent_actions_max = 10
         stub._recent_actions_expiry = 3600
-        stub._last_tool_use = {}
         stub._system_prompt = "Original prompt"
         stub.config = MagicMock()
         stub.config.tools.enabled = True

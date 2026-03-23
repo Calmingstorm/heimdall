@@ -33,7 +33,6 @@ def _make_bot_stub():
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
-    stub._last_tool_use = {}
     stub._system_prompt = "You are a bot."
     stub.config = MagicMock()
     stub.config.tools.enabled = True
@@ -110,8 +109,7 @@ class TestCheckpointSaveOnToolLoopError:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check all hosts", "chan-1")
+        await stub._handle_message_inner(msg, "check all hosts", "chan-1")
 
         # Error should be saved as sanitized marker (tools were used)
         assistant_saves = [
@@ -135,8 +133,7 @@ class TestCheckpointSaveOnToolLoopError:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "deploy app", "chan-1")
+        await stub._handle_message_inner(msg, "deploy app", "chan-1")
 
         # remove_last_message should NOT be called
         stub.sessions.remove_last_message.assert_not_called()
@@ -151,8 +148,7 @@ class TestCheckpointSaveOnToolLoopError:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub.sessions.prune.assert_called()
         stub.sessions.save.assert_called()
@@ -167,8 +163,7 @@ class TestCheckpointSaveOnToolLoopError:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub._send_chunked.assert_called_once()
         sent_text = stub._send_chunked.call_args[0][1]
@@ -189,8 +184,7 @@ class TestCheckpointSaveOnException:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "deploy app", "chan-1")
+        await stub._handle_message_inner(msg, "deploy app", "chan-1")
 
         # Error saved as sanitized marker
         assistant_saves = [
@@ -216,8 +210,7 @@ class TestCheckpointSaveOnChatError:
         stub.permissions.is_guest = MagicMock(return_value=True)
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hello", "chan-1")
+        await stub._handle_message_inner(msg, "hello", "chan-1")
 
         assistant_saves = [
             c for c in stub.sessions.add_message.call_args_list
@@ -241,8 +234,7 @@ class TestCheckpointSaveSuccessUnchanged:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         assistant_saves = [
             c for c in stub.sessions.add_message.call_args_list
@@ -262,8 +254,7 @@ class TestCheckpointSaveSuccessUnchanged:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub.tool_memory.record.assert_called()
 
@@ -277,8 +268,7 @@ class TestCheckpointSaveSuccessUnchanged:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub.tool_memory.record.assert_not_called()
 
@@ -293,8 +283,7 @@ class TestNoCodexEarlyReturnUnchanged:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         # This path still removes user message (early return at line 1061)
         stub.sessions.remove_last_message.assert_called_with("chan-1", "user")

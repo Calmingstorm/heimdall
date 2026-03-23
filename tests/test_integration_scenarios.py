@@ -1,15 +1,12 @@
-"""Round 8: End-to-end integration tests for Issues 1-5.
+"""Round 8: End-to-end integration tests.
 
-These tests exercise _handle_message_inner through the full routing path,
-verifying that the fixes from Rounds 5-6 work end-to-end:
+These tests exercise _handle_message_inner through the full routing path:
 
-- Issue 3:   Task route text-only response → _last_tool_use set for channel
-- Issue 3:   Task route exception → _last_tool_use still set
 - Issue 5:   Task route empty → friendly fallback (not "(no response)")
 - Handoff:   Codex handoff returns empty → skill response preserved
 - Issue 2:   No "REQUIRES APPROVAL" in any tool description sent to Codex
 
-Note: Chat route tests removed — all messages now route to "task" (no classifier).
+Note: All messages route to Codex with tools (no classifier, no keyword bypass).
 """
 from __future__ import annotations
 
@@ -40,7 +37,6 @@ def _make_bot_stub(**overrides):
     # State tracking
     stub._recent_actions = {}
     stub._recent_actions_max = 10
-    stub._last_tool_use = {}
     stub._pending_files = {}
 
     # Config
@@ -133,66 +129,6 @@ def _make_message(channel_id="chan-1", content="test"):
 
 
 # ---------------------------------------------------------------------------
-# Issue 3: Task route text-only → _last_tool_use set
-# ---------------------------------------------------------------------------
-
-class TestIssue3TaskRouteTracksActivity:
-    """After task route completes (even text-only), _last_tool_use is set."""
-
-    async def test_task_text_only_sets_last_tool_use(self):
-        """Codex returns text-only (no tool calls) on task route.
-        _last_tool_use[channel_id] should be set so follow-ups route to task."""
-        stub = _make_bot_stub()
-        msg = _make_message(channel_id="chan-42")
-
-        # _process_with_tools returns text-only (no tools, no handoff)
-        stub._process_with_tools = AsyncMock(
-            return_value=("I can help with that. Shall I proceed?", False, False, [], False)
-        )
-
-        before = time.monotonic()
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "restart nginx", "chan-42")
-        after = time.monotonic()
-
-        # _last_tool_use should be set even though no tool was actually called
-        assert "chan-42" in stub._last_tool_use
-        assert stub._last_tool_use["chan-42"] >= before
-        assert stub._last_tool_use["chan-42"] <= after
-
-    async def test_task_with_tools_sets_last_tool_use(self):
-        """Codex calls tools on task route. _last_tool_use set after completion."""
-        stub = _make_bot_stub()
-        msg = _make_message(channel_id="chan-42")
-
-        stub._process_with_tools = AsyncMock(
-            return_value=("Disk is 42% full.", False, False, ["check_disk"], False)
-        )
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk on server", "chan-42")
-
-        assert "chan-42" in stub._last_tool_use
-
-    async def test_task_exception_still_sets_last_tool_use(self):
-        """Even if _process_with_tools raises and is caught by inner try/except,
-        _last_tool_use should still be set (user might say 'try again')."""
-        stub = _make_bot_stub()
-        msg = _make_message(channel_id="chan-42")
-
-        stub._process_with_tools = AsyncMock(
-            side_effect=RuntimeError("Codex timeout")
-        )
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "restart nginx", "chan-42")
-
-        # Should be set despite exception — the inner except catches it
-        assert "chan-42" in stub._last_tool_use
-
-
-
-# ---------------------------------------------------------------------------
 # Issue 5: Task route empty → friendly fallback (not "(no response)")
 # ---------------------------------------------------------------------------
 
@@ -213,8 +149,7 @@ class TestIssue5TaskRouteEmptyFallback:
         # Bind the REAL _process_with_tools so fallback logic runs
         stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub._send_chunked.assert_called_once()
         sent_text = stub._send_chunked.call_args[0][1]
@@ -264,8 +199,7 @@ class TestHandoffPreservesSkillResponseIntegration:
         # Codex handoff chat returns empty
         stub.codex_client.chat = AsyncMock(return_value="")
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "restart nginx", "chan-1")
+        await stub._handle_message_inner(msg, "restart nginx", "chan-1")
 
         # The skill output should be preserved and sent (not the empty Codex response)
         stub._send_chunked.assert_called_once()
@@ -284,8 +218,7 @@ class TestHandoffPreservesSkillResponseIntegration:
         # Codex handoff raises
         stub.codex_client.chat = AsyncMock(side_effect=RuntimeError("Codex down"))
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub._send_chunked.assert_called_once()
         sent_text = stub._send_chunked.call_args[0][1]
@@ -303,8 +236,7 @@ class TestHandoffPreservesSkillResponseIntegration:
             return_value="The disk on server is 42% full. Looking good!"
         )
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub._send_chunked.assert_called_once()
         sent_text = stub._send_chunked.call_args[0][1]

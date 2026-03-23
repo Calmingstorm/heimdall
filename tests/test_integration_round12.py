@@ -31,7 +31,6 @@ def _make_bot_stub():
     stub._recent_actions = {}
     stub._recent_actions_max = 10
     stub._recent_actions_expiry = 3600
-    stub._last_tool_use = {}
     stub._system_prompt = "test system prompt"
     stub._channel_locks = {}
     stub._processed_messages = MagicMock()
@@ -243,8 +242,7 @@ class TestTaskRouteErrorHandling:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "check disk on server", "chan-1")
+        await stub._handle_message_inner(msg, "check disk on server", "chan-1")
 
         # Codex exception is caught internally, error sent via _send_chunked
         stub._send_chunked.assert_called()
@@ -259,8 +257,7 @@ class TestTaskRouteErrorHandling:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         # Should send error since Codex failed
         stub._send_chunked.assert_called()
@@ -285,8 +282,7 @@ class TestEndToEndRouting:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "check disk on server", "chan-1")
+        await stub._handle_message_inner(msg, "check disk on server", "chan-1")
 
         stub._send_chunked.assert_called()
         sent_text = stub._send_chunked.call_args[0][1]
@@ -302,8 +298,7 @@ class TestEndToEndRouting:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hello", "chan-1")
+        await stub._handle_message_inner(msg, "hello", "chan-1")
 
         # _process_with_tools should be called (task route), not codex_client.chat (chat route)
         stub._process_with_tools.assert_called()
@@ -322,8 +317,7 @@ class TestEndToEndRouting:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub._send_chunked.assert_called()
         sent_text = stub._send_chunked.call_args[0][1]
@@ -338,8 +332,7 @@ class TestEndToEndRouting:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "ambiguous message", "chan-1")
+        await stub._handle_message_inner(msg, "ambiguous message", "chan-1")
 
         stub._process_with_tools.assert_called()
         stub._send_chunked.assert_called()
@@ -517,8 +510,7 @@ class TestToolLoopEdgeCases:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         # Should have sent an error message via _send_with_retry or _send_chunked
         assert stub._send_with_retry.called or stub._send_chunked.called
@@ -541,10 +533,9 @@ class TestImageBlocksRouting:
 
         msg = _make_message()
         image_blocks = [{"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}}]
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(
-                msg, "describe this image", "chan-1", image_blocks=image_blocks
-            )
+        await stub._handle_message_inner(
+            msg, "describe this image", "chan-1", image_blocks=image_blocks
+        )
 
         # Should have routed to task (tools) path
         stub._process_with_tools.assert_called()

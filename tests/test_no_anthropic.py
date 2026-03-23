@@ -26,7 +26,6 @@ def _make_bot_stub():
     stub._recent_actions = {}
     stub._recent_actions_max = 10
     stub._recent_actions_expiry = 3600
-    stub._last_tool_use = {}
     stub._system_prompt = "You are a bot."
     stub._pending_files = {}
     stub.config = MagicMock()
@@ -108,8 +107,7 @@ class TestTaskRouteNoAnthropic:
         stub = _make_bot_stub()
         msg = _make_message()
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
             await stub._handle_message_inner(msg, "check disk on server", "user-1")
 
@@ -121,8 +119,7 @@ class TestTaskRouteNoAnthropic:
         stub.codex_client = None
         msg = _make_message()
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
             await stub._handle_message_inner(msg, "check disk on server", "user-1")
 
@@ -138,8 +135,7 @@ class TestTaskRouteNoAnthropic:
         )
         msg = _make_message()
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
             await stub._handle_message_inner(msg, "check disk on server", "user-1")
 
@@ -153,8 +149,7 @@ class TestTaskRouteNoAnthropic:
         stub = _make_bot_stub()
         msg = _make_message()
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
             await stub._handle_message_inner(msg, "check disk on server", "user-1")
 

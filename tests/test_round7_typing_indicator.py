@@ -30,7 +30,6 @@ def _make_bot_stub():
     stub._recent_actions = {}
     stub._recent_actions_max = 10
     stub._recent_actions_expiry = 3600
-    stub._last_tool_use = {}
     stub._system_prompt = "test prompt"
     stub._pending_files = {}
     stub.config = MagicMock()
@@ -243,3 +242,4 @@ class TestTypingDuringLLMCall:
 
         assert text == "No tools."
         msg.channel.typing.assert_called_once()
+

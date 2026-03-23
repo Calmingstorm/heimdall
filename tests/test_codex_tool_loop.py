@@ -29,7 +29,6 @@ def _make_bot_stub():
     stub._recent_actions = {}
     stub._recent_actions_max = 10
     stub._recent_actions_expiry = 3600
-    stub._last_tool_use = {}
     stub._system_prompt = "test system prompt"
     stub._channel_locks = {}
     stub._processed_messages = MagicMock()
@@ -278,8 +277,7 @@ class TestTaskRouteCodex:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "check disk on server", "chan-1")
+        await stub._handle_message_inner(msg, "check disk on server", "chan-1")
 
         stub._process_with_tools.assert_called_once()
         call_kwargs = stub._process_with_tools.call_args[1]
@@ -292,8 +290,7 @@ class TestTaskRouteCodex:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub._process_with_tools.assert_called_once()
         call_kwargs = stub._process_with_tools.call_args[1]
@@ -306,8 +303,7 @@ class TestTaskRouteCodex:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         # Error is caught, response is sent via _send_chunked (not _send_with_retry)
         stub._send_chunked.assert_called_once()
@@ -319,8 +315,7 @@ class TestTaskRouteCodex:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub._process_with_tools.assert_not_called()
         stub._send_with_retry.assert_called_once()
@@ -341,8 +336,7 @@ class TestBudgetWithCodex:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         # Should call _process_with_tools — no budget gate
         stub._process_with_tools.assert_called_once()
@@ -354,8 +348,7 @@ class TestBudgetWithCodex:
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub._process_with_tools.assert_not_called()
         stub._send_with_retry.assert_called_once()

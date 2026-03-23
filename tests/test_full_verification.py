@@ -293,22 +293,6 @@ class TestSystemPrompt:
 class TestRouting:
     """Verify message routing logic."""
 
-    def test_task_keywords_infrastructure(self):
-        from src.discord.routing import is_task_by_keyword
-        assert is_task_by_keyword("restart nginx")
-        assert is_task_by_keyword("deploy the app")
-        assert is_task_by_keyword("check docker containers")
-        assert is_task_by_keyword("what's the cpu usage")
-        assert is_task_by_keyword("run ansible playbook")
-        assert is_task_by_keyword("check disk usage")
-        assert is_task_by_keyword("incus list")
-
-    def test_task_keywords_not_casual(self):
-        from src.discord.routing import is_task_by_keyword
-        assert not is_task_by_keyword("hello how are you")
-        assert not is_task_by_keyword("nice weather today")
-        assert not is_task_by_keyword("what do you think about AI")
-
     def test_claude_code_defaults_empty(self):
         """CLAUDE_CODE_DEFAULTS should have empty hosts by default."""
         from src.discord.routing import CLAUDE_CODE_DEFAULTS

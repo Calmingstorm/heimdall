@@ -37,7 +37,6 @@ def _make_bot_stub():
     stub._recent_actions = {}
     stub._recent_actions_max = 10
     stub._recent_actions_expiry = 3600
-    stub._last_tool_use = {}
     stub._system_prompt = "You are a bot."
     stub.config = MagicMock()
     stub.config.tools.enabled = True

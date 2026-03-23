@@ -24,7 +24,6 @@ def _make_bot_stub():
     stub._recent_actions = {}
     stub._recent_actions_max = 10
     stub._recent_actions_expiry = 3600
-    stub._last_tool_use = {}
     stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
     return stub
 

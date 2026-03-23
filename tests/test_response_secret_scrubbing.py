@@ -172,7 +172,6 @@ def _make_bot_stub():
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
-    stub._last_tool_use = {}
     stub._system_prompt = "system prompt"
     stub.config = MagicMock()
     stub.config.tools.enabled = True
@@ -233,8 +232,7 @@ class TestHandleMessageInnerScrubbing:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "what's the server password?", "chan-1")
+        await stub._handle_message_inner(msg, "what's the server password?", "chan-1")
 
         # The text sent to Discord should be scrubbed
         sent_text = stub._send_chunked.call_args[0][1]
@@ -252,8 +250,7 @@ class TestHandleMessageInnerScrubbing:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check the config", "chan-1")
+        await stub._handle_message_inner(msg, "check the config", "chan-1")
 
         # History should contain the scrubbed version
         assistant_saves = [c for c in stub.sessions.add_message.call_args_list if c[0][1] == "assistant"]
@@ -271,8 +268,7 @@ class TestHandleMessageInnerScrubbing:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "how's the server?", "chan-1")
+        await stub._handle_message_inner(msg, "how's the server?", "chan-1")
 
         sent_text = stub._send_chunked.call_args[0][1]
         assert sent_text == original
@@ -286,8 +282,7 @@ class TestHandleMessageInnerScrubbing:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "show me the database config", "chan-1")
+        await stub._handle_message_inner(msg, "show me the database config", "chan-1")
 
         sent_text = stub._send_chunked.call_args[0][1]
         assert "secret@host" not in sent_text
@@ -301,8 +296,7 @@ class TestHandleMessageInnerScrubbing:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         # Error saved as sanitized marker (not raw error text)
         stub.sessions.remove_last_message.assert_not_called()
@@ -334,8 +328,7 @@ class TestStreamIterationScrubbing:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check the API key", "chan-1")
+        await stub._handle_message_inner(msg, "check the API key", "chan-1")
 
         sent_text = stub._send_chunked.call_args[0][1]
         assert "sk-abcdefghijklmnopqrstuvwxyz" not in sent_text
@@ -352,8 +345,7 @@ class TestStreamIterationScrubbing:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "show config", "chan-1")
+        await stub._handle_message_inner(msg, "show config", "chan-1")
 
         sent_text = stub._send_chunked.call_args[0][1]
         assert "supersecretvalue99" not in sent_text

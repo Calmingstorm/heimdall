@@ -31,7 +31,6 @@ def _make_bot_stub():
     stub._recent_actions = {}
     stub._recent_actions_max = 10
     stub._recent_actions_expiry = 3600
-    stub._last_tool_use = {}
     stub._system_prompt = "default prompt"
     stub._pending_files = {}
     stub.config = MagicMock()
@@ -107,8 +106,7 @@ class TestSystemPromptNotMutated:
         stub._build_system_prompt = MagicMock(return_value="user-specific prompt")
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         # self._system_prompt should NOT have been changed
         assert stub._system_prompt == original_prompt
@@ -120,8 +118,7 @@ class TestSystemPromptNotMutated:
         stub._build_system_prompt = MagicMock(return_value="per-request prompt")
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub._process_with_tools.assert_called_once()
         kwargs = stub._process_with_tools.call_args[1]
@@ -161,9 +158,8 @@ class TestSystemPromptNotMutated:
         msg1 = _make_message("chan-A", "user-1")
         msg2 = _make_message("chan-B", "user-2")
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg1, "check disk", "chan-A")
-            await stub._handle_message_inner(msg2, "check memory", "chan-B")
+        await stub._handle_message_inner(msg1, "check disk", "chan-A")
+        await stub._handle_message_inner(msg2, "check memory", "chan-B")
 
         assert "prompt-for-chan-A" in prompts_seen
         assert "prompt-for-chan-B" in prompts_seen

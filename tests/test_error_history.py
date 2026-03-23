@@ -32,7 +32,6 @@ def _make_bot_stub():
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
-    stub._last_tool_use = {}
     stub._system_prompt = "You are a bot."
     stub.config = MagicMock()
     stub.config.tools.enabled = True
@@ -162,8 +161,7 @@ class TestProcessWithToolsErrorFlag:
         stub._process_with_tools = AsyncMock(side_effect=RuntimeError("Rate limited"))
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
+        await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
 
         # Error should be sent via _send_chunked
         stub._send_chunked.assert_called_once()
@@ -187,10 +185,9 @@ class TestHistorySaveOnError:
         stub._process_with_tools = AsyncMock(return_value=process_return)
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(
-                msg, "check disk", str(msg.channel.id),
-            )
+        await stub._handle_message_inner(
+            msg, "check disk", str(msg.channel.id),
+        )
         return stub
 
     async def test_normal_response_saved_to_history(self):
@@ -265,11 +262,10 @@ class TestHistorySaveOnError:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(
-                msg, "check server", str(msg.channel.id),
-                voice_callback=voice_cb,
-            )
+        await stub._handle_message_inner(
+            msg, "check server", str(msg.channel.id),
+            voice_callback=voice_cb,
+        )
         voice_cb.assert_called_once_with("Service overloaded.")
 
 
@@ -290,10 +286,9 @@ class TestErrorHistoryEdgeCases:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(
-                msg, "test", str(msg.channel.id),
-            )
+        await stub._handle_message_inner(
+            msg, "test", str(msg.channel.id),
+        )
         calls = stub.sessions.add_message.call_args_list
         assert len(calls) == 2  # user message + sanitized error marker
         assert calls[0][0][1] == "user"
@@ -309,10 +304,9 @@ class TestErrorHistoryEdgeCases:
         stub.permissions.is_guest = MagicMock(return_value=True)
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(
-                msg, "hey whats up", str(msg.channel.id),
-            )
+        await stub._handle_message_inner(
+            msg, "hey whats up", str(msg.channel.id),
+        )
         calls = stub.sessions.add_message.call_args_list
         assert len(calls) == 2  # user message + error response
         assert calls[0][0][1] == "user"

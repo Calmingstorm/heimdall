@@ -31,7 +31,7 @@ from ..tools import ToolExecutor, SkillManager, get_tool_definitions
 from ..tools.tool_memory import ToolMemory
 from ..search import OllamaEmbedder, SessionVectorStore
 from ..permissions import PermissionManager
-from .routing import is_task_by_keyword, resolve_claude_code_target, CLAUDE_CODE_DEFAULTS
+from .routing import resolve_claude_code_target, CLAUDE_CODE_DEFAULTS
 from .voice import VoiceManager, VoiceMessageProxy
 
 log = get_logger("discord")
@@ -295,7 +295,6 @@ class LokiBot(discord.Client):
         self._recent_actions: dict[str, list[tuple[float, str]]] = {}
         self._recent_actions_max = 10
         self._recent_actions_expiry = 3600  # seconds (1 hour)
-        self._last_tool_use: dict[str, float] = {}
         # Background task tracking
         self._background_tasks: dict[str, BackgroundTask] = {}
         self._background_tasks_max = 20
@@ -663,8 +662,6 @@ class LokiBot(discord.Client):
         # Cap per-channel list
         if len(actions) > self._recent_actions_max:
             self._recent_actions[channel_id] = actions[-self._recent_actions_max:]
-
-        self._last_tool_use[channel_id] = time.monotonic()
 
     def _register_commands(self) -> None:
         @self.tree.command(name="status", description="Show Loki bot status")
@@ -1189,117 +1186,35 @@ class LokiBot(discord.Client):
             log.info("Attached %d image(s) to message for Claude vision", len(image_blocks))
 
         try:
-            # Images force the "task" route (vision requires tool-capable backend)
-            if image_blocks:
-                msg_type = "task"
-                log.info("Message has images, forcing task route (vision)")
-            elif message.author.bot and self.config.discord.respond_to_bots:
-                msg_type = "task"
-                log.info("Bot message with respond_to_bots enabled, forcing task route")
-            elif is_task_by_keyword(content):
-                msg_type = "task"
-                log.info("Message matched task keyword, forcing 'task' route")
-            else:
-                # All messages go to Codex with tools — no classifier needed.
-                msg_type = "task"
-
-            # Guest tier: force chat route (no tools, no code execution)
-            if self.permissions.is_guest(str(message.author.id)):
-                msg_type = "chat"
-                log.info("Guest tier user %s, forcing chat route", message.author.id)
-
+            is_guest = self.permissions.is_guest(str(message.author.id))
             already_sent = False
             is_error = False
             tools_used: list[str] = []
-            if msg_type == "chat" and self.codex_client:
-                # Route chat to OpenAI Codex (ChatGPT subscription, $0)
-                log.info("Message classified as 'chat', routing to Codex")
-                chat_prompt = self._build_chat_system_prompt(channel=message.channel, user_id=user_id)
-                try:
-                    response = await self.codex_client.chat(
-                        messages=history,
-                        system=chat_prompt,
-                    )
-                    if not response:
-                        response = _EMPTY_RESPONSE_FALLBACK
-                    log.info("Codex response: %r", response[:200])
-                except Exception as e:
-                    log.warning("Codex chat failed: %s", e)
-                    response = "Chat is temporarily unavailable. Please try again in a moment."
-                    is_error = True
-            elif msg_type == "chat":
-                # No Codex configured
-                log.info("Message classified as 'chat', no chat backend configured")
-                response = "Chat backend is not configured."
-                is_error = True
-            elif msg_type == "claude_code":
-                # Route to Claude Code CLI (claude -p) — free, reads files directly.
-                # Ideal for code analysis, review, script writing, explaining code.
-                log.info("Message classified as 'claude_code', routing to Claude Code CLI")
-                # Include recent conversation context so claude -p can understand
-                # follow-up references (e.g. "what about the error handling?").
-                # claude -p is stateless — without context, follow-ups would fail.
-                claude_prompt = content
-                if len(history) > 1:
-                    # history includes the current message as last item;
-                    # take up to 6 preceding messages (3 exchanges) for context
-                    context_msgs = history[:-1][-6:]
-                    context_parts = []
-                    for m in context_msgs:
-                        role = "User" if m["role"] == "user" else "Assistant"
-                        text = m["content"] if isinstance(m["content"], str) else str(m["content"])
-                        if len(text) > 500:
-                            text = text[:500] + "..."
-                        context_parts.append(f"{role}: {text}")
-                    claude_prompt = (
-                        "Previous conversation (for context):\n---\n"
-                        + "\n".join(context_parts)
-                        + "\n---\n\nCurrent request:\n"
-                        + content
-                    )
-                cc_host, cc_dir = resolve_claude_code_target(content)
-                log.info("Claude Code target: host=%s dir=%s", cc_host, cc_dir)
-                try:
-                    async with message.channel.typing():
-                        response = await self.tool_executor._handle_claude_code({
-                            "host": cc_host,
-                            "working_directory": cc_dir,
-                            "prompt": claude_prompt,
-                            "allow_edits": False,
-                            "max_output_chars": 8000,
-                        })
-                    # If claude -p returned an error, fall back to Codex chat
-                    if response.startswith("Claude Code failed") or response.startswith("Unknown"):
-                        log.warning("Claude Code CLI failed, falling back to Codex: %s", response[:200])
-                        if self.codex_client:
-                            chat_prompt = self._build_chat_system_prompt(channel=message.channel, user_id=user_id)
-                            try:
-                                response = await self.codex_client.chat(messages=history, system=chat_prompt)
-                                if not response:
-                                    response = _EMPTY_RESPONSE_FALLBACK
-                            except Exception as codex_err:
-                                log.warning("Codex fallback also failed: %s", codex_err)
-                                response = "Claude Code CLI and fallback both failed. Try again later."
-                                is_error = True
-                        else:
-                            is_error = True
-                except Exception as e:
-                    log.warning("Claude Code routing failed, falling back to Codex: %s", e)
-                    if self.codex_client:
-                        chat_prompt = self._build_chat_system_prompt(channel=message.channel, user_id=user_id)
-                        try:
-                            response = await self.codex_client.chat(messages=history, system=chat_prompt)
-                            if not response:
-                                response = _EMPTY_RESPONSE_FALLBACK
-                        except Exception as codex_err:
-                            log.warning("Codex fallback also failed: %s", codex_err)
-                            response = f"Claude Code CLI failed: {e}"
-                            is_error = True
-                    else:
-                        response = f"Claude Code CLI failed: {e}"
+            handoff = False
+
+            if is_guest:
+                # Guest tier: chat only, no tools
+                log.info("Guest tier user %s, chat route (no tools)", message.author.id)
+                if self.codex_client:
+                    chat_prompt = self._build_chat_system_prompt(channel=message.channel, user_id=user_id)
+                    try:
+                        response = await self.codex_client.chat(
+                            messages=history,
+                            system=chat_prompt,
+                        )
+                        if not response:
+                            response = _EMPTY_RESPONSE_FALLBACK
+                        log.info("Codex response: %r", response[:200])
+                    except Exception as e:
+                        log.warning("Codex chat failed: %s", e)
+                        response = "Chat is temporarily unavailable. Please try again in a moment."
                         is_error = True
+                else:
+                    log.info("No chat backend configured for guest user")
+                    response = "Chat backend is not configured."
+                    is_error = True
             else:
-                # Task — use Codex with tools (free via subscription)
+                # Everyone else: Codex with ALL tools — no classifier, no routing
                 if not self.codex_client:
                     await self._send_with_retry(
                         message,
@@ -1307,13 +1222,9 @@ class LokiBot(discord.Client):
                     )
                     self.sessions.remove_last_message(channel_id, "user")
                     return
-                # Build full system prompt only for task messages that need it.
-                # Chat paths use _build_chat_system_prompt() instead, so building
-                # the full prompt eagerly for every message wastes disk I/O
-                # (memory.json + learned.json reads) and string formatting.
                 _sp = self._build_system_prompt(channel=message.channel, user_id=user_id, query=content)
                 _sp = await self._inject_tool_hints(_sp, content, user_id)
-                log.info("Task route: using Codex with tools")
+                log.info("Routing to Codex with tools")
                 # Use abbreviated history to reduce poisoning from stale responses
                 task_history = await self.sessions.get_task_history(channel_id, max_messages=20)
                 # Re-inject images into task history (they were added to `history` above
@@ -1356,8 +1267,6 @@ class LokiBot(discord.Client):
                         log.warning("Codex handoff failed, using skill result directly: %s", e)
                         response = _skill_response
                         already_sent = False
-                # Track task route usage so follow-ups classify as "task"
-                self._last_tool_use[channel_id] = time.monotonic()
         except Exception as e:
             log.error("Error processing message: %s", e, exc_info=True)
             await self._send_with_retry(message, f"Something went wrong: {e}")
@@ -1372,10 +1281,10 @@ class LokiBot(discord.Client):
 
         log.info("Final response to send: %r", response[:200])
         if not is_error:
-            # On the task route, if no tools were used and no skill handoff,
+            # On the tool route, if no tools were used and no skill handoff,
             # the response may be a fabrication. Save a neutral marker instead
             # to prevent poisoning future requests.
-            if msg_type == "task" and not tools_used and not handoff:
+            if not is_guest and not tools_used and not handoff:
                 # Don't save tool-less task responses at all — they pollute
                 # history and teach the model that text-only responses are normal
                 # for the task route. The user still sees the response in Discord.
@@ -2039,35 +1948,8 @@ class LokiBot(discord.Client):
         except discord.HTTPException as e:
             return f"Failed to upload to Discord: {e}"
 
-    # Scheduling intent patterns — the user's current message must contain
-    # at least one of these to allow schedule_task.  Prevents the LLM from
-    # proactively scheduling things based on conversation history alone.
-    _SCHEDULE_INTENT_RE = re.compile(
-        r"|".join([
-            r"\bschedule\b", r"\bremind\b", r"\balarm\b", r"\btimer\b",
-            r"\bevery\s+\d", r"\bcron\b", r"\bat\s+\d",
-            r"\bin\s+\d+\s+(?:min|hour|day|sec)",
-            r"\brecurring\b", r"\bdaily\b", r"\bweekly\b", r"\bhourly\b",
-            r"\btomorrow\b", r"\btonight\b",
-            r"\bnext\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month)\b",
-        ]),
-        re.IGNORECASE,
-    )
-
     def _handle_schedule_task(self, message: discord.Message, inp: dict) -> str:
         """Create a scheduled task."""
-        # Guard: only schedule if the user's current message expresses intent
-        user_text = getattr(message, "content", "") or ""
-        if not self._SCHEDULE_INTENT_RE.search(user_text):
-            log.warning(
-                "schedule_task blocked: no scheduling intent in user message %r",
-                user_text[:120],
-            )
-            return (
-                "I considered scheduling a task, but your message doesn't appear to "
-                "request scheduling. If you'd like me to schedule something, please "
-                "ask explicitly (e.g. 'remind me to…', 'schedule a check every…')."
-            )
         try:
             schedule = self.scheduler.add(
                 description=inp.get("description", "Unnamed task"),

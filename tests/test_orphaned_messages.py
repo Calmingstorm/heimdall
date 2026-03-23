@@ -103,7 +103,6 @@ def _make_bot_stub():
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
-    stub._last_tool_use = {}
     stub._system_prompt = "You are a bot."
     stub.config = MagicMock()
     stub.config.tools.enabled = True
@@ -161,8 +160,7 @@ class TestOrphanCleanupOnGenericException:
         stub._process_with_tools = AsyncMock(side_effect=RuntimeError("boom"))
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         # Error saved as sanitized marker (not removed) for checkpoint-save
         stub.sessions.remove_last_message.assert_not_called()
@@ -181,8 +179,7 @@ class TestOrphanCleanupOnGenericException:
         stub._process_with_tools = AsyncMock(side_effect=RuntimeError("boom"))
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         # Inner except catches Codex exception and sends error via _send_chunked
         stub._send_chunked.assert_called_once()
@@ -201,8 +198,7 @@ class TestOrphanCleanupOnIsError:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         # Error saved as sanitized marker (not removed) for checkpoint-save
         stub.sessions.remove_last_message.assert_not_called()
@@ -223,8 +219,7 @@ class TestOrphanCleanupOnIsError:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub.sessions.save.assert_called()
 
@@ -241,8 +236,7 @@ class TestNoOrphanCleanupOnSuccess:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         stub.sessions.remove_last_message.assert_not_called()
 
@@ -255,8 +249,7 @@ class TestNoOrphanCleanupOnSuccess:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         add_calls = stub.sessions.add_message.call_args_list
         assert len(add_calls) == 2
@@ -276,8 +269,7 @@ class TestNoOrphanCleanupOnSuccess:
 
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hey whats up", "chan-1")
+        await stub._handle_message_inner(msg, "hey whats up", "chan-1")
 
         stub.sessions.remove_last_message.assert_not_called()
 
@@ -294,8 +286,7 @@ class TestNoOrphanCleanupOnSuccess:
         )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg, "check disk", "chan-1")
+        await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         # Should NOT remove the user message since response succeeded
         stub.sessions.remove_last_message.assert_not_called()

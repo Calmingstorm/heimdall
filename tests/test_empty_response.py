@@ -1,8 +1,7 @@
-"""Tests for Issues 1, 3, 5: empty response retry, follow-up tracking, friendly fallback.
+"""Tests for Issues 1, 5: empty response retry, friendly fallback.
 
 Round 5 implementation tests:
 - Issue 1: Codex retries on 200-with-empty-body (both chat and tool paths)
-- Issue 3: _last_tool_use set after task route completes (even without tool calls)
 - Issue 5: "(no response)" replaced with friendly fallback message
 - Round 4 finding: handoff preserves skill response on empty chat()
 """
@@ -278,35 +277,6 @@ class TestChatRouteEmptyFallback:
         # Verify the constant exists and is meaningful
         assert _EMPTY_RESPONSE_FALLBACK
         assert "try again" in _EMPTY_RESPONSE_FALLBACK.lower()
-
-
-# ---------------------------------------------------------------------------
-# Issue 3: _last_tool_use set after task route — success path
-# ---------------------------------------------------------------------------
-
-
-class TestLastToolUseAfterTaskRoute:
-    """_last_tool_use is set after task route completes, even without tool calls."""
-
-    async def test_set_after_task_success_no_tool_calls(self):
-        """When Codex responds text-only (no tool calls), _last_tool_use is still set."""
-        from src.discord.client import LokiBot
-
-        with patch.object(LokiBot, "__init__", lambda self, *a, **kw: None):
-            bot = LokiBot.__new__(LokiBot)
-
-        bot._last_tool_use = {}
-        channel_id = "test_channel_999"
-
-        # Simulate: _process_with_tools returned text, no tools, no handoff
-        # The code after _process_with_tools should set _last_tool_use
-        before = time.monotonic()
-        bot._last_tool_use[channel_id] = time.monotonic()
-        after = time.monotonic()
-
-        assert channel_id in bot._last_tool_use
-        assert bot._last_tool_use[channel_id] >= before
-        assert bot._last_tool_use[channel_id] <= after
 
 
 # ---------------------------------------------------------------------------
