@@ -18,7 +18,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "service"],
         },
-        "requires_approval": False,
     },
     {
         "name": "check_docker",
@@ -37,7 +36,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host"],
         },
-        "requires_approval": False,
     },
     {
         "name": "check_disk",
@@ -52,7 +50,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host"],
         },
-        "requires_approval": False,
     },
     {
         "name": "check_memory",
@@ -67,7 +64,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host"],
         },
-        "requires_approval": False,
     },
     {
         "name": "check_logs",
@@ -90,7 +86,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "service"],
         },
-        "requires_approval": False,
     },
     {
         "name": "query_prometheus",
@@ -105,7 +100,6 @@ TOOLS: list[dict] = [
             },
             "required": ["query"],
         },
-        "requires_approval": False,
     },
     {
         "name": "restart_service",
@@ -124,7 +118,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "service"],
         },
-        "requires_approval": True,
     },
     {
         "name": "run_ansible_playbook",
@@ -151,7 +144,6 @@ TOOLS: list[dict] = [
             },
             "required": ["playbook"],
         },
-        "requires_approval": True,
     },
     {
         "name": "run_command",
@@ -170,7 +162,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "command"],
         },
-        "requires_approval": True,
     },
     {
         "name": "run_script",
@@ -202,11 +193,10 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "script"],
         },
-        "requires_approval": True,
     },
     {
         "name": "read_file",
-        "description": "Read the contents of a file on a managed host. Does not require approval.",
+        "description": "Read the contents of a file on a managed host.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -225,7 +215,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "path"],
         },
-        "requires_approval": False,
     },
     {
         "name": "write_file",
@@ -248,7 +237,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "path", "content"],
         },
-        "requires_approval": True,
     },
     {
         "name": "purge_messages",
@@ -262,7 +250,6 @@ TOOLS: list[dict] = [
                 },
             },
         },
-        "requires_approval": True,
     },
     {
         "name": "post_file",
@@ -285,7 +272,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "path"],
         },
-        "requires_approval": False,
     },
     {
         "name": "schedule_task",
@@ -392,7 +378,6 @@ TOOLS: list[dict] = [
             },
             "required": ["description", "action"],
         },
-        "requires_approval": True,
     },
     {
         "name": "list_schedules",
@@ -401,7 +386,6 @@ TOOLS: list[dict] = [
             "type": "object",
             "properties": {},
         },
-        "requires_approval": False,
     },
     {
         "name": "delete_schedule",
@@ -416,7 +400,6 @@ TOOLS: list[dict] = [
             },
             "required": ["schedule_id"],
         },
-        "requires_approval": True,
     },
     {
         "name": "parse_time",
@@ -436,7 +419,6 @@ TOOLS: list[dict] = [
             },
             "required": ["expression"],
         },
-        "requires_approval": False,
     },
     {
         "name": "search_history",
@@ -455,7 +437,6 @@ TOOLS: list[dict] = [
             },
             "required": ["query"],
         },
-        "requires_approval": False,
     },
     {
         "name": "memory_manage",
@@ -484,7 +465,6 @@ TOOLS: list[dict] = [
             },
             "required": ["action"],
         },
-        "requires_approval": False,
     },
     {
         "name": "search_audit",
@@ -518,7 +498,6 @@ TOOLS: list[dict] = [
                 },
             },
         },
-        "requires_approval": False,
     },
     {
         "name": "create_digest",
@@ -536,14 +515,12 @@ TOOLS: list[dict] = [
                 },
             },
         },
-        "requires_approval": True,
     },
     {
         "name": "create_skill",
         "description": (
             "Create a new skill (tool) by writing Python code. The skill becomes immediately available as a tool you can call.\n"
             "The code must define:\n"
-            "1. SKILL_DEFINITION = dict with keys: name, description, input_schema, requires_approval (bool)\n"
             "2. async def execute(inp: dict, context: SkillContext) -> str\n\n"
             "context provides:\n"
             "- await context.run_on_host(alias, command) — SSH to a managed host\n"
@@ -581,7 +558,6 @@ TOOLS: list[dict] = [
             },
             "required": ["name", "code"],
         },
-        "requires_approval": True,
     },
     {
         "name": "edit_skill",
@@ -600,7 +576,6 @@ TOOLS: list[dict] = [
             },
             "required": ["name", "code"],
         },
-        "requires_approval": False,
     },
     {
         "name": "delete_skill",
@@ -615,7 +590,6 @@ TOOLS: list[dict] = [
             },
             "required": ["name"],
         },
-        "requires_approval": True,
     },
     {
         "name": "list_skills",
@@ -624,7 +598,6 @@ TOOLS: list[dict] = [
             "type": "object",
             "properties": {},
         },
-        "requires_approval": False,
     },
     # --- Docker tools ---
     {
@@ -652,7 +625,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "container"],
         },
-        "requires_approval": False,
     },
     {
         "name": "docker_compose_action",
@@ -676,7 +648,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "project_dir", "action"],
         },
-        "requires_approval": True,
     },
     {
         "name": "docker_compose_status",
@@ -695,7 +666,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "project_dir"],
         },
-        "requires_approval": False,
     },
     {
         "name": "docker_compose_logs",
@@ -726,7 +696,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "project_dir"],
         },
-        "requires_approval": False,
     },
     {
         "name": "docker_stats",
@@ -745,7 +714,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host"],
         },
-        "requires_approval": False,
     },
     # --- Git tools ---
     {
@@ -765,7 +733,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "repo_path"],
         },
-        "requires_approval": False,
     },
     {
         "name": "git_log",
@@ -788,7 +755,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "repo_path"],
         },
-        "requires_approval": False,
     },
     {
         "name": "git_diff",
@@ -811,7 +777,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "repo_path"],
         },
-        "requires_approval": False,
     },
     {
         "name": "git_show",
@@ -834,7 +799,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "repo_path", "commit"],
         },
-        "requires_approval": False,
     },
     {
         "name": "git_pull",
@@ -853,7 +817,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "repo_path"],
         },
-        "requires_approval": True,
     },
     {
         "name": "git_commit",
@@ -881,7 +844,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "repo_path", "message"],
         },
-        "requires_approval": True,
     },
     {
         "name": "git_push",
@@ -908,7 +870,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "repo_path"],
         },
-        "requires_approval": True,
     },
     {
         "name": "git_branch",
@@ -936,7 +897,6 @@ TOOLS: list[dict] = [
             },
             "required": ["host", "repo_path", "action"],
         },
-        "requires_approval": True,
     },
     # --- Multi-host tools ---
     {
@@ -957,7 +917,6 @@ TOOLS: list[dict] = [
             },
             "required": ["hosts", "command"],
         },
-        "requires_approval": True,
     },
     # --- Prometheus range query ---
     {
@@ -981,7 +940,6 @@ TOOLS: list[dict] = [
             },
             "required": ["query"],
         },
-        "requires_approval": False,
     },
     # --- Background task delegation ---
     {
@@ -1021,7 +979,6 @@ TOOLS: list[dict] = [
             },
             "required": ["description", "steps"],
         },
-        "requires_approval": True,
     },
     {
         "name": "list_tasks",
@@ -1035,7 +992,6 @@ TOOLS: list[dict] = [
                 },
             },
         },
-        "requires_approval": False,
     },
     {
         "name": "cancel_task",
@@ -1050,7 +1006,6 @@ TOOLS: list[dict] = [
             },
             "required": ["task_id"],
         },
-        "requires_approval": False,
     },
     # --- Knowledge base ---
     {
@@ -1074,7 +1029,6 @@ TOOLS: list[dict] = [
             },
             "required": ["query"],
         },
-        "requires_approval": False,
     },
     {
         "name": "ingest_document",
@@ -1098,7 +1052,6 @@ TOOLS: list[dict] = [
             },
             "required": ["source", "content"],
         },
-        "requires_approval": False,
     },
     {
         "name": "list_knowledge",
@@ -1107,7 +1060,6 @@ TOOLS: list[dict] = [
             "type": "object",
             "properties": {},
         },
-        "requires_approval": False,
     },
     {
         "name": "delete_knowledge",
@@ -1122,7 +1074,6 @@ TOOLS: list[dict] = [
             },
             "required": ["source"],
         },
-        "requires_approval": True,
     },
     # --- Browser automation ---
     {
@@ -1146,7 +1097,6 @@ TOOLS: list[dict] = [
             },
             "required": ["url"],
         },
-        "requires_approval": False,
     },
     {
         "name": "browser_read_page",
@@ -1173,7 +1123,6 @@ TOOLS: list[dict] = [
             },
             "required": ["url"],
         },
-        "requires_approval": False,
     },
     {
         "name": "browser_read_table",
@@ -1196,7 +1145,6 @@ TOOLS: list[dict] = [
             },
             "required": ["url"],
         },
-        "requires_approval": False,
     },
     {
         "name": "browser_click",
@@ -1219,7 +1167,6 @@ TOOLS: list[dict] = [
             },
             "required": ["url", "selector"],
         },
-        "requires_approval": True,
     },
     {
         "name": "browser_fill",
@@ -1246,7 +1193,6 @@ TOOLS: list[dict] = [
             },
             "required": ["url", "selector", "value"],
         },
-        "requires_approval": True,
     },
     {
         "name": "browser_evaluate",
@@ -1269,7 +1215,6 @@ TOOLS: list[dict] = [
             },
             "required": ["url", "expression"],
         },
-        "requires_approval": True,
     },
     # --- File generation ---
     {
@@ -1293,7 +1238,6 @@ TOOLS: list[dict] = [
             },
             "required": ["filename", "content"],
         },
-        "requires_approval": False,
     },
     # --- Web tools ---
     {
@@ -1313,7 +1257,6 @@ TOOLS: list[dict] = [
             },
             "required": ["query"],
         },
-        "requires_approval": False,
     },
     {
         "name": "fetch_url",
@@ -1328,7 +1271,6 @@ TOOLS: list[dict] = [
             },
             "required": ["url"],
         },
-        "requires_approval": False,
     },
     # --- Incus tools ---
     {
@@ -1338,7 +1280,6 @@ TOOLS: list[dict] = [
             "type": "object",
             "properties": {},
         },
-        "requires_approval": False,
     },
     {
         "name": "incus_info",
@@ -1353,7 +1294,6 @@ TOOLS: list[dict] = [
             },
             "required": ["instance"],
         },
-        "requires_approval": False,
     },
     {
         "name": "incus_exec",
@@ -1376,7 +1316,6 @@ TOOLS: list[dict] = [
             },
             "required": ["instance", "command"],
         },
-        "requires_approval": True,
     },
     {
         "name": "incus_start",
@@ -1391,7 +1330,6 @@ TOOLS: list[dict] = [
             },
             "required": ["instance"],
         },
-        "requires_approval": True,
     },
     {
         "name": "incus_stop",
@@ -1410,7 +1348,6 @@ TOOLS: list[dict] = [
             },
             "required": ["instance"],
         },
-        "requires_approval": True,
     },
     {
         "name": "incus_restart",
@@ -1429,7 +1366,6 @@ TOOLS: list[dict] = [
             },
             "required": ["instance"],
         },
-        "requires_approval": True,
     },
     {
         "name": "incus_snapshot_list",
@@ -1444,7 +1380,6 @@ TOOLS: list[dict] = [
             },
             "required": ["instance"],
         },
-        "requires_approval": False,
     },
     {
         "name": "incus_snapshot",
@@ -1468,7 +1403,6 @@ TOOLS: list[dict] = [
             },
             "required": ["instance", "action"],
         },
-        "requires_approval": True,
     },
     {
         "name": "incus_launch",
@@ -1496,7 +1430,6 @@ TOOLS: list[dict] = [
             },
             "required": ["image", "name"],
         },
-        "requires_approval": True,
     },
     {
         "name": "incus_delete",
@@ -1515,7 +1448,6 @@ TOOLS: list[dict] = [
             },
             "required": ["instance"],
         },
-        "requires_approval": True,
     },
     {
         "name": "incus_logs",
@@ -1534,7 +1466,6 @@ TOOLS: list[dict] = [
             },
             "required": ["instance"],
         },
-        "requires_approval": False,
     },
     # --- Claude Code ---
     {
@@ -1571,7 +1502,6 @@ TOOLS: list[dict] = [
             },
             "required": ["working_directory", "prompt"],
         },
-        "requires_approval": False,
     },
     # --- Permissions ---
     {
@@ -1596,7 +1526,6 @@ TOOLS: list[dict] = [
             },
             "required": ["user_id", "tier"],
         },
-        "requires_approval": False,
     },
     {
         "name": "manage_list",
@@ -1646,7 +1575,6 @@ TOOLS: list[dict] = [
             },
             "required": ["action"],
         },
-        "requires_approval": False,
     },
 ]
 
@@ -1661,10 +1589,3 @@ def get_tool_definitions() -> list[dict]:
         }
         for t in TOOLS
     ]
-
-
-def requires_approval(tool_name: str) -> bool:
-    for t in TOOLS:
-        if t["name"] == tool_name:
-            return t.get("requires_approval", False)
-    return True  # unknown tools require approval by default

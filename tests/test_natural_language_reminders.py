@@ -254,9 +254,6 @@ class TestParseTimeRegistry:
     def test_tool_exists(self):
         assert self._tool()
 
-    def test_no_approval(self):
-        assert self._tool()["requires_approval"] is False
-
     def test_expression_required(self):
         schema = self._tool()["input_schema"]
         assert "expression" in schema["properties"]

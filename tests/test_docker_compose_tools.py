@@ -24,10 +24,6 @@ class TestDockerComposeStatusRegistry:
         names = [t["name"] for t in TOOLS]
         assert "docker_compose_status" in names
 
-    def test_no_approval_required(self):
-        tool = next(t for t in TOOLS if t["name"] == "docker_compose_status")
-        assert tool["requires_approval"] is False
-
     def test_required_fields(self):
         tool = next(t for t in TOOLS if t["name"] == "docker_compose_status")
         assert tool["input_schema"]["required"] == ["host", "project_dir"]
@@ -45,10 +41,6 @@ class TestDockerComposeLogsRegistry:
     def test_tool_exists(self):
         names = [t["name"] for t in TOOLS]
         assert "docker_compose_logs" in names
-
-    def test_no_approval_required(self):
-        tool = next(t for t in TOOLS if t["name"] == "docker_compose_logs")
-        assert tool["requires_approval"] is False
 
     def test_required_fields(self):
         tool = next(t for t in TOOLS if t["name"] == "docker_compose_logs")

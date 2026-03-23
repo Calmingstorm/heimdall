@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.tools.executor import ToolExecutor
-from src.tools.registry import TOOLS, requires_approval
+from src.tools.registry import TOOLS
 
 
 @pytest.fixture
@@ -31,15 +31,6 @@ class TestGitWriteRegistry:
     def test_git_branch_in_registry(self):
         names = [t["name"] for t in TOOLS]
         assert "git_branch" in names
-
-    def test_git_commit_requires_approval(self):
-        assert requires_approval("git_commit") is True
-
-    def test_git_push_requires_approval(self):
-        assert requires_approval("git_push") is True
-
-    def test_git_branch_requires_approval(self):
-        assert requires_approval("git_branch") is True
 
     def test_git_commit_schema_has_message_required(self):
         tool = next(t for t in TOOLS if t["name"] == "git_commit")

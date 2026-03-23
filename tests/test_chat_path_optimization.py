@@ -42,7 +42,6 @@ def _make_bot_stub():
     stub.config.discord.allowed_users = []
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
-    stub.config.tools.approval_timeout_seconds = 30
     stub.sessions = MagicMock()
     stub.sessions.get_history_with_compaction = AsyncMock(return_value=[])
     stub.sessions.get_task_history = AsyncMock(return_value=[])

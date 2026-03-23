@@ -226,10 +226,8 @@ class TestNonlocalSystemPromptBehavior:
         stub.config.discord.allowed_users = []
         stub.config.discord.respond_to_bots = False
         stub.config.discord.require_mention = False
-        stub.config.tools.approval_timeout_seconds = 30
         stub.codex_client = MagicMock()
         stub.skill_manager = MagicMock()
-        stub.skill_manager.requires_approval = MagicMock(return_value=None)
         stub.skill_manager.has_skill = MagicMock(return_value=False)
         stub.skill_manager.list_skills = MagicMock(return_value=[])
         stub.skill_manager.create_skill = MagicMock(return_value="Skill created.")
@@ -297,8 +295,7 @@ class TestNonlocalSystemPromptBehavior:
 
         stub.codex_client.chat_with_tools = mock_chat_with_tools
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
             text, already_sent, is_error, tools_used, handoff = await stub._process_with_tools(
                 msg, [{"role": "user", "content": "create a skill"}],
@@ -340,8 +337,7 @@ class TestNonlocalSystemPromptBehavior:
 
         stub.codex_client.chat_with_tools = mock_chat_with_tools
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
             await stub._process_with_tools(
                 msg, [{"role": "user", "content": "check the disk"}],
@@ -376,7 +372,6 @@ class TestClaudeCodeCodexDoubleFail:
         stub.config.discord.allowed_users = []
         stub.config.discord.respond_to_bots = False
         stub.config.discord.require_mention = False
-        stub.config.tools.approval_timeout_seconds = 30
         stub.sessions = MagicMock()
         stub.sessions.get_history_with_compaction = AsyncMock(return_value=[])
         stub.sessions.add_message = MagicMock()

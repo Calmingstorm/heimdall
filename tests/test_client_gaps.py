@@ -153,7 +153,6 @@ def _make_bot_stub(**overrides):
     stub.config.discord.channels = ["67890"]
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
-    stub.config.tools.approval_timeout_seconds = 30
     stub.config.monitoring.alert_channel_id = "67890"
     stub.sessions = MagicMock()
     stub.sessions.get_history_with_compaction = AsyncMock(return_value=[])
@@ -175,7 +174,6 @@ def _make_bot_stub(**overrides):
     stub.skill_manager = MagicMock()
     stub.skill_manager.list_skills = MagicMock(return_value=[])
     stub.skill_manager.has_skill = MagicMock(return_value=False)
-    stub.skill_manager.requires_approval = MagicMock(return_value=False)
     stub.skill_manager.get_tool_definitions = MagicMock(return_value=[])
     stub.skill_manager.create_skill = MagicMock(return_value="Skill created")
     stub.skill_manager.edit_skill = MagicMock(return_value="Skill updated")
@@ -916,11 +914,11 @@ class TestToolDispatchBranches:
         stub.skill_manager.list_skills.assert_called()
 
     async def test_dispatch_list_skills_with_skills(self):
-        """list_skills with skills formats a list including approval status."""
+        """list_skills with skills formats a list."""
         stub = _make_bot_stub()
         stub.skill_manager.list_skills = MagicMock(return_value=[
-            {"name": "skill1", "description": "First skill", "requires_approval": False},
-            {"name": "skill2", "description": "Dangerous skill", "requires_approval": True},
+            {"name": "skill1", "description": "First skill"},
+            {"name": "skill2", "description": "Dangerous skill"},
         ])
         await self._run_dispatch(stub, "list_skills")
         stub.skill_manager.list_skills.assert_called()

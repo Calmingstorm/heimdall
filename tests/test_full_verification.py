@@ -174,7 +174,7 @@ class TestToolSystem:
             assert "name" in tool, f"Tool missing name: {tool}"
             assert "description" in tool, f"Tool {tool.get('name')} missing description"
             assert "input_schema" in tool, f"Tool {tool['name']} missing input_schema"
-            assert "requires_approval" in tool, f"Tool {tool['name']} missing requires_approval"
+            assert "requires_approval" not in tool, f"Tool {tool['name']} should not have requires_approval"
 
     def test_tool_names_are_unique(self):
         from src.tools.registry import TOOLS
@@ -511,7 +511,6 @@ class TestModuleImports:
     MODULES = [
         "src.discord.client",
         "src.discord.routing",
-        "src.discord.approval",
         "src.discord.background_task",
         "src.discord.voice",
         "src.llm.system_prompt",

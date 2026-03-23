@@ -40,7 +40,6 @@ def tools_config(tmp_dir: Path) -> ToolsConfig:
         allowed_services=["apache2", "prometheus", "grafana-server"],
         allowed_playbooks=["check-services.yml", "update-all.yml"],
         ansible_directory="/ansible",
-        approval_timeout_seconds=10,
         command_timeout_seconds=5,
         prometheus_host="server",
         ansible_host="desktop",

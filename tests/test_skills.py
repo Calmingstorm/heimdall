@@ -126,7 +126,6 @@ class TestListSkills:
         skills = skill_mgr.list_skills()
         assert len(skills) == 1
         assert skills[0]["name"] == "test_skill"
-        assert skills[0]["requires_approval"] is False
 
 
 class TestExecute:
@@ -153,10 +152,3 @@ class TestToolDefinitions:
         assert "requires_approval" not in defs[0]
 
 
-class TestRequiresApproval:
-    def test_skill_approval(self, skill_mgr: SkillManager):
-        skill_mgr.create_skill("test_skill", VALID_SKILL_CODE)
-        assert skill_mgr.requires_approval("test_skill") is False
-
-    def test_non_skill_returns_none(self, skill_mgr: SkillManager):
-        assert skill_mgr.requires_approval("check_disk") is None

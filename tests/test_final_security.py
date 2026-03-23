@@ -334,42 +334,6 @@ class TestSSLDesignDecision:
                 break
 
 
-# --- Tool Approval System ---
-
-class TestToolApprovalSystem:
-    """Verify destructive tools require approval."""
-
-    def test_destructive_tools_require_approval(self):
-        """Tools that modify state should have requires_approval=True."""
-        from src.tools.registry import TOOLS
-        destructive_names = {
-            "run_command", "restart_service", "write_file",
-            "docker_compose_action", "run_ansible_playbook",
-            "incus_stop", "incus_restart", "incus_delete",
-            "incus_snapshot", "incus_launch",
-            "git_commit", "git_push",
-        }
-        for tool in TOOLS:
-            if tool["name"] in destructive_names:
-                assert tool.get("requires_approval") is True, (
-                    f"Destructive tool {tool['name']} should require approval"
-                )
-
-    def test_read_only_tools_no_approval(self):
-        """Read-only tools should not require approval."""
-        from src.tools.registry import TOOLS
-        read_only_names = {
-            "execute_command",  # renamed — the read-only alias for status checks
-            "check_service", "check_docker", "check_logs",
-            "read_file", "docker_logs", "incus_list", "incus_info",
-        }
-        for tool in TOOLS:
-            if tool["name"] in read_only_names:
-                assert tool.get("requires_approval") is not True, (
-                    f"Read-only tool {tool['name']} should not require approval"
-                )
-
-
 # --- Secret Scrubber Extended Patterns ---
 
 class TestSecretScrubberExtended:

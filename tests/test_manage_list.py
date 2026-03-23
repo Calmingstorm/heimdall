@@ -59,9 +59,6 @@ class TestManageListRegistry:
     def test_tool_exists(self):
         assert self._get_tool()["name"] == "manage_list"
 
-    def test_no_approval_required(self):
-        assert self._get_tool()["requires_approval"] is False
-
     def test_action_enum(self):
         schema = self._get_tool()["input_schema"]
         actions = schema["properties"]["action"]["enum"]

@@ -45,12 +45,9 @@ def _make_bot_stub():
     stub.config.discord.allowed_users = []
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
-    stub.config.tools.approval_timeout_seconds = 30
-    stub.config.tools.auto_approve = False
     stub.codex_client = MagicMock()
     stub.codex_client.chat_with_tools = AsyncMock()
     stub.skill_manager = MagicMock()
-    stub.skill_manager.requires_approval = MagicMock(return_value=None)
     stub.skill_manager.has_skill = MagicMock(return_value=False)
     stub.skill_manager.list_skills = MagicMock(return_value=[])
     stub.skill_manager.should_handoff_to_codex = MagicMock(return_value=False)
@@ -121,8 +118,7 @@ class TestToolLoopIteration:
             side_effect=_codex_tool_then_text([tc], "Disk is 42% full.")
         )
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             text, already_sent, is_error, _tools, _handoff = await stub._process_with_tools(msg, [])
 
         assert text == "Disk is 42% full."
@@ -150,8 +146,7 @@ class TestToolLoopIteration:
 
         stub.codex_client.chat_with_tools = _capture_chat
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [{"role": "user", "content": "check uptime"}])
 
         # Second call to chat_with_tools should have tool result in messages
@@ -186,8 +181,7 @@ class TestToolLoopIteration:
 
         stub.codex_client.chat_with_tools = _capture
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         # After first iteration, messages should have: assistant (tool_use) + user (tool_result)
@@ -216,8 +210,7 @@ class TestParallelToolExecution:
         )
         stub.tool_executor.execute = AsyncMock(return_value="50%")
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         assert stub.tool_executor.execute.call_count == 2
@@ -245,8 +238,7 @@ class TestParallelToolExecution:
         stub.codex_client.chat_with_tools = _cap
         stub.tool_executor.execute = AsyncMock(return_value="result")
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         tool_results = captured[1][-1]["content"]
@@ -274,8 +266,7 @@ class TestProgressMessages:
             side_effect=_codex_tool_then_text([tc])
         )
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         # Check progress embed was sent via channel.send
@@ -296,8 +287,7 @@ class TestProgressMessages:
             side_effect=_codex_tool_then_text([tc])
         )
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         embed = msg.channel.send.call_args[1]["embed"]
@@ -318,98 +308,12 @@ class TestProgressMessages:
             side_effect=_codex_tool_then_text([tc1, tc2])
         )
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         embed = msg.channel.send.call_args[1]["embed"]
         assert "`check_disk`" in embed.description
         assert "`check_memory`" in embed.description
-
-
-# ---------------------------------------------------------------------------
-# Tool approval flow
-# ---------------------------------------------------------------------------
-
-class TestToolApproval:
-    """Approval required/denied flow for destructive tools."""
-
-    async def test_approved_tool_executes(self):
-        """When approval is granted, the tool runs normally."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-
-        tc = ToolCall(id="tool-1", name="run_command", input={"command": "rm -rf /tmp/test"})
-        stub.codex_client.chat_with_tools = AsyncMock(
-            side_effect=_codex_tool_then_text([tc])
-        )
-        stub.tool_executor.execute = AsyncMock(return_value="removed")
-
-        with patch("src.discord.client.requires_approval", return_value=True), \
-             patch("src.discord.client.request_approval", new_callable=AsyncMock, return_value=True) as mock_approve, \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
-            await stub._process_with_tools(msg, [])
-
-        mock_approve.assert_called_once()
-        stub.tool_executor.execute.assert_called_once()
-
-    async def test_denied_tool_returns_denial_message(self):
-        """When approval is denied, the tool result says 'denied'."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-
-        tc = ToolCall(id="tool-deny", name="run_command", input={"command": "reboot"})
-
-        captured = []
-        call_count = 0
-        async def _cap(messages, system, tools):
-            nonlocal call_count
-            captured.append(list(messages))
-            r = [
-                _tool_response([tc]),
-                _text_response("Action denied."),
-            ][call_count]
-            call_count += 1
-            return r
-
-        stub.codex_client.chat_with_tools = _cap
-
-        with patch("src.discord.client.requires_approval", return_value=True), \
-             patch("src.discord.client.request_approval", new_callable=AsyncMock, return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
-            await stub._process_with_tools(msg, [])
-
-        # Tool executor should NOT have been called
-        stub.tool_executor.execute.assert_not_called()
-        # Audit log should record denial
-        stub.audit.log_execution.assert_called_once()
-        assert stub.audit.log_execution.call_args[1]["approved"] is False
-        # Tool result should say denied
-        tool_results = captured[1][-1]["content"]
-        assert "denied" in tool_results[0]["content"].lower()
-
-    async def test_skill_approval_takes_precedence(self):
-        """Skill manager's approval setting takes precedence over registry."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-
-        tc = ToolCall(id="tool-1", name="my_skill", input={})
-        stub.codex_client.chat_with_tools = AsyncMock(
-            side_effect=_codex_tool_then_text([tc])
-        )
-        # Skill says requires approval
-        stub.skill_manager.requires_approval = MagicMock(return_value=True)
-        stub.skill_manager.has_skill = MagicMock(return_value=True)
-        stub.skill_manager.execute = AsyncMock(return_value="skill result")
-
-        with patch("src.discord.client.requires_approval", return_value=False) as reg_approval, \
-             patch("src.discord.client.request_approval", new_callable=AsyncMock, return_value=True), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
-            await stub._process_with_tools(msg, [])
-
-        # request_approval was called because skill said True, even though registry said False
-        # The approval was requested (we patched it to return True)
-        stub.skill_manager.execute.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
@@ -442,8 +346,7 @@ class TestToolOutputProcessing:
 
         stub.codex_client.chat_with_tools = _cap
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         tool_content = captured[1][-1]["content"][0]["content"]
@@ -473,8 +376,7 @@ class TestToolOutputProcessing:
         stub.codex_client.chat_with_tools = _cap
 
         # Use real scrub_output_secrets
-        with patch("src.discord.client.requires_approval", return_value=False):
-            await stub._process_with_tools(msg, [])
+        await stub._process_with_tools(msg, [])
 
         tool_content = captured[1][-1]["content"][0]["content"]
         assert "sk-abc123secret" not in tool_content
@@ -498,8 +400,7 @@ class TestAuditAndTracking:
             side_effect=_codex_tool_then_text([tc1, tc2])
         )
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         assert stub.audit.log_execution.call_count == 2
@@ -517,8 +418,7 @@ class TestAuditAndTracking:
         )
         stub.tool_executor.execute = AsyncMock(return_value="log output")
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         assert "ch-42" in stub._recent_actions
@@ -536,8 +436,7 @@ class TestAuditAndTracking:
             side_effect=_codex_tool_then_text([tc])
         )
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         call_kwargs = stub.audit.log_execution.call_args[1]
@@ -556,8 +455,7 @@ class TestAuditAndTracking:
         )
         stub.tool_executor.execute = AsyncMock(side_effect=RuntimeError("SSH timeout"))
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         call_kwargs = stub.audit.log_execution.call_args[1]
@@ -593,8 +491,7 @@ class TestToolExceptionHandling:
 
         stub.codex_client.chat_with_tools = _cap
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             text, _, is_error, _tools, _handoff = await stub._process_with_tools(msg, [])
 
         assert is_error is False  # The loop handled the error; final response is valid
@@ -637,8 +534,7 @@ class TestToolExceptionHandling:
 
         stub.codex_client.chat_with_tools = _cap
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         results = captured[1][-1]["content"]
@@ -705,8 +601,7 @@ class TestMaxIterations:
             return_value=_tool_response([tc])
         )
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             text, already_sent, is_error, _tools, _handoff = await stub._process_with_tools(msg, [])
 
         assert is_error is True
@@ -736,8 +631,7 @@ class TestDiscordNativeTools:
             side_effect=_codex_tool_then_text([tc])
         )
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         stub._handle_search_history.assert_called_once()
@@ -748,7 +642,6 @@ class TestDiscordNativeTools:
         stub = _make_bot_stub()
         msg = _make_message()
         stub.skill_manager.has_skill = MagicMock(return_value=True)
-        stub.skill_manager.requires_approval = MagicMock(return_value=False)
         stub.skill_manager.execute = AsyncMock(return_value="skill output")
 
         tc = ToolCall(id="tool-1", name="my_custom_skill", input={"arg": "val"})
@@ -756,8 +649,7 @@ class TestDiscordNativeTools:
             side_effect=_codex_tool_then_text([tc])
         )
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         stub.skill_manager.execute.assert_called_once()
@@ -773,8 +665,7 @@ class TestDiscordNativeTools:
             side_effect=_codex_tool_then_text([tc])
         )
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             await stub._process_with_tools(msg, [])
 
         stub.tool_executor.execute.assert_called_once_with("check_disk", {"host": "server"}, user_id="user-1")

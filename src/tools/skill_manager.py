@@ -109,10 +109,6 @@ class SkillManager:
                 del sys.modules[module_name]
                 return None
 
-            # Ensure requires_approval defaults to True
-            if "requires_approval" not in definition:
-                definition["requires_approval"] = True
-
             name = definition["name"]
             log.info("Loaded skill: %s from %s", name, path.name)
             return LoadedSkill(
@@ -232,7 +228,6 @@ class SkillManager:
             {
                 "name": s.name,
                 "description": s.definition.get("description", ""),
-                "requires_approval": s.definition.get("requires_approval", True),
                 "loaded_at": s.loaded_at,
             }
             for s in self._skills.values()
@@ -247,13 +242,6 @@ class SkillManager:
         if not skill:
             return False
         return bool(skill.definition.get("handoff_to_codex", False))
-
-    def requires_approval(self, tool_name: str) -> bool | None:
-        """Return approval flag for a skill, or None if not a skill."""
-        skill = self._skills.get(tool_name)
-        if skill is None:
-            return None
-        return skill.definition.get("requires_approval", True)
 
     def get_tool_definitions(self) -> list[dict]:
         """Return tool definitions for all loaded skills."""

@@ -70,7 +70,6 @@ def _make_bot_stub():
     stub.config.discord.allowed_users = []
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
-    stub.config.tools.approval_timeout_seconds = 30
     stub.codex_client = MagicMock()
     stub.codex_client.chat = AsyncMock(return_value="Hello!")
     stub.codex_client.chat_with_tools = AsyncMock(
@@ -82,7 +81,6 @@ def _make_bot_stub():
     stub.permissions.is_guest = MagicMock(return_value=False)
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub.skill_manager = MagicMock()
-    stub.skill_manager.requires_approval = MagicMock(return_value=None)
     stub.skill_manager.has_skill = MagicMock(return_value=False)
     stub.skill_manager.list_skills = MagicMock(return_value=[])
     stub.skill_manager.should_handoff_to_codex = MagicMock(return_value=False)
@@ -228,8 +226,7 @@ class TestProcessWithToolsCodexOnly:
             LLMResponse(text="Disk is 42% full."),
         ])
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             text, already_sent, is_error, tools, handoff = await stub._process_with_tools(
                 msg, [],
             )

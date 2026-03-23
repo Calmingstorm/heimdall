@@ -40,7 +40,6 @@ def _make_bot_stub():
     stub.config.discord.allowed_users = []
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
-    stub.config.tools.approval_timeout_seconds = 30
     stub.sessions = MagicMock()
     stub.sessions.get_history_with_compaction = AsyncMock(return_value=[])
     stub.sessions.get_task_history = AsyncMock(return_value=[])
@@ -144,14 +143,12 @@ class TestProcessWithToolsErrorFlag:
         )
 
         # Mock tool execution
-        stub.skill_manager.requires_approval = MagicMock(return_value=False)
         stub.tool_executor.execute = AsyncMock(return_value="OK")
 
         stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
         stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
             text, already_sent, is_error, _tools, _handoff = await stub._process_with_tools(msg, [])
         assert is_error is True

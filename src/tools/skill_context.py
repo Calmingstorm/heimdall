@@ -222,8 +222,8 @@ class SkillContext:
     async def execute_tool(self, tool_name: str, tool_input: dict | None = None) -> str:
         """Execute a safe built-in tool by name. Returns the tool's output string.
 
-        Only tools listed in SKILL_SAFE_TOOLS are allowed. Destructive or
-        approval-required tools (run_command, write_file, etc.) are blocked.
+        Only tools listed in SKILL_SAFE_TOOLS are allowed. Destructive
+        tools (run_command, write_file, etc.) are blocked from skill context.
         """
         if tool_name not in SKILL_SAFE_TOOLS:
             self._log.warning("Skill attempted blocked tool: %s", tool_name)

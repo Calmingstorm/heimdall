@@ -62,7 +62,6 @@ class TestToolsUsedLocalVariable:
         stub._send_with_retry = AsyncMock()
         stub._merged_tool_definitions = MagicMock(return_value=[])
         stub.skill_manager = MagicMock()
-        stub.skill_manager.requires_approval = MagicMock(return_value=None)
         stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
 
         msg = MagicMock()
@@ -114,15 +113,13 @@ class TestToolsUsedLocalVariable:
         stub.codex_client.chat_with_tools = fake_chat_with_tools
 
         # Mock the tool execution chain
-        stub.skill_manager.requires_approval = MagicMock(return_value=False)
         stub.skill_manager.has_skill = MagicMock(return_value=False)
         stub.tool_executor.execute = AsyncMock(return_value="OK")
         stub.audit = MagicMock()
         stub.audit.log_execution = AsyncMock()
         stub._track_recent_action = MagicMock()
 
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
             _text, _sent, _err, tools, _handoff = await stub._process_with_tools(msg, [])
 

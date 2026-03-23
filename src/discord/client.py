@@ -29,11 +29,9 @@ from ..logging import get_logger
 from ..scheduler import Scheduler
 from ..sessions import SessionManager
 from ..tools import ToolExecutor, SkillManager, get_tool_definitions
-from ..tools.registry import requires_approval
 from ..tools.tool_memory import ToolMemory
 from ..search import OllamaEmbedder, SessionVectorStore
 from ..permissions import PermissionManager
-from .approval import request_approval
 from .routing import is_task_by_keyword, resolve_claude_code_target, CLAUDE_CODE_DEFAULTS
 from .voice import VoiceManager, VoiceMessageProxy
 
@@ -1507,9 +1505,6 @@ class LokiBot(discord.Client):
         progress_steps: list[dict] = []
         cancel_view: ToolLoopCancelView | None = None
 
-        # Session approval cache — once a tool is approved, skip re-prompting in this loop
-        approved_tools: set[str] = set()
-
         user_id = str(message.author.id)
 
         # Filter tools based on user permission tier (skip for test webhooks)
@@ -1689,40 +1684,6 @@ class LokiBot(discord.Client):
                 tool_input = block.input
                 log.info("Tool call: %s(%s)", tool_name, tool_input)
 
-                approved = True
-                # Auto-approve for test webhooks
-                is_test_wh = message.webhook_id and str(message.webhook_id) in _ALLOWED_WEBHOOK_IDS
-                # Check skill manager first for approval, fall through to registry
-                skill_approval = self.skill_manager.requires_approval(tool_name)
-                needs_approval = skill_approval if skill_approval is not None else requires_approval(tool_name)
-                if needs_approval and tool_name not in approved_tools and not is_test_wh and not self.config.tools.auto_approve:
-                    approved = await request_approval(
-                        bot=self,
-                        channel=message.channel,
-                        tool_name=tool_name,
-                        tool_input=tool_input,
-                        allowed_users=self.config.discord.allowed_users,
-                        timeout=self.config.tools.approval_timeout_seconds,
-                    )
-                    if approved:
-                        approved_tools.add(tool_name)
-                    if not approved:
-                        await self.audit.log_execution(
-                            user_id=str(message.author.id),
-                            user_name=str(message.author),
-                            channel_id=str(message.channel.id),
-                            tool_name=tool_name,
-                            tool_input=tool_input,
-                            approved=False,
-                            result_summary="Denied or timed out",
-                            execution_time_ms=0,
-                        )
-                        return {
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": "Action was denied or timed out.",
-                        }
-
                 t0 = time.monotonic()
                 error = None
                 # Handle Discord-native tools
@@ -1789,8 +1750,7 @@ class LokiBot(discord.Client):
                         else:
                             lines = []
                             for s in skills:
-                                appr = " [requires approval]" if s["requires_approval"] else ""
-                                lines.append(f"**{s['name']}**: {s['description']}{appr}")
+                                lines.append(f"**{s['name']}**: {s['description']}")
                             result = f"**User-created skills ({len(skills)}):**\n" + "\n".join(lines)
                     elif self.skill_manager.has_skill(tool_name):
                         async def _skill_msg(text: str) -> None:
@@ -1821,7 +1781,7 @@ class LokiBot(discord.Client):
                     channel_id=str(message.channel.id),
                     tool_name=tool_name,
                     tool_input=tool_input,
-                    approved=approved,
+                    approved=True,
                     result_summary=result,
                     execution_time_ms=elapsed_ms,
                     error=error,

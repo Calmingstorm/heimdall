@@ -49,7 +49,6 @@ def _make_bot_stub(**overrides):
     stub.config.discord.allowed_users = []
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
-    stub.config.tools.approval_timeout_seconds = 30
 
     # Sessions
     stub.sessions = MagicMock()
@@ -411,14 +410,10 @@ class TestIssue2ToolDescriptionsClean:
                 f"'REQUIRES APPROVAL': {desc[:100]}"
             )
 
-    def test_requires_approval_flags_still_enforced(self):
-        """The requires_approval boolean flag should still be present on
-        destructive tools — the code-level check must still work."""
-        from src.tools.registry import TOOLS, requires_approval
-
-        # Spot-check known destructive tools
-        for tool_name in ["restart_service", "run_command", "write_file",
-                          "docker_compose_action", "delete_file"]:
-            assert requires_approval(tool_name), (
-                f"Tool {tool_name} should still require approval"
+    def test_no_requires_approval_flags(self):
+        """The requires_approval field should no longer exist on tools."""
+        from src.tools.registry import TOOLS
+        for tool in TOOLS:
+            assert "requires_approval" not in tool, (
+                f"Tool {tool['name']} should not have requires_approval field"
             )

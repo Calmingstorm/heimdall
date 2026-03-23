@@ -27,11 +27,9 @@ from src.llm.circuit_breaker import CircuitOpenError  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
-# Patch requires_approval to return False for test tools
 @pytest.fixture(autouse=True)
 def _no_approval():
-    with patch("src.discord.client.requires_approval", return_value=False):
-        yield
+    yield
 
 
 # ---------------------------------------------------------------------------
@@ -53,13 +51,11 @@ def _make_bot_stub():
     stub.config.discord.allowed_users = ["user-1"]
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
-    stub.config.tools.approval_timeout_seconds = 30
     stub.sessions = MagicMock()
     stub.codex_client = MagicMock()
     stub.skill_manager = MagicMock()
     stub.skill_manager.list_skills = MagicMock(return_value=[])
     stub.skill_manager.has_skill = MagicMock(return_value=False)
-    stub.skill_manager.requires_approval = MagicMock(return_value=None)
     stub.skill_manager.should_handoff_to_codex = MagicMock(return_value=False)
     stub.audit = MagicMock()
     stub.audit.log_execution = AsyncMock()

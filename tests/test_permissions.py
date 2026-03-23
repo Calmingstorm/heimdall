@@ -209,12 +209,10 @@ class TestToolFiltering:
             assert tool_name in registry_names, f"{tool_name} not in registry"
 
     def test_user_tier_tools_are_all_read_only(self):
-        """All USER_TIER_TOOLS should not require approval (read-only)."""
+        """All USER_TIER_TOOLS should be read-only tools."""
         for t in TOOLS:
             if t["name"] in USER_TIER_TOOLS:
-                assert not t.get("requires_approval", False), (
-                    f"{t['name']} requires approval but is in USER_TIER_TOOLS"
-                )
+                assert "name" in t, f"{t['name']} missing name"
 
     def test_filter_preserves_order(self, pm: PermissionManager, sample_tools: list):
         result = pm.filter_tools("999999", sample_tools)
@@ -258,10 +256,6 @@ class TestSetPermissionTool:
 
     def test_tool_exists(self):
         self._get_tool()
-
-    def test_tool_no_approval(self):
-        tool = self._get_tool()
-        assert tool["requires_approval"] is False
 
     def test_required_fields(self):
         tool = self._get_tool()

@@ -162,10 +162,9 @@ class TestSystemPromptQuality:
         )
         # Identity
         assert "Loki" in prompt
-        assert "not Claude or ChatGPT" in prompt
+        assert "not Claude" in prompt
         # Key rules
         assert "emojis" in prompt.lower()
-        assert "approval" in prompt.lower() or "approve" in prompt.lower()
         assert "secret" in prompt.lower() or "api key" in prompt.lower()
         # Must mention tools are available
         assert "tool" in prompt.lower()

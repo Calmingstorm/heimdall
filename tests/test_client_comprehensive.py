@@ -70,7 +70,6 @@ def _make_bot_stub(**overrides):
     stub.config.discord.channels = ["67890"]
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
-    stub.config.tools.approval_timeout_seconds = 30
     stub.config.monitoring.alert_channel_id = "67890"
     stub.sessions = MagicMock()
     stub.sessions.get_history_with_compaction = AsyncMock(return_value=[])
@@ -90,7 +89,6 @@ def _make_bot_stub(**overrides):
     stub.skill_manager = MagicMock()
     stub.skill_manager.list_skills = MagicMock(return_value=[])
     stub.skill_manager.has_skill = MagicMock(return_value=False)
-    stub.skill_manager.requires_approval = MagicMock(return_value=None)
     stub.skill_manager.get_tool_definitions = MagicMock(return_value=[])
     stub.audit = MagicMock()
     stub.audit.log_execution = AsyncMock()
@@ -2736,8 +2734,7 @@ class TestProcessWithTools:
         stub._track_recent_action = MagicMock()
 
         msg = _make_message()
-        with patch("src.discord.client.requires_approval", return_value=False), \
-             patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
             text, already_sent, is_error, tools, _handoff = await stub._process_with_tools(
                 msg, [{"role": "user", "content": "check all disks"}],

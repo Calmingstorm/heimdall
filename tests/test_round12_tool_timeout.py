@@ -42,13 +42,11 @@ def _make_bot_stub(tool_timeout: int = 300):
     stub.config.discord.allowed_users = ["user-1"]
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
-    stub.config.tools.approval_timeout_seconds = 30
     stub.sessions = MagicMock()
     stub.codex_client = MagicMock()
     stub.skill_manager = MagicMock()
     stub.skill_manager.list_skills = MagicMock(return_value=[])
     stub.skill_manager.has_skill = MagicMock(return_value=False)
-    stub.skill_manager.requires_approval = MagicMock(return_value=None)
     stub.skill_manager.should_handoff_to_codex = MagicMock(return_value=False)
     stub.audit = MagicMock()
     stub.audit.log_execution = AsyncMock()
@@ -92,8 +90,7 @@ class TestPerToolTimeout:
     """Test that tool execution is wrapped in asyncio.wait_for with a timeout."""
 
     @pytest.mark.asyncio
-    @patch("src.discord.client.requires_approval", return_value=False)
-    async def test_tool_timeout_returns_error_message(self, _mock_approval):
+    async def test_tool_timeout_returns_error_message(self):
         """A tool that exceeds the timeout returns a clear error message."""
         stub = _make_bot_stub(tool_timeout=1)  # 1 second timeout
         msg = _make_message()
@@ -130,8 +127,7 @@ class TestPerToolTimeout:
         )
 
     @pytest.mark.asyncio
-    @patch("src.discord.client.requires_approval", return_value=False)
-    async def test_timeout_audit_logged(self, _mock_approval):
+    async def test_timeout_audit_logged(self):
         """Timeout events are audit-logged with the correct error message."""
         stub = _make_bot_stub(tool_timeout=1)
         msg = _make_message()
@@ -167,8 +163,7 @@ class TestPerToolTimeout:
         assert call_kwargs["approved"] is True
 
     @pytest.mark.asyncio
-    @patch("src.discord.client.requires_approval", return_value=False)
-    async def test_one_slow_tool_doesnt_block_fast_tool(self, _mock_approval):
+    async def test_one_slow_tool_doesnt_block_fast_tool(self):
         """In a parallel group, one slow tool times out while the other completes."""
         stub = _make_bot_stub(tool_timeout=1)
         msg = _make_message()
@@ -211,8 +206,7 @@ class TestPerToolTimeout:
         assert any("fast result" in c for c in results_content)
 
     @pytest.mark.asyncio
-    @patch("src.discord.client.requires_approval", return_value=False)
-    async def test_fast_tool_not_affected_by_timeout(self, _mock_approval):
+    async def test_fast_tool_not_affected_by_timeout(self):
         """A tool that completes quickly is not affected by the timeout."""
         stub = _make_bot_stub(tool_timeout=300)
         msg = _make_message()
@@ -236,8 +230,7 @@ class TestPerToolTimeout:
         assert "check_disk" in tools_used
 
     @pytest.mark.asyncio
-    @patch("src.discord.client.requires_approval", return_value=False)
-    async def test_timeout_value_from_config(self, _mock_approval):
+    async def test_timeout_value_from_config(self):
         """The timeout value comes from config.tools.tool_timeout_seconds."""
         stub = _make_bot_stub(tool_timeout=2)
         msg = _make_message()
@@ -266,8 +259,7 @@ class TestPerToolTimeout:
         assert any("timed out after 2s" in str(r.get("content", "")) for r in tool_result_content)
 
     @pytest.mark.asyncio
-    @patch("src.discord.client.requires_approval", return_value=False)
-    async def test_audit_failure_doesnt_crash_on_timeout(self, _mock_approval):
+    async def test_audit_failure_doesnt_crash_on_timeout(self):
         """If audit logging fails during timeout handling, the tool loop continues."""
         stub = _make_bot_stub(tool_timeout=1)
         msg = _make_message()

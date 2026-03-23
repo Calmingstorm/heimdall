@@ -38,13 +38,11 @@ def _make_bot_stub():
     stub.config.discord.allowed_users = ["user-1"]
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
-    stub.config.tools.approval_timeout_seconds = 30
     stub.sessions = MagicMock()
     stub.codex_client = MagicMock()
     stub.skill_manager = MagicMock()
     stub.skill_manager.list_skills = MagicMock(return_value=[])
     stub.skill_manager.has_skill = MagicMock(return_value=False)
-    stub.skill_manager.requires_approval = MagicMock(return_value=None)
     stub.skill_manager.should_handoff_to_codex = MagicMock(return_value=False)
     stub.audit = MagicMock()
     stub.audit.log_execution = AsyncMock()
@@ -167,10 +165,9 @@ class TestPartialCompletionOnApiError:
             ConnectionError("API unreachable"),
         ])
 
-        with patch("src.discord.client.requires_approval", return_value=False):
-            result, _, is_error, tools_used, _ = await LokiBot._process_with_tools(
-                stub, msg, [],
-            )
+        result, _, is_error, tools_used, _ = await LokiBot._process_with_tools(
+            stub, msg, [],
+        )
 
         assert is_error is True
         assert "**Partial completion (1/1 steps):**" in result
@@ -187,10 +184,9 @@ class TestPartialCompletionOnApiError:
             side_effect=ConnectionError("API unreachable"),
         )
 
-        with patch("src.discord.client.requires_approval", return_value=False):
-            result, _, is_error, _, _ = await LokiBot._process_with_tools(
-                stub, msg, [],
-            )
+        result, _, is_error, _, _ = await LokiBot._process_with_tools(
+            stub, msg, [],
+        )
 
         assert is_error is True
         assert "LLM API error: API unreachable" in result
@@ -212,10 +208,9 @@ class TestPartialCompletionOnApiError:
             RuntimeError("Server error"),
         ])
 
-        with patch("src.discord.client.requires_approval", return_value=False):
-            result, _, is_error, _, _ = await LokiBot._process_with_tools(
-                stub, msg, [],
-            )
+        result, _, is_error, _, _ = await LokiBot._process_with_tools(
+            stub, msg, [],
+        )
 
         assert is_error is True
         # The embed should have been edited to error state
@@ -244,10 +239,9 @@ class TestPartialCompletionOnMaxIterations:
             text="", tool_calls=[ToolCall(id="t1", name="run_command", input={})],
         ))
 
-        with patch("src.discord.client.requires_approval", return_value=False):
-            result, _, is_error, tools_used, _ = await LokiBot._process_with_tools(
-                stub, msg, [],
-            )
+        result, _, is_error, tools_used, _ = await LokiBot._process_with_tools(
+            stub, msg, [],
+        )
 
         assert is_error is True
         assert "Too many tool calls" in result
@@ -277,10 +271,9 @@ class TestPartialCompletionOnMaxIterations:
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=alternating_tools)
 
-        with patch("src.discord.client.requires_approval", return_value=False):
-            result, _, is_error, _, _ = await LokiBot._process_with_tools(
-                stub, msg, [],
-            )
+        result, _, is_error, _, _ = await LokiBot._process_with_tools(
+            stub, msg, [],
+        )
 
         assert is_error is True
         assert "`check_disk`" in result
@@ -307,10 +300,9 @@ class TestNoReportOnSuccess:
             LLMResponse(text="All disks are healthy!", tool_calls=[]),
         ])
 
-        with patch("src.discord.client.requires_approval", return_value=False):
-            result, _, is_error, _, _ = await LokiBot._process_with_tools(
-                stub, msg, [],
-            )
+        result, _, is_error, _, _ = await LokiBot._process_with_tools(
+            stub, msg, [],
+        )
 
         assert is_error is False
         assert result == "All disks are healthy!"
