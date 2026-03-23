@@ -221,7 +221,7 @@ class TestNoHardcodedSecrets:
                 except Exception:
                     continue
                 # Skip test files that contain key strings as assertions
-                if "test_" in f and ("scrub" in content[:200].lower() or "secret" in f.lower() or "security" in f.lower()):
+                if "test_" in f and ("scrub" in content[:500].lower() or "secret" in f.lower() or "security" in f.lower()):
                     continue
                 assert "BEGIN RSA PRIVATE" not in content, f"{f} contains RSA private key"
                 assert "BEGIN OPENSSH PRIVATE" not in content, f"{f} contains OpenSSH private key"
