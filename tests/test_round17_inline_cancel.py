@@ -23,11 +23,6 @@ from src.discord.client import (  # noqa: E402
 )
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
-@pytest.fixture(autouse=True)
-def _no_approval():
-    """Patch requires_approval to return False for all tools in all tests."""
-    yield
-
 
 # ---------------------------------------------------------------------------
 # Helpers

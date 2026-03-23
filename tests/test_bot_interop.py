@@ -30,10 +30,6 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 # Helpers
 # ---------------------------------------------------------------------------
 
-@pytest.fixture(autouse=True)
-def _no_approval():
-    yield
-
 
 def _make_bot_stub(respond_to_bots=False):
     """Minimal LokiBot stub for bot interop tests."""

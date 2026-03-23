@@ -39,7 +39,7 @@ class CircuitBreaker:
     Parameters
     ----------
     name : str
-        Human-readable provider name (e.g. "codex_api", "haiku_classify").
+        Human-readable provider name (e.g. "codex_api").
     failure_threshold : int
         Consecutive failures before the breaker opens. Default 3.
     recovery_timeout : float

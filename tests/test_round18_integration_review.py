@@ -27,10 +27,6 @@ from src.llm.circuit_breaker import CircuitOpenError  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
-@pytest.fixture(autouse=True)
-def _no_approval():
-    yield
-
 
 # ---------------------------------------------------------------------------
 # Helpers

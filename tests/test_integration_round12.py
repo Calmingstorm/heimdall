@@ -76,7 +76,7 @@ def _make_bot_stub():
     stub._process_with_tools = AsyncMock(
         return_value=("response", False, False, [], False)
     )
-    # Only non-approval tools for simpler testing (must exist in registry with requires_approval=False)
+    # Tool definitions for testing
     stub._merged_tool_definitions = MagicMock(return_value=[
         {"name": "check_disk", "description": "Check disk usage", "input_schema": {"type": "object", "properties": {"host": {"type": "string"}}}},
         {"name": "check_service", "description": "Check service status", "input_schema": {"type": "object", "properties": {"host": {"type": "string"}, "service": {"type": "string"}}}},
