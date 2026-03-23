@@ -78,7 +78,7 @@ def ipv6_config(tmp_dir: Path) -> ToolsConfig:
         ssh_known_hosts_path=str(tmp_dir / "known_hosts"),
         hosts={
             "ipv6local": ToolHost(address="::1", ssh_user="root", os="linux"),
-            "remote": ToolHost(address="192.168.1.100", ssh_user="root", os="linux"),
+            "remote": ToolHost(address="10.0.0.50", ssh_user="root", os="linux"),
         },
         allowed_services=["nginx"],
         command_timeout_seconds=10,

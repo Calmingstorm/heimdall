@@ -1471,10 +1471,13 @@ TOOLS: list[dict] = [
     {
         "name": "claude_code",
         "description": (
-            "Spawn an AI coding agent for multi-file code tasks: writing features, refactoring, code review, architecture analysis. "
-            "Use this when the task requires reasoning about code structure across multiple files. "
-            "Do NOT use for: git history (use git_log/git_show/git_diff), reading single files (use read_file), running commands (use run_command). "
-            "For code+deploy requests, call this first to write code, then use infrastructure tools to deploy."
+            "Deep reasoning agent for complex multi-step tasks: code generation, repo analysis, debugging, "
+            "building/deploying projects, reading docs and following instructions, architecture review — "
+            "anything that would take 3+ direct tool calls step-by-step. claude -p runs the entire chain "
+            "in one session with no context loss. Results return as text + files on disk. "
+            "Do NOT use for: git history (use git_log/git_show/git_diff), reading single files (use read_file), "
+            "running single commands (use run_command). "
+            "For code+deploy: call this first to write code, then use infrastructure tools to deploy."
         ),
         "input_schema": {
             "type": "object",

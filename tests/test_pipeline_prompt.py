@@ -26,23 +26,22 @@ class TestSystemPromptPipelineGuidance:
         assert "expensive" not in prompt.lower()
         assert "(slow)" not in prompt.lower()
 
-    def test_mentions_multi_file_code_tasks(self):
-        """Should describe claude_code as for multi-file code tasks."""
+    def test_mentions_complex_multi_step_tasks(self):
+        """Should describe claude_code as for complex multi-step tasks."""
         prompt = _full_prompt()
-        assert "multi-file" in prompt.lower()
+        assert "complex multi-step" in prompt.lower() or "multi-step task" in prompt.lower()
 
     def test_mentions_allow_edits(self):
         """Should mention allow_edits parameter for write mode."""
         prompt = _full_prompt()
         assert "allow_edits" in prompt
 
-    def test_mentions_code_delegation(self):
-        """Should describe claude_code as a coding agent for delegation."""
+    def test_mentions_deep_reasoning_delegation(self):
+        """Should describe claude_code as a deep reasoning agent for delegation."""
         prompt = _full_prompt()
         lower = prompt.lower()
-        # Should mention claude_code and coding agent delegation
         assert "claude_code" in prompt
-        assert "coding agent" in lower or "code creation" in lower
+        assert "deep reasoning agent" in lower
 
     def test_code_creation_and_review_present(self):
         """Should include guidance for code creation and code review patterns."""
@@ -94,11 +93,10 @@ class TestToolDescriptionPipelineGuidance:
         """Tool description should state what it's FOR, not just what it's against."""
         desc = self._get_claude_code_tool()["description"]
         lower = desc.lower()
-        assert "multi-file" in lower
-        # Should mention at least one positive use case
+        # Should mention broad use cases (broadened from just code tasks)
         assert any(
             term in lower
-            for term in ["refactoring", "code review", "writing features", "architecture"]
+            for term in ["code generation", "repo analysis", "debugging", "architecture review", "building"]
         )
 
     def test_mentions_deploy_pipeline(self):
