@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .config import load_config
 from .discord import LokiBot
+from .discord.client import scrub_response_secrets
 from .health import HealthServer
 from .logging import setup_logging, get_logger
 
@@ -37,7 +38,7 @@ def main() -> None:
         async def _webhook_send(channel_id: str, text: str) -> None:
             channel = bot.get_channel(int(channel_id))
             if channel:
-                await channel.send(text)
+                await channel.send(scrub_response_secrets(text))
             else:
                 log.warning("Webhook: channel %s not found", channel_id)
 

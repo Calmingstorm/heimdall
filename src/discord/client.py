@@ -1626,7 +1626,7 @@ class LokiBot(discord.Client):
                             result = f"**User-created skills ({len(skills)}):**\n" + "\n".join(lines)
                     elif self.skill_manager.has_skill(tool_name):
                         async def _skill_msg(text: str) -> None:
-                            await message.channel.send(text)
+                            await message.channel.send(scrub_response_secrets(text))
                         async def _skill_file(data: bytes, filename: str, caption: str = "") -> None:
                             channel_id_key = str(message.channel.id)
                             self._pending_files.setdefault(channel_id_key, []).append((data, filename))
@@ -2053,7 +2053,7 @@ class LokiBot(discord.Client):
         for r in results:
             source = r["source"]
             score = r["score"]
-            content = r["content"].replace("\n", " ")[:500]
+            content = scrub_output_secrets(r["content"].replace("\n", " ")[:500])
             lines.append(f"**[{source}]** (score: {score})\n{content}")
 
         return f"**Found {len(results)} result(s) for '{query}':**\n\n" + "\n\n".join(lines)
@@ -2182,7 +2182,7 @@ class LokiBot(discord.Client):
             raw = await self._format_digest_raw()
         except Exception as e:
             log.error("Digest data collection failed: %s", e)
-            await channel.send(f"**Daily Infrastructure Digest**\n\nFailed to collect data: {e}")
+            await channel.send(scrub_response_secrets(f"**Daily Infrastructure Digest**\n\nFailed to collect data: {e}"))
             return
 
         # Summarize the digest — prefer Codex (free), fall back to raw truncation
@@ -2200,7 +2200,7 @@ class LokiBot(discord.Client):
             log.warning("Digest summary failed, using raw: %s", e)
             summary = raw[:3000]
 
-        await channel.send(f"**Daily Infrastructure Digest**\n\n{summary}")
+        await channel.send(scrub_response_secrets(f"**Daily Infrastructure Digest**\n\n{summary}"))
 
         # Audit log the digest
         await self.audit.log_execution(
@@ -2435,7 +2435,7 @@ class LokiBot(discord.Client):
             text = text[:1900] + "\n... (truncated)"
 
         try:
-            await channel.send(text)
+            await channel.send(scrub_response_secrets(text))
         except Exception as e:
             log.error("Failed to post workflow results: %s", e)
 
@@ -2467,10 +2467,10 @@ class LokiBot(discord.Client):
             try:
                 result = await self.tool_executor.execute(tool_name, tool_input)
                 text = f"**Scheduled: {schedule['description']}**\n```\n{result[:1800]}\n```"
-                await channel.send(text)
+                await channel.send(scrub_response_secrets(text))
             except Exception as e:
                 await channel.send(
-                    f"**Scheduled task failed:** {schedule['description']}\nError: {e}"
+                    scrub_response_secrets(f"**Scheduled task failed:** {schedule['description']}\nError: {e}")
                 )
 
         elif schedule["action"] == "workflow":
