@@ -165,7 +165,6 @@ def _make_bot_stub(**overrides):
     stub.sessions.get_or_create = MagicMock()
     stub.sessions._sessions = {}
     stub.sessions.persist_dir = Path("/tmp/test_sessions")
-    stub.classifier.classify = AsyncMock(return_value="chat")
     stub.codex_client = MagicMock()
     stub.codex_client.chat = AsyncMock(return_value="response")
     stub.codex_client.chat_with_tools = AsyncMock(

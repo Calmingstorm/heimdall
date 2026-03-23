@@ -41,8 +41,6 @@ def _make_bot_stub(**overrides):
     stub.sessions.prune = MagicMock()
     stub.sessions.save = MagicMock()
     stub.sessions.scrub_secrets = MagicMock()
-    stub.classifier = MagicMock()
-    stub.classifier.classify = AsyncMock(return_value="chat")
     stub.codex_client = MagicMock()
     stub.codex_client.chat = AsyncMock(return_value="response")
     stub.skill_manager = MagicMock()

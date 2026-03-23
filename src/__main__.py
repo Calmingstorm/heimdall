@@ -67,7 +67,6 @@ def main() -> None:
             await bot.browser_manager.shutdown()
         await bot.scheduler.stop()
         bot.sessions.save_all()
-        await bot.classifier.close()
         await bot.close()
         await health.stop()
         loop.stop()

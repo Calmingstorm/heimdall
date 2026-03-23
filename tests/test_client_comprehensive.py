@@ -82,7 +82,6 @@ def _make_bot_stub(**overrides):
     stub.sessions.search_history = AsyncMock(return_value=[])
     stub.sessions.get_or_create = MagicMock()
     stub.sessions._sessions = {}
-    stub.classifier.classify = AsyncMock(return_value="chat")
     stub.codex_client = MagicMock()
     stub.codex_client.chat = AsyncMock(return_value="Codex chat response")
     stub.codex_client.chat_with_tools = AsyncMock()
@@ -2252,12 +2251,13 @@ class TestHandleMessageInnerErrors:
     async def test_generic_exception_sends_went_wrong(self):
         """Should send 'Something went wrong' for unexpected exceptions."""
         stub = _make_bot_stub()
-        # Make classifier itself raise, which bubbles to outer except
-        stub.classifier.classify = AsyncMock(side_effect=RuntimeError("classifier crashed"))
+        # Make get_task_history raise, which bubbles to outer except
+        # (this is called before the inner try/except around _process_with_tools)
+        stub.sessions.get_task_history = AsyncMock(side_effect=RuntimeError("db crashed"))
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
+        with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "hello", "67890")
 
         stub._send_with_retry.assert_awaited()
@@ -2315,138 +2315,6 @@ class TestHandleMessageInnerErrors:
         assert len(assistant_saves) == 1
 
 
-# ---------------------------------------------------------------------------
-# _handle_message_inner — claude_code routing
-# ---------------------------------------------------------------------------
-
-class TestClaudeCodeRouting:
-    """Tests for claude_code message routing in _handle_message_inner."""
-
-    async def test_claude_code_success(self):
-        """Should route to claude_code when classifier returns claude_code."""
-        stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub.tool_executor._handle_claude_code = AsyncMock(return_value="Code analysis result")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False), \
-             patch("src.discord.client.resolve_claude_code_target", return_value=("desktop", "/root/project")):
-            await stub._handle_message_inner(msg, "review the code", "67890")
-
-        stub.tool_executor._handle_claude_code.assert_awaited()
-        stub._send_chunked.assert_awaited()
-
-    async def test_claude_code_failure_falls_back_to_codex(self):
-        """Should fall back to Codex chat when claude_code CLI fails."""
-        stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub.codex_client = MagicMock()
-        stub.codex_client.chat = AsyncMock(return_value="Codex fallback")
-        stub.tool_executor._handle_claude_code = AsyncMock(return_value="Claude Code failed: timeout")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False), \
-             patch("src.discord.client.resolve_claude_code_target", return_value=("desktop", "/root")):
-            await stub._handle_message_inner(msg, "review code", "67890")
-
-        stub.codex_client.chat.assert_awaited()
-
-    async def test_claude_code_exception_falls_back_to_codex(self):
-        """Should fall back to Codex chat when claude_code raises exception."""
-        stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub.codex_client = MagicMock()
-        stub.codex_client.chat = AsyncMock(return_value="Codex fallback")
-        stub.tool_executor._handle_claude_code = AsyncMock(side_effect=RuntimeError("SSH failed"))
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False), \
-             patch("src.discord.client.resolve_claude_code_target", return_value=("desktop", "/root")):
-            await stub._handle_message_inner(msg, "review code", "67890")
-
-        stub.codex_client.chat.assert_awaited()
-
-    async def test_claude_code_failure_falls_back_to_error_message(self):
-        """Should send error when claude_code fails and codex_client is None."""
-        stub = _make_bot_stub()
-        stub.codex_client = None
-        stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub.tool_executor._handle_claude_code = AsyncMock(return_value="Claude Code failed: timeout")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False), \
-             patch("src.discord.client.resolve_claude_code_target", return_value=("desktop", "/root")):
-            await stub._handle_message_inner(msg, "review code", "67890")
-
-        stub._send_chunked.assert_awaited()
-
-    async def test_claude_code_exception_no_codex_sends_error(self):
-        """Should send error when claude_code raises and codex_client is None."""
-        stub = _make_bot_stub()
-        stub.codex_client = None
-        stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub.tool_executor._handle_claude_code = AsyncMock(side_effect=RuntimeError("fail"))
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False), \
-             patch("src.discord.client.resolve_claude_code_target", return_value=("desktop", "/root")):
-            await stub._handle_message_inner(msg, "review code", "67890")
-
-        stub._send_chunked.assert_awaited()
-
-    async def test_claude_code_with_conversation_context(self):
-        """Should inject conversation context into claude_code prompt."""
-        stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub.sessions.get_history_with_compaction = AsyncMock(return_value=[
-            {"role": "user", "content": "what does foo.py do?"},
-            {"role": "assistant", "content": "It handles bar logic."},
-            {"role": "user", "content": "review the error handling"},
-        ])
-        stub.tool_executor._handle_claude_code = AsyncMock(return_value="Code review done")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False), \
-             patch("src.discord.client.resolve_claude_code_target", return_value=("desktop", "/root")):
-            await stub._handle_message_inner(msg, "review the error handling", "67890")
-
-        # Check that the prompt sent to claude_code includes context
-        call_args = stub.tool_executor._handle_claude_code.call_args[0][0]
-        assert "Previous conversation" in call_args["prompt"]
-
-    async def test_claude_code_failure_with_codex_uses_codex_fallback(self):
-        """Should fall back to Codex when claude_code fails."""
-        stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub.tool_executor._handle_claude_code = AsyncMock(return_value="Claude Code failed: timeout")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False), \
-             patch("src.discord.client.resolve_claude_code_target", return_value=("desktop", "/root")):
-            await stub._handle_message_inner(msg, "review code", "67890")
-
-        stub.codex_client.chat.assert_awaited()
-
-    async def test_claude_code_exception_with_codex_uses_codex_fallback(self):
-        """Should fall back to Codex when claude_code raises."""
-        stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub.tool_executor._handle_claude_code = AsyncMock(side_effect=RuntimeError("fail"))
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False), \
-             patch("src.discord.client.resolve_claude_code_target", return_value=("desktop", "/root")):
-            await stub._handle_message_inner(msg, "review code", "67890")
-
-        stub.codex_client.chat.assert_awaited()
 
 
 # ---------------------------------------------------------------------------
@@ -2779,7 +2647,6 @@ class TestTaskRouteWithCodex:
     async def test_task_with_codex_calls_process_with_tools(self):
         """When Codex available, task route calls _process_with_tools."""
         stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="task")
         stub._process_with_tools = AsyncMock(return_value=("Tool result", False, False, ["check_disk"], False))
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 

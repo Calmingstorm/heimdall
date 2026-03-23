@@ -3,12 +3,13 @@
 These tests exercise _handle_message_inner through the full routing path,
 verifying that the fixes from Rounds 5-6 work end-to-end:
 
-- Issue 1+5: Empty Codex response on chat route → friendly fallback sent
 - Issue 3:   Task route text-only response → _last_tool_use set for channel
 - Issue 3:   Task route exception → _last_tool_use still set
 - Issue 5:   Task route empty → friendly fallback (not "(no response)")
 - Handoff:   Codex handoff returns empty → skill response preserved
 - Issue 2:   No "REQUIRES APPROVAL" in any tool description sent to Codex
+
+Note: Chat route tests removed — all messages now route to "task" (no classifier).
 """
 from __future__ import annotations
 
@@ -59,10 +60,6 @@ def _make_bot_stub(**overrides):
     stub.sessions.prune = MagicMock()
     stub.sessions.save = MagicMock()
     stub.sessions.get_or_create = MagicMock()
-
-    # Classifier (Haiku)
-    stub.classifier = MagicMock()
-    stub.classifier.classify = AsyncMock(return_value="chat")
 
     # Codex client
     stub.codex_client = MagicMock()
@@ -193,79 +190,6 @@ class TestIssue3TaskRouteTracksActivity:
         # Should be set despite exception — the inner except catches it
         assert "chan-42" in stub._last_tool_use
 
-    async def test_chat_route_does_not_set_last_tool_use(self):
-        """Chat route should NOT set _last_tool_use — only task route does."""
-        stub = _make_bot_stub()
-        msg = _make_message(channel_id="chan-42")
-        stub.classifier.classify = AsyncMock(return_value="chat")
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hey there", "chan-42")
-
-        assert "chan-42" not in stub._last_tool_use
-
-    async def test_followup_gets_recent_tool_true_after_task(self):
-        """After a task route completes, the classifier should receive
-        has_recent_tool_use=True for the next message in the same channel."""
-        stub = _make_bot_stub()
-        msg1 = _make_message(channel_id="chan-42", content="restart nginx")
-        msg2 = _make_message(channel_id="chan-42", content="yes do it")
-
-        stub._process_with_tools = AsyncMock(
-            return_value=("I'll restart nginx for you.", False, False, [], False)
-        )
-
-        # First message: routed as task via keyword
-        with patch("src.discord.client.is_task_by_keyword", return_value=True):
-            await stub._handle_message_inner(msg1, "restart nginx", "chan-42")
-
-        # Second message: "yes do it" — not a keyword match, goes to classifier
-        stub.classifier.classify = AsyncMock(return_value="task")
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg2, "yes do it", "chan-42")
-
-        # Classifier should have been called with has_recent_tool_use=True
-        classify_call = stub.classifier.classify.call_args
-        assert classify_call.kwargs.get("has_recent_tool_use") is True
-
-
-# ---------------------------------------------------------------------------
-# Issue 1+5: Chat route empty → fallback sent to Discord
-# ---------------------------------------------------------------------------
-
-class TestIssue1And5ChatRouteEmptyFallback:
-    """Empty chat response should show friendly fallback, not silent failure."""
-
-    async def test_chat_empty_response_sends_fallback(self):
-        """When codex_client.chat() returns empty string on chat route,
-        the friendly fallback should be sent to Discord."""
-        stub = _make_bot_stub()
-        msg = _make_message(channel_id="chan-1")
-        stub.codex_client.chat = AsyncMock(return_value="")
-        stub.classifier.classify = AsyncMock(return_value="chat")
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hello", "chan-1")
-
-        # Verify _send_chunked was called with the fallback message
-        stub._send_chunked.assert_called_once()
-        sent_text = stub._send_chunked.call_args[0][1]
-        assert "try again" in sent_text.lower()
-        assert sent_text == _EMPTY_RESPONSE_FALLBACK
-
-    async def test_chat_normal_response_sent_as_is(self):
-        """Normal chat responses should pass through unchanged."""
-        stub = _make_bot_stub()
-        msg = _make_message(channel_id="chan-1")
-        stub.codex_client.chat = AsyncMock(return_value="Hi there!")
-        stub.classifier.classify = AsyncMock(return_value="chat")
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hello", "chan-1")
-
-        stub._send_chunked.assert_called_once()
-        sent_text = stub._send_chunked.call_args[0][1]
-        assert sent_text == "Hi there!"
 
 
 # ---------------------------------------------------------------------------

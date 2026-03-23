@@ -119,18 +119,18 @@ class TestConfigSystem:
 
     def test_config_defaults_timezone(self):
         from src.config.schema import Config
-        cfg = Config(discord={"token": "t"}, anthropic={"api_key": "k"})
+        cfg = Config(discord={"token": "t"})
         assert cfg.timezone == "UTC"
 
     def test_config_defaults_bot_interaction(self):
         from src.config.schema import Config
-        cfg = Config(discord={"token": "t"}, anthropic={"api_key": "k"})
+        cfg = Config(discord={"token": "t"})
         assert cfg.discord.respond_to_bots is False
         assert cfg.discord.require_mention is False
 
     def test_config_defaults_tools(self):
         from src.config.schema import Config
-        cfg = Config(discord={"token": "t"}, anthropic={"api_key": "k"})
+        cfg = Config(discord={"token": "t"})
         assert cfg.tools.prometheus_host == ""
         assert cfg.tools.ansible_host == ""
         assert cfg.tools.claude_code_host == ""
@@ -515,7 +515,6 @@ class TestModuleImports:
         "src.discord.voice",
         "src.llm.system_prompt",
         "src.llm.openai_codex",
-        "src.llm.haiku_classifier",
         "src.llm.circuit_breaker",
         "src.llm.secret_scrubber",
         "src.llm.types",

@@ -13,10 +13,6 @@ SRC = Path(__file__).resolve().parent.parent / "src"
 # 1. Stale OllamaClassifier references removed
 # ---------------------------------------------------------------------------
 class TestNoOllamaClassifierReferences:
-    def test_haiku_classifier_no_ollama_ref(self):
-        source = (SRC / "llm" / "haiku_classifier.py").read_text()
-        assert "OllamaClassifier" not in source
-
     def test_no_ollama_ref_in_any_source(self):
         for py in SRC.rglob("*.py"):
             source = py.read_text()
@@ -142,7 +138,6 @@ class TestNoStaleEggInfo:
 # 7. Module import sanity — all changed files still import cleanly
 # ---------------------------------------------------------------------------
 _CHANGED_MODULES = [
-    "src.llm.haiku_classifier",
     "src.permissions.manager",
     "src.sessions.manager",
     "src.learning.reflector",

@@ -39,17 +39,13 @@ class TestSubstituteEnvVars:
 class TestLoadConfig:
     def test_loads_minimal_config(self, tmp_dir: Path, monkeypatch):
         monkeypatch.setenv("DISCORD_TOKEN", "test-token")
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
         config_path = tmp_dir / "config.yml"
         config_path.write_text(
             "discord:\n"
             "  token: ${DISCORD_TOKEN}\n"
-            "anthropic:\n"
-            "  api_key: ${ANTHROPIC_API_KEY}\n"
         )
         cfg = load_config(config_path)
         assert cfg.discord.token == "test-token"
-        assert cfg.anthropic.api_key == "sk-test"
         # Defaults
         assert cfg.sessions.max_history == 50
         assert cfg.tools.command_timeout_seconds == 30
@@ -61,7 +57,6 @@ class TestLoadConfig:
         monkeypatch.setenv("WEBHOOK_SECRET", "test-secret")
         cfg = load_config("config.yml")
         assert cfg.discord.token == "test-token"
-        assert cfg.anthropic.api_key == "sk-test"
         # Round 2: hosts should be empty (no personal data)
         assert cfg.tools.hosts == {}
         assert cfg.tools.allowed_services == []

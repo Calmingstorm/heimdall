@@ -187,7 +187,6 @@ def _make_bot_stub():
     stub.sessions.remove_last_message = MagicMock(return_value=True)
     stub.sessions.prune = MagicMock()
     stub.sessions.save = MagicMock()
-    stub.classifier.classify = AsyncMock(return_value="chat")
     stub.codex_client = MagicMock()
     stub.codex_client.chat = AsyncMock(return_value="Codex chat response")
     stub.codex_client.chat_with_tools = AsyncMock(return_value=MagicMock())
@@ -219,20 +218,22 @@ def _make_message(channel_id="chan-1"):
 
 
 class TestHandleMessageInnerScrubbing:
-    """Verify _handle_message_inner scrubs responses before Discord delivery."""
+    """Verify _handle_message_inner scrubs responses before Discord delivery.
+
+    All messages now route to "task" (no classifier). Tests mock _process_with_tools
+    to return responses and verify scrubbing happens before Discord delivery.
+    """
 
     async def test_codex_response_scrubbed_before_send(self):
-        """Codex response containing a secret should be scrubbed."""
+        """Task response containing a secret should be scrubbed."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub.codex_client = MagicMock()
-        stub.codex_client.chat = AsyncMock(
-            return_value="The password: supersecretvalue99"
+        stub._process_with_tools = AsyncMock(
+            return_value=("The password: supersecretvalue99", False, False, [], False)
         )
-        stub.classifier.classify = AsyncMock(return_value="chat")
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
+        with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "what's the server password?", "chan-1")
 
         # The text sent to Discord should be scrubbed
@@ -244,58 +245,42 @@ class TestHandleMessageInnerScrubbing:
         """Scrubbed text should also be saved to session history."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub.codex_client = MagicMock()
-        stub.codex_client.chat = AsyncMock(
-            return_value="Found api_key=sk-ant-abc123xyz456def789ghi in config"
+        # Include tools_used so the response gets saved to history
+        # (task route skips saving tool-less responses to prevent poisoning)
+        stub._process_with_tools = AsyncMock(
+            return_value=("Found api_key=sk-ant-abc123xyz456def789ghi in config", False, False, ["read_file"], False)
         )
-        stub.classifier.classify = AsyncMock(return_value="chat")
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
+        with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check the config", "chan-1")
 
         # History should contain the scrubbed version
-        saved_text = stub.sessions.add_message.call_args[0][2]
+        assistant_saves = [c for c in stub.sessions.add_message.call_args_list if c[0][1] == "assistant"]
+        assert len(assistant_saves) == 1
+        saved_text = assistant_saves[0][0][2]
         assert "sk-ant-abc123" not in saved_text
 
     async def test_safe_response_unchanged(self):
         """Normal responses without secrets should pass through unchanged."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub.codex_client = MagicMock()
         original = "The server is running fine. CPU at 23%, disk at 45%."
-        stub.codex_client.chat = AsyncMock(return_value=original)
-        stub.classifier.classify = AsyncMock(return_value="chat")
+        stub._process_with_tools = AsyncMock(
+            return_value=(original, False, False, [], False)
+        )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
+        with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "how's the server?", "chan-1")
 
         sent_text = stub._send_chunked.call_args[0][1]
         assert sent_text == original
 
-    async def test_claude_code_response_scrubbed(self):
-        """Claude Code CLI response containing a secret should be scrubbed."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-        stub.tool_executor = MagicMock()
-        stub.tool_executor._handle_claude_code = AsyncMock(
-            return_value="The config contains password: admin1234567"
-        )
-        stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "check the config", "chan-1")
-
-        sent_text = stub._send_chunked.call_args[0][1]
-        assert "admin1234567" not in sent_text
-
     async def test_process_with_tools_response_scrubbed(self):
         """Task response containing a secret should be scrubbed."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub.classifier.classify = AsyncMock(return_value="task")
         stub._process_with_tools = AsyncMock(
             return_value=("The database URL is postgres://admin:secret@host/db", False, False, [], False)
         )
@@ -311,7 +296,6 @@ class TestHandleMessageInnerScrubbing:
         """Error responses are saved as sanitized markers for checkpoint-save."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub.classifier.classify = AsyncMock(return_value="task")
         stub._process_with_tools = AsyncMock(
             return_value=("API overloaded", False, True, [], False)
         )
@@ -345,7 +329,6 @@ class TestStreamIterationScrubbing:
         msg = _make_message()
 
         secret_text = "Here is the token: sk-abcdefghijklmnopqrstuvwxyz1234567890"
-        stub.classifier.classify = AsyncMock(return_value="task")
         stub._process_with_tools = AsyncMock(
             return_value=(secret_text, False, False, [], False)
         )
@@ -364,7 +347,6 @@ class TestStreamIterationScrubbing:
         msg = _make_message()
 
         secret_text = "x" * 40 + " password: supersecretvalue99 " + "y" * 40
-        stub.classifier.classify = AsyncMock(return_value="task")
         stub._process_with_tools = AsyncMock(
             return_value=(secret_text, False, False, [], False)
         )

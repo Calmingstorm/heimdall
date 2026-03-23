@@ -3,11 +3,9 @@ from __future__ import annotations
 
 import re
 
-# Word-boundary regex patterns for task keyword pre-check.
-# These bypass the classifier to save a round-trip for obvious tasks.
-# Single ambiguous words (check, log, memory, service, find, run, status)
-# are omitted — the classifier handles those.
-# Multi-word phrases that are unambiguous in context ARE included.
+# Word-boundary regex patterns for task keyword detection.
+# All messages now route to Codex with tools, so these are redundant
+# but kept for Round 3 cleanup.
 _TASK_KEYWORD_PATTERNS = re.compile(
     r"|".join([
         # Infrastructure-specific (never appear in casual chat)
@@ -44,11 +42,9 @@ _TASK_KEYWORD_PATTERNS = re.compile(
 
 
 def is_task_by_keyword(content: str) -> bool:
-    """Fast pre-check: return True if the message contains unambiguous task keywords.
+    """Return True if the message contains unambiguous task keywords.
 
-    Uses word-boundary regex to avoid false positives from substring matching.
-    Single ambiguous words are left to the classifier.
-    Multi-word infrastructure phrases are safe to bypass on.
+    Now redundant since all messages route to task, but kept for Round 3 cleanup.
     """
     return bool(_TASK_KEYWORD_PATTERNS.search(content))
 

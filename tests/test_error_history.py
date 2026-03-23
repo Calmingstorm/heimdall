@@ -2,7 +2,7 @@
 
 Round 14 (checkpoint-save): error responses ARE saved to conversation history
 so the user can reference what was done and continue with "keep going" or
-"finish the task".  The partial completion report from Round 13 is included
+"finish the task". The partial completion report from Round 13 is included
 in the error response, giving the LLM context about what was already
 accomplished.
 """
@@ -46,7 +46,6 @@ def _make_bot_stub():
     stub.sessions.add_message = MagicMock()
     stub.sessions.prune = MagicMock()
     stub.sessions.save = MagicMock()
-    stub.classifier.classify = AsyncMock(return_value="task")
     stub.codex_client = MagicMock()
     stub.codex_client.chat = AsyncMock(return_value="Codex chat response")
     stub.codex_client.chat_with_tools = AsyncMock(
@@ -185,9 +184,6 @@ class TestHistorySaveOnError:
         stub = _make_bot_stub()
         msg = _make_message()
 
-        # Force task routing via keyword match
-        stub.classifier.classify = AsyncMock(return_value="task")
-
         stub._process_with_tools = AsyncMock(return_value=process_return)
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
@@ -264,7 +260,6 @@ class TestHistorySaveOnError:
         msg = _make_message()
         voice_cb = AsyncMock()
 
-        stub.classifier.classify = AsyncMock(return_value="task")
         stub._process_with_tools = AsyncMock(
             return_value=("Service overloaded.", False, True, [], False)
         )
@@ -290,7 +285,6 @@ class TestErrorHistoryEdgeCases:
         for checkpoint-save (Round 14)."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub.classifier.classify = AsyncMock(return_value="task")
         stub._process_with_tools = AsyncMock(
             return_value=("(no response)", False, True, [], False)
         )
@@ -311,7 +305,8 @@ class TestErrorHistoryEdgeCases:
         msg = _make_message()
         stub.codex_client = MagicMock()
         stub.codex_client.chat = AsyncMock(side_effect=Exception("Codex down"))
-        stub.classifier.classify = AsyncMock(return_value="chat")
+        # Guest tier forces the chat route (classifier removed)
+        stub.permissions.is_guest = MagicMock(return_value=True)
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):

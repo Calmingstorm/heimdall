@@ -1,9 +1,7 @@
-"""Tests verifying bot config backward compatibility and Codex-only routing.
+"""Tests verifying Codex-only routing.
 
 These tests verify:
-  - Config loads without an anthropic section (backward compat)
-  - Config loads with anthropic.api_key = ""
-  - _process_with_tools uses only Codex
+  - _process_with_tools uses only Codex (no classifier needed)
   - Task route errors gracefully when no Codex client
 """
 from __future__ import annotations
@@ -15,41 +13,8 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.config.schema import AnthropicConfig, Config, DiscordConfig  # noqa: E402
 from src.discord.client import LokiBot  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
-
-
-# ---------------------------------------------------------------------------
-# Config tests
-# ---------------------------------------------------------------------------
-
-class TestAnthropicConfigOptional:
-    """AnthropicConfig.api_key defaults to empty string."""
-
-    def test_api_key_defaults_to_empty(self):
-        cfg = AnthropicConfig()
-        assert cfg.api_key == ""
-
-    def test_config_without_anthropic_section(self):
-        """Config can be created without specifying anthropic at all."""
-        cfg = Config(discord=DiscordConfig(token="test-token"))
-        assert cfg.anthropic.api_key == ""
-
-    def test_config_with_empty_api_key(self):
-        cfg = Config(
-            discord=DiscordConfig(token="test-token"),
-            anthropic=AnthropicConfig(api_key=""),
-        )
-        assert cfg.anthropic.api_key == ""
-
-    def test_config_with_api_key_still_works(self):
-        """Backward compat: providing an API key still works."""
-        cfg = Config(
-            discord=DiscordConfig(token="test-token"),
-            anthropic=AnthropicConfig(api_key="sk-test-key"),
-        )
-        assert cfg.anthropic.api_key == "sk-test-key"
 
 
 # ---------------------------------------------------------------------------
@@ -75,8 +40,6 @@ def _make_bot_stub():
     stub.codex_client.chat_with_tools = AsyncMock(
         return_value=LLMResponse(text="Done.")
     )
-    stub.classifier = MagicMock()
-    stub.classifier.classify = AsyncMock(return_value="task")
     stub.permissions = MagicMock()
     stub.permissions.is_guest = MagicMock(return_value=False)
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)

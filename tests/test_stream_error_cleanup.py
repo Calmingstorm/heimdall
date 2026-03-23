@@ -7,8 +7,7 @@ and return already_sent=False so the error message is delivered normally.
 
 Bug 2: _last_tool_use.get(channel_id, 0) defaults to 0, so in the first ~5
 minutes after boot (time.monotonic() < 300), ALL channels appeared to have
-recent tool use, biasing the classifier toward "task". Fix: use `channel_id in`
-check instead of defaulting to 0.
+recent tool use. Fix: use `channel_id in` check instead of defaulting to 0.
 """
 from __future__ import annotations
 
@@ -51,7 +50,6 @@ def _make_bot_stub():
     stub.sessions.save = MagicMock()
     stub.sessions.get_history_with_compaction = AsyncMock(return_value=[])
     stub.sessions.get_task_history = AsyncMock(return_value=[])
-    stub.classifier.classify = AsyncMock(return_value="task")
     stub.codex_client = MagicMock()
     stub.codex_client.chat = AsyncMock(return_value="Codex response")
     stub.codex_client.chat_with_tools = AsyncMock()
@@ -146,7 +144,6 @@ class TestStreamErrorPreviewCleanup:
         stub = _make_bot_stub()
         msg = _make_message()
 
-        stub.classifier.classify = AsyncMock(return_value="task")
         stub._process_with_tools = AsyncMock(
             return_value=("The AI service is temporarily overloaded.", False, True, [], False)
         )
@@ -259,48 +256,3 @@ class TestMonotonicBootBug:
         )
         assert recent is False
 
-    async def test_classifier_not_hinted_on_fresh_boot(self):
-        """Integration: on fresh boot, the classifier should NOT receive
-        the 'tools were used recently' hint for any channel."""
-        stub = _make_bot_stub()
-        msg = _make_message(channel_id="chan-1")
-
-        # Fresh boot: _last_tool_use is empty
-        stub._last_tool_use = {}
-        stub.classifier.classify = AsyncMock(return_value="chat")
-        stub.codex_client = MagicMock()
-        stub.codex_client.chat = AsyncMock(return_value="Hey!")
-
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(
-                msg, "hey whats up", "chan-1",
-            )
-
-        # classify_message should be called with has_recent_tool_use=False + skill_hints
-        call_kwargs = stub.classifier.classify.call_args
-        assert call_kwargs[0][0] == "hey whats up"
-        assert call_kwargs[1]["has_recent_tool_use"] is False
-
-    async def test_classifier_hinted_after_tool_use(self):
-        """Integration: after tool use, the classifier should receive the hint."""
-        stub = _make_bot_stub()
-        msg = _make_message(channel_id="chan-1")
-
-        # Simulate recent tool use in chan-1
-        stub._last_tool_use = {"chan-1": time.monotonic() - 60}
-        stub.classifier.classify = AsyncMock(return_value="task")
-
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            # Need to mock _process_with_tools to prevent it from running
-            stub._process_with_tools = AsyncMock(return_value=("result", False, False, [], False))
-            await stub._handle_message_inner(
-                msg, "and the desktop?", "chan-1",
-            )
-
-        call_kwargs = stub.classifier.classify.call_args
-        assert call_kwargs[0][0] == "and the desktop?"
-        assert call_kwargs[1]["has_recent_tool_use"] is True

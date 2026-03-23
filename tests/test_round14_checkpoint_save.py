@@ -48,7 +48,6 @@ def _make_bot_stub():
     stub.sessions.remove_last_message = MagicMock(return_value=True)
     stub.sessions.prune = MagicMock()
     stub.sessions.save = MagicMock()
-    stub.classifier.classify = AsyncMock(return_value="task")
     stub.codex_client = MagicMock()
     stub.codex_client.chat = AsyncMock(return_value="Codex chat response")
     stub.codex_client.chat_with_tools = AsyncMock(
@@ -213,7 +212,8 @@ class TestCheckpointSaveOnChatError:
         stub = _make_bot_stub()
         msg = _make_message()
         stub.codex_client.chat = AsyncMock(side_effect=Exception("API down"))
-        stub.classifier.classify = AsyncMock(return_value="chat")
+        # Guest tier forces the chat route (classifier removed)
+        stub.permissions.is_guest = MagicMock(return_value=True)
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.is_task_by_keyword", return_value=False):

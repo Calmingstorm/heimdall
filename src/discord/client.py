@@ -22,7 +22,6 @@ from .background_task import (
 )
 from ..learning import ConversationReflector
 from ..llm import CircuitOpenError, CodexAuth, CodexChatClient
-from ..llm.haiku_classifier import HaikuClassifier
 from ..llm.secret_scrubber import scrub_output_secrets
 from ..llm.system_prompt import build_system_prompt, build_chat_system_prompt
 from ..logging import get_logger
@@ -296,7 +295,6 @@ class LokiBot(discord.Client):
         self._recent_actions: dict[str, list[tuple[float, str]]] = {}
         self._recent_actions_max = 10
         self._recent_actions_expiry = 3600  # seconds (1 hour)
-        # Per-channel timestamp of last tool use (monotonic), for classifier context
         self._last_tool_use: dict[str, float] = {}
         # Background task tracking
         self._background_tasks: dict[str, BackgroundTask] = {}
@@ -340,11 +338,6 @@ class LokiBot(discord.Client):
             )
             if not self._knowledge_store.available:
                 self._knowledge_store = None
-
-        # Message classifier — Haiku via Anthropic Messages API (raw HTTP)
-        self.classifier = HaikuClassifier(
-            api_key=config.anthropic.api_key,
-        )
 
         self.sessions = SessionManager(
             max_history=config.sessions.max_history,
@@ -471,8 +464,6 @@ class LokiBot(discord.Client):
             log.info("Configured hosts: %s", ", ".join(cfg.tools.hosts.keys()))
         if not cfg.tools.claude_code_host:
             log.info("claude_code_host not set — claude -p code generation requires a configured host")
-        if not cfg.anthropic.api_key:
-            log.warning("No Anthropic API key — message classification will not work")
         if cfg.openai_codex.enabled and not self.codex_client:
             log.warning("Codex enabled but not configured — session compaction and learning reflection disabled")
         if cfg.discord.respond_to_bots:
@@ -673,7 +664,6 @@ class LokiBot(discord.Client):
         if len(actions) > self._recent_actions_max:
             self._recent_actions[channel_id] = actions[-self._recent_actions_max:]
 
-        # Track per-channel tool use time for classifier context
         self._last_tool_use[channel_id] = time.monotonic()
 
     def _register_commands(self) -> None:
@@ -690,11 +680,9 @@ class LokiBot(discord.Client):
                 else:
                     voice_status = "\nVoice: Not connected"
             codex_status = "Codex: " + ("enabled" if self.codex_client else "not configured")
-            classifier_status = "Classifier: Haiku"
             await interaction.response.send_message(
                 f"**Loki Status**\n"
-                f"{codex_status}\n"
-                f"{classifier_status}"
+                f"{codex_status}"
                 f"{voice_status}"
             )
 
@@ -1212,21 +1200,8 @@ class LokiBot(discord.Client):
                 msg_type = "task"
                 log.info("Message matched task keyword, forcing 'task' route")
             else:
-                # Classify message into chat/claude_code/task via Haiku.
-                # All backends are free (subscription-based), so always classify.
-                _recent_tool = (
-                    channel_id in self._last_tool_use
-                    and time.monotonic() - self._last_tool_use[channel_id] < 300
-                )
-                # Build skill hints for the classifier so it knows what tools exist
-                _skill_hints = ", ".join(
-                    f"{s['name']} ({s['description'][:60]})"
-                    for s in self.skill_manager.list_skills()
-                ) if self.skill_manager else ""
-                msg_type = await self.classifier.classify(
-                    content, has_recent_tool_use=_recent_tool,
-                    skill_hints=_skill_hints,
-                )
+                # All messages go to Codex with tools — no classifier needed.
+                msg_type = "task"
 
             # Guest tier: force chat route (no tools, no code execution)
             if self.permissions.is_guest(str(message.author.id)):

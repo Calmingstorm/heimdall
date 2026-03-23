@@ -16,14 +16,6 @@ class DiscordConfig(BaseModel):
     require_mention: bool = False
 
 
-class AnthropicConfig(BaseModel):
-    """Anthropic API config — used for Haiku classification only."""
-    api_key: str = ""
-    model: str = "claude-haiku-4-5-20251001"
-    max_tokens: int = 16384
-    daily_budget_tokens: int = 0
-
-
 class ContextConfig(BaseModel):
     directory: str = "./data/context"
     max_system_prompt_tokens: int = 32000
@@ -139,7 +131,6 @@ class MonitoringConfig(BaseModel):
 class Config(BaseModel):
     timezone: str = "UTC"
     discord: DiscordConfig
-    anthropic: AnthropicConfig = AnthropicConfig()
     openai_codex: OpenAICodexConfig = OpenAICodexConfig()
     context: ContextConfig = ContextConfig()
     sessions: SessionsConfig = SessionsConfig()

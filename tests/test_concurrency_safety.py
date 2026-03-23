@@ -47,7 +47,6 @@ def _make_bot_stub():
     stub.sessions.remove_last_message = MagicMock(return_value=True)
     stub.sessions.prune = MagicMock()
     stub.sessions.save = MagicMock()
-    stub.classifier.classify = AsyncMock(return_value="task")
     stub.codex_client = MagicMock()
     stub.codex_client.chat = AsyncMock(return_value="Codex chat response")
     stub.codex_client.chat_with_tools = AsyncMock(return_value=MagicMock())

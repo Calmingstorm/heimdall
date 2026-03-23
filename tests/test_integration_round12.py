@@ -2,13 +2,11 @@
 
 Tests cover:
 1. Multi-turn Codex tool loop (3+ iterations)
-2. Haiku circuit breaker → heuristic fallback chain
-3. Haiku malformed response handling (missing keys, error objects)
-4. Codex error handling when Codex raises
-5. End-to-end routing: classify → route → tool loop → result
-6. Compaction and reflection with Codex callable
-7. Codex tool loop edge cases
-8. Chat route error handling
+2. Codex error handling when Codex raises
+3. End-to-end routing: all messages route to task → tool loop → result
+4. Compaction and reflection with Codex callable
+5. Codex tool loop edge cases
+6. Image blocks force task route
 """
 from __future__ import annotations
 
@@ -21,8 +19,6 @@ import pytest  # noqa: E402
 
 from src.discord.client import LokiBot  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
-from src.llm.haiku_classifier import HaikuClassifier  # noqa: E402
-from src.llm.circuit_breaker import CircuitOpenError  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -60,8 +56,6 @@ def _make_bot_stub():
     stub.sessions.reset = MagicMock()
     stub.sessions.search_history = AsyncMock(return_value=[])
     stub.sessions.get_or_create = MagicMock()
-    stub.classifier = MagicMock()
-    stub.classifier.classify = AsyncMock(return_value="task")
     stub.codex_client = MagicMock()
     stub.codex_client.chat = AsyncMock(return_value="Codex chat response")
     stub.codex_client.chat_with_tools = AsyncMock(
@@ -107,43 +101,6 @@ def _make_message(channel_id="chan-1", author_id="12345"):
     msg.author.id = author_id
     msg.reply = AsyncMock()
     return msg
-
-
-def _mock_haiku_response(text: str, status: int = 200, body: dict | None = None):
-    """Create a mock aiohttp session for Anthropic Messages API.
-
-    Returns a mock session that can be injected into classifier._session.
-    """
-    mock_resp = AsyncMock()
-    mock_resp.status = status
-    if body is not None:
-        mock_resp.json = AsyncMock(return_value=body)
-    else:
-        mock_resp.json = AsyncMock(return_value={
-            "id": "msg_test",
-            "type": "message",
-            "role": "assistant",
-            "content": [{"type": "text", "text": text}],
-            "model": "claude-haiku-4-5-20251001",
-            "stop_reason": "end_turn",
-            "usage": {"input_tokens": 200, "output_tokens": 1},
-        })
-    mock_resp.text = AsyncMock(return_value=f"HTTP {status}")
-
-    mock_post_ctx = AsyncMock()
-    mock_post_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
-    mock_post_ctx.__aexit__ = AsyncMock(return_value=False)
-
-    mock_session = MagicMock()
-    mock_session.post = MagicMock(return_value=mock_post_ctx)
-    mock_session.closed = False
-
-    return mock_session
-
-
-def _inject_haiku_session(classifier, mock_session):
-    """Inject a mock session into classifier so _get_session() returns it."""
-    classifier._session = mock_session
 
 
 # ---------------------------------------------------------------------------
@@ -272,141 +229,7 @@ class TestMultiTurnToolLoop:
 
 
 # ---------------------------------------------------------------------------
-# 2. Haiku Circuit Breaker → Heuristic Fallback
-# ---------------------------------------------------------------------------
-
-class TestHaikuFallbackChain:
-    """Test Haiku classifier fallback behavior."""
-
-    async def test_circuit_open_returns_chat(self):
-        """When Haiku circuit breaker is open, classify returns 'chat'."""
-        classifier = HaikuClassifier(api_key="test-key")
-        classifier.breaker.check = MagicMock(
-            side_effect=CircuitOpenError("haiku_classify", retry_after=60.0)
-        )
-
-        result = await classifier.classify("check disk on server")
-        assert result == "chat"
-
-    async def test_connection_error_returns_task(self):
-        """When Haiku is unreachable, classify returns 'task' (fail-safe)."""
-        classifier = HaikuClassifier(api_key="test-key")
-
-        import aiohttp
-        mock_session = MagicMock()
-        mock_session.closed = False
-        mock_session.post = MagicMock(side_effect=aiohttp.ClientError("Connection refused"))
-        _inject_haiku_session(classifier, mock_session)
-
-        with patch("src.llm.haiku_classifier.asyncio.sleep", new_callable=AsyncMock):
-            result = await classifier.classify("check disk on server")
-        assert result == "task"
-
-    async def test_repeated_failures_open_circuit(self):
-        """3 consecutive failures should open the circuit breaker."""
-        classifier = HaikuClassifier(api_key="test-key")
-
-        import aiohttp
-        mock_session = MagicMock()
-        mock_session.closed = False
-        mock_session.post = MagicMock(side_effect=aiohttp.ClientError("refused"))
-        _inject_haiku_session(classifier, mock_session)
-
-        with patch("src.llm.haiku_classifier.asyncio.sleep", new_callable=AsyncMock):
-            for _ in range(3):
-                result = await classifier.classify("test")
-                assert result == "task"
-
-        # After 3 failures, circuit should be open
-        result = await classifier.classify("test again")
-        assert result == "chat"  # CircuitOpenError → "chat"
-
-    async def test_success_after_failure_resets_circuit(self):
-        """Successful classification after failure resets the breaker."""
-        classifier = HaikuClassifier(api_key="test-key")
-
-        # One failure
-        import aiohttp
-        fail_session = MagicMock()
-        fail_session.closed = False
-        fail_session.post = MagicMock(side_effect=aiohttp.ClientError("refused"))
-        _inject_haiku_session(classifier, fail_session)
-
-        with patch("src.llm.haiku_classifier.asyncio.sleep", new_callable=AsyncMock):
-            await classifier.classify("test")
-
-        # Then success
-        _inject_haiku_session(classifier, _mock_haiku_response("task"))
-        result = await classifier.classify("check disk")
-        assert result == "task"
-
-        # Should still work (circuit not open)
-        _inject_haiku_session(classifier, _mock_haiku_response("chat"))
-        result = await classifier.classify("hello")
-        assert result == "chat"
-
-
-# ---------------------------------------------------------------------------
-# 3. Haiku Malformed Response Handling
-# ---------------------------------------------------------------------------
-
-class TestHaikuMalformedResponses:
-    """Test Haiku classifier with malformed responses."""
-
-    async def test_missing_content_key(self):
-        """Haiku returns JSON without 'content' key → fallback to 'task'."""
-        classifier = HaikuClassifier(api_key="test-key")
-        _inject_haiku_session(classifier, _mock_haiku_response(
-            "", body={"type": "error", "error": {"type": "invalid_request_error", "message": "bad request"}}
-        ))
-        result = await classifier.classify("check disk")
-        assert result == "task"
-
-    async def test_empty_response_string(self):
-        """Haiku returns empty response string → fallback to 'task'."""
-        classifier = HaikuClassifier(api_key="test-key")
-        _inject_haiku_session(classifier, _mock_haiku_response(""))
-        result = await classifier.classify("check disk")
-        assert result == "task"
-
-    async def test_multi_word_response(self):
-        """Haiku returns multi-word response → fallback to 'task'."""
-        classifier = HaikuClassifier(api_key="test-key")
-        _inject_haiku_session(classifier, _mock_haiku_response(
-            "I think this is a task"
-        ))
-        result = await classifier.classify("check disk")
-        assert result == "task"
-
-    async def test_http_error_falls_back_to_task(self):
-        """Retryable HTTP errors (503) should fall back to 'task' after retry."""
-        classifier = HaikuClassifier(api_key="test-key")
-        _inject_haiku_session(classifier, _mock_haiku_response("", status=503))
-        with patch("src.llm.haiku_classifier.asyncio.sleep", new_callable=AsyncMock):
-            result = await classifier.classify("check disk")
-        assert result == "task"
-
-    async def test_empty_content_array(self):
-        """Haiku returns JSON with empty content array → fallback to 'task'."""
-        classifier = HaikuClassifier(api_key="test-key")
-        _inject_haiku_session(classifier, _mock_haiku_response(
-            "", body={
-                "id": "msg_test",
-                "type": "message",
-                "role": "assistant",
-                "content": [],
-                "model": "claude-haiku-4-5-20251001",
-                "stop_reason": "end_turn",
-                "usage": {"input_tokens": 200, "output_tokens": 0},
-            }
-        ))
-        result = await classifier.classify("check disk")
-        # Empty content array → data["content"][0] raises IndexError → "task"
-        assert result == "task"
-
-
-# ---------------------------------------------------------------------------
-# 4. Codex Error Handling
+# 2. Codex Error Handling
 # ---------------------------------------------------------------------------
 
 class TestTaskRouteErrorHandling:
@@ -415,7 +238,6 @@ class TestTaskRouteErrorHandling:
     async def test_codex_exception_sends_error_response(self):
         """When Codex raises, task route catches and sends error via _send_chunked."""
         stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="task")
 
         stub._process_with_tools = AsyncMock(side_effect=RuntimeError("Codex API error"))
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
@@ -432,7 +254,6 @@ class TestTaskRouteErrorHandling:
     async def test_codex_failure_returns_error(self):
         """When Codex tool loop fails, sends error message."""
         stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="task")
 
         stub._process_with_tools = AsyncMock(side_effect=RuntimeError("Codex API error"))
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
@@ -448,18 +269,16 @@ class TestTaskRouteErrorHandling:
 
 
 # ---------------------------------------------------------------------------
-# 5. End-to-End Routing: Classify → Route → Tool Loop → Result
+# 3. End-to-End Routing: All Messages → Task Route → Tool Loop → Result
 # ---------------------------------------------------------------------------
 
 class TestEndToEndRouting:
-    """Test complete message flow from classification to response."""
+    """Test complete message flow — all messages route to task (Codex with tools)."""
 
     async def test_task_message_end_to_end(self):
-        """Task message: Haiku classifies → Codex tool loop → response."""
+        """Task message routes to Codex tool loop and returns response."""
         stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="task")
 
-        # _process_with_tools always uses Codex (no use_codex parameter needed)
         stub._process_with_tools = AsyncMock(
             return_value=("Disk is 42% full on server.", False, False, ["check_disk"], False)
         )
@@ -473,25 +292,28 @@ class TestEndToEndRouting:
         sent_text = stub._send_chunked.call_args[0][1]
         assert "42%" in sent_text
 
-    async def test_chat_message_end_to_end(self):
-        """Chat message: Haiku classifies → Codex chat → response."""
+    async def test_all_messages_route_to_task(self):
+        """Any message (even casual 'hello') routes to the task path with tools."""
         stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="chat")
-        stub.codex_client.chat = AsyncMock(return_value="Hello! How can I help?")
+
+        stub._process_with_tools = AsyncMock(
+            return_value=("Hello! How can I help you today?", False, False, [], False)
+        )
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hello there", "chan-1")
+            await stub._handle_message_inner(msg, "hello", "chan-1")
 
+        # _process_with_tools should be called (task route), not codex_client.chat (chat route)
+        stub._process_with_tools.assert_called()
         stub._send_chunked.assert_called()
         sent_text = stub._send_chunked.call_args[0][1]
         assert "Hello" in sent_text
 
-    async def test_keyword_bypass_skips_classifier(self):
-        """Keyword-matched messages bypass classifier entirely."""
+    async def test_keyword_bypass_routes_to_task(self):
+        """Keyword-matched messages route to task (same as all other messages)."""
         stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="chat")  # Would be wrong if called
 
         async def mock_process(msg, hist, **kwargs):
             return ("Disk checked.", False, False, ["check_disk"], False)
@@ -503,31 +325,13 @@ class TestEndToEndRouting:
         with patch("src.discord.client.is_task_by_keyword", return_value=True):
             await stub._handle_message_inner(msg, "check disk", "chan-1")
 
-        # Classifier should NOT be called for keyword-matched messages
-        stub.classifier.classify.assert_not_called()
-
-    async def test_claude_code_message_end_to_end(self):
-        """claude_code message: Haiku classifies → claude -p CLI → response."""
-        stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub.tool_executor._handle_claude_code = AsyncMock(
-            return_value="The function processes HTTP requests using async handlers."
-        )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "explain the request handler", "chan-1")
-
         stub._send_chunked.assert_called()
         sent_text = stub._send_chunked.call_args[0][1]
-        assert "async handlers" in sent_text
+        assert "Disk checked" in sent_text
 
-    async def test_classifier_failure_falls_back_to_task(self):
-        """When classifier raises, fallback to 'task' and use Codex tool loop."""
+    async def test_default_routes_to_task(self):
+        """Non-keyword messages also route to task (the default route)."""
         stub = _make_bot_stub()
-        # Simulate a real HaikuClassifier that fails and returns "task"
-        stub.classifier.classify = AsyncMock(return_value="task")
         stub._process_with_tools = AsyncMock(
             return_value=("Here's the result.", False, False, ["some_tool"], False)
         )
@@ -537,76 +341,14 @@ class TestEndToEndRouting:
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(msg, "ambiguous message", "chan-1")
 
+        stub._process_with_tools.assert_called()
         stub._send_chunked.assert_called()
         sent_text = stub._send_chunked.call_args[0][1]
         assert "result" in sent_text
 
-    async def test_circuit_open_routes_chat_end_to_end(self):
-        """When classifier circuit opens (returns 'chat'), client routes to Codex chat."""
-        stub = _make_bot_stub()
-        # Simulate circuit breaker being open → classifier returns "chat"
-        stub.classifier.classify = AsyncMock(return_value="chat")
-        stub.codex_client.chat = AsyncMock(return_value="I'm here to help!")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "check disk on server", "chan-1")
-
-        # Even though this looks like a task, circuit open → "chat" → Codex chat
-        stub.codex_client.chat.assert_called()
-        stub._send_chunked.assert_called()
-        sent_text = stub._send_chunked.call_args[0][1]
-        assert "help" in sent_text.lower()
-
-    async def test_classifier_circuit_open_routes_to_chat(self):
-        """When Haiku circuit breaker is open, classifier returns 'chat'."""
-        classifier = HaikuClassifier(api_key="test-key")
-        # Trip the circuit breaker
-        for _ in range(3):
-            classifier.breaker.record_failure()
-
-        result = await classifier.classify("check disk on server")
-        assert result == "chat"
-
-    async def test_classifier_passes_skill_hints(self):
-        """Classifier receives skill hints from the client context."""
-        classifier = HaikuClassifier(api_key="test-key")
-        mock_session = _mock_haiku_response("task")
-        _inject_haiku_session(classifier, mock_session)
-
-        result = await classifier.classify(
-            "what's the weather",
-            skill_hints="weather (get current weather), news (fetch headlines)",
-        )
-        assert result == "task"
-
-        # Verify skill hints were included in the system prompt
-        call_kwargs = mock_session.post.call_args
-        body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
-        assert "weather" in body["system"]
-        assert "news" in body["system"]
-
-    async def test_classifier_passes_recent_tool_use_context(self):
-        """Classifier receives recent tool use context."""
-        classifier = HaikuClassifier(api_key="test-key")
-        mock_session = _mock_haiku_response("task")
-        _inject_haiku_session(classifier, mock_session)
-
-        result = await classifier.classify(
-            "and the desktop?",
-            has_recent_tool_use=True,
-        )
-        assert result == "task"
-
-        # Verify tool use context was included in the system prompt
-        call_kwargs = mock_session.post.call_args
-        body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json")
-        assert "recently ran tool commands" in body["system"]
-
 
 # ---------------------------------------------------------------------------
-# 6. Compaction and Reflection with Codex Callable
+# 4. Compaction and Reflection with Codex Callable
 # ---------------------------------------------------------------------------
 
 class TestCompactionReflectionIntegration:
@@ -689,7 +431,7 @@ class TestCompactionReflectionIntegration:
 
 
 # ---------------------------------------------------------------------------
-# 7. Tool Loop Edge Cases
+# 5. Tool Loop Edge Cases
 # ---------------------------------------------------------------------------
 
 class TestToolLoopEdgeCases:
@@ -769,10 +511,9 @@ class TestToolLoopEdgeCases:
         assert tools_used == ["check_disk"]
 
     async def test_no_codex_returns_error(self):
-        """When Codex is not available and task is classified, error is returned."""
+        """When Codex is not available, error is returned."""
         stub = _make_bot_stub()
         stub.codex_client = None
-        stub.classifier.classify = AsyncMock(return_value="task")
         stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
@@ -784,119 +525,15 @@ class TestToolLoopEdgeCases:
 
 
 # ---------------------------------------------------------------------------
-# 8. Chat Route Edge Cases
-# ---------------------------------------------------------------------------
-
-class TestChatRouteEdgeCases:
-    """Test chat route error handling."""
-
-    async def test_chat_codex_failure_returns_error(self):
-        """When Codex chat fails, should return error message."""
-        stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="chat")
-        stub.codex_client.chat = AsyncMock(side_effect=RuntimeError("Codex down"))
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hello", "chan-1")
-
-        stub._send_chunked.assert_called()
-        sent_text = stub._send_chunked.call_args[0][1]
-        # Should be an error message
-        assert "unavailable" in sent_text.lower() or "error" in sent_text.lower() or "try again" in sent_text.lower()
-
-    async def test_no_codex_chat_returns_error_not_haiku(self):
-        """When no Codex client, chat returns error."""
-        stub = _make_bot_stub()
-        stub.codex_client = None
-        stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hello", "chan-1")
-
-        stub._send_chunked.assert_called()
-        sent_text = stub._send_chunked.call_args[0][1]
-        assert "not configured" in sent_text.lower() or "unavailable" in sent_text.lower() or "error" in sent_text.lower()
-
-
-# ---------------------------------------------------------------------------
-# 9. Claude Code Routing Edge Cases
-# ---------------------------------------------------------------------------
-
-class TestClaudeCodeRoutingEdgeCases:
-    """Test claude_code routing edge cases — 'Unknown' prefix fallback."""
-
-    async def test_unknown_prefix_triggers_codex_fallback(self):
-        """Response starting with 'Unknown' triggers Codex fallback (line 1029)."""
-        stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub.tool_executor._handle_claude_code = AsyncMock(
-            return_value="Unknown: could not determine target host"
-        )
-        stub.codex_client.chat = AsyncMock(return_value="I can help with that differently.")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False), \
-             patch("src.discord.client.resolve_claude_code_target", return_value=("desktop", "/root")):
-            await stub._handle_message_inner(msg, "review the auth module", "chan-1")
-
-        # Verify Codex fallback was used after "Unknown" prefix
-        stub.codex_client.chat.assert_called_once()
-        stub._send_chunked.assert_called()
-
-    async def test_claude_code_failed_prefix_triggers_codex_fallback(self):
-        """Response starting with 'Claude Code failed' also triggers Codex fallback."""
-        stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub.tool_executor._handle_claude_code = AsyncMock(
-            return_value="Claude Code failed: SSH connection timed out"
-        )
-        stub.codex_client.chat = AsyncMock(return_value="Let me try another approach.")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False), \
-             patch("src.discord.client.resolve_claude_code_target", return_value=("desktop", "/root")):
-            await stub._handle_message_inner(msg, "analyze this code", "chan-1")
-
-        stub.codex_client.chat.assert_called_once()
-        stub._send_chunked.assert_called()
-
-    async def test_unknown_prefix_no_codex_returns_error(self):
-        """'Unknown' prefix with no Codex client returns error (not crash)."""
-        stub = _make_bot_stub()
-        stub.codex_client = None
-        stub.classifier.classify = AsyncMock(return_value="claude_code")
-        stub.tool_executor._handle_claude_code = AsyncMock(
-            return_value="Unknown: error details"
-        )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        with patch("src.discord.client.is_task_by_keyword", return_value=False), \
-             patch("src.discord.client.resolve_claude_code_target", return_value=("desktop", "/root")):
-            await stub._handle_message_inner(msg, "review code", "chan-1")
-
-        # Should still send a response (error), not crash
-        stub._send_chunked.assert_called()
-
-
-# ---------------------------------------------------------------------------
-# 10. Image Blocks Force Task Route
+# 6. Image Blocks Force Task Route
 # ---------------------------------------------------------------------------
 
 class TestImageBlocksRouting:
     """Test that messages with image attachments force the 'task' route."""
 
     async def test_image_blocks_force_task_route(self):
-        """When image_blocks is non-empty, msg_type is forced to 'task' (line 942)."""
+        """When image_blocks is non-empty, msg_type is forced to 'task'."""
         stub = _make_bot_stub()
-        # Classifier would return "chat" — but images should override
-        stub.classifier.classify = AsyncMock(return_value="chat")
         stub._process_with_tools = AsyncMock(
             return_value=("I can see the image.", False, False, [], False)
         )
@@ -904,88 +541,10 @@ class TestImageBlocksRouting:
 
         msg = _make_message()
         image_blocks = [{"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}}]
-        # Pass image_blocks directly to _handle_message_inner (same as on_message does)
         with patch("src.discord.client.is_task_by_keyword", return_value=False):
             await stub._handle_message_inner(
                 msg, "describe this image", "chan-1", image_blocks=image_blocks
             )
 
-        # Classifier should NOT have been called — images bypass it
-        stub.classifier.classify.assert_not_called()
         # Should have routed to task (tools) path
         stub._process_with_tools.assert_called()
-
-    async def test_no_image_blocks_uses_classifier(self):
-        """When no image attachments, classifier is called normally."""
-        stub = _make_bot_stub()
-        stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        msg = _make_message()
-        # Pass empty image_blocks (same as on_message does when no attachments)
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hello", "chan-1", image_blocks=[])
-
-        # Classifier should have been called
-        stub.classifier.classify.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# 11. Classifier Graceful Shutdown
-# ---------------------------------------------------------------------------
-
-class TestClassifierGracefulShutdown:
-    """Test that the classifier's close() method works correctly for shutdown."""
-
-    async def test_close_after_classify(self):
-        """Classifier can be closed after use without errors."""
-        classifier = HaikuClassifier(api_key="test-key")
-        mock_session = _mock_haiku_response("task")
-        _inject_haiku_session(classifier, mock_session)
-
-        result = await classifier.classify("check disk")
-        assert result == "task"
-
-        # Simulate shutdown — close should work
-        mock_session.close = AsyncMock()
-        await classifier.close()
-        mock_session.close.assert_called_once()
-
-    async def test_close_idempotent(self):
-        """Calling close() multiple times is safe."""
-        classifier = HaikuClassifier(api_key="test-key")
-        mock_session = AsyncMock()
-        mock_session.closed = False
-        classifier._session = mock_session
-
-        await classifier.close()
-        mock_session.close.assert_called_once()
-
-        # Second close — session is now marked as closed
-        mock_session.closed = True
-        await classifier.close()
-        # close() should not be called again
-        assert mock_session.close.call_count == 1
-
-    async def test_classify_after_close_recreates_session(self):
-        """If classifier is closed and then used again, it recreates the session."""
-        classifier = HaikuClassifier(api_key="test-key")
-
-        # First: use with a mock session
-        mock_session1 = _mock_haiku_response("task")
-        _inject_haiku_session(classifier, mock_session1)
-        result1 = await classifier.classify("test")
-        assert result1 == "task"
-
-        # Close it
-        mock_session1.close = AsyncMock()
-        await classifier.close()
-
-        # Mark as closed so _get_session() recreates
-        mock_session1.closed = True
-
-        # Second: inject a new session (simulating _get_session recreation)
-        mock_session2 = _mock_haiku_response("chat")
-        _inject_haiku_session(classifier, mock_session2)
-        result2 = await classifier.classify("hello")
-        assert result2 == "chat"

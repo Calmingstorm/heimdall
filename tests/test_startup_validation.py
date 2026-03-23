@@ -86,7 +86,6 @@ class TestStartupConfigWarnings:
         stub.config = MagicMock()
         stub.config.tools.hosts = {}
         stub.config.tools.claude_code_host = ""
-        stub.config.anthropic.api_key = "sk-test"
         stub.config.openai_codex.enabled = False
         stub.config.discord.respond_to_bots = False
         stub.config.discord.require_mention = False
@@ -115,13 +114,6 @@ class TestStartupConfigWarnings:
             from src.discord.client import LokiBot
             LokiBot._log_startup_config(stub)
         assert any("webserver" in r.message and "dbserver" in r.message for r in caplog.records)
-
-    def test_warns_on_missing_anthropic_key(self, caplog):
-        stub = self._make_stub(**{"config.anthropic.api_key": ""})
-        with caplog.at_level(logging.WARNING, logger="loki.discord"):
-            from src.discord.client import LokiBot
-            LokiBot._log_startup_config(stub)
-        assert any("No Anthropic API key" in r.message for r in caplog.records)
 
     def test_warns_on_codex_enabled_but_unconfigured(self, caplog):
         stub = self._make_stub(**{"config.openai_codex.enabled": True})

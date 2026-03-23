@@ -1,13 +1,14 @@
-"""Tests for chat-path optimization: deferred system prompt build and Codex cleanup.
+"""Tests for deferred system prompt build and Codex cleanup.
 
 Session 15 deferred the full system prompt build (`_build_system_prompt`) from
-running on EVERY message to only running on task-classified messages.  Chat
-messages use `_build_chat_system_prompt` instead, avoiding the full prompt's
-disk I/O (memory.json + learned.json reads) and string formatting (host lists,
-services, playbooks).
+running on EVERY message to only running on task messages.  This avoids the full
+prompt's disk I/O (memory.json + learned.json reads) and string formatting
+(host lists, services, playbooks) when not needed.
 
 Also verifies that the Codex client's `instructions` field no longer duplicates
 the emoji rule already present in the chat system prompt template.
+
+Note: Chat path tests removed — all messages now route to "task" (no classifier).
 """
 from __future__ import annotations
 
@@ -49,7 +50,6 @@ def _make_bot_stub():
     stub.sessions.remove_last_message = MagicMock(return_value=True)
     stub.sessions.prune = MagicMock()
     stub.sessions.save = MagicMock()
-    stub.classifier.classify = AsyncMock(return_value="chat")
     stub.codex_client = MagicMock()
     stub.codex_client.chat = AsyncMock(return_value="Codex chat response")
     stub.codex_client.chat_with_tools = AsyncMock(return_value=MagicMock())
@@ -78,80 +78,6 @@ def _make_message(channel_id="chan-1"):
     msg.author.id = "user-1"
     msg.reply = AsyncMock()
     return msg
-
-
-# ---------------------------------------------------------------------------
-# Deferred system prompt build — chat paths
-# ---------------------------------------------------------------------------
-
-class TestChatPathSkipsFullPromptBuild:
-    """Chat-routed messages should NOT call _build_system_prompt."""
-
-    async def test_codex_chat_does_not_build_full_prompt(self):
-        """When Codex handles a chat message, _build_system_prompt should
-        not be called (only _build_chat_system_prompt)."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-        stub.codex_client = MagicMock()
-        stub.codex_client.chat = AsyncMock(return_value="Hey!")
-        stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hey whats up", "chan-1")
-
-        stub._build_system_prompt.assert_not_called()
-        stub._build_chat_system_prompt.assert_called_once()
-
-    async def test_no_codex_chat_returns_error(self):
-        """When no Codex is configured and chat is selected, should return
-        error message without building the full system prompt."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-        stub.codex_client = None
-        stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hey whats up", "chan-1")
-
-        stub._build_system_prompt.assert_not_called()
-        # Error message sent to user
-        stub._send_chunked.assert_called_once()
-        sent = stub._send_chunked.call_args[0][1]
-        assert "not configured" in sent.lower()
-
-    async def test_codex_failure_fallback_does_not_build_full_prompt(self):
-        """When Codex fails and falls back to _process_with_tools,
-        _build_system_prompt should still not be called."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-        stub.codex_client = MagicMock()
-        stub.codex_client.chat = AsyncMock(side_effect=Exception("Codex down"))
-        stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._process_with_tools = AsyncMock(
-            return_value=("Fallback response", False, False, [], False)
-        )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hey whats up", "chan-1")
-
-        stub._build_system_prompt.assert_not_called()
-
-    async def test_chat_does_not_build_full_prompt(self):
-        """When message is routed to Codex chat,
-        _build_system_prompt should not be called."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-        stub.codex_client = MagicMock()
-        stub.codex_client.chat = AsyncMock(return_value="Chat response")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hey whats up", "chan-1")
-
-        stub._build_system_prompt.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -292,80 +218,3 @@ class TestCodexInstructionsCleanup:
         assert "NEVER use emojis" in CHAT_SYSTEM_PROMPT_TEMPLATE
 
 
-# ---------------------------------------------------------------------------
-# Chat prompt called with correct channel
-# ---------------------------------------------------------------------------
-
-class TestChatPromptChannelPassthrough:
-    """_build_chat_system_prompt should receive the message's channel."""
-
-    async def test_codex_path_passes_channel(self):
-        stub = _make_bot_stub()
-        msg = _make_message()
-        stub.codex_client = MagicMock()
-        stub.codex_client.chat = AsyncMock(return_value="Hi!")
-        stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hello", "chan-1")
-
-        stub._build_chat_system_prompt.assert_called_with(channel=msg.channel, user_id=str(msg.author.id))
-
-    async def test_no_codex_chat_returns_error_with_channel(self):
-        """When no Codex configured and chat is selected, should return error."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-        stub.codex_client = None
-        stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hello", "chan-1")
-
-        stub._send_chunked.assert_called_once()
-        sent = stub._send_chunked.call_args[0][1]
-        assert "not configured" in sent.lower()
-
-
-# ---------------------------------------------------------------------------
-# Chat prompt override correctness
-# ---------------------------------------------------------------------------
-
-class TestChatPromptOverride:
-    """Chat paths must pass the chat prompt as system_prompt_override
-    to _process_with_tools rather than relying on _system_prompt."""
-
-    async def test_no_codex_chat_returns_error_message(self):
-        """When no Codex is configured and chat selected, returns error without
-        calling _process_with_tools."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-        stub.codex_client = None
-        stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hello", "chan-1")
-
-        stub._process_with_tools.assert_not_called()
-        stub._send_chunked.assert_called_once()
-
-    async def test_codex_failure_returns_error_message(self):
-        """When Codex fails on chat route, returns error message."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-        stub.codex_client = MagicMock()
-        stub.codex_client.chat = AsyncMock(side_effect=Exception("fail"))
-        stub.classifier.classify = AsyncMock(return_value="chat")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-
-        with patch("src.discord.client.is_task_by_keyword", return_value=False):
-            await stub._handle_message_inner(msg, "hello", "chan-1")
-
-        # Should NOT fall back to _process_with_tools
-        stub._process_with_tools.assert_not_called()
-        # Error message sent to user
-        stub._send_chunked.assert_called_once()
-        sent = stub._send_chunked.call_args[0][1]
-        assert "temporarily unavailable" in sent.lower()
