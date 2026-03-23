@@ -23,7 +23,8 @@ No classifier, no approval prompts, no hesitation.
 - **Anti-hedging** — detects and retries "shall I?" / "would you like?" hesitation (bot-to-bot)
 - **5-layer session defense** — context separators, selective history saving, abbreviated task history, compaction error omission, fabrication/hedging detection
 - **Audit logging** — append-only JSONL log of all tool executions
-- **Secret scrubbing** — API keys, passwords, and tokens are automatically redacted from responses
+- **Secret scrubbing** — 10 patterns (API keys, passwords, tokens, AWS/GitHub/Stripe/Slack credentials) redacted from responses, errors, webhooks, and tool output
+- **Performance optimized** — system prompt caching, tool definition caching, connection pooling, TTL-based cache invalidation
 - **Multi-deployment** — Docker, Incus system containers, or bare metal
 
 ## Personality
@@ -124,6 +125,35 @@ Tool handler → _run_on_host(alias) → _exec_command(address, cmd, ...)
                                             ├── localhost? → run_local_command (subprocess)
                                             └── remote?    → run_ssh_command (SSH)
 ```
+
+### Session Defense (5 Layers)
+
+1. **Context separator** — `"---CONTEXT ABOVE IS HISTORY---"` injected between history and new message
+2. **Selective saving** — only tool-bearing responses saved to history (tool-less responses discarded)
+3. **Abbreviated task history** — windowed subset keeps context focused on recent activity
+4. **Compaction error omission** — compacted summaries omit errors and failures, preserve outcomes
+5. **Fabrication + hedging detection** — retries when LLM fabricates output or hedges with "shall I?"
+
+### Security
+
+- **10 secret patterns** detected and scrubbed: passwords, API keys, OpenAI sk-, RSA/DSA private keys, DB URIs, GitHub tokens (ghp_/gho_/ghu_/ghs_/ghr_), AWS AKIA, Stripe sk_live_, Slack xox*
+- Scrubbing runs at 9+ locations: LLM responses, error messages, monitor alerts, webhook payloads, knowledge search results, digest output, scheduled tasks, workflow results, skill callbacks
+- Input validation: read_file line limits, incus_exec command quoting, script base64 encoding, interpreter allowlist
+- Context separator + role architecture prevent prompt injection
+
+### Tool Loop
+
+- Up to 20 iterations per message (Codex → tool calls → results → Codex → ...)
+- Multiple tool calls per iteration run concurrently
+- Tool output truncated to 12000 chars and secret-scrubbed before LLM sees it
+- Timeouts enforced per-tool (default 300s)
+
+### Bot Interaction
+
+- Bot messages buffered (`combine_bot_messages`) — waits for multi-message bursts
+- Bot preamble injected: "EXECUTE immediately" — prevents hesitation
+- Bot mentions stripped, webhook bots bypass buffer (take human path)
+- Tool-less bot responses not saved to history (anti-poisoning)
 
 ### Components
 
