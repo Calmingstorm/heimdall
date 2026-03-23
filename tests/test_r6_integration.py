@@ -268,8 +268,20 @@ class TestSkillPromptRebuildUserContext:
         stub.tool_memory = MagicMock()
         stub.tool_memory.format_hints = MagicMock(return_value="")
 
+        # Cache attributes for prompt caching helpers
+        stub._cached_hosts = None
+        stub._cached_skills_text = None
+        stub._memory_cache = {}
+        stub._memory_cache_ttl = 60.0
+        stub._reflector_cache = {}
+        stub._reflector_cache_ttl = 60.0
+
         from src.discord.client import LokiBot
         stub._build_system_prompt = LokiBot._build_system_prompt.__get__(stub)
+        stub._get_cached_hosts = LokiBot._get_cached_hosts.__get__(stub)
+        stub._get_cached_skills_text = LokiBot._get_cached_skills_text.__get__(stub)
+        stub._get_cached_memory = LokiBot._get_cached_memory.__get__(stub)
+        stub._get_cached_reflector = LokiBot._get_cached_reflector.__get__(stub)
         return stub
 
     async def test_create_skill_passes_user_id(self):

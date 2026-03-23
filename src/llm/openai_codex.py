@@ -32,7 +32,14 @@ class CodexChatClient:
 
     async def _get_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
+            connector = aiohttp.TCPConnector(
+                limit=10,                # max connections (single-host API)
+                limit_per_host=10,       # same as limit — one host only
+                keepalive_timeout=30,    # reuse connections across requests
+                enable_cleanup_closed=True,
+            )
             self._session = aiohttp.ClientSession(
+                connector=connector,
                 auto_decompress=False,
                 headers={"Accept-Encoding": "identity"},
             )

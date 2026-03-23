@@ -72,6 +72,9 @@ class ToolMemory:
     def __init__(self, data_path: str | None = None):
         self._path = Path(data_path) if data_path else None
         self._entries: list[dict] = []
+        # Cache for format_hints results — avoids re-computing embeddings per message
+        self._hints_cache: dict[str, tuple[float, str]] = {}
+        self._hints_cache_ttl: float = 30.0  # seconds
         self._load()
 
     def _load(self) -> None:
@@ -208,20 +211,41 @@ class ToolMemory:
         allowed_tools: set[str] | None = None,
         embedder: OllamaEmbedder | None = None,
     ) -> str:
-        """Format tool pattern hints for system prompt injection."""
+        """Format tool pattern hints for system prompt injection.
+
+        Results are cached per query string with a short TTL to avoid
+        re-computing embeddings for repeated/similar queries.
+        """
+        import time as _time
+        now = _time.monotonic()
+        cache_key = query[:200]  # normalize to avoid huge keys
+        cached = self._hints_cache.get(cache_key)
+        if cached and now - cached[0] < self._hints_cache_ttl:
+            return cached[1]
+
         patterns = await self.find_patterns(
             query, allowed_tools=allowed_tools, embedder=embedder,
         )
         if not patterns:
-            return ""
+            result = ""
+        else:
+            lines = []
+            for p in patterns:
+                chain = " -> ".join(f"`{t}`" for t in p["tools_used"])
+                lines.append(f"- {chain}")
+            result = (
+                "## Tool Use Patterns\n"
+                "For similar queries, these tool sequences worked well:\n"
+                + "\n".join(lines)
+            )
 
-        lines = []
-        for p in patterns:
-            chain = " -> ".join(f"`{t}`" for t in p["tools_used"])
-            lines.append(f"- {chain}")
+        self._hints_cache[cache_key] = (now, result)
 
-        return (
-            "## Tool Use Patterns\n"
-            "For similar queries, these tool sequences worked well:\n"
-            + "\n".join(lines)
-        )
+        # Evict stale entries periodically to prevent unbounded growth
+        if len(self._hints_cache) > 100:
+            self._hints_cache = {
+                k: v for k, v in self._hints_cache.items()
+                if now - v[0] < self._hints_cache_ttl
+            }
+
+        return result

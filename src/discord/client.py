@@ -299,6 +299,16 @@ class LokiBot(discord.Client):
         self._background_tasks_max = 20
         # Cached merged tool definitions — invalidated on skill create/edit/delete
         self._cached_merged_tools: list[dict] | None = None
+        # Cached host string dict — invalidated on context reload
+        self._cached_hosts: dict[str, str] | None = None
+        # Cached skills list text — invalidated on skill create/edit/delete
+        self._cached_skills_text: str | None = None
+        # TTL cache for per-user memory (avoids file I/O per message)
+        self._memory_cache: dict[str | None, tuple[float, dict[str, str]]] = {}
+        self._memory_cache_ttl: float = 60.0  # seconds
+        # TTL cache for reflector prompt section (avoids file I/O per message)
+        self._reflector_cache: dict[str | None, tuple[float, str]] = {}
+        self._reflector_cache_ttl: float = 60.0  # seconds
         # Throttled cache cleanup
         self._last_cache_cleanup: float = 0.0
         self._cache_cleanup_interval: float = 300.0  # every 5 minutes
@@ -464,16 +474,64 @@ class LokiBot(discord.Client):
         if cfg.discord.require_mention:
             log.info("Mention-only mode — will only respond when @mentioned")
 
+    def _get_cached_hosts(self) -> dict[str, str]:
+        """Return cached host string dict. Rebuilt on config reload."""
+        if self._cached_hosts is None:
+            self._cached_hosts = {
+                alias: f"{h.ssh_user}@{h.address}"
+                for alias, h in self.config.tools.hosts.items()
+            }
+        return self._cached_hosts
+
+    def _get_cached_skills_text(self) -> str:
+        """Return cached skills list text. Invalidated on skill create/edit/delete."""
+        if self._cached_skills_text is None:
+            if hasattr(self, "skill_manager"):
+                skills = self.skill_manager.list_skills()
+                if skills:
+                    self._cached_skills_text = "\n".join(
+                        f"- `{s['name']}`: {s['description']}" for s in skills
+                    )
+                else:
+                    self._cached_skills_text = ""
+            else:
+                self._cached_skills_text = ""
+        return self._cached_skills_text
+
+    def _get_cached_memory(self, user_id: str | None) -> dict[str, str]:
+        """Return cached per-user memory with TTL to avoid file I/O per message."""
+        now = time.time()
+        cached = self._memory_cache.get(user_id)
+        if cached and now - cached[0] < self._memory_cache_ttl:
+            return cached[1]
+        memory = self.tool_executor._load_memory_for_user(user_id)
+        self._memory_cache[user_id] = (now, memory)
+        return memory
+
+    def _get_cached_reflector(self, user_id: str | None) -> str:
+        """Return cached reflector prompt section with TTL to avoid file I/O per message."""
+        if not hasattr(self, "reflector"):
+            return ""
+        now = time.time()
+        cached = self._reflector_cache.get(user_id)
+        if cached and now - cached[0] < self._reflector_cache_ttl:
+            return cached[1]
+        learned = self.reflector.get_prompt_section(user_id=user_id)
+        self._reflector_cache[user_id] = (now, learned)
+        return learned
+
+    def _invalidate_prompt_caches(self) -> None:
+        """Invalidate all prompt-related caches. Called on config/context reload."""
+        self._cached_hosts = None
+        self._cached_skills_text = None
+        self._memory_cache.clear()
+        self._reflector_cache.clear()
+
     def _build_system_prompt(
         self, channel: discord.abc.GuildChannel | None = None,
         user_id: str | None = None,
         query: str | None = None,
     ) -> str:
-        hosts = {
-            alias: f"{h.ssh_user}@{h.address}"
-            for alias, h in self.config.tools.hosts.items()
-        }
-
         voice_info = "Voice support is not enabled."
         if self.voice_manager:
             if self.voice_manager.is_connected:
@@ -494,7 +552,7 @@ class LokiBot(discord.Client):
 
         prompt = build_system_prompt(
             context=self.context_loader.context,
-            hosts=hosts,
+            hosts=self._get_cached_hosts(),
             services=self.config.tools.allowed_services,
             playbooks=self.config.tools.allowed_playbooks,
             voice_info=voice_info,
@@ -502,23 +560,20 @@ class LokiBot(discord.Client):
         )
 
         # Inject persistent memory into the system prompt (per-user + global)
-        memory = self.tool_executor._load_memory_for_user(user_id)
+        memory = self._get_cached_memory(user_id)
         if memory:
             memory_text = "\n".join(f"- **{k}**: {v}" for k, v in memory.items())
             prompt += f"\n\n## Persistent Memory\n{memory_text}"
 
         # Inject learned context from cross-conversation reflection (per-user filtered)
-        if hasattr(self, "reflector"):
-            learned = self.reflector.get_prompt_section(user_id=user_id)
-            if learned:
-                prompt += f"\n\n{learned}"
+        learned = self._get_cached_reflector(user_id)
+        if learned:
+            prompt += f"\n\n{learned}"
 
-        # Inject user-created skills list
-        if hasattr(self, "skill_manager"):
-            skills = self.skill_manager.list_skills()
-            if skills:
-                skills_text = "\n".join(f"- `{s['name']}`: {s['description']}" for s in skills)
-                prompt += f"\n\n## User-Created Skills\n{skills_text}"
+        # Inject user-created skills list (cached, invalidated on skill CRUD)
+        skills_text = self._get_cached_skills_text()
+        if skills_text:
+            prompt += f"\n\n## User-Created Skills\n{skills_text}"
 
         # Inject recent tool executions for this channel only
         if channel is not None:
@@ -594,16 +649,15 @@ class LokiBot(discord.Client):
         prompt = build_chat_system_prompt(voice_info=voice_info, tz=self.config.timezone)
 
         # Inject persistent memory (per-user + global, personalization matters for chat)
-        memory = self.tool_executor._load_memory_for_user(user_id)
+        memory = self._get_cached_memory(user_id)
         if memory:
             memory_text = "\n".join(f"- **{k}**: {v}" for k, v in memory.items())
             prompt += f"\n\n## Persistent Memory\n{memory_text}"
 
         # Inject learned context (per-user filtered, personality from past conversations)
-        if hasattr(self, "reflector"):
-            learned = self.reflector.get_prompt_section(user_id=user_id)
-            if learned:
-                prompt += f"\n\n{learned}"
+        learned = self._get_cached_reflector(user_id)
+        if learned:
+            prompt += f"\n\n{learned}"
 
         # Channel personality
         if channel is not None:
@@ -656,6 +710,18 @@ class LokiBot(discord.Client):
         stale_locks = [cid for cid in self._channel_locks if cid not in active_channels]
         for cid in stale_locks:
             del self._channel_locks[cid]
+
+        # Clean up expired TTL cache entries for memory and reflector
+        ttl = getattr(self, "_memory_cache_ttl", 60.0)
+        self._memory_cache = {
+            k: v for k, v in getattr(self, "_memory_cache", {}).items()
+            if now - v[0] < ttl
+        }
+        ttl = getattr(self, "_reflector_cache_ttl", 60.0)
+        self._reflector_cache = {
+            k: v for k, v in getattr(self, "_reflector_cache", {}).items()
+            if now - v[0] < ttl
+        }
 
     def _maybe_cleanup_caches(self) -> None:
         """Run cache cleanup if enough time has passed since the last run."""
@@ -730,6 +796,7 @@ class LokiBot(discord.Client):
                 await interaction.response.send_message("Access denied.", ephemeral=True)
                 return
             self.context_loader.reload()
+            self._invalidate_prompt_caches()
             self._system_prompt = self._build_system_prompt()
             await interaction.response.send_message("Context files reloaded.")
 
@@ -1647,18 +1714,21 @@ class LokiBot(discord.Client):
                             self.skill_manager.create_skill, tool_input["name"], tool_input["code"],
                         )
                         self._cached_merged_tools = None  # invalidate tool cache
+                        self._cached_skills_text = None  # invalidate skills text cache
                         system_prompt = self._build_system_prompt(channel=message.channel, user_id=user_id)
                     elif tool_name == "edit_skill":
                         result = await asyncio.to_thread(
                             self.skill_manager.edit_skill, tool_input["name"], tool_input["code"],
                         )
                         self._cached_merged_tools = None  # invalidate tool cache
+                        self._cached_skills_text = None  # invalidate skills text cache
                         system_prompt = self._build_system_prompt(channel=message.channel, user_id=user_id)
                     elif tool_name == "delete_skill":
                         result = await asyncio.to_thread(
                             self.skill_manager.delete_skill, tool_input["name"],
                         )
                         self._cached_merged_tools = None  # invalidate tool cache
+                        self._cached_skills_text = None  # invalidate skills text cache
                         system_prompt = self._build_system_prompt(channel=message.channel, user_id=user_id)
                     elif tool_name == "list_skills":
                         skills = self.skill_manager.list_skills()

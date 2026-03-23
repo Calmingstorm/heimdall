@@ -78,9 +78,21 @@ def _make_bot_stub(**overrides):
     stub._recent_actions_max = 10
     stub._recent_actions_expiry = overrides.get("expiry", 3600)
 
-    # Bind the real methods
+    # Cache attributes for prompt caching helpers
+    stub._cached_hosts = None
+    stub._cached_skills_text = None
+    stub._memory_cache = {}
+    stub._memory_cache_ttl = 60.0
+    stub._reflector_cache = {}
+    stub._reflector_cache_ttl = 60.0
+
+    # Bind the real methods (including new cache helpers)
     stub._build_system_prompt = LokiBot._build_system_prompt.__get__(stub)
     stub._build_chat_system_prompt = LokiBot._build_chat_system_prompt.__get__(stub)
+    stub._get_cached_hosts = LokiBot._get_cached_hosts.__get__(stub)
+    stub._get_cached_skills_text = LokiBot._get_cached_skills_text.__get__(stub)
+    stub._get_cached_memory = LokiBot._get_cached_memory.__get__(stub)
+    stub._get_cached_reflector = LokiBot._get_cached_reflector.__get__(stub)
 
     return stub
 
