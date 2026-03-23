@@ -1592,12 +1592,11 @@ class LokiBot(discord.Client):
                 # and the response hedges ("shall I", "if you want"), retry once.
                 if (
                     iteration == 0
-                    and is_bot_message
                     and not tools_used_in_loop
                     and detect_hedging(llm_resp.text or "", tools_used_in_loop)
                 ):
                     log.warning(
-                        "Hedging detected in bot response — retrying with correction"
+                        "Hedging detected — retrying with correction"
                     )
                     messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_HEDGING_RETRY_MSG)
