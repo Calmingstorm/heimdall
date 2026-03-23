@@ -1257,7 +1257,7 @@ class LokiBot(discord.Client):
                         already_sent = False
         except Exception as e:
             log.error("Error processing message: %s", e, exc_info=True)
-            await self._send_with_retry(message, f"Something went wrong: {e}")
+            await self._send_with_retry(message, scrub_response_secrets(f"Something went wrong: {e}"))
             self.sessions.remove_last_message(channel_id, "user")
             return
 
@@ -2271,7 +2271,7 @@ class LokiBot(discord.Client):
             return
 
         try:
-            await channel.send(message)
+            await channel.send(scrub_response_secrets(message))
             log.info("Sent monitor alert to channel %s", channel_id)
         except Exception as e:
             log.error("Failed to send monitor alert: %s", e)

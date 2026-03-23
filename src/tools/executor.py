@@ -378,7 +378,10 @@ class ToolExecutor:
 
     async def _handle_read_file(self, inp: dict) -> str:
         path = inp["path"]
-        lines = inp.get("lines", 200)
+        try:
+            lines = min(int(inp.get("lines", 200)), 1000)
+        except (TypeError, ValueError):
+            lines = 200
         safe_path = shlex.quote(path)
         return await self._run_on_host(
             inp["host"],
@@ -798,7 +801,7 @@ class ToolExecutor:
         cmd = f"incus exec {instance}"
         if user:
             cmd += f" --user {shlex.quote(user)}"
-        cmd += f" -- {command}"
+        cmd += f" -- sh -c {shlex.quote(command)}"
         return await self._run_on_host(self._incus_host(), cmd)
 
     async def _handle_incus_start(self, inp: dict) -> str:
