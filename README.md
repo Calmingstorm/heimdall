@@ -227,6 +227,11 @@ The config file uses `${VAR}` for required env vars and `${VAR:-default}` for op
 - **`browser`** — enable/disable, CDP URL
 - **`learning`** — enable/disable, max entries
 - **`logging`** — level, directory
+- **`context`** — context directory, max system prompt tokens
+- **`sessions`** — max history length, max age, persist directory
+- **`usage`** — usage tracking directory
+- **`monitoring`** — enable/disable, check definitions (disk, memory, service, PromQL), alert channel, cooldown
+- **`permissions`** — per-user tier assignments, default tier, overrides file path
 
 ### Bot Interaction Modes
 

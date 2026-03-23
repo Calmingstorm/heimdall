@@ -1,7 +1,7 @@
 """Integration tests for the _process_with_tools tool execution loop.
 
 Exercises the core loop in client.py that iterates tool calls: message
-assembly, parallel tool execution, approval flow, progress messages,
+assembly, parallel tool execution, progress messages,
 tool result truncation, secret scrubbing, audit logging, recent-action
 tracking, and max-iteration guard.
 

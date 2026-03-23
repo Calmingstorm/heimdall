@@ -1414,8 +1414,8 @@ class TestFTSPrepareQuery:
 
     def test_ip_address_quoted(self):
         """IP addresses (contain dots) are quoted for literal match."""
-        result = _prepare_query("192.168.1.1")
-        assert result == '"192.168.1.1"'
+        result = _prepare_query("198.51.100.1")
+        assert result == '"198.51.100.1"'
 
     def test_path_quoted(self):
         """File paths (contain slashes) are quoted."""

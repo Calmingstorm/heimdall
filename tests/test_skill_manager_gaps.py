@@ -27,7 +27,6 @@ SKILL_DEFINITION = {
         "type": "object",
         "properties": {"msg": {"type": "string"}},
     },
-    "requires_approval": False,
 }
 
 async def execute(inp, context):

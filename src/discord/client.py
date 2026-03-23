@@ -1308,7 +1308,7 @@ class LokiBot(discord.Client):
                     response = "Chat backend is not configured."
                     is_error = True
             else:
-                # Everyone else: Codex with ALL tools — no classifier, no routing
+                # Everyone else: Codex with ALL tools
                 if not self.codex_client:
                     await self._send_with_retry(
                         message,
@@ -1377,13 +1377,10 @@ class LokiBot(discord.Client):
 
         log.info("Final response to send: %r", response[:200])
         if not is_error:
-            # On the tool route, if no tools were used and no skill handoff,
-            # the response may be a fabrication. Save a neutral marker instead
-            # to prevent poisoning future requests.
+            # If tools were available but not used (and no skill handoff),
+            # don't save the response — text-only replies pollute history
+            # and teach the model that answering without tools is acceptable.
             if not is_guest and not tools_used and not handoff:
-                # Don't save tool-less task responses at all — they pollute
-                # history and teach the model that text-only responses are normal
-                # for the task route. The user still sees the response in Discord.
                 pass
             else:
                 self.sessions.add_message(channel_id, "assistant", response)
@@ -1492,9 +1489,9 @@ class LokiBot(discord.Client):
         is_test_wh = message.webhook_id and str(message.webhook_id) in _ALLOWED_WEBHOOK_IDS
         if tools is not None and not is_test_wh:
             tools = self.permissions.filter_tools(user_id, tools)
-            # filter_tools returns None for guest tier (no tools)
+            # Normalize empty tool list to None
             if tools is not None and not tools:
-                tools = None  # empty list → None (no tools)
+                tools = None
 
         log.info("Tool loop starting: %d tools available, %d messages in history",
                  len(tools) if tools else 0, len(messages))

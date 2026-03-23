@@ -5,7 +5,7 @@ list system supporting any named list, per-user/shared ownership, done/undone
 status, on-the-fly creation, and migration from old grocery_list.json.
 
 Tests cover:
-- Registry: tool definition, schema, no approval required, in user tier whitelist
+- Registry: tool definition, schema, in user tier whitelist
 - Storage: _lists_path, _load_lists, _save_lists, migration from grocery_list.json
 - Actions: add, remove, show, clear, mark_done, mark_undone, list_all
 - Ownership: shared vs personal lists, access control
