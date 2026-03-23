@@ -428,7 +428,7 @@ class TestExecuteToolAllowlist:
 
     @pytest.mark.asyncio
     async def test_run_command_blocked(self, ctx_with_memory):
-        """execute_tool blocks run_command (requires approval)."""
+        """execute_tool blocks run_command (not in skill allowlist)."""
         result = await ctx_with_memory.execute_tool(
             "run_command", {"host": "server", "command": "rm -rf /"},
         )
@@ -436,7 +436,7 @@ class TestExecuteToolAllowlist:
 
     @pytest.mark.asyncio
     async def test_write_file_blocked(self, ctx_with_memory):
-        """execute_tool blocks write_file (requires approval)."""
+        """execute_tool blocks write_file (not in skill allowlist)."""
         result = await ctx_with_memory.execute_tool(
             "write_file", {"host": "server", "path": "/etc/passwd", "content": "hacked"},
         )
@@ -444,7 +444,7 @@ class TestExecuteToolAllowlist:
 
     @pytest.mark.asyncio
     async def test_restart_service_blocked(self, ctx_with_memory):
-        """execute_tool blocks restart_service (requires approval)."""
+        """execute_tool blocks restart_service (not in skill allowlist)."""
         result = await ctx_with_memory.execute_tool(
             "restart_service", {"host": "server", "service": "apache2"},
         )
@@ -452,7 +452,7 @@ class TestExecuteToolAllowlist:
 
     @pytest.mark.asyncio
     async def test_create_skill_blocked(self, ctx_with_memory):
-        """execute_tool blocks create_skill (requires approval)."""
+        """execute_tool blocks create_skill (not in skill allowlist)."""
         result = await ctx_with_memory.execute_tool(
             "create_skill", {"name": "evil", "code": "..."},
         )
@@ -460,7 +460,7 @@ class TestExecuteToolAllowlist:
 
     @pytest.mark.asyncio
     async def test_incus_exec_blocked(self, ctx_with_memory):
-        """execute_tool blocks incus_exec (requires approval)."""
+        """execute_tool blocks incus_exec (not in skill allowlist)."""
         result = await ctx_with_memory.execute_tool(
             "incus_exec", {"instance": "test", "command": "whoami"},
         )
@@ -468,7 +468,7 @@ class TestExecuteToolAllowlist:
 
     @pytest.mark.asyncio
     async def test_docker_compose_action_blocked(self, ctx_with_memory):
-        """execute_tool blocks docker_compose_action (requires approval)."""
+        """execute_tool blocks docker_compose_action (not in skill allowlist)."""
         result = await ctx_with_memory.execute_tool(
             "docker_compose_action",
             {"host": "server", "project_dir": "/opt/foo", "action": "down"},

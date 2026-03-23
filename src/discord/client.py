@@ -713,7 +713,6 @@ class LokiBot(discord.Client):
                 "**Usage**\n"
                 "All backends are subscription-based (free).\n"
                 "Codex: ChatGPT subscription\n"
-                "Classifier: Haiku (Anthropic API)\n"
                 "Claude Code: Max subscription"
             )
 
