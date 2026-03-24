@@ -32,7 +32,7 @@ _DEFAULT_WORKFLOW = {
     },
     "4": {
         "class_type": "CheckpointLoaderSimple",
-        "inputs": {"ckpt_name": "sd_xl_base_1.0.safetensors"},
+        "inputs": {"ckpt_name": "realisticVisionV60B1_v60B1VAE.safetensors"},
     },
     "5": {
         "class_type": "EmptyLatentImage",
@@ -75,14 +75,22 @@ class ComfyUIClient:
         Returns PNG image bytes on success, None on failure.
         """
         import copy
+        import random
 
         workflow = copy.deepcopy(_DEFAULT_WORKFLOW)
+
+        # Auto-detect checkpoint if the default isn't available
+        ckpt = workflow["4"]["inputs"]["ckpt_name"]
+        resolved = await self._resolve_checkpoint(ckpt)
+        if not resolved:
+            log.warning("No checkpoints available on ComfyUI")
+            return None
+        workflow["4"]["inputs"]["ckpt_name"] = resolved
+
         workflow["5"]["inputs"]["width"] = width
         workflow["5"]["inputs"]["height"] = height
         workflow["6"]["inputs"]["text"] = prompt
         workflow["7"]["inputs"]["text"] = negative
-        # Randomize seed
-        import random
         workflow["3"]["inputs"]["seed"] = random.randint(0, 2**32 - 1)
 
         client_id = uuid.uuid4().hex[:8]
@@ -135,6 +143,27 @@ class ComfyUIClient:
         except Exception as e:
             log.warning("ComfyUI unexpected error: %s", e)
             return None
+
+    async def _resolve_checkpoint(self, preferred: str) -> str | None:
+        """Check if preferred checkpoint exists, fall back to first available."""
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{self.base_url}/object_info/CheckpointLoaderSimple"
+                ) as resp:
+                    if resp.status != 200:
+                        return preferred  # Can't check, try anyway
+                    data = await resp.json()
+                    available = data["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0]
+                    if preferred in available:
+                        return preferred
+                    if available:
+                        chosen = available[0]
+                        log.info("Checkpoint '%s' not found, using '%s'", preferred, chosen)
+                        return chosen
+                    return None
+        except Exception:
+            return preferred  # Can't check, try anyway
 
     async def _poll_history(
         self, session: aiohttp.ClientSession, prompt_id: str
