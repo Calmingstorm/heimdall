@@ -1563,6 +1563,23 @@ TOOLS: list[dict] = [
             "required": ["user_id", "tier"],
         },
     },
+    # --- PDF analysis ---
+    {
+        "name": "analyze_pdf",
+        "description": "Extracts text from a PDF file. Accepts a URL or host:path. "
+                       "Returns markdown-formatted text content. "
+                       "For host files, fetches via read_file. For URLs, downloads directly. "
+                       "Truncated to 12000 chars. For image-heavy PDFs, use browser_screenshot.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "URL to fetch PDF from"},
+                "host": {"type": "string", "description": "Host alias for file-based PDF"},
+                "path": {"type": "string", "description": "File path on host"},
+                "pages": {"type": "string", "description": "Page range, e.g. '1-5' or '3' (default: all)"},
+            },
+        },
+    },
     # --- List management ---
     {
         "name": "manage_list",

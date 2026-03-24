@@ -1151,6 +1151,32 @@ class LokiBot(discord.Client):
                     text_parts.append(f"[Image: {att.filename} (failed to read: {e})]")
                 continue
 
+            # PDF attachments — extract text inline
+            if ext == ".pdf":
+                if att.size > 25 * 1024 * 1024:
+                    text_parts.append(f"[PDF: {att.filename} ({att.size / 1024 / 1024:.1f} MB, exceeds 25 MB limit)]")
+                    continue
+                try:
+                    import fitz
+                    data = await att.read()
+                    doc = fitz.open(stream=data, filetype="pdf")
+                    try:
+                        pages_text = []
+                        for i, page in enumerate(doc):
+                            pages_text.append(f"Page {i + 1}: {page.get_text()}")
+                        full_text = "\n".join(pages_text)
+                        if len(full_text) > 8000:
+                            full_text = full_text[:8000] + "\n[... truncated ...]"
+                        text_parts.append(
+                            f"**Attached PDF: {att.filename}** ({doc.page_count} pages)\n```\n{full_text}\n```\n"
+                            f"[This is a PDF. Text has been extracted. For detailed analysis, use analyze_pdf tool.]"
+                        )
+                    finally:
+                        doc.close()
+                except Exception as e:
+                    text_parts.append(f"[PDF: {att.filename} (failed to extract text: {e})]")
+                continue
+
             # Text files — read and inline
             text_extensions = {
                 ".txt", ".md", ".yml", ".yaml", ".json", ".toml", ".ini",
