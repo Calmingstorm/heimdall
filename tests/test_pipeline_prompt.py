@@ -1,13 +1,17 @@
 """Tests for pipeline pattern: system prompt and tool description guide the LLM to use claude_code within its tool loop."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from src.llm.system_prompt import build_system_prompt, SYSTEM_PROMPT_TEMPLATE
 from src.tools.registry import TOOLS, get_tool_definitions
+
+_ARCH_CONTEXT = (Path(__file__).parent.parent / "data" / "context" / "architecture.md").read_text()
 
 
 def _full_prompt() -> str:
     return build_system_prompt(
-        context="", hosts={}, services=[], playbooks=[],
+        context=_ARCH_CONTEXT, hosts={}, services=[], playbooks=[],
     )
 
 

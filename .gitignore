@@ -14,10 +14,13 @@ data/schedules.json
 data/learned.json
 data/grocery_list.json
 data/context/*.md
+!data/context/architecture.md
 data/skills/*.py
 data/skills/__pycache__/
 data/chromadb/
+data/search/
 data/fts.db
+data/*.db
 data/lists.json
 data/tool_memory.json
 data/permissions.json

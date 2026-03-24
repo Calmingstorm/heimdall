@@ -1,6 +1,6 @@
 """Full-text search index using SQLite FTS5.
 
-Provides exact-match and keyword search to complement ChromaDB semantic search.
+Provides exact-match and keyword search to complement sqlite-vec semantic search.
 Two tables: session_fts (archived conversations) and knowledge_fts (ingested docs).
 """
 from __future__ import annotations

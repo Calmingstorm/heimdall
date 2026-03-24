@@ -1,67 +1,19 @@
-"""Tests for OllamaEmbedder (embedder.py).
+"""Tests for LocalEmbedder (embedder.py).
 
-Mocks aiohttp.ClientSession to avoid real Ollama calls. Tests verify:
-- Successful embedding returns vector
+Mocks fastembed to avoid real model downloads. Tests verify:
+- Successful embedding returns 384-dim vector
 - Input truncation to MAX_INPUT_CHARS
-- HTTP error handling (non-200 status)
-- Network/exception handling (returns None)
-- Empty/malformed response handling
-- URL construction and model parameter
+- Exception handling (returns None)
+- Lazy model initialization
 """
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
 
-from src.search.embedder import OllamaEmbedder, MAX_INPUT_CHARS
-
-
-def _make_mock_response(status: int = 200, json_data: dict | None = None):
-    """Create a mock aiohttp response with given status and JSON body."""
-    resp = MagicMock()
-    resp.status = status
-    resp.json = AsyncMock(return_value=json_data or {})
-    return resp
-
-
-def _patch_session(response):
-    """Build mocks for the double async-context-manager aiohttp pattern.
-
-    Returns (patcher, inner_session_mock) where inner_session_mock.post
-    captures the call args.
-
-    Usage::
-
-        async with aiohttp.ClientSession() as session:   # outer CM
-            async with session.post(...) as resp:          # inner CM
-    """
-    # Inner CM: session.post(...) -> async context manager yielding response
-    post_cm = AsyncMock()
-    post_cm.__aenter__.return_value = response
-
-    # The session that lives inside the outer `async with`
-    inner_session = MagicMock()
-    inner_session.post.return_value = post_cm
-
-    # Outer CM: aiohttp.ClientSession() -> async context manager yielding session
-    outer_cm = AsyncMock()
-    outer_cm.__aenter__.return_value = inner_session
-
-    patcher = patch("aiohttp.ClientSession", return_value=outer_cm)
-    return patcher, inner_session
-
-
-def _patch_session_error(exc):
-    """Build mocks where session.post() raises an exception."""
-    inner_session = MagicMock()
-    inner_session.post.side_effect = exc
-
-    outer_cm = AsyncMock()
-    outer_cm.__aenter__.return_value = inner_session
-
-    patcher = patch("aiohttp.ClientSession", return_value=outer_cm)
-    return patcher
+from src.search.embedder import LocalEmbedder, MAX_INPUT_CHARS
 
 
 # ── Successful embedding ────────────────────────────────────────────
@@ -69,45 +21,33 @@ def _patch_session_error(exc):
 
 class TestEmbedSuccess:
     async def test_returns_embedding_vector(self):
-        """Successful API call returns the first embedding vector."""
-        embedding = [0.1] * 768
-        resp = _make_mock_response(200, {"embeddings": [embedding]})
-        patcher, _ = _patch_session(resp)
+        """Successful embed returns a list of floats."""
+        fake_model = MagicMock()
+        fake_model.embed.return_value = iter([np.array([0.1] * 384, dtype=np.float32)])
 
-        with patcher:
-            embedder = OllamaEmbedder("http://localhost:11434")
+        with patch("src.search.embedder.LocalEmbedder._ensure_model"):
+            embedder = LocalEmbedder()
+            embedder._model = fake_model
             result = await embedder.embed("test text")
 
-        assert result == embedding
+        assert result is not None
+        assert len(result) == 384
+        assert isinstance(result[0], float)
 
-    async def test_passes_correct_url_and_payload(self):
-        """API call uses correct URL, model, and input text."""
-        embedding = [0.5] * 768
-        resp = _make_mock_response(200, {"embeddings": [embedding]})
-        patcher, inner = _patch_session(resp)
+    async def test_returns_correct_values(self):
+        """Embed returns the exact values from the model."""
+        expected = [float(i) / 384 for i in range(384)]
+        fake_model = MagicMock()
+        fake_model.embed.return_value = iter([np.array(expected, dtype=np.float32)])
 
-        with patcher:
-            embedder = OllamaEmbedder("http://localhost:11434", model="nomic-embed-text")
-            await embedder.embed("hello world")
+        with patch("src.search.embedder.LocalEmbedder._ensure_model"):
+            embedder = LocalEmbedder()
+            embedder._model = fake_model
+            result = await embedder.embed("test")
 
-        call_args = inner.post.call_args
-        assert call_args[0][0] == "http://localhost:11434/api/embed"
-        assert call_args[1]["json"]["model"] == "nomic-embed-text"
-        assert call_args[1]["json"]["input"] == "hello world"
-
-    async def test_strips_trailing_slash_from_base_url(self):
-        """Trailing slash in base_url is stripped before building endpoint URL."""
-        embedding = [0.1] * 768
-        resp = _make_mock_response(200, {"embeddings": [embedding]})
-        patcher, inner = _patch_session(resp)
-
-        with patcher:
-            embedder = OllamaEmbedder("http://localhost:11434/")
-            await embedder.embed("test")
-
-        call_url = inner.post.call_args[0][0]
-        assert call_url == "http://localhost:11434/api/embed"
-        assert "//" not in call_url.split("://")[1]
+        assert result is not None
+        for a, b in zip(result, expected):
+            assert abs(a - b) < 1e-5
 
 
 # ── Input truncation ───────────────────────────────────────────────
@@ -115,32 +55,33 @@ class TestEmbedSuccess:
 
 class TestInputTruncation:
     async def test_long_input_truncated(self):
-        """Input longer than MAX_INPUT_CHARS is truncated before sending."""
-        embedding = [0.2] * 768
-        resp = _make_mock_response(200, {"embeddings": [embedding]})
-        patcher, inner = _patch_session(resp)
+        """Input longer than MAX_INPUT_CHARS is truncated before embedding."""
+        fake_model = MagicMock()
+        fake_model.embed.return_value = iter([np.array([0.2] * 384, dtype=np.float32)])
 
         long_text = "x" * (MAX_INPUT_CHARS + 5000)
 
-        with patcher:
-            embedder = OllamaEmbedder("http://localhost:11434")
+        with patch("src.search.embedder.LocalEmbedder._ensure_model"):
+            embedder = LocalEmbedder()
+            embedder._model = fake_model
             result = await embedder.embed(long_text)
 
-        sent_text = inner.post.call_args[1]["json"]["input"]
+        assert result is not None
+        # Verify the text passed to model.embed was truncated
+        sent_text = fake_model.embed.call_args[0][0][0]
         assert len(sent_text) == MAX_INPUT_CHARS
-        assert result == embedding
 
     async def test_short_input_not_truncated(self):
-        """Input shorter than MAX_INPUT_CHARS is sent as-is."""
-        embedding = [0.3] * 768
-        resp = _make_mock_response(200, {"embeddings": [embedding]})
-        patcher, inner = _patch_session(resp)
+        """Input shorter than MAX_INPUT_CHARS is passed as-is."""
+        fake_model = MagicMock()
+        fake_model.embed.return_value = iter([np.array([0.3] * 384, dtype=np.float32)])
 
-        with patcher:
-            embedder = OllamaEmbedder("http://localhost:11434")
+        with patch("src.search.embedder.LocalEmbedder._ensure_model"):
+            embedder = LocalEmbedder()
+            embedder._model = fake_model
             await embedder.embed("short text")
 
-        sent_text = inner.post.call_args[1]["json"]["input"]
+        sent_text = fake_model.embed.call_args[0][0][0]
         assert sent_text == "short text"
 
 
@@ -148,111 +89,71 @@ class TestInputTruncation:
 
 
 class TestErrorHandling:
-    async def test_non_200_returns_none(self):
-        """Non-200 HTTP status returns None."""
-        resp = _make_mock_response(500, {})
-        patcher, _ = _patch_session(resp)
-
-        with patcher:
-            embedder = OllamaEmbedder("http://localhost:11434")
+    async def test_model_load_failure_returns_none(self):
+        """If fastembed import fails, embed returns None."""
+        embedder = LocalEmbedder()
+        with patch.object(embedder, "_ensure_model", side_effect=ImportError("no fastembed")):
             result = await embedder.embed("test")
-
         assert result is None
 
-    async def test_404_returns_none(self):
-        """404 response (model not found) returns None."""
-        resp = _make_mock_response(404, {"error": "model not found"})
-        patcher, _ = _patch_session(resp)
+    async def test_embed_exception_returns_none(self):
+        """If model.embed raises, returns None."""
+        fake_model = MagicMock()
+        fake_model.embed.side_effect = RuntimeError("ONNX error")
 
-        with patcher:
-            embedder = OllamaEmbedder("http://localhost:11434")
-            result = await embedder.embed("test")
-
-        assert result is None
-
-    async def test_connection_error_returns_none(self):
-        """Network connection error returns None."""
-        patcher = _patch_session_error(ConnectionError("Connection refused"))
-
-        with patcher:
-            embedder = OllamaEmbedder("http://localhost:11434")
-            result = await embedder.embed("test")
-
-        assert result is None
-
-    async def test_timeout_returns_none(self):
-        """Timeout returns None."""
-        import asyncio
-        patcher = _patch_session_error(asyncio.TimeoutError())
-
-        with patcher:
-            embedder = OllamaEmbedder("http://localhost:11434")
+        with patch("src.search.embedder.LocalEmbedder._ensure_model"):
+            embedder = LocalEmbedder()
+            embedder._model = fake_model
             result = await embedder.embed("test")
 
         assert result is None
 
     async def test_generic_exception_returns_none(self):
         """Any unexpected exception returns None."""
-        patcher = _patch_session_error(RuntimeError("unexpected"))
-
-        with patcher:
-            embedder = OllamaEmbedder("http://localhost:11434")
+        embedder = LocalEmbedder()
+        with patch.object(embedder, "_ensure_model", side_effect=Exception("unexpected")):
             result = await embedder.embed("test")
-
         assert result is None
 
 
-# ── Malformed response handling ─────────────────────────────────────
+# ── Lazy initialization ────────────────────────────────────────────
 
 
-class TestMalformedResponses:
-    async def test_empty_embeddings_list(self):
-        """Empty embeddings list returns None."""
-        resp = _make_mock_response(200, {"embeddings": []})
-        patcher, _ = _patch_session(resp)
+class TestLazyInit:
+    def test_model_not_loaded_at_init(self):
+        """Model is not loaded until first embed call."""
+        embedder = LocalEmbedder()
+        assert embedder._model is None
 
-        with patcher:
-            embedder = OllamaEmbedder("http://localhost:11434")
-            result = await embedder.embed("test")
+    def test_ensure_model_loads_on_first_call(self):
+        """_ensure_model imports and creates TextEmbedding."""
+        mock_text_embedding = MagicMock()
+        with patch.dict("sys.modules", {"fastembed": MagicMock(TextEmbedding=mock_text_embedding)}):
+            embedder = LocalEmbedder()
+            embedder._ensure_model()
+            assert embedder._model is not None
 
-        assert result is None
-
-    async def test_missing_embeddings_key(self):
-        """Response without 'embeddings' key returns None."""
-        resp = _make_mock_response(200, {"result": "something"})
-        patcher, _ = _patch_session(resp)
-
-        with patcher:
-            embedder = OllamaEmbedder("http://localhost:11434")
-            result = await embedder.embed("test")
-
-        assert result is None
-
-    async def test_none_embeddings_value(self):
-        """Response with embeddings=None returns None."""
-        resp = _make_mock_response(200, {"embeddings": None})
-        patcher, _ = _patch_session(resp)
-
-        with patcher:
-            embedder = OllamaEmbedder("http://localhost:11434")
-            result = await embedder.embed("test")
-
-        assert result is None
+    def test_ensure_model_idempotent(self):
+        """Calling _ensure_model twice doesn't reload."""
+        embedder = LocalEmbedder()
+        embedder._model = MagicMock()  # Already loaded
+        existing = embedder._model
+        embedder._ensure_model()
+        assert embedder._model is existing  # Same object
 
 
-# ── Custom model ────────────────────────────────────────────────────
+# ── Constants ───────────────────────────────────────────────────────
 
 
-class TestCustomModel:
-    async def test_custom_model_name(self):
-        """Custom model name is passed in the request payload."""
-        embedding = [0.4] * 384
-        resp = _make_mock_response(200, {"embeddings": [embedding]})
-        patcher, inner = _patch_session(resp)
+class TestConstants:
+    def test_dimensions(self):
+        """DIMENSIONS should be 384 for bge-small-en-v1.5."""
+        assert LocalEmbedder.DIMENSIONS == 384
 
-        with patcher:
-            embedder = OllamaEmbedder("http://localhost:11434", model="all-minilm")
-            result = await embedder.embed("test")
+    def test_model_name(self):
+        """MODEL should be BAAI/bge-small-en-v1.5."""
+        assert LocalEmbedder.MODEL == "BAAI/bge-small-en-v1.5"
 
-        assert inner.post.call_args[1]["json"]["model"] == "all-minilm"
-        assert result == embedding
+    def test_max_input_chars(self):
+        """MAX_INPUT_CHARS should be 32000."""
+        assert MAX_INPUT_CHARS == 32_000

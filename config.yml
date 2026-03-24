@@ -46,8 +46,6 @@ tools:
   #   - check-services.yml
   #   - system-info.yml
   ansible_directory: "/ansible"
-  auto_approve: false             # Skip approval prompts for destructive tools (use with caution)
-  approval_timeout_seconds: 120
   command_timeout_seconds: 120
   # prometheus_host: "myserver"   # Host alias to run Prometheus queries on
   # ansible_host: "myhost"       # Host alias to run Ansible playbooks from
@@ -55,6 +53,7 @@ tools:
   # claude_code_user: ""         # Non-root user for claude -p edits (e.g. "deploy")
   # claude_code_dir: "/opt/project"  # Default working directory for claude -p
   # incus_host: "myhost"         # Host alias where Incus runs
+  # tool_packs: [docker, systemd, git]  # Empty or absent = all tools loaded
 
 webhook:
   enabled: false
@@ -70,9 +69,7 @@ learning:
 
 search:
   enabled: true
-  ollama_url: "${OLLAMA_URL:-http://localhost:11434}"
-  embed_model: "nomic-embed-text"
-  chromadb_path: "./data/chromadb"
+  search_db_path: "./data/chromadb"  # Directory for search SQLite DBs (sessions.db, knowledge.db)
 
 logging:
   level: "INFO"
@@ -92,3 +89,7 @@ voice:
 browser:
   enabled: false
   cdp_url: "ws://loki-browser:3000?token=${BROWSER_TOKEN:-loki-internal}"
+
+# comfyui:
+#   enabled: false
+#   url: http://localhost:8188

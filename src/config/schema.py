@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DiscordConfig(BaseModel):
@@ -49,6 +49,8 @@ class ToolsConfig(BaseModel):
     claude_code_user: str = ""
     claude_code_dir: str = "/opt/project"
     incus_host: str = ""
+    # Empty = all tools. Options: docker, systemd, incus, ansible, prometheus, git, comfyui
+    tool_packs: list[str] = Field(default_factory=list)
 
 
 class LoggingConfig(BaseModel):
@@ -82,10 +84,10 @@ class LearningConfig(BaseModel):
 
 
 class SearchConfig(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
     enabled: bool = True
-    ollama_url: str = "http://localhost:11434"
-    embed_model: str = "nomic-embed-text"
-    chromadb_path: str = "./data/chromadb"
+    # Accepts "chromadb_path" from old configs for backward compat
+    search_db_path: str = Field(default="./data/chromadb", validation_alias="chromadb_path")
 
 
 class VoiceConfig(BaseModel):
@@ -109,6 +111,11 @@ class PermissionsConfig(BaseModel):
     tiers: dict[str, str] = Field(default_factory=dict)
     default_tier: str = "user"
     overrides_path: str = "./data/permissions.json"
+
+
+class ComfyUIConfig(BaseModel):
+    enabled: bool = False
+    url: str = "http://localhost:8188"
 
 
 class MonitorCheck(BaseModel):
@@ -144,6 +151,7 @@ class Config(BaseModel):
     monitoring: MonitoringConfig = MonitoringConfig()
     browser: BrowserConfig = BrowserConfig()
     permissions: PermissionsConfig = PermissionsConfig()
+    comfyui: ComfyUIConfig = ComfyUIConfig()
 
 
 def _substitute_env_vars(text: str) -> str:

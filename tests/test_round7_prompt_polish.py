@@ -12,16 +12,20 @@ Covers:
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from src.llm.system_prompt import (
     build_system_prompt,
     SYSTEM_PROMPT_TEMPLATE,
 )
 from src.tools.registry import TOOLS, get_tool_definitions
 
+_ARCH_CONTEXT = (Path(__file__).parent.parent / "data" / "context" / "architecture.md").read_text()
+
 
 def _build_prompt() -> str:
     return build_system_prompt(
-        context="", hosts={}, services=[], playbooks=[],
+        context=_ARCH_CONTEXT, hosts={}, services=[], playbooks=[],
     )
 
 
@@ -106,7 +110,7 @@ class TestCapabilitiesAsHave:
     def test_no_can_use_in_capabilities(self):
         prompt = _build_prompt()
         cap_start = prompt.find("## Your Capabilities")
-        cap_end = prompt.find("## Claude Code")
+        cap_end = prompt.find("## Rules")
         capabilities = prompt[cap_start:cap_end]
         assert "can use" not in capabilities.lower() or "not \"can use\"" in capabilities
 

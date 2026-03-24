@@ -1,10 +1,23 @@
 # Example Context File
 
-Context files provide environment-specific information to Loki's system prompt.
-Place `.md` files in this directory and they will be loaded automatically.
-Use `/reload` in Discord to reload context files without restarting.
+Context files provide operational guidance and environment-specific information
+to Loki's system prompt. Place `.md` files in this directory and they will be
+loaded automatically. Use `/reload` in Discord to reload context files without
+restarting.
 
 Rename this file to `example.md` (remove `.template`) to activate it.
+
+## Three-Layer Architecture
+
+Loki's instructions are split into three layers:
+
+1. **System prompt** (~3000 chars) — Identity: personality, core behavior, rules
+2. **Context files** (this directory) — Architecture: how tools work, patterns, guidance
+3. **Tool descriptions** (registry.py) — Self-documenting: each tool describes itself
+
+The `architecture.md` file in this directory provides core operational guidance
+(Claude Code delegation, knowledge base, scheduling, common patterns). You can
+add additional context files for environment-specific information.
 
 ## Hosts
 

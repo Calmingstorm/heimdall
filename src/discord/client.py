@@ -29,7 +29,7 @@ from ..scheduler import Scheduler
 from ..sessions import SessionManager
 from ..tools import ToolExecutor, SkillManager, get_tool_definitions
 from ..tools.tool_memory import ToolMemory
-from ..search import OllamaEmbedder, SessionVectorStore
+from ..search import LocalEmbedder, SessionVectorStore
 from ..permissions import PermissionManager
 from .voice import VoiceManager, VoiceMessageProxy
 
@@ -380,29 +380,36 @@ class LokiBot(discord.Client):
 
         # Semantic search + FTS5 components
         self._vector_store: SessionVectorStore | None = None
-        self._embedder: OllamaEmbedder | None = None
+        self._embedder: LocalEmbedder | None = None
         self._knowledge_store: KnowledgeStore | None = None
         self._fts_index: FullTextIndex | None = None
         if config.search.enabled:
-            self._embedder = OllamaEmbedder(
-                base_url=config.search.ollama_url,
-                model=config.search.embed_model,
-            )
+            self._embedder = LocalEmbedder()
             # Initialize FTS5 index (SQLite, no external deps)
             from pathlib import Path
-            fts_db_path = str(Path(config.search.chromadb_path).parent / "fts.db")
+            search_db_path = config.search.search_db_path
+            fts_db_path = str(Path(search_db_path).parent / "fts.db")
             from ..search.fts import FullTextIndex
             self._fts_index = FullTextIndex(fts_db_path)
             if not self._fts_index.available:
                 self._fts_index = None
 
+            # Always initialize stores — they work in FTS-only mode even without
+            # sqlite-vec or embedder. Don't null them out on vec init failure.
+            session_db = str(Path(search_db_path) / "sessions.db") if Path(search_db_path).is_dir() else search_db_path + "_sessions.db"
+            knowledge_db = str(Path(search_db_path) / "knowledge.db") if Path(search_db_path).is_dir() else search_db_path + "_knowledge.db"
+            # Ensure the directory exists
+            Path(search_db_path).mkdir(parents=True, exist_ok=True)
+            session_db = str(Path(search_db_path) / "sessions.db")
+            knowledge_db = str(Path(search_db_path) / "knowledge.db")
+
             self._vector_store = SessionVectorStore(
-                config.search.chromadb_path, fts_index=self._fts_index,
+                session_db, fts_index=self._fts_index,
             )
             if not self._vector_store.available:
                 self._vector_store = None
             self._knowledge_store = KnowledgeStore(
-                config.search.chromadb_path, fts_index=self._fts_index,
+                knowledge_db, fts_index=self._fts_index,
             )
             if not self._knowledge_store.available:
                 self._knowledge_store = None
@@ -734,7 +741,7 @@ class LokiBot(discord.Client):
         """
         if self._cached_merged_tools is not None:
             return self._cached_merged_tools
-        builtin = get_tool_definitions()
+        builtin = get_tool_definitions(enabled_packs=self.config.tools.tool_packs)
         builtin_names = {t["name"] for t in builtin}
         skill_defs = [
             t for t in self.skill_manager.get_tool_definitions()
@@ -898,6 +905,11 @@ class LokiBot(discord.Client):
 
     async def on_ready(self) -> None:
         log.info("Logged in as %s (ID: %s)", self.user, self.user.id)
+        packs = self.config.tools.tool_packs
+        if packs:
+            log.info("Tool packs enabled: %s", ", ".join(packs))
+        else:
+            log.info("Tool packs: all tools loaded (no filtering)")
         # Prune stale sessions loaded from disk.  load() reads ALL persisted
         # session files regardless of age; pruning here removes expired ones
         # immediately instead of waiting for the first user message.
@@ -910,7 +922,7 @@ class LokiBot(discord.Client):
             await self.tree.sync(guild=guild)
             log.info("Slash commands synced to guild: %s", guild.name)
         self.scheduler.start(self._on_scheduled_task)
-        if self._vector_store and self._embedder:
+        if self._vector_store:
             asyncio.create_task(self._backfill_archives())
         # Start proactive monitoring if configured
         if hasattr(self, "infra_watcher") and self.infra_watcher:
@@ -925,7 +937,7 @@ class LokiBot(discord.Client):
                 log.info("Backfilled %d archive sessions into vector store", count)
             else:
                 log.info("Vector store up to date")
-            # Backfill knowledge FTS from existing ChromaDB data
+            # Backfill knowledge FTS from existing data
             if self._knowledge_store and self._fts_index:
                 kb_count = self._knowledge_store.backfill_fts()
                 if kb_count:
@@ -1137,6 +1149,32 @@ class LokiBot(discord.Client):
                     log.info("Processed image attachment: %s (%d KB)", att.filename, att.size // 1024)
                 except Exception as e:
                     text_parts.append(f"[Image: {att.filename} (failed to read: {e})]")
+                continue
+
+            # PDF attachments — extract text inline
+            if ext == ".pdf":
+                if att.size > 25 * 1024 * 1024:
+                    text_parts.append(f"[PDF: {att.filename} ({att.size / 1024 / 1024:.1f} MB, exceeds 25 MB limit)]")
+                    continue
+                try:
+                    import fitz
+                    data = await att.read()
+                    doc = fitz.open(stream=data, filetype="pdf")
+                    try:
+                        pages_text = []
+                        for i, page in enumerate(doc):
+                            pages_text.append(f"Page {i + 1}: {page.get_text()}")
+                        full_text = "\n".join(pages_text)
+                        if len(full_text) > 8000:
+                            full_text = full_text[:8000] + "\n[... truncated ...]"
+                        text_parts.append(
+                            f"**Attached PDF: {att.filename}** ({doc.page_count} pages)\n```\n{full_text}\n```\n"
+                            f"[This is a PDF. Text has been extracted. For detailed analysis, use analyze_pdf tool.]"
+                        )
+                    finally:
+                        doc.close()
+                except Exception as e:
+                    text_parts.append(f"[PDF: {att.filename} (failed to extract text: {e})]")
                 continue
 
             # Text files — read and inline
@@ -1548,6 +1586,9 @@ class LokiBot(discord.Client):
             if tools is not None and not tools:
                 tools = None
 
+        # Collect image blocks from analyze_image calls for vision injection
+        pending_image_blocks: list[dict] = []
+
         log.info("Tool loop starting: %d tools available, %d messages in history",
                  len(tools) if tools else 0, len(messages))
 
@@ -1725,7 +1766,7 @@ class LokiBot(discord.Client):
 
             # Execute tools in parallel
             async def _run_tool(block):
-                nonlocal system_prompt
+                nonlocal system_prompt, pending_image_blocks
                 tool_name = block.name
                 tool_input = block.input
                 log.info("Tool call: %s(%s)", tool_name, tool_input)
@@ -1795,6 +1836,16 @@ class LokiBot(discord.Client):
                         self._cached_merged_tools = None  # invalidate tool cache
                         self._cached_skills_text = None  # invalidate skills text cache
                         system_prompt = self._build_system_prompt(channel=message.channel, user_id=user_id)
+                    elif tool_name == "add_reaction":
+                        result = await self._handle_add_reaction(message, tool_input)
+                    elif tool_name == "create_poll":
+                        result = await self._handle_create_poll(message, tool_input)
+                    elif tool_name == "broadcast":
+                        result = await self._handle_broadcast(message, tool_input)
+                    elif tool_name == "analyze_image":
+                        result = await self._handle_analyze_image(message, tool_input)
+                    elif tool_name == "generate_image":
+                        result = await self._handle_generate_image(message, tool_input)
                     elif tool_name == "list_skills":
                         skills = self.skill_manager.list_skills()
                         if not skills:
@@ -1822,6 +1873,11 @@ class LokiBot(discord.Client):
                     result = f"Error executing {tool_name}: {e}"
 
                 elapsed_ms = int((time.monotonic() - t0) * 1000)
+
+                # Handle special image block return from analyze_image
+                if isinstance(result, dict) and "__image_block__" in result:
+                    pending_image_blocks.append(result["__image_block__"])
+                    result = f"[Image loaded. Analyze it with this instruction: {result['__prompt__']}]"
 
                 # Scrub secrets from tool output
                 result = scrub_output_secrets(result)
@@ -1894,6 +1950,18 @@ class LokiBot(discord.Client):
                 *[_run_tool_with_timeout(b) for b in tool_calls],
             )
             messages.append({"role": "user", "content": list(tool_results)})
+
+            # Inject pending image blocks as vision content for the next LLM call.
+            # This reuses the same base64 image block format as _process_attachments.
+            if pending_image_blocks:
+                vision_content: list[dict] = list(pending_image_blocks)
+                vision_content.append({
+                    "type": "text",
+                    "text": "The image(s) above were fetched by analyze_image. Describe and analyze them.",
+                })
+                messages.append({"role": "user", "content": vision_content})
+                log.info("Injected %d image block(s) into tool loop messages", len(pending_image_blocks))
+                pending_image_blocks.clear()
 
             # Update progress step to done with elapsed time
             step_elapsed_ms = int((time.monotonic() - step_t0) * 1000)
@@ -2216,9 +2284,9 @@ class LokiBot(discord.Client):
         return f"**Found {len(results)} result(s) for '{query}':**\n" + "\n".join(lines)
 
     async def _handle_search_knowledge(self, inp: dict) -> str:
-        """Semantic search over the knowledge base."""
-        if not self._knowledge_store or not self._embedder:
-            return "Knowledge base is not available (search not enabled or ChromaDB not initialized)."
+        """Semantic + FTS search over the knowledge base."""
+        if not self._knowledge_store:
+            return "Knowledge base is not available (search not enabled or not initialized)."
 
         query = inp.get("query", "")
         limit = min(inp.get("limit", 5), 10)
@@ -2240,8 +2308,8 @@ class LokiBot(discord.Client):
 
     async def _handle_ingest_document(self, inp: dict, uploader: str) -> str:
         """Ingest a document into the knowledge base."""
-        if not self._knowledge_store or not self._embedder:
-            return "Knowledge base is not available (search not enabled or ChromaDB not initialized)."
+        if not self._knowledge_store:
+            return "Knowledge base is not available (search not enabled or not initialized)."
 
         source = inp.get("source", "")
         content = inp.get("content", "")
@@ -2255,7 +2323,7 @@ class LokiBot(discord.Client):
             uploader=uploader,
         )
         if count == 0:
-            return f"Failed to ingest '{source}' — no chunks could be embedded."
+            return f"Failed to ingest '{source}' — no chunks could be indexed."
         return f"Ingested '{source}' into knowledge base ({count} chunks indexed)."
 
     def _handle_list_knowledge(self) -> str:
@@ -2563,6 +2631,201 @@ class LokiBot(discord.Client):
             return f"Task `{task_id}` is not running (status: {task.status})."
         task.cancel()
         return f"Cancellation requested for task `{task_id}`."
+
+    async def _handle_add_reaction(self, message: discord.Message, inp: dict) -> str:
+        """Add an emoji reaction to a message."""
+        message_id = inp.get("message_id")
+        emoji = inp.get("emoji")
+        if not message_id or not emoji:
+            return "Both 'message_id' and 'emoji' are required."
+        try:
+            msg = await message.channel.fetch_message(int(message_id))
+            await msg.add_reaction(emoji)
+            return "Reaction added."
+        except discord.NotFound:
+            return f"Message {message_id} not found in this channel."
+        except discord.Forbidden:
+            return "Permission denied to add reaction."
+        except Exception as e:
+            return f"Failed to add reaction: {e}"
+
+    async def _handle_create_poll(self, message: discord.Message, inp: dict) -> str:
+        """Create a Discord native poll in the current channel."""
+        from datetime import timedelta
+
+        question = inp.get("question")
+        options = inp.get("options", [])
+        if not question or not options:
+            return "Both 'question' and 'options' are required."
+        if len(options) > 10:
+            return "Discord polls support a maximum of 10 options."
+        # Scrub secrets from poll content before sending to Discord
+        question = scrub_response_secrets(str(question))
+        options = [scrub_response_secrets(str(opt)) for opt in options]
+        duration_hours = min(inp.get("duration_hours", 24), 168)
+        multiple = inp.get("multiple", False)
+        try:
+            poll = discord.Poll(
+                question=question,
+                duration=timedelta(hours=duration_hours),
+                multiple=multiple,
+            )
+            for opt in options:
+                poll.add_answer(text=opt)
+            await message.channel.send(poll=poll)
+            return "Poll created."
+        except Exception as e:
+            return f"Failed to create poll: {e}"
+
+    async def _handle_broadcast(self, message: discord.Message, inp: dict) -> str:
+        """Send a message with optional rich embed to the current channel."""
+        text = inp.get("text")
+        embed_data = inp.get("embed")
+        embed_obj = None
+
+        if embed_data and isinstance(embed_data, dict):
+            color_str = embed_data.get("color", "#000000")
+            try:
+                color_val = int(color_str.lstrip("#"), 16)
+            except (ValueError, AttributeError):
+                color_val = 0
+            embed_obj = discord.Embed(
+                title=embed_data.get("title"),
+                description=embed_data.get("description"),
+                color=color_val,
+            )
+            for field in embed_data.get("fields", []):
+                embed_obj.add_field(
+                    name=field.get("name", "\u200b"),
+                    value=field.get("value", "\u200b"),
+                    inline=field.get("inline", False),
+                )
+
+        if not text and not embed_obj:
+            return "Provide 'text' and/or 'embed' content."
+
+        # Scrub secrets before sending to Discord (broadcast bypasses LLM response scrubbing)
+        if text:
+            text = scrub_response_secrets(text)
+        await message.channel.send(content=text, embed=embed_obj)
+        return "Message sent."
+
+    async def _handle_analyze_image(self, message: discord.Message, inp: dict) -> str | dict:
+        """Fetch an image and return a vision block for the LLM to analyze.
+
+        Returns either an error string or a dict with ``__image_block__`` key
+        that the tool loop injects as a vision content block.
+        """
+        import aiohttp
+
+        url = inp.get("url")
+        host = inp.get("host")
+        path = inp.get("path")
+        prompt = inp.get("prompt", "Describe this image in detail.")
+
+        image_bytes: bytes | None = None
+
+        if url:
+            # Validate URL scheme to prevent SSRF via file://, ftp://, etc.
+            if not url.startswith(("http://", "https://")):
+                return "Only http:// and https:// URLs are supported."
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                        if resp.status != 200:
+                            return f"Failed to fetch image from URL (HTTP {resp.status})"
+                        ct = resp.headers.get("Content-Type", "")
+                        if not ct.startswith("image/"):
+                            return f"URL does not point to an image (Content-Type: {ct})"
+                        image_bytes = await resp.read()
+            except Exception as e:
+                return f"Failed to fetch image from URL: {e}"
+        elif host and path:
+            # Use executor to fetch from host via base64
+            import shlex
+            resolved = self.tool_executor._resolve_host(host)
+            if not resolved:
+                return f"Unknown or disallowed host: {host}"
+            address, ssh_user, _os = resolved
+            safe_path = shlex.quote(path)
+            code, output = await self.tool_executor._exec_command(
+                address, f"base64 -w0 {safe_path}", ssh_user,
+            )
+            if code != 0:
+                return f"Failed to read image from host: {output}"
+            try:
+                image_bytes = base64.b64decode(output.strip())
+            except Exception as e:
+                return f"Failed to decode image data: {e}"
+        else:
+            return "Provide either 'url' or both 'host' and 'path'."
+
+        if not image_bytes:
+            return "No image data retrieved."
+
+        # Enforce 5MB limit (same as Discord attachment limit)
+        if len(image_bytes) > 5 * 1024 * 1024:
+            return "Image exceeds 5MB size limit."
+
+        media_type = self._detect_image_type(image_bytes)
+        if not media_type:
+            return "Unsupported image format. Supported: PNG, JPEG, GIF, WEBP."
+
+        b64 = base64.b64encode(image_bytes).decode("ascii")
+
+        # Return a special marker dict that the tool loop will inject as a
+        # vision content block.  The tool result text sent to the LLM will be
+        # the prompt, while the image block gets appended to the next user
+        # message so Codex can see it.
+        return {
+            "__image_block__": {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": media_type,
+                    "data": b64,
+                },
+            },
+            "__prompt__": prompt,
+        }
+
+    async def _handle_generate_image(self, message: discord.Message, inp: dict) -> str:
+        """Generate an image via ComfyUI and post as Discord attachment."""
+        if not self.config.comfyui.enabled:
+            return "Image generation is disabled. Enable ComfyUI in config to use this tool."
+
+        prompt_text = inp.get("prompt", "")
+        if not prompt_text:
+            return "A 'prompt' describing the image is required."
+
+        negative = inp.get("negative", "")
+        width = inp.get("width", 1024)
+        height = inp.get("height", 1024)
+
+        # Clamp dimensions to reasonable range
+        width = max(64, min(2048, width))
+        height = max(64, min(2048, height))
+
+        from ..tools.comfyui import ComfyUIClient
+
+        client = ComfyUIClient(self.config.comfyui.url)
+        image_bytes = await client.generate(
+            prompt=prompt_text,
+            negative=negative,
+            width=width,
+            height=height,
+        )
+
+        if not image_bytes:
+            return "Image generation failed. ComfyUI may be unavailable or the request timed out."
+
+        try:
+            file = discord.File(io.BytesIO(image_bytes), filename="generated.png")
+            caption = scrub_response_secrets(f"Generated: {prompt_text[:100]}")
+            await message.channel.send(content=caption, file=file)
+            return f"Image generated and posted ({len(image_bytes) / 1024:.1f} KB)."
+        except discord.HTTPException as e:
+            return f"Failed to upload generated image to Discord: {e}"
 
     async def _run_scheduled_workflow(
         self, channel: discord.abc.Messageable, schedule: dict,

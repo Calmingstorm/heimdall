@@ -1,7 +1,7 @@
 """Speech-to-text wrapper around faster-whisper.
 
 Lazy-loads the model on first request and unloads after idle timeout
-to free VRAM for Ollama.
+to free VRAM.
 """
 
 from __future__ import annotations

@@ -1,38 +1,44 @@
 from __future__ import annotations
 
-import aiohttp
+import asyncio
+from functools import partial
 
 from ..logging import get_logger
 
 log = get_logger("search.embedder")
 
-# nomic-embed-text context limit is ~8192 tokens; truncate input to ~32K chars
+# bge-small context is ~512 tokens; truncate input to ~32K chars to be safe
 MAX_INPUT_CHARS = 32_000
 
 
-class OllamaEmbedder:
-    def __init__(self, base_url: str, model: str = "nomic-embed-text") -> None:
-        self.base_url = base_url.rstrip("/")
-        self.model = model
+class LocalEmbedder:
+    """In-process text embeddings via fastembed (ONNX, CPU, no server needed)."""
+
+    MODEL = "BAAI/bge-small-en-v1.5"
+    DIMENSIONS = 384
+
+    def __init__(self) -> None:
+        self._model = None
+
+    def _ensure_model(self):
+        if self._model is None:
+            from fastembed import TextEmbedding
+            self._model = TextEmbedding(self.MODEL)
 
     async def embed(self, text: str) -> list[float] | None:
-        """Embed text via Ollama /api/embed endpoint. Returns None on failure."""
-        text = text[:MAX_INPUT_CHARS]
+        """Embed text. Returns 384-dim float list or None on failure."""
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.base_url}/api/embed",
-                    json={"model": self.model, "input": text},
-                    timeout=aiohttp.ClientTimeout(total=30),
-                ) as resp:
-                    if resp.status != 200:
-                        log.warning("Ollama embed returned %d", resp.status)
-                        return None
-                    data = await resp.json()
-                    embeddings = data.get("embeddings")
-                    if embeddings and len(embeddings) > 0:
-                        return embeddings[0]
-                    return None
+            self._ensure_model()
+            text = text[:MAX_INPUT_CHARS]
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None, partial(self._embed_sync, text)
+            )
+            return result
         except Exception as e:
-            log.warning("Ollama embed failed: %s", e)
+            log.warning("Embed failed: %s", e)
             return None
+
+    def _embed_sync(self, text: str) -> list[float]:
+        vectors = list(self._model.embed([text]))
+        return vectors[0].tolist()

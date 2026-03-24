@@ -627,6 +627,151 @@ class ToolExecutor:
         from .web import fetch_url
         return await fetch_url(inp["url"])
 
+    # --- PDF analysis ---
+
+    @staticmethod
+    def _parse_page_range(pages: str, total: int) -> list[int]:
+        """Parse a page range string like '1-5' or '3' into 0-indexed page indices."""
+        pages = pages.strip()
+        if "-" in pages:
+            parts = pages.split("-", 1)
+            try:
+                start = max(int(parts[0]) - 1, 0)
+                end = min(int(parts[1]), total)
+                return list(range(start, end))
+            except ValueError:
+                return list(range(total))
+        else:
+            try:
+                idx = int(pages) - 1
+                if 0 <= idx < total:
+                    return [idx]
+                return list(range(total))
+            except ValueError:
+                return list(range(total))
+
+    async def _handle_analyze_pdf(self, inp: dict) -> str:
+        url = inp.get("url")
+        host = inp.get("host")
+        path = inp.get("path")
+        pages_str = inp.get("pages")
+
+        # Validate URL scheme early (before heavy imports) to prevent SSRF
+        if url and not url.startswith(("http://", "https://")):
+            return "Only http:// and https:// URLs are supported."
+
+        import fitz
+
+        pdf_bytes: bytes | None = None
+
+        if url:
+            # Download PDF from URL
+            import aiohttp
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                        if resp.status != 200:
+                            return f"Failed to fetch PDF from URL (HTTP {resp.status})"
+                        pdf_bytes = await resp.read()
+            except Exception as e:
+                return f"Failed to fetch PDF from URL: {e}"
+        elif host and path:
+            # Fetch from host via base64
+            resolved = self._resolve_host(host)
+            if not resolved:
+                return f"Unknown or disallowed host: {host}"
+            address, ssh_user, _os = resolved
+            safe_path = shlex.quote(path)
+            code, output = await self._exec_command(
+                address, f"base64 -w0 {safe_path}", ssh_user,
+            )
+            if code != 0:
+                return f"Failed to read PDF from host: {output}"
+            try:
+                pdf_bytes = base64.b64decode(output.strip())
+            except Exception as e:
+                return f"Failed to decode PDF data: {e}"
+        else:
+            return "Provide either 'url' or both 'host' and 'path'."
+
+        try:
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        except Exception as e:
+            return f"Failed to open PDF: {e}"
+
+        try:
+            total = doc.page_count
+            if pages_str:
+                indices = self._parse_page_range(pages_str, total)
+            else:
+                indices = list(range(total))
+
+            parts = []
+            for i in indices:
+                page = doc[i]
+                text = page.get_text()
+                parts.append(f"## Page {i + 1}\n{text}")
+
+            result = "\n\n".join(parts)
+            # Truncate to TOOL_OUTPUT_MAX_CHARS (handled by caller, but be safe)
+            if len(result) > 12000:
+                result = result[:12000] + "\n\n[... truncated — use pages parameter for specific pages ...]"
+            return result if result.strip() else "PDF contains no extractable text. Try browser_screenshot for image-heavy PDFs."
+        finally:
+            doc.close()
+
+    # --- Process management ---
+
+    async def _handle_manage_process(self, inp: dict) -> str:
+        # Lazy-init the process registry
+        if not hasattr(self, "_process_registry"):
+            from .process_manager import ProcessRegistry
+            self._process_registry = ProcessRegistry()
+
+        action = inp.get("action", "list")
+        registry = self._process_registry
+
+        if action == "start":
+            command = inp.get("command")
+            host = inp.get("host")
+            if not command:
+                return "command is required for start action."
+            if not host:
+                return "host is required for start action."
+            # Validate host against configured hosts
+            resolved = self._resolve_host(host)
+            if not resolved:
+                return f"Unknown or disallowed host: {host}"
+            # Periodic cleanup
+            registry.cleanup()
+            return await registry.start(host, command)
+
+        elif action == "poll":
+            pid = inp.get("pid")
+            if pid is None:
+                return "pid is required for poll action."
+            return registry.poll(int(pid))
+
+        elif action == "write":
+            pid = inp.get("pid")
+            text = inp.get("input_text", "")
+            if pid is None:
+                return "pid is required for write action."
+            if not text:
+                return "input_text is required for write action."
+            return await registry.write(int(pid), text)
+
+        elif action == "kill":
+            pid = inp.get("pid")
+            if pid is None:
+                return "pid is required for kill action."
+            return await registry.kill(int(pid))
+
+        elif action == "list":
+            return registry.list_all()
+
+        return f"Unknown action: {action}"
+
     # --- Claude Code ---
 
     async def _handle_claude_code(self, inp: dict) -> str:

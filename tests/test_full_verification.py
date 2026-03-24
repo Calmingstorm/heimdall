@@ -162,11 +162,11 @@ class TestConfigSystem:
 # ---------------------------------------------------------------------------
 
 class TestToolSystem:
-    """Verify all 71 tools are registered and properly structured."""
+    """Verify all tools are registered and properly structured."""
 
     def test_tool_count(self):
         from src.tools.registry import TOOLS
-        assert len(TOOLS) == 71
+        assert len(TOOLS) == 78
 
     def test_all_tools_have_required_keys(self):
         from src.tools.registry import TOOLS

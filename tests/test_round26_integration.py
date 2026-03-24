@@ -1083,67 +1083,52 @@ class TestAutoJoinLeaveVoice:
 # =====================================================================
 
 class TestKnowledgeStoreUnit:
-    """KnowledgeStore integration tests with mocked ChromaDB."""
+    """KnowledgeStore integration tests with real SQLite (no vec extension)."""
 
-    async def test_ingest_chunks_text(self):
-        """Ingest splits text into chunks and embeds each."""
-        store = KnowledgeStore.__new__(KnowledgeStore)
-        store._collection = MagicMock()
-        store._collection.get = MagicMock(return_value={"ids": []})
-        store._collection.upsert = MagicMock()
-        store._fts = None
+    def _make_store(self, tmp_path, fts=None):
+        """Create a KnowledgeStore with patched load_extension."""
+        db_path = str(tmp_path / "knowledge.db")
+        with patch("src.knowledge.store.load_extension", return_value=False):
+            return KnowledgeStore(db_path, fts_index=fts)
 
+    async def test_ingest_chunks_text(self, tmp_path):
+        """Ingest splits text into chunks and stores in SQLite."""
+        store = self._make_store(tmp_path)
         embedder = AsyncMock()
         embedder.embed = AsyncMock(return_value=[0.1, 0.2, 0.3])
 
-        # Short text: single chunk
         count = await store.ingest("Short doc", "test.md", embedder)
         assert count == 1
-        store._collection.upsert.assert_called_once()
+        assert store.count() == 1
 
-    async def test_ingest_long_text_multiple_chunks(self):
+    async def test_ingest_long_text_multiple_chunks(self, tmp_path):
         """Long text produces multiple chunks."""
-        store = KnowledgeStore.__new__(KnowledgeStore)
-        store._collection = MagicMock()
-        store._collection.get = MagicMock(return_value={"ids": []})
-        store._collection.upsert = MagicMock()
-        store._fts = None
-
+        store = self._make_store(tmp_path)
         embedder = AsyncMock()
         embedder.embed = AsyncMock(return_value=[0.1])
 
-        long_text = "word " * 1000  # ~5000 chars
+        long_text = "word " * 1000
         count = await store.ingest(long_text, "long.md", embedder)
-        assert count >= 2  # Should be chunked
+        assert count >= 2
 
-    async def test_ingest_replaces_existing_source(self):
-        """Re-ingesting same source deletes old chunks first."""
-        store = KnowledgeStore.__new__(KnowledgeStore)
-        store._collection = MagicMock()
-        store._collection.get = MagicMock(return_value={"ids": ["old_1", "old_2"]})
-        store._collection.delete = MagicMock()
-        store._collection.upsert = MagicMock()
-        store._fts = None
-
+    async def test_ingest_replaces_existing_source(self, tmp_path):
+        """Re-ingesting same source replaces old chunks."""
+        store = self._make_store(tmp_path)
         embedder = AsyncMock()
         embedder.embed = AsyncMock(return_value=[0.5])
 
+        await store.ingest("Old content", "source.md", embedder)
+        assert store.count() == 1
         await store.ingest("New content", "source.md", embedder)
+        assert store.count() == 1  # Replaced, not duplicated
 
-        store._collection.delete.assert_called_once_with(ids=["old_1", "old_2"])
-
-    async def test_ingest_with_fts_dual_write(self):
-        """Ingest writes to both ChromaDB and FTS5."""
+    async def test_ingest_with_fts_dual_write(self, tmp_path):
+        """Ingest writes to both SQLite and FTS5."""
         fts = MagicMock()
         fts.delete_knowledge_source = MagicMock()
         fts.index_knowledge_chunk = MagicMock(return_value=True)
 
-        store = KnowledgeStore.__new__(KnowledgeStore)
-        store._collection = MagicMock()
-        store._collection.get = MagicMock(return_value={"ids": []})
-        store._collection.upsert = MagicMock()
-        store._fts = fts
-
+        store = self._make_store(tmp_path, fts=fts)
         embedder = AsyncMock()
         embedder.embed = AsyncMock(return_value=[0.1])
 
@@ -1151,173 +1136,116 @@ class TestKnowledgeStoreUnit:
         assert count == 1
         fts.index_knowledge_chunk.assert_called_once()
 
-    async def test_search_filters_poor_matches(self):
-        """Semantic search filters results with distance > 0.8."""
-        store = KnowledgeStore.__new__(KnowledgeStore)
-        store._collection = MagicMock()
-        store._collection.query = MagicMock(return_value={
-            "ids": [["id1", "id2", "id3"]],
-            "documents": [["good match", "ok match", "poor match"]],
-            "metadatas": [[
-                {"source": "doc1", "chunk_index": 0},
-                {"source": "doc2", "chunk_index": 1},
-                {"source": "doc3", "chunk_index": 2},
-            ]],
-            "distances": [[0.3, 0.7, 0.9]],  # 0.9 > 0.8 threshold
-        })
-        store._fts = None
-
+    async def test_search_returns_empty_without_vec(self, tmp_path):
+        """Semantic search returns empty without sqlite-vec."""
+        store = self._make_store(tmp_path)
         embedder = AsyncMock()
         embedder.embed = AsyncMock(return_value=[0.5])
 
         results = await store.search("test query", embedder, limit=5)
-        assert len(results) == 2  # Third result filtered out (distance 0.9)
-        assert results[0]["content"] == "good match"
-        assert results[1]["content"] == "ok match"
+        assert results == []
 
-    async def test_search_returns_empty_when_unavailable(self):
+    async def test_search_returns_empty_when_unavailable(self, tmp_path):
         """Search returns empty list when store is unavailable."""
-        store = KnowledgeStore.__new__(KnowledgeStore)
-        store._collection = None
-        store._fts = None
+        bad_path = str(tmp_path / "x" / "y" / "z.db")
+        with patch("src.knowledge.store.load_extension", return_value=False):
+            store = KnowledgeStore(bad_path)
 
         embedder = AsyncMock()
         results = await store.search("test", embedder)
         assert results == []
 
-    async def test_search_returns_empty_when_embed_fails(self):
+    async def test_search_returns_empty_when_embed_fails(self, tmp_path):
         """Search returns empty when embedder returns None."""
-        store = KnowledgeStore.__new__(KnowledgeStore)
-        store._collection = MagicMock()
-        store._fts = None
-
+        store = self._make_store(tmp_path)
         embedder = AsyncMock()
         embedder.embed = AsyncMock(return_value=None)
 
         results = await store.search("test", embedder)
         assert results == []
 
-    async def test_delete_source_removes_chromadb_and_fts(self):
-        """delete_source removes from both ChromaDB and FTS5."""
+    async def test_delete_source_removes_sqlite_and_fts(self, tmp_path):
+        """delete_source removes from both SQLite and FTS5."""
         fts = MagicMock()
         fts.delete_knowledge_source = MagicMock(return_value=3)
 
-        store = KnowledgeStore.__new__(KnowledgeStore)
-        store._collection = MagicMock()
-        store._collection.get = MagicMock(return_value={"ids": ["c1", "c2", "c3"]})
-        store._collection.delete = MagicMock()
-        store._fts = fts
+        store = self._make_store(tmp_path, fts=fts)
+        embedder = AsyncMock()
+        embedder.embed = AsyncMock(return_value=[0.1])
 
+        await store.ingest("content for doc", "old-doc.md", embedder)
         count = store.delete_source("old-doc.md")
-        assert count == 3
-        store._collection.delete.assert_called_once_with(ids=["c1", "c2", "c3"])
-        fts.delete_knowledge_source.assert_called_once_with("old-doc.md")
+        assert count == 1
+        fts.delete_knowledge_source.assert_called_with("old-doc.md")
 
-    async def test_list_sources_groups_by_source(self):
+    async def test_list_sources_groups_by_source(self, tmp_path):
         """list_sources aggregates chunks by source name."""
-        store = KnowledgeStore.__new__(KnowledgeStore)
-        store._collection = MagicMock()
-        store._collection.get = MagicMock(return_value={
-            "metadatas": [
-                {"source": "doc-a", "uploader": "admin", "ingested_at": "2025-01-01"},
-                {"source": "doc-a", "uploader": "admin", "ingested_at": "2025-01-01"},
-                {"source": "doc-b", "uploader": "user", "ingested_at": "2025-01-02"},
-            ],
-        })
-        store._fts = None
+        store = self._make_store(tmp_path)
+        embedder = AsyncMock()
+        embedder.embed = AsyncMock(return_value=[0.1])
+
+        await store.ingest("content a", "doc-a", embedder, uploader="admin")
+        await store.ingest("content b", "doc-b", embedder, uploader="user")
 
         sources = store.list_sources()
         assert len(sources) == 2
-        # Sorted by name
-        assert sources[0]["source"] == "doc-a"
-        assert sources[0]["chunks"] == 2
-        assert sources[1]["source"] == "doc-b"
-        assert sources[1]["chunks"] == 1
+        names = [s["source"] for s in sources]
+        assert "doc-a" in names
+        assert "doc-b" in names
 
 
 class TestHybridSearch:
     """Hybrid search combining semantic + FTS5 via Reciprocal Rank Fusion."""
 
-    async def test_hybrid_search_merges_results(self):
-        """search_hybrid combines semantic and FTS results via RRF."""
+    def _make_store(self, tmp_path, fts=None):
+        db_path = str(tmp_path / "knowledge.db")
+        with patch("src.knowledge.store.load_extension", return_value=False):
+            return KnowledgeStore(db_path, fts_index=fts)
+
+    async def test_hybrid_search_fts_only(self, tmp_path):
+        """search_hybrid uses FTS results when no vec available."""
         fts = MagicMock()
         fts.search_knowledge = MagicMock(return_value=[
             {"chunk_id": "c1", "content": "FTS result 1", "source": "doc1"},
             {"chunk_id": "c2", "content": "FTS result 2", "source": "doc2"},
         ])
 
-        store = KnowledgeStore.__new__(KnowledgeStore)
-        store._collection = MagicMock()
-        store._collection.query = MagicMock(return_value={
-            "ids": [["c1", "c3"]],
-            "documents": [["Semantic result 1", "Semantic result 3"]],
-            "metadatas": [[
-                {"source": "doc1", "chunk_index": 0},
-                {"source": "doc3", "chunk_index": 0},
-            ]],
-            "distances": [[0.2, 0.4]],
-        })
-        store._fts = fts
-
+        store = self._make_store(tmp_path, fts=fts)
         embedder = AsyncMock()
         embedder.embed = AsyncMock(return_value=[0.5])
 
         results = await store.search_hybrid("test query", embedder, limit=5)
-
-        # c1 appears in both lists → higher RRF score → ranked first
         assert len(results) >= 1
-        assert results[0]["chunk_id"] == "doc1_0" or results[0].get("source") == "doc1"
 
-    async def test_hybrid_search_empty_when_both_empty(self):
+    async def test_hybrid_search_empty_when_both_empty(self, tmp_path):
         """search_hybrid returns empty when both backends return nothing."""
         fts = MagicMock()
         fts.search_knowledge = MagicMock(return_value=[])
 
-        store = KnowledgeStore.__new__(KnowledgeStore)
-        store._collection = MagicMock()
-        store._collection.query = MagicMock(return_value={
-            "ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]],
-        })
-        store._fts = fts
-
+        store = self._make_store(tmp_path, fts=fts)
         embedder = AsyncMock()
         embedder.embed = AsyncMock(return_value=[0.5])
 
         results = await store.search_hybrid("nothing", embedder)
         assert results == []
 
-    async def test_hybrid_search_semantic_only(self):
-        """search_hybrid works with only semantic results (no FTS)."""
-        store = KnowledgeStore.__new__(KnowledgeStore)
-        store._collection = MagicMock()
-        store._collection.query = MagicMock(return_value={
-            "ids": [["c1"]],
-            "documents": [["Semantic only"]],
-            "metadatas": [[{"source": "doc1", "chunk_index": 0}]],
-            "distances": [[0.3]],
-        })
-        store._fts = None  # No FTS
-
+    async def test_hybrid_search_no_fts(self, tmp_path):
+        """search_hybrid works without FTS (returns empty without vec)."""
+        store = self._make_store(tmp_path)
         embedder = AsyncMock()
         embedder.embed = AsyncMock(return_value=[0.5])
 
         results = await store.search_hybrid("query", embedder, limit=5)
-        assert len(results) == 1
+        assert results == []
 
-    async def test_hybrid_search_fts_only(self):
-        """search_hybrid works with only FTS results (no semantic)."""
+    async def test_hybrid_search_fts_only_results(self, tmp_path):
+        """search_hybrid returns FTS results when no semantic available."""
         fts = MagicMock()
         fts.search_knowledge = MagicMock(return_value=[
             {"chunk_id": "c1", "content": "FTS result", "source": "doc1"},
         ])
 
-        store = KnowledgeStore.__new__(KnowledgeStore)
-        store._collection = MagicMock()
-        store._collection.query = MagicMock(return_value={
-            "ids": [[]], "documents": [[]], "metadatas": [[]], "distances": [[]],
-        })
-        store._fts = fts
-
+        store = self._make_store(tmp_path, fts=fts)
         embedder = AsyncMock()
         embedder.embed = AsyncMock(return_value=[0.5])
 

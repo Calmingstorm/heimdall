@@ -5,52 +5,7 @@ import subprocess
 
 import pytest
 
-from src.config.schema import (
-    Config,
-    SearchConfig,
-    ToolsConfig,
-    load_config,
-    _substitute_env_vars,
-)
-
-
-class TestOllamaUrlDeploymentAgnostic:
-    """ollama_url should default to localhost, not Docker-specific host."""
-
-    def test_schema_default_uses_localhost(self):
-        sc = SearchConfig()
-        assert sc.ollama_url == "http://localhost:11434"
-        assert "host.docker.internal" not in sc.ollama_url
-
-    def test_config_yml_uses_env_var_for_ollama(self):
-        content = Path("config.yml").read_text()
-        assert "${OLLAMA_URL:-" in content
-        assert "localhost:11434" in content
-
-    def test_config_yml_no_hardcoded_docker_internal(self):
-        """config.yml should not hardcode host.docker.internal."""
-        content = Path("config.yml").read_text()
-        assert "host.docker.internal" not in content
-
-    def test_docker_compose_sets_ollama_url(self):
-        """docker-compose.yml should set OLLAMA_URL for Docker deployments."""
-        content = Path("docker-compose.yml").read_text()
-        assert "OLLAMA_URL" in content
-        assert "host.docker.internal" in content
-
-    def test_config_loads_with_custom_ollama_url(self, monkeypatch):
-        monkeypatch.setenv("DISCORD_TOKEN", "test-token")
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-        monkeypatch.setenv("OLLAMA_URL", "http://10.0.0.5:11434")
-        cfg = load_config("config.yml")
-        assert cfg.search.ollama_url == "http://10.0.0.5:11434"
-
-    def test_config_loads_with_default_ollama_url(self, monkeypatch):
-        monkeypatch.setenv("DISCORD_TOKEN", "test-token")
-        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
-        monkeypatch.delenv("OLLAMA_URL", raising=False)
-        cfg = load_config("config.yml")
-        assert cfg.search.ollama_url == "http://localhost:11434"
+from src.config.schema import ToolsConfig
 
 
 class TestNoDockerOnlyAssumptions:
@@ -172,10 +127,6 @@ class TestMonitorScript:
 
 class TestEnvExample:
     """Env example covers deployment-specific variables."""
-
-    def test_env_example_has_ollama_url(self):
-        content = Path(".env.example").read_text()
-        assert "OLLAMA_URL" in content
 
     def test_env_example_documents_docker_vs_local(self):
         content = Path(".env.example").read_text()

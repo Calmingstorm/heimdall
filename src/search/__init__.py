@@ -1,6 +1,6 @@
-from .embedder import OllamaEmbedder
+from .embedder import LocalEmbedder
 from .fts import FullTextIndex
 from .hybrid import reciprocal_rank_fusion
 from .vectorstore import SessionVectorStore
 
-__all__ = ["FullTextIndex", "OllamaEmbedder", "SessionVectorStore", "reciprocal_rank_fusion"]
+__all__ = ["FullTextIndex", "LocalEmbedder", "SessionVectorStore", "reciprocal_rank_fusion"]

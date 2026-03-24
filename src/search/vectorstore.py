@@ -1,52 +1,75 @@
+"""Session archive vector store — semantic search over archived conversations.
+
+Uses SQLite + sqlite-vec for vector storage and FTS5 for keyword search.
+Archives are indexed when sessions are compacted, enabling cross-session search.
+"""
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ..logging import get_logger
 from .hybrid import reciprocal_rank_fusion
+from .sqlite_vec import load_extension, serialize_vector
 
 if TYPE_CHECKING:
-    from .embedder import OllamaEmbedder
+    from .embedder import LocalEmbedder
     from .fts import FullTextIndex
 
 log = get_logger("search.vectorstore")
 
-try:
-    import chromadb
-    HAS_CHROMADB = True
-except ImportError:
-    HAS_CHROMADB = False
-
-COLLECTION_NAME = "session_archives"
 MAX_MESSAGES_PER_DOC = 20
 MAX_MSG_CHARS = 500
+VECTOR_DIM = 384  # must match LocalEmbedder.DIMENSIONS
 
 
 class SessionVectorStore:
-    def __init__(self, chromadb_path: str, fts_index: FullTextIndex | None = None) -> None:
-        self._client = None
-        self._collection = None
+    """Semantic + FTS search over archived session conversations."""
+
+    def __init__(self, db_path: str, fts_index: FullTextIndex | None = None) -> None:
+        self._conn: sqlite3.Connection | None = None
+        self._has_vec = False
         self._fts = fts_index
-        if not HAS_CHROMADB:
-            log.warning("chromadb not installed — semantic search disabled")
-            return
         try:
-            self._client = chromadb.PersistentClient(path=chromadb_path)
-            self._collection = self._client.get_or_create_collection(
-                name=COLLECTION_NAME,
-                metadata={"hnsw:space": "cosine"},
+            conn = sqlite3.connect(db_path, check_same_thread=False)
+            conn.execute("PRAGMA journal_mode=WAL")
+            self._has_vec = load_extension(conn)
+            if not self._has_vec:
+                log.warning("sqlite-vec not available — semantic session search disabled, FTS-only mode")
+            # Metadata table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS session_archives (
+                    doc_id TEXT PRIMARY KEY,
+                    content TEXT NOT NULL,
+                    channel_id TEXT NOT NULL DEFAULT '',
+                    last_active REAL NOT NULL DEFAULT 0,
+                    message_count INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_session_channel ON session_archives(channel_id)"
             )
-            log.info("ChromaDB initialized at %s", chromadb_path)
+            # Vector table (only if sqlite-vec loaded)
+            if self._has_vec:
+                conn.execute(f"""
+                    CREATE VIRTUAL TABLE IF NOT EXISTS session_vec USING vec0(
+                        doc_id TEXT PRIMARY KEY,
+                        embedding float[{VECTOR_DIM}] distance_metric=cosine
+                    )
+                """)
+            conn.commit()
+            self._conn = conn
+            log.info("Session vector store initialized at %s (vec=%s)", db_path, self._has_vec)
         except Exception as e:
-            log.error("ChromaDB init failed: %s", e)
+            log.error("Session vector store init failed: %s", e)
 
     @property
     def available(self) -> bool:
-        return self._collection is not None
+        return self._conn is not None
 
-    async def index_session(self, archive_path: Path, embedder: OllamaEmbedder) -> bool:
+    async def index_session(self, archive_path: Path, embedder: LocalEmbedder) -> bool:
         """Index a single archived session JSON. Returns True on success."""
         if not self.available:
             return False
@@ -61,38 +84,44 @@ class SessionVectorStore:
         if not doc_text:
             return False
 
-        vector = await embedder.embed(doc_text)
-        if vector is None:
-            log.warning("Failed to embed archive %s", archive_path.name)
-            return False
+        channel_id = str(data.get("channel_id", ""))
+        last_active = float(data.get("last_active", 0))
+        message_count = len(data.get("messages", []))
 
         try:
-            self._collection.upsert(
-                ids=[doc_id],
-                documents=[doc_text],
-                embeddings=[vector],
-                metadatas=[{
-                    "channel_id": str(data.get("channel_id", "")),
-                    "last_active": float(data.get("last_active", 0)),
-                    "message_count": len(data.get("messages", [])),
-                }],
+            # Always write metadata
+            self._conn.execute(
+                "INSERT OR REPLACE INTO session_archives "
+                "(doc_id, content, channel_id, last_active, message_count) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (doc_id, doc_text, channel_id, last_active, message_count),
             )
-            # Dual-write to FTS5
+            # Always write to FTS5 (decoupled from embedding success)
             if self._fts:
-                self._fts.index_session(
-                    doc_id, doc_text,
-                    str(data.get("channel_id", "")),
-                    float(data.get("last_active", 0)),
-                )
-            log.info("Indexed session %s for semantic search", doc_id)
+                self._fts.index_session(doc_id, doc_text, channel_id, last_active)
+
+            # Try vector embedding (optional — FTS still works without it)
+            if self._has_vec and embedder:
+                vector = await embedder.embed(doc_text)
+                if vector is not None:
+                    vec_bytes = serialize_vector(vector)
+                    self._conn.execute(
+                        "INSERT OR REPLACE INTO session_vec (doc_id, embedding) VALUES (?, ?)",
+                        (doc_id, vec_bytes),
+                    )
+                else:
+                    log.warning("Failed to embed archive %s", archive_path.name)
+
+            self._conn.commit()
+            log.info("Indexed session %s for search", doc_id)
             return True
         except Exception as e:
-            log.error("ChromaDB upsert failed for %s: %s", doc_id, e)
+            log.error("Session index failed for %s: %s", doc_id, e)
             return False
 
-    async def search(self, query: str, embedder: OllamaEmbedder, limit: int = 10) -> list[dict]:
-        """Semantic search across archived sessions. Returns results in search_history format."""
-        if not self.available:
+    async def search(self, query: str, embedder: LocalEmbedder, limit: int = 10) -> list[dict]:
+        """Semantic search across archived sessions."""
+        if not self.available or not self._has_vec:
             return []
 
         vector = await embedder.embed(query)
@@ -100,39 +129,39 @@ class SessionVectorStore:
             return []
 
         try:
-            results = self._collection.query(
-                query_embeddings=[vector],
-                n_results=limit,
-                include=["documents", "metadatas", "distances"],
-            )
+            vec_bytes = serialize_vector(vector)
+            rows = self._conn.execute(
+                """
+                SELECT v.doc_id, v.distance, a.content, a.channel_id, a.last_active
+                FROM session_vec v
+                JOIN session_archives a ON a.doc_id = v.doc_id
+                WHERE v.embedding MATCH ?
+                AND k = ?
+                ORDER BY v.distance
+                """,
+                (vec_bytes, limit),
+            ).fetchall()
         except Exception as e:
-            log.warning("ChromaDB query failed: %s", e)
+            log.warning("Session vector search failed: %s", e)
             return []
 
         out = []
-        if not results or not results.get("ids") or not results["ids"][0]:
-            return out
-
-        for i, doc_id in enumerate(results["ids"][0]):
-            meta = results["metadatas"][0][i] if results.get("metadatas") else {}
-            doc = results["documents"][0][i] if results.get("documents") else ""
-            distance = results["distances"][0][i] if results.get("distances") else 1.0
-
-            # Cosine distance: 0 = identical, 2 = opposite. Skip poor matches.
-            if distance > 1.0:
+        for row in rows:
+            distance = row[1]
+            # Cosine distance: 0 = identical, higher = more different. Skip poor matches.
+            if distance > 0.8:
                 continue
-
             out.append({
                 "type": "semantic",
-                "content": doc[:500],
-                "timestamp": float(meta.get("last_active", 0)),
-                "channel_id": str(meta.get("channel_id", "unknown")),
+                "content": row[2][:500],
+                "timestamp": float(row[4]),
+                "channel_id": str(row[3]),
             })
 
         return out
 
-    async def backfill(self, archive_dir: Path, embedder: OllamaEmbedder) -> int:
-        """Index all archive JSONs not yet in ChromaDB. Returns count of newly indexed."""
+    async def backfill(self, archive_dir: Path, embedder: LocalEmbedder) -> int:
+        """Index all archive JSONs not yet indexed. Returns count of newly indexed."""
         if not self.available:
             return 0
         if not archive_dir.exists():
@@ -140,7 +169,10 @@ class SessionVectorStore:
 
         # Get already-indexed IDs
         try:
-            existing = set(self._collection.get()["ids"])
+            existing = {
+                r[0] for r in
+                self._conn.execute("SELECT doc_id FROM session_archives").fetchall()
+            }
         except Exception:
             existing = set()
 
@@ -152,7 +184,7 @@ class SessionVectorStore:
             if await self.index_session(path, embedder):
                 count += 1
 
-        # Backfill FTS5 for any sessions already in ChromaDB but not in FTS
+        # Backfill FTS5 for any sessions in SQLite but not in FTS
         if self._fts:
             for path in sorted(archive_dir.glob("*.json")):
                 doc_id = path.stem
@@ -173,10 +205,16 @@ class SessionVectorStore:
         return count
 
     async def search_hybrid(
-        self, query: str, embedder: OllamaEmbedder, limit: int = 10,
+        self, query: str, embedder: LocalEmbedder | None, limit: int = 10,
     ) -> list[dict]:
-        """Combined FTS5 + semantic search with Reciprocal Rank Fusion."""
-        semantic_results = await self.search(query, embedder, limit=limit * 2)
+        """Combined FTS5 + semantic search with Reciprocal Rank Fusion.
+
+        Works in FTS-only mode when embedder is None or vector search unavailable.
+        """
+        semantic_results = []
+        if embedder and self._has_vec:
+            semantic_results = await self.search(query, embedder, limit=limit * 2)
+
         fts_results = []
         if self._fts:
             fts_results = self._fts.search_sessions(query, limit=limit * 2)

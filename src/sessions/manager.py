@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from ..logging import get_logger
 if TYPE_CHECKING:
     from ..learning.reflector import ConversationReflector
-    from ..search.embedder import OllamaEmbedder
+    from ..search.embedder import LocalEmbedder
     from ..search.vectorstore import SessionVectorStore
 
 # Type alias for the compaction callable:
@@ -50,7 +50,7 @@ class SessionManager:
         persist_dir: str,
         reflector: ConversationReflector | None = None,
         vector_store: SessionVectorStore | None = None,
-        embedder: OllamaEmbedder | None = None,
+        embedder: LocalEmbedder | None = None,
     ) -> None:
         self.max_history = max_history
         self.max_age_seconds = max_age_hours * 3600
@@ -326,8 +326,8 @@ class SessionManager:
             self._reflection_tasks.add(task)
             task.add_done_callback(self._reflection_tasks.discard)
 
-        # Index for semantic search
-        if self._vector_store and self._embedder and self._vector_store.available:
+        # Index for semantic + FTS search
+        if self._vector_store and self._vector_store.available:
             task = asyncio.create_task(self._safe_index(path))
             self._indexing_tasks.add(task)
             task.add_done_callback(self._indexing_tasks.discard)
@@ -406,7 +406,7 @@ class SessionManager:
             return results[:limit]
 
         # Step 3: hybrid search (FTS5 + semantic) fills remaining slots
-        if len(results) < limit and self._vector_store and self._embedder:
+        if len(results) < limit and self._vector_store:
             try:
                 hybrid_results = await self._vector_store.search_hybrid(
                     query, self._embedder, limit=limit,

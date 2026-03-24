@@ -2,8 +2,8 @@
 
 After a successful tool loop, records {query, tools_used, embedding, timestamp}.
 Before starting a tool loop, finds similar past queries and suggests tool
-sequences that worked well. Uses semantic similarity (Ollama embeddings) when
-available, falls back to Jaccard keyword overlap otherwise.
+sequences that worked well. Uses semantic similarity (local embeddings via fastembed)
+when available, falls back to Jaccard keyword overlap otherwise.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..search.embedder import OllamaEmbedder
+    from ..search.embedder import LocalEmbedder
 
 MAX_ENTRIES = 200
 EXPIRY_DAYS = 30
@@ -111,7 +111,7 @@ class ToolMemory:
         query: str,
         tools_used: list[str],
         success: bool = True,
-        embedder: OllamaEmbedder | None = None,
+        embedder: LocalEmbedder | None = None,
     ) -> None:
         """Record a tool use pattern after a tool loop completes."""
         if not tools_used:
@@ -148,7 +148,7 @@ class ToolMemory:
         query: str,
         limit: int = 3,
         allowed_tools: set[str] | None = None,
-        embedder: OllamaEmbedder | None = None,
+        embedder: LocalEmbedder | None = None,
     ) -> list[dict]:
         """Find successful tool patterns similar to the given query.
 
@@ -209,7 +209,7 @@ class ToolMemory:
         self,
         query: str,
         allowed_tools: set[str] | None = None,
-        embedder: OllamaEmbedder | None = None,
+        embedder: LocalEmbedder | None = None,
     ) -> str:
         """Format tool pattern hints for system prompt injection.
 

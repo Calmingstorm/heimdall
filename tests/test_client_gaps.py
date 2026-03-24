@@ -54,7 +54,7 @@ def _minimal_config(tmp_path, **overrides):
         sessions=SessionsConfig(persist_directory=str(tmp_path / "sessions")),
         usage=UsageConfig(directory=str(tmp_path / "usage")),
         context=ContextConfig(directory=str(tmp_path / "context")),
-        search=SearchConfig(enabled=False, chromadb_path=str(tmp_path / "chromadb")),
+        search=SearchConfig(enabled=False, search_db_path=str(tmp_path / "search")),
         voice=VoiceConfig(enabled=False),
         browser=BrowserConfig(enabled=False),
         openai_codex=OpenAICodexConfig(enabled=False),
@@ -81,7 +81,7 @@ _CORE_PATCHES = [
     "AuditLogger",
     "PermissionManager",
     "ToolMemory",
-    "OllamaEmbedder",
+    "LocalEmbedder",
     "SessionVectorStore",
     "KnowledgeStore",
     "VoiceManager",
@@ -336,7 +336,7 @@ class TestLokiBotInit:
             tmp_path,
             search=SearchConfig(
                 enabled=True,
-                chromadb_path=str(tmp_path / "chromadb"),
+                search_db_path=str(tmp_path / "search"),
             ),
         )
         overrides = {
@@ -346,7 +346,7 @@ class TestLokiBotInit:
         }
         bot, mocks = _construct_bot(config, mock_overrides=overrides)
 
-        mocks["OllamaEmbedder"].assert_called_once()
+        mocks["LocalEmbedder"].assert_called_once()
         assert bot._embedder is not None
         assert bot._vector_store is not None
         assert bot._knowledge_store is not None
@@ -358,7 +358,7 @@ class TestLokiBotInit:
             tmp_path,
             search=SearchConfig(
                 enabled=True,
-                chromadb_path=str(tmp_path / "chromadb"),
+                search_db_path=str(tmp_path / "search"),
             ),
         )
         overrides = {
@@ -556,7 +556,7 @@ class TestBackfillArchives:
         stub = _make_bot_stub()
         stub._backfill_archives = LokiBot._backfill_archives.__get__(stub)
         stub._vector_store = AsyncMock()
-        stub._vector_store.backfill = AsyncMock(side_effect=RuntimeError("chromadb down"))
+        stub._vector_store.backfill = AsyncMock(side_effect=RuntimeError("store down"))
         stub._embedder = MagicMock()
 
         # Should not raise

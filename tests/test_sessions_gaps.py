@@ -230,7 +230,7 @@ class TestSafeIndex:
         """_safe_index catches and logs indexing errors without crashing."""
         mock_vs = MagicMock()
         mock_vs.available = True
-        mock_vs.index_session = AsyncMock(side_effect=RuntimeError("ChromaDB down"))
+        mock_vs.index_session = AsyncMock(side_effect=RuntimeError("vector store down"))
         mock_embedder = MagicMock()
 
         mgr = SessionManager(
@@ -421,7 +421,7 @@ class TestSearchHistoryAdvanced:
         """search_history returns keyword results even if hybrid search fails."""
         mock_vs = MagicMock()
         mock_vs.available = True
-        mock_vs.search_hybrid = AsyncMock(side_effect=RuntimeError("ChromaDB error"))
+        mock_vs.search_hybrid = AsyncMock(side_effect=RuntimeError("vector store error"))
         mock_embedder = MagicMock()
 
         mgr = SessionManager(

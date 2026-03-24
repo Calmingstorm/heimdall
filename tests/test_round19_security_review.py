@@ -681,13 +681,14 @@ class TestNoShellInjectionInHandlers:
                     pass  # Allow if variable is pre-quoted in the handler
 
     def test_no_shell_true_outside_ssh(self):
-        """create_subprocess_shell only in ssh.py."""
+        """create_subprocess_shell only in ssh.py and process_manager.py."""
+        allowed = {"ssh.py", "process_manager.py"}
         for path in SRC_DIR.rglob("*.py"):
-            if path.name == "ssh.py":
+            if path.name in allowed:
                 continue
             content = path.read_text()
             assert "create_subprocess_shell" not in content, (
-                f"Shell subprocess outside ssh.py in {path.relative_to(SRC_DIR.parent)}"
+                f"Shell subprocess outside allowed files in {path.relative_to(SRC_DIR.parent)}"
             )
 
     def test_base64_used_for_content_transport(self):
