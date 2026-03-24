@@ -1647,6 +1647,47 @@ TOOLS: list[dict] = [
             },
         },
     },
+    # --- Process management ---
+    {
+        "name": "manage_process",
+        "description": (
+            "Manages background processes: start, poll output, send stdin, kill, or list. "
+            "Start spawns a long-running command and returns its PID. Poll returns recent output lines. "
+            "Write sends text to stdin. Kill terminates the process. List shows all tracked processes. "
+            "Max 20 concurrent, auto-killed after 1 hour."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["start", "poll", "write", "kill", "list"],
+                    "description": "Action to perform",
+                },
+                "host": {
+                    "type": "string",
+                    "description": "Host alias (required for start)",
+                },
+                "command": {
+                    "type": "string",
+                    "description": "Shell command to run (required for start)",
+                },
+                "pid": {
+                    "type": "integer",
+                    "description": "Process ID (required for poll, write, kill)",
+                },
+                "input_text": {
+                    "type": "string",
+                    "description": "Text to send to stdin (required for write)",
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": "Max lifetime in seconds (default 300, max 3600)",
+                },
+            },
+            "required": ["action"],
+        },
+    },
     # --- List management ---
     {
         "name": "manage_list",

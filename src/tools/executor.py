@@ -716,6 +716,54 @@ class ToolExecutor:
         finally:
             doc.close()
 
+    # --- Process management ---
+
+    async def _handle_manage_process(self, inp: dict) -> str:
+        # Lazy-init the process registry
+        if not hasattr(self, "_process_registry"):
+            from .process_manager import ProcessRegistry
+            self._process_registry = ProcessRegistry()
+
+        action = inp.get("action", "list")
+        registry = self._process_registry
+
+        if action == "start":
+            command = inp.get("command")
+            host = inp.get("host")
+            if not command:
+                return "command is required for start action."
+            if not host:
+                return "host is required for start action."
+            # Periodic cleanup
+            registry.cleanup()
+            return await registry.start(host, command)
+
+        elif action == "poll":
+            pid = inp.get("pid")
+            if pid is None:
+                return "pid is required for poll action."
+            return registry.poll(int(pid))
+
+        elif action == "write":
+            pid = inp.get("pid")
+            text = inp.get("input_text", "")
+            if pid is None:
+                return "pid is required for write action."
+            if not text:
+                return "input_text is required for write action."
+            return await registry.write(int(pid), text)
+
+        elif action == "kill":
+            pid = inp.get("pid")
+            if pid is None:
+                return "pid is required for kill action."
+            return await registry.kill(int(pid))
+
+        elif action == "list":
+            return registry.list_all()
+
+        return f"Unknown action: {action}"
+
     # --- Claude Code ---
 
     async def _handle_claude_code(self, inp: dict) -> str:
