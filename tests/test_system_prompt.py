@@ -1,6 +1,7 @@
 """Tests for llm/system_prompt.py."""
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import patch
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -12,6 +13,8 @@ from src.llm.system_prompt import (
     CHAT_SYSTEM_PROMPT_TEMPLATE,
     SYSTEM_PROMPT_TEMPLATE,
 )
+
+_ARCH_CONTEXT = (Path(__file__).parent.parent / "data" / "context" / "architecture.md").read_text()
 
 
 class TestBuildSystemPrompt:
@@ -55,17 +58,25 @@ class TestBuildSystemPrompt:
         )
         assert "Connected to General voice channel" in prompt
 
-    def test_includes_infrastructure_sections(self):
-        """Full prompt must include all infra-specific sections."""
+    def test_includes_identity_sections(self):
+        """Full prompt must include identity sections (operational guidance is in context files)."""
         prompt = build_system_prompt(
             context="", hosts={}, services=[], playbooks=[],
         )
         assert "Your Capabilities" in prompt
+        assert "Rules" in prompt
+        assert "PromQL" in prompt
+        assert "EXECUTOR" in prompt
+
+    def test_context_injects_architecture(self):
+        """When architecture context is loaded, operational sections appear in built prompt."""
+        prompt = build_system_prompt(
+            context=_ARCH_CONTEXT, hosts={}, services=[], playbooks=[],
+        )
         assert "Claude Code Delegation" in prompt
         assert "Knowledge Base" in prompt
         assert "Background Tasks" in prompt
         assert "Common Patterns" in prompt
-        assert "PromQL" in prompt
 
 
 class TestBuildChatSystemPrompt:
@@ -172,12 +183,9 @@ class TestSystemPromptQuality:
         assert "claude_code" in prompt.lower() or "claude code" in prompt.lower()
 
     def test_delegate_task_critical_rule_present(self):
-        """The CRITICAL rule about actually calling delegate_task must be present."""
-        prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
-        )
-        assert "MUST" in prompt
-        assert "delegate_task" in prompt
+        """The CRITICAL rule about actually calling delegate_task must be in context."""
+        assert "MUST" in _ARCH_CONTEXT
+        assert "delegate_task" in _ARCH_CONTEXT
 
     def test_inline_code_rule_present(self):
         """System prompt must instruct Codex to never write code inline."""
@@ -212,26 +220,18 @@ class TestSystemPromptQuality:
             assert phrase in prompt, f"Must forbid phrase: {phrase}"
         # Must identify as executor, not assistant
         assert "EXECUTOR" in prompt
-        # Must instruct run_script for multi-line scripts
-        assert "run_script" in prompt
-        assert "writes to temp file" in prompt.lower() or "run_script" in prompt
+        # run_script guidance is in architecture context file
+        assert "run_script" in _ARCH_CONTEXT
 
     def test_no_inline_heredoc_pattern(self):
-        """System prompt must forbid inline heredocs/multi-line SSH commands."""
-        prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
-        )
-        assert "heredoc" in prompt.lower()
-        assert "no heredocs" in prompt.lower() or "run_script" in prompt
+        """Architecture context must forbid inline heredocs/multi-line SSH commands."""
+        assert "heredoc" in _ARCH_CONTEXT.lower()
+        assert "run_script" in _ARCH_CONTEXT
 
     def test_run_script_referenced(self):
-        """System prompt must reference run_script for multi-line scripts."""
-        prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
-        )
-        assert "run_script" in prompt
-        # Must say to use run_script for complex/multi-line scripts
-        assert "multi-line" in prompt.lower() or "multi_line" in prompt.lower()
+        """Architecture context must reference run_script for multi-line scripts."""
+        assert "run_script" in _ARCH_CONTEXT
+        assert "multi-line" in _ARCH_CONTEXT.lower() or "Multi-line" in _ARCH_CONTEXT
 
 
 class TestTimezoneSupport:
@@ -285,10 +285,10 @@ class TestTimezoneSupport:
         assert "All times Eastern" not in prompt
 
     def test_system_prompt_shows_configured_timezone(self):
-        """System prompt scheduling section shows the configured timezone."""
+        """System prompt shows the scheduling timezone."""
         prompt = build_system_prompt(
             context="", hosts={}, services=[], playbooks=[],
             tz="America/Chicago",
         )
         # Should show CST or CDT depending on time of year
-        assert "configured timezone" in prompt
+        assert "Scheduling timezone" in prompt

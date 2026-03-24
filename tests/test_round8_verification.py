@@ -9,6 +9,7 @@ _last_tool_use) are consolidated into test_round10_verification.py.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 from src.llm.system_prompt import (
     build_system_prompt,
@@ -18,10 +19,12 @@ from src.llm.system_prompt import (
 )
 from src.tools.registry import TOOLS
 
+_ARCH_CONTEXT = (Path(__file__).parent.parent / "data" / "context" / "architecture.md").read_text()
+
 
 def _build_prompt() -> str:
     return build_system_prompt(
-        context="", hosts={"web": "10.0.0.1"}, services=["nginx"], playbooks=["deploy"],
+        context=_ARCH_CONTEXT, hosts={"web": "10.0.0.1"}, services=["nginx"], playbooks=["deploy"],
     )
 
 
@@ -162,17 +165,23 @@ class TestTemplateSafety:
         assert not unfilled, f"Unfilled format fields: {unfilled}"
 
     def test_template_has_expected_sections(self):
-        sections = [
+        """Template has identity sections; operational sections are in context files."""
+        template_sections = [
             "## Current Date",
             "## Your Capabilities",
-            "## Claude Code Delegation",
-            "## Knowledge Base",
-            "## Background Tasks",
             "## Rules",
             "## Available Hosts",
         ]
-        for section in sections:
+        for section in template_sections:
             assert section in SYSTEM_PROMPT_TEMPLATE, f"Missing section: {section}"
+        # Operational sections moved to architecture.md context file
+        context_sections = [
+            "## Claude Code Delegation",
+            "## Knowledge Base",
+            "## Background Tasks",
+        ]
+        for section in context_sections:
+            assert section in _ARCH_CONTEXT, f"Missing in context: {section}"
 
     def test_char_budget_remaining(self):
         """At least 100 chars of budget remaining."""

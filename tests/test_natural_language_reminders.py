@@ -297,21 +297,17 @@ class TestScheduleTaskDescription:
 
 
 class TestSystemPromptReminders:
-    def test_full_prompt_has_reminders_section(self):
-        from src.llm.system_prompt import build_system_prompt
+    def test_context_has_reminders_section(self):
+        from pathlib import Path
 
-        prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[]
-        )
-        assert "Reminders and Scheduling" in prompt
+        arch = (Path(__file__).parent.parent / "data" / "context" / "architecture.md").read_text()
+        assert "Reminders and Scheduling" in arch
 
-    def test_full_prompt_has_time_examples(self):
-        from src.llm.system_prompt import build_system_prompt
+    def test_context_has_time_examples(self):
+        from pathlib import Path
 
-        prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[]
-        )
-        assert "parse_time" in prompt
+        arch = (Path(__file__).parent.parent / "data" / "context" / "architecture.md").read_text()
+        assert "parse_time" in arch
 
     def test_full_prompt_has_current_datetime(self):
         from src.llm.system_prompt import build_system_prompt
