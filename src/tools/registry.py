@@ -22,6 +22,7 @@ TOOL_PACKS: dict[str, list[str]] = {
         "git_status", "git_log", "git_diff", "git_show",
         "git_pull", "git_commit", "git_push", "git_branch",
     ],
+    "comfyui": ["generate_image"],
 }
 
 # All tool names that belong to any pack
@@ -1753,6 +1754,38 @@ TOOLS: list[dict] = [
                     "description": "What to look for (default: describe the image)",
                 },
             },
+        },
+    },
+    # --- Image generation (ComfyUI) ---
+    {
+        "name": "generate_image",
+        "description": (
+            "Generates an image from a text prompt using ComfyUI (Stable Diffusion). "
+            "Posts the result as a Discord attachment. "
+            "Supports positive prompt, negative prompt, and custom dimensions. "
+            "Requires ComfyUI to be enabled in config."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "prompt": {
+                    "type": "string",
+                    "description": "Text description of the image to generate",
+                },
+                "negative": {
+                    "type": "string",
+                    "description": "Negative prompt — things to avoid (default: empty)",
+                },
+                "width": {
+                    "type": "integer",
+                    "description": "Image width in pixels (default 1024)",
+                },
+                "height": {
+                    "type": "integer",
+                    "description": "Image height in pixels (default 1024)",
+                },
+            },
+            "required": ["prompt"],
         },
     },
 ]

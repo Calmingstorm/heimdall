@@ -1844,6 +1844,8 @@ class LokiBot(discord.Client):
                         result = await self._handle_broadcast(message, tool_input)
                     elif tool_name == "analyze_image":
                         result = await self._handle_analyze_image(message, tool_input)
+                    elif tool_name == "generate_image":
+                        result = await self._handle_generate_image(message, tool_input)
                     elif tool_name == "list_skills":
                         skills = self.skill_manager.list_skills()
                         if not skills:
@@ -2777,6 +2779,44 @@ class LokiBot(discord.Client):
             },
             "__prompt__": prompt,
         }
+
+    async def _handle_generate_image(self, message: discord.Message, inp: dict) -> str:
+        """Generate an image via ComfyUI and post as Discord attachment."""
+        if not self.config.comfyui.enabled:
+            return "Image generation is disabled. Enable ComfyUI in config to use this tool."
+
+        prompt_text = inp.get("prompt", "")
+        if not prompt_text:
+            return "A 'prompt' describing the image is required."
+
+        negative = inp.get("negative", "")
+        width = inp.get("width", 1024)
+        height = inp.get("height", 1024)
+
+        # Clamp dimensions to reasonable range
+        width = max(64, min(2048, width))
+        height = max(64, min(2048, height))
+
+        from ..tools.comfyui import ComfyUIClient
+
+        client = ComfyUIClient(self.config.comfyui.url)
+        image_bytes = await client.generate(
+            prompt=prompt_text,
+            negative=negative,
+            width=width,
+            height=height,
+        )
+
+        if not image_bytes:
+            return "Image generation failed. ComfyUI may be unavailable or the request timed out."
+
+        try:
+            file = discord.File(io.BytesIO(image_bytes), filename="generated.png")
+            caption = f"Generated: {prompt_text[:100]}"
+            await message.channel.send(content=caption, file=file)
+            return f"Image generated and posted ({len(image_bytes) / 1024:.1f} KB)."
+        except discord.HTTPException as e:
+            return f"Failed to upload generated image to Discord: {e}"
 
     async def _run_scheduled_workflow(
         self, channel: discord.abc.Messageable, schedule: dict,

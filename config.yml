@@ -91,3 +91,7 @@ voice:
 browser:
   enabled: false
   cdp_url: "ws://loki-browser:3000?token=${BROWSER_TOKEN:-loki-internal}"
+
+# comfyui:
+#   enabled: false
+#   url: http://localhost:8188

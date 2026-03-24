@@ -111,6 +111,11 @@ class PermissionsConfig(BaseModel):
     overrides_path: str = "./data/permissions.json"
 
 
+class ComfyUIConfig(BaseModel):
+    enabled: bool = False
+    url: str = "http://localhost:8188"
+
+
 class MonitorCheck(BaseModel):
     name: str
     type: str  # "disk", "memory", "service", "promql"
@@ -144,6 +149,7 @@ class Config(BaseModel):
     monitoring: MonitoringConfig = MonitoringConfig()
     browser: BrowserConfig = BrowserConfig()
     permissions: PermissionsConfig = PermissionsConfig()
+    comfyui: ComfyUIConfig = ComfyUIConfig()
 
 
 def _substitute_env_vars(text: str) -> str:
