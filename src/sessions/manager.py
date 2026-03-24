@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from ..logging import get_logger
 if TYPE_CHECKING:
     from ..learning.reflector import ConversationReflector
-    from ..search.embedder import OllamaEmbedder
+    from ..search.embedder import LocalEmbedder
     from ..search.vectorstore import SessionVectorStore
 
 # Type alias for the compaction callable:
@@ -50,7 +50,7 @@ class SessionManager:
         persist_dir: str,
         reflector: ConversationReflector | None = None,
         vector_store: SessionVectorStore | None = None,
-        embedder: OllamaEmbedder | None = None,
+        embedder: LocalEmbedder | None = None,
     ) -> None:
         self.max_history = max_history
         self.max_age_seconds = max_age_hours * 3600

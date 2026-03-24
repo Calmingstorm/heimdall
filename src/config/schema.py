@@ -85,8 +85,6 @@ class LearningConfig(BaseModel):
 
 class SearchConfig(BaseModel):
     enabled: bool = True
-    ollama_url: str = "http://localhost:11434"
-    embed_model: str = "nomic-embed-text"
     chromadb_path: str = "./data/chromadb"
 
 

@@ -14,7 +14,7 @@ from ..logging import get_logger
 from ..search.hybrid import reciprocal_rank_fusion
 
 if TYPE_CHECKING:
-    from ..search.embedder import OllamaEmbedder
+    from ..search.embedder import LocalEmbedder
     from ..search.fts import FullTextIndex
 
 log = get_logger("knowledge")
@@ -64,7 +64,7 @@ class KnowledgeStore:
         self,
         content: str,
         source: str,
-        embedder: OllamaEmbedder,
+        embedder: LocalEmbedder,
         *,
         uploader: str = "system",
     ) -> int:
@@ -132,7 +132,7 @@ class KnowledgeStore:
     async def search(
         self,
         query: str,
-        embedder: OllamaEmbedder,
+        embedder: LocalEmbedder,
         limit: int = 5,
     ) -> list[dict]:
         """Semantic search across the knowledge base.
@@ -225,7 +225,7 @@ class KnowledgeStore:
         return 0
 
     async def search_hybrid(
-        self, query: str, embedder: OllamaEmbedder, limit: int = 5,
+        self, query: str, embedder: LocalEmbedder, limit: int = 5,
     ) -> list[dict]:
         """Combined FTS5 + semantic search with Reciprocal Rank Fusion."""
         semantic_results = await self.search(query, embedder, limit=limit * 2)

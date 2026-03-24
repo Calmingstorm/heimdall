@@ -12,7 +12,7 @@ from ..logging import get_logger
 if TYPE_CHECKING:
     from ..knowledge.store import KnowledgeStore
     from ..scheduler.scheduler import Scheduler
-    from ..search.embedder import OllamaEmbedder
+    from ..search.embedder import LocalEmbedder
     from ..sessions.manager import SessionManager
     from .executor import ToolExecutor
 
@@ -72,7 +72,7 @@ class SkillContext:
         message_callback: Callable[[str], Awaitable[None]] | None = None,
         file_callback: Callable[[bytes, str, str], Awaitable[None]] | None = None,
         knowledge_store: KnowledgeStore | None = None,
-        embedder: OllamaEmbedder | None = None,
+        embedder: LocalEmbedder | None = None,
         session_manager: SessionManager | None = None,
         scheduler: Scheduler | None = None,
     ) -> None:

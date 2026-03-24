@@ -29,7 +29,7 @@ from ..scheduler import Scheduler
 from ..sessions import SessionManager
 from ..tools import ToolExecutor, SkillManager, get_tool_definitions
 from ..tools.tool_memory import ToolMemory
-from ..search import OllamaEmbedder, SessionVectorStore
+from ..search import LocalEmbedder, SessionVectorStore
 from ..permissions import PermissionManager
 from .voice import VoiceManager, VoiceMessageProxy
 
@@ -380,14 +380,11 @@ class LokiBot(discord.Client):
 
         # Semantic search + FTS5 components
         self._vector_store: SessionVectorStore | None = None
-        self._embedder: OllamaEmbedder | None = None
+        self._embedder: LocalEmbedder | None = None
         self._knowledge_store: KnowledgeStore | None = None
         self._fts_index: FullTextIndex | None = None
         if config.search.enabled:
-            self._embedder = OllamaEmbedder(
-                base_url=config.search.ollama_url,
-                model=config.search.embed_model,
-            )
+            self._embedder = LocalEmbedder()
             # Initialize FTS5 index (SQLite, no external deps)
             from pathlib import Path
             fts_db_path = str(Path(config.search.chromadb_path).parent / "fts.db")

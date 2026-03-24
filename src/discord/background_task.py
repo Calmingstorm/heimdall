@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from ..tools.executor import ToolExecutor
     from ..tools.skill_manager import SkillManager
     from ..knowledge.store import KnowledgeStore
-    from ..search.embedder import OllamaEmbedder
+    from ..search.embedder import LocalEmbedder
 
 log = get_logger("background_task")
 
@@ -73,7 +73,7 @@ async def run_background_task(
     executor: ToolExecutor,
     skill_manager: SkillManager,
     knowledge_store: KnowledgeStore | None = None,
-    embedder: OllamaEmbedder | None = None,
+    embedder: LocalEmbedder | None = None,
     audit_logger: AuditLogger | None = None,
 ) -> None:
     """Execute a background task's steps sequentially with progress updates."""
@@ -215,7 +215,7 @@ async def _execute_tool(
     executor: ToolExecutor,
     skill_manager: SkillManager,
     knowledge_store: KnowledgeStore | None,
-    embedder: OllamaEmbedder | None,
+    embedder: LocalEmbedder | None,
     requester: str,
 ) -> str:
     """Execute a single tool, routing to the right handler."""

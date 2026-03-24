@@ -8,7 +8,7 @@ from ..logging import get_logger
 from .hybrid import reciprocal_rank_fusion
 
 if TYPE_CHECKING:
-    from .embedder import OllamaEmbedder
+    from .embedder import LocalEmbedder
     from .fts import FullTextIndex
 
 log = get_logger("search.vectorstore")
@@ -46,7 +46,7 @@ class SessionVectorStore:
     def available(self) -> bool:
         return self._collection is not None
 
-    async def index_session(self, archive_path: Path, embedder: OllamaEmbedder) -> bool:
+    async def index_session(self, archive_path: Path, embedder: LocalEmbedder) -> bool:
         """Index a single archived session JSON. Returns True on success."""
         if not self.available:
             return False
@@ -90,7 +90,7 @@ class SessionVectorStore:
             log.error("ChromaDB upsert failed for %s: %s", doc_id, e)
             return False
 
-    async def search(self, query: str, embedder: OllamaEmbedder, limit: int = 10) -> list[dict]:
+    async def search(self, query: str, embedder: LocalEmbedder, limit: int = 10) -> list[dict]:
         """Semantic search across archived sessions. Returns results in search_history format."""
         if not self.available:
             return []
@@ -131,7 +131,7 @@ class SessionVectorStore:
 
         return out
 
-    async def backfill(self, archive_dir: Path, embedder: OllamaEmbedder) -> int:
+    async def backfill(self, archive_dir: Path, embedder: LocalEmbedder) -> int:
         """Index all archive JSONs not yet in ChromaDB. Returns count of newly indexed."""
         if not self.available:
             return 0
@@ -173,7 +173,7 @@ class SessionVectorStore:
         return count
 
     async def search_hybrid(
-        self, query: str, embedder: OllamaEmbedder, limit: int = 10,
+        self, query: str, embedder: LocalEmbedder, limit: int = 10,
     ) -> list[dict]:
         """Combined FTS5 + semantic search with Reciprocal Rank Fusion."""
         semantic_results = await self.search(query, embedder, limit=limit * 2)

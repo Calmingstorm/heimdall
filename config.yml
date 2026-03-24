@@ -71,8 +71,6 @@ learning:
 
 search:
   enabled: true
-  ollama_url: "${OLLAMA_URL:-http://localhost:11434}"
-  embed_model: "nomic-embed-text"
   chromadb_path: "./data/chromadb"
 
 logging:
