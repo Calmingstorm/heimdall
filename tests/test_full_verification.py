@@ -371,7 +371,7 @@ class TestDeploymentFiles:
     def test_env_example_has_required_vars(self):
         content = (ROOT / ".env.example").read_text()
         assert "DISCORD_TOKEN" in content
-        assert "ANTHROPIC_API_KEY" in content
+        # Anthropic removed — no classifier
 
     def test_incus_deploy_script_exists(self):
         script = ROOT / "scripts" / "incus-deploy.sh"

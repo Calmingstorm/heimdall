@@ -175,7 +175,7 @@ class TestDeploymentFiles:
     def test_env_example_has_required_vars(self):
         content = Path(".env.example").read_text()
         assert "DISCORD_TOKEN" in content
-        assert "ANTHROPIC_API_KEY" in content
+        # Anthropic removed — no classifier
 
     def test_env_example_no_personal_data(self):
         content = Path(".env.example").read_text()

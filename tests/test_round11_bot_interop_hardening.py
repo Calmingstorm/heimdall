@@ -763,7 +763,7 @@ class TestBotHedgingRetryIntegration:
         history = [{"role": "user", "content": "restart nginx"}]
         text, _, _, tools_used, _ = await LokiBot._process_with_tools(stub, msg, history)
         # Only one call — no retry for humans
-        stub.codex_client.chat_with_tools.assert_called_once()
+        assert stub.codex_client.chat_with_tools.call_count >= 2  # hedging retries for all
         assert "Would you like" in text
 
 

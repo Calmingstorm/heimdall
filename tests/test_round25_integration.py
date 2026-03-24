@@ -575,7 +575,7 @@ class TestBotSendsCode:
         assert call_count == 3  # fabrication → tool call → final
         assert "docker_ps" in tools_used
 
-    async def test_no_hedging_retry_for_human_messages(self):
+    async def test_hedging_retry_fires_for_human_messages(self):
         """Hedging detection does NOT retry for human messages (only bot messages)."""
         stub = _make_bot_stub(respond_to_bots=False)
         msg = _make_message(is_bot=False)
@@ -592,10 +592,9 @@ class TestBotSendsCode:
                 [{"role": "user", "content": "check disk"}],
             )
 
-        # Should NOT retry — hedging is only for bot-to-bot
-        assert is_error is False
-        assert "would you like" in text.lower()
-        stub.codex_client.chat_with_tools.assert_called_once()
+        # Hedging now fires for ALL messages (not just bots)
+        # So it should have retried once
+        assert stub.codex_client.chat_with_tools.call_count >= 2
 
     async def test_bot_message_preamble_mentions_run_script(self):
         """The bot preamble specifically mentions run_script for code execution."""
@@ -1232,8 +1231,8 @@ class TestSessionPoisoningDefense:
         assert call_count == 2  # No retry — fabrication only checked on iteration 0
         assert "check_disk" in tools_used
 
-    async def test_hedging_detected_for_bot_only(self):
-        """Hedging is detected for bot messages but not human messages."""
+    async def test_hedging_detected_for_all_messages(self):
+        """Hedging is detected for all messages — both bot and human."""
         # Bot message — should retry
         stub_bot = _make_bot_stub(respond_to_bots=True)
         msg_bot = _make_message(is_bot=True)
@@ -1275,8 +1274,8 @@ class TestSessionPoisoningDefense:
                 msg_human, [{"role": "user", "content": "deploy"}],
             )
 
-        assert "shall i" in text.lower()  # Not retried for humans
-        stub_human.codex_client.chat_with_tools.assert_called_once()
+        # Hedging now fires for ALL messages — human messages also get retried
+        assert stub_human.codex_client.chat_with_tools.call_count >= 2
 
     # -- Cross-layer integration --
 

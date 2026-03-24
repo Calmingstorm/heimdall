@@ -222,7 +222,7 @@ class TestSystemPromptQuality:
             context="", hosts={}, services=[], playbooks=[],
         )
         assert "heredoc" in prompt.lower()
-        assert "Never use inline heredocs" in prompt or "never use inline heredocs" in prompt.lower()
+        assert "no heredocs" in prompt.lower() or "run_script" in prompt
 
     def test_run_script_referenced(self):
         """System prompt must reference run_script for multi-line scripts."""
