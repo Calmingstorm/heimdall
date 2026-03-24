@@ -2300,7 +2300,7 @@ class LokiBot(discord.Client):
         lines = []
         for r in results:
             source = r["source"]
-            score = r["score"]
+            score = r.get("score", r.get("rrf_score", r.get("rank", 0)))
             content = scrub_output_secrets(r["content"].replace("\n", " ")[:500])
             lines.append(f"**[{source}]** (score: {score})\n{content}")
 
