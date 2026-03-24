@@ -442,8 +442,8 @@ class TestSystemInvariants:
     def test_no_chromadb_imports_in_source(self):
         """No chromadb import statements should remain in source code.
 
-        Note: chromadb_path config field name is kept for backward compat
-        (renamed in Round 19). We check for actual chromadb library usage.
+        Note: config field was renamed from chromadb_path to search_db_path
+        in Round 19, with validation_alias for backward compat.
         """
         import os
         src_dir = Path(__file__).parent.parent / "src"

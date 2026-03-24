@@ -2,8 +2,8 @@
 
 After a successful tool loop, records {query, tools_used, embedding, timestamp}.
 Before starting a tool loop, finds similar past queries and suggests tool
-sequences that worked well. Uses semantic similarity (Ollama embeddings) when
-available, falls back to Jaccard keyword overlap otherwise.
+sequences that worked well. Uses semantic similarity (local embeddings via fastembed)
+when available, falls back to Jaccard keyword overlap otherwise.
 """
 
 from __future__ import annotations

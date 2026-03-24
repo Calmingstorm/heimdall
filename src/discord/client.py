@@ -387,7 +387,7 @@ class LokiBot(discord.Client):
             self._embedder = LocalEmbedder()
             # Initialize FTS5 index (SQLite, no external deps)
             from pathlib import Path
-            search_db_path = config.search.chromadb_path  # now used for SQLite DBs
+            search_db_path = config.search.search_db_path
             fts_db_path = str(Path(search_db_path).parent / "fts.db")
             from ..search.fts import FullTextIndex
             self._fts_index = FullTextIndex(fts_db_path)

@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DiscordConfig(BaseModel):
@@ -84,8 +84,10 @@ class LearningConfig(BaseModel):
 
 
 class SearchConfig(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
     enabled: bool = True
-    chromadb_path: str = "./data/chromadb"
+    # Accepts "chromadb_path" from old configs for backward compat
+    search_db_path: str = Field(default="./data/chromadb", validation_alias="chromadb_path")
 
 
 class VoiceConfig(BaseModel):

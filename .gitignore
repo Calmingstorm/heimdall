@@ -18,7 +18,9 @@ data/context/*.md
 data/skills/*.py
 data/skills/__pycache__/
 data/chromadb/
+data/search/
 data/fts.db
+data/*.db
 data/lists.json
 data/tool_memory.json
 data/permissions.json
