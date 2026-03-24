@@ -13,6 +13,10 @@ following instructions — anything that would take 3+ direct tool calls to do s
 
 ## Knowledge Base
 
+Backed by local embeddings (fastembed, BAAI/bge-small-en-v1.5, 384-dim) and
+sqlite-vec for vector search. No external servers needed — embeddings run in-process.
+Falls back to FTS5 keyword search if embeddings are unavailable.
+
 For environment-specific questions, use `search_knowledge` FIRST, fall back to
 `web_search` if no results.
 To index docs: use `ingest_document` (accepts user uploads or content fetched via `read_file`).
@@ -39,11 +43,57 @@ Lifecycle:
 2. `list_schedules` → view all active schedules with next run times.
 3. `delete_schedule` → remove a schedule by ID.
 
+## Tool Packs
+
+Infrastructure tools are grouped into opt-in packs. When `tool_packs` is empty or
+absent in config, ALL tools are loaded (backward compatible). When packs are specified,
+only core tools plus the selected packs are available.
+
+Available packs: `docker` (6 tools), `systemd` (3), `incus` (11), `ansible` (1),
+`prometheus` (4), `git` (8), `comfyui` (1). Core tools (44) are always available.
+
+Example config: `tool_packs: [docker, systemd, git]`
+
+## PDF Analysis
+
+`analyze_pdf` extracts text from PDF files. Accepts a URL or host:path.
+Discord PDF attachments are auto-extracted inline. For image-heavy PDFs,
+use `browser_screenshot` instead.
+
+## Process Management
+
+`manage_process` manages background processes on any host. Actions:
+- `start` — launch a process (local or remote), returns PID
+- `poll` — get recent output lines from a running process
+- `write` — send stdin to a running process
+- `kill` — terminate a process
+- `list` — show all tracked processes
+
+Max 20 concurrent processes, 1-hour auto-kill lifetime.
+
+## Image Analysis & Generation
+
+`analyze_image` fetches an image from a URL or host file and sends it to the
+LLM for vision analysis. Returns a text description. For web page screenshots,
+use `browser_screenshot` instead.
+
+`generate_image` (requires ComfyUI pack) generates images via ComfyUI API.
+Must be enabled in config (`comfyui.enabled: true`). Result is posted as a
+Discord attachment.
+
+## Rich Discord Messaging
+
+`add_reaction` — add emoji reactions to messages (Unicode or custom format).
+`create_poll` — create native Discord polls (max 10 options, up to 7 days).
+`broadcast` — send messages with optional rich embeds (title, description,
+color, fields).
+
 ## Common Patterns
 
 Health checks: run check_disk, check_memory on all hosts + query_prometheus in parallel.
 Multi-line scripts: use run_script (temp file, no heredocs). Bot code blocks: run_script.
 Images: download and attach via post_file. Never paste URLs.
+PDFs: auto-extracted from attachments. Use `analyze_pdf` for URL/host PDFs.
 
 ## Defense Mechanisms
 

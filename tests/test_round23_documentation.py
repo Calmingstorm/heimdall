@@ -69,8 +69,7 @@ class TestReadmeAccuracy:
 
         actual_count = len(TOOLS)
         assert actual_count >= 70
-        # README says 76+
-        assert "76+" in self.readme or f"{actual_count}" in self.readme
+        assert f"{actual_count}" in self.readme
 
     def test_personality_mentioned(self):
         """README mentions the personality."""
@@ -109,9 +108,9 @@ class TestReadmeAccuracy:
         assert not (src / "discord" / "routing.py").exists()
 
     def test_test_suite_count_accurate(self):
-        """README says 3900+ tests which should match reality."""
-        # We know baseline is 3933
-        assert "3900+" in self.readme or "3933" in self.readme
+        """README test count should be reasonable."""
+        # README says 4400+ which is accurate for the current suite
+        assert "4400+" in self.readme or "4497" in self.readme
 
     def test_no_classification_in_env_vars(self):
         """Environment variables table should not reference classification."""
@@ -163,7 +162,9 @@ class TestClaudeMdAccuracy:
 
     def test_tool_count_accurate(self):
         """CLAUDE.md tool count matches reality."""
-        assert "76+" in self.claude_md or "76 tool" in self.claude_md
+        from src.tools.registry import TOOLS
+        actual_count = len(TOOLS)
+        assert str(actual_count) in self.claude_md or f"{actual_count} tool" in self.claude_md
 
     def test_no_requires_approval_pattern(self):
         """CLAUDE.md should not describe requires_approval as a tool field."""

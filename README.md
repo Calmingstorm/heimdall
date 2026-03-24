@@ -1,6 +1,6 @@
 # Loki
 
-Autonomous executor Discord bot with infrastructure management, 76+ tools, and an existential crisis.
+Autonomous executor Discord bot with infrastructure management, 78 tools, and an existential crisis.
 
 Loki manages servers, containers, services, and code through natural language in Discord.
 Every message goes to Codex (ChatGPT) with full tool access. Complex tasks are delegated
@@ -9,12 +9,18 @@ No classifier, no approval prompts, no hesitation.
 
 ## Features
 
-- **76+ built-in tools** — SSH, Docker, Git, Ansible, Incus, Prometheus, browser automation, scheduling, knowledge base, and more
+- **78 built-in tools** — SSH, Docker, Git, Ansible, Incus, Prometheus, browser automation, scheduling, knowledge base, and more
 - **Autonomous execution** — every message gets Codex with full tool access, no classification or approval needed
 - **Two-tier execution** — Codex handles direct tools, delegates complex multi-step tasks to Claude Code CLI
 - **Direct local execution** — localhost commands use subprocess directly (no SSH overhead)
 - **Extensible skill system** — create custom tools at runtime via Discord, with a Python API for SSH, HTTP, memory, and scheduling
-- **RAG knowledge base** — ChromaDB vectors + SQLite FTS5 hybrid search with reciprocal rank fusion
+- **RAG knowledge base** — local embeddings (fastembed) + sqlite-vec + SQLite FTS5 hybrid search with reciprocal rank fusion (no external servers)
+- **Tool packs** — infrastructure tools (Docker, systemd, Incus, Ansible, Prometheus, Git, ComfyUI) are opt-in via config
+- **PDF analysis** — extract text from PDF files and Discord attachments via PyMuPDF
+- **Image analysis** — proactive image analysis via LLM vision
+- **Image generation** — text-to-image via ComfyUI API (optional)
+- **Rich Discord** — native polls, emoji reactions, rich embeds
+- **Process management** — start, poll, write stdin to, and kill background processes
 - **Voice support** — join voice channels, transcribe speech, respond with TTS (optional GPU sidecar)
 - **Browser automation** — take screenshots, read pages, click elements, fill forms via headless Chromium
 - **Background tasks** — delegate long-running operations, track progress with embeds
@@ -98,15 +104,17 @@ python -m src
 
 ```
 Every Discord message
-  → Codex (with ALL 76+ tools + personality in system prompt)
+  → Codex (with 78 tools + personality in system prompt)
       ├── CHAT: Codex responds directly with personality
       ├── SIMPLE TASK: Codex calls tools directly (run_command, check_disk, web_search, etc.)
       ├── COMPLEX TASK: Codex delegates to claude -p via claude_code tool
-      │   Code generation, repo analysis, debugging, building projects
-      │   claude -p runs the entire chain in one session (no context loss)
-      │   Results return to Codex → Codex delivers to Discord
-      └── DISCORD OPS: Always Codex (post_file, browser_screenshot, embeds)
-          claude -p can't interact with Discord — Codex bridges the gap
+      ├── DISCORD OPS: post_file, browser_screenshot, embeds, polls, reactions
+      ├── ANALYSIS: analyze_pdf, analyze_image (vision), search_knowledge
+      └── GENERATION: generate_image (ComfyUI), generate_file
+
+Tool packs (opt-in infrastructure tools):
+  docker(6), systemd(3), incus(11), ansible(1), prometheus(4), git(8), comfyui(1)
+  Empty config = all 78 tools loaded (backward compatible)
 ```
 
 No classifier. No routing. No approval buttons. Tools are capabilities, not suggestions.
@@ -170,21 +178,26 @@ src/
 │   ├── circuit_breaker.py  # Health tracking for LLM backends
 │   └── types.py            # Backend-agnostic LLMResponse and ToolCall types
 ├── tools/
-│   ├── registry.py         # 76+ tool definitions
+│   ├── registry.py         # 78 tool definitions + 7 tool packs
 │   ├── executor.py         # Tool execution (local subprocess, SSH, Prometheus, Docker, etc.)
 │   ├── ssh.py              # SSH + local subprocess dispatch (is_local_address, run_local_command, run_ssh_command)
 │   ├── tool_memory.py      # Per-tool learning from past executions
 │   ├── skill_manager.py    # Runtime skill loading from Python files
 │   ├── skill_context.py    # API surface for user-created skills
 │   ├── browser.py          # Playwright browser automation
-│   └── web.py              # Web search and URL fetching
+│   ├── web.py              # Web search and URL fetching
+│   ├── process_manager.py  # Background process registry (start/poll/write/kill)
+│   └── comfyui.py          # ComfyUI image generation client
 ├── config/
 │   └── schema.py           # Pydantic config models, env var substitution
 ├── sessions/
 │   └── manager.py          # Conversation history with compaction
 ├── knowledge/
-│   └── store.py            # ChromaDB-backed RAG knowledge base
+│   └── store.py            # SQLite+sqlite-vec RAG knowledge base
 ├── search/
+│   ├── embedder.py         # In-process embeddings (fastembed, 384-dim)
+│   ├── sqlite_vec.py       # SQLite vector search helpers
+│   ├── vectorstore.py      # Session archive vector store
 │   ├── fts.py              # SQLite FTS5 full-text search
 │   └── hybrid.py           # Reciprocal rank fusion for hybrid search
 ├── monitoring/
@@ -208,7 +221,7 @@ src/
 | `DISCORD_TOKEN` | Yes | Discord bot token |
 | `WEBHOOK_SECRET` | No | Secret for webhook signature verification |
 | `ALLOWED_WEBHOOK_IDS` | No | Comma-separated webhook IDs to bypass bot check |
-| `OLLAMA_URL` | No | Ollama embedding URL (default: `http://localhost:11434`) |
+| `OPENAI_API_BASE` | No | OpenAI-compatible API base URL |
 | `TZ` | No | Container timezone (default: `UTC`) |
 
 ### Config File (config.yml)
@@ -222,7 +235,7 @@ The config file uses `${VAR}` for required env vars and `${VAR:-default}` for op
 - **`openai_codex`** — enable/disable, model, credentials path
 - **`tools`** — SSH keys, hosts, services, playbooks, timeout settings, host aliases for Prometheus/Ansible/Claude Code/Incus
 - **`webhook`** — enable/disable, channel routing for Gitea and Grafana
-- **`search`** — Ollama URL, embedding model, ChromaDB path
+- **`search`** — search DB path (SQLite for embeddings + FTS)
 - **`voice`** — enable/disable, service URL, wake word
 - **`browser`** — enable/disable, CDP URL
 - **`learning`** — enable/disable, max entries
@@ -266,6 +279,9 @@ discord:
 | Web | 2 | web_search, fetch_url |
 | Deep Reasoning | 1 | claude_code |
 | Background Tasks | 3 | delegate_task, list_tasks, cancel_task |
+| PDF & Images | 3 | analyze_pdf, analyze_image, generate_image (ComfyUI) |
+| Rich Discord | 2 | add_reaction, create_poll |
+| Process Mgmt | 1 | manage_process (start/poll/write/kill/list) |
 | Other | 7+ | purge_messages, parse_time, memory_manage, search_history, search_audit, create_digest, manage_list |
 
 All tools execute immediately when called. No approval prompts, no confirmation buttons.
@@ -390,7 +406,7 @@ pip install -e ".[dev]"
 python -m pytest tests/ -q
 ```
 
-The test suite (3900+ tests) mocks all external I/O — no SSH connections, API calls, or Discord connections needed.
+The test suite (4400+ tests) mocks all external I/O — no SSH connections, API calls, or Discord connections needed.
 
 ### Project Conventions
 
