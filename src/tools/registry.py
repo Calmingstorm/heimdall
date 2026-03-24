@@ -1580,6 +1580,73 @@ TOOLS: list[dict] = [
             },
         },
     },
+    # --- Rich Discord messaging ---
+    {
+        "name": "add_reaction",
+        "description": "Adds an emoji reaction to a message. Requires message_id and emoji. "
+                       "Use Unicode emoji (\U0001f44d) or custom emoji format (<:name:id>).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "message_id": {"type": "string", "description": "Discord message ID to react to"},
+                "emoji": {"type": "string", "description": "Emoji to react with"},
+            },
+            "required": ["message_id", "emoji"],
+        },
+    },
+    {
+        "name": "create_poll",
+        "description": "Creates a Discord native poll in the current channel. "
+                       "Max 10 options. Duration in hours (default 24, max 168/7 days).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "question": {"type": "string", "description": "The poll question"},
+                "options": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of answer options (max 10)",
+                },
+                "duration_hours": {"type": "integer", "description": "Poll duration in hours (default 24)"},
+                "multiple": {"type": "boolean", "description": "Allow multiple selections (default false)"},
+            },
+            "required": ["question", "options"],
+        },
+    },
+    {
+        "name": "broadcast",
+        "description": "Sends a message to the current channel with optional rich embed. "
+                       "Use for announcements, formatted info, or styled messages. "
+                       "Supports embed with title, description, color (hex), and fields.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Plain text message content"},
+                "embed": {
+                    "type": "object",
+                    "description": "Optional rich embed object",
+                    "properties": {
+                        "title": {"type": "string", "description": "Embed title"},
+                        "description": {"type": "string", "description": "Embed body text"},
+                        "color": {"type": "string", "description": "Hex color, e.g. '#ff0000'"},
+                        "fields": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "value": {"type": "string"},
+                                    "inline": {"type": "boolean"},
+                                },
+                                "required": ["name", "value"],
+                            },
+                            "description": "List of embed fields",
+                        },
+                    },
+                },
+            },
+        },
+    },
     # --- List management ---
     {
         "name": "manage_list",

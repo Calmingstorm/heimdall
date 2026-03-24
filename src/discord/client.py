@@ -1833,6 +1833,12 @@ class LokiBot(discord.Client):
                         self._cached_merged_tools = None  # invalidate tool cache
                         self._cached_skills_text = None  # invalidate skills text cache
                         system_prompt = self._build_system_prompt(channel=message.channel, user_id=user_id)
+                    elif tool_name == "add_reaction":
+                        result = await self._handle_add_reaction(message, tool_input)
+                    elif tool_name == "create_poll":
+                        result = await self._handle_create_poll(message, tool_input)
+                    elif tool_name == "broadcast":
+                        result = await self._handle_broadcast(message, tool_input)
                     elif tool_name == "list_skills":
                         skills = self.skill_manager.list_skills()
                         if not skills:
@@ -2601,6 +2607,78 @@ class LokiBot(discord.Client):
             return f"Task `{task_id}` is not running (status: {task.status})."
         task.cancel()
         return f"Cancellation requested for task `{task_id}`."
+
+    async def _handle_add_reaction(self, message: discord.Message, inp: dict) -> str:
+        """Add an emoji reaction to a message."""
+        message_id = inp.get("message_id")
+        emoji = inp.get("emoji")
+        if not message_id or not emoji:
+            return "Both 'message_id' and 'emoji' are required."
+        try:
+            msg = await message.channel.fetch_message(int(message_id))
+            await msg.add_reaction(emoji)
+            return "Reaction added."
+        except discord.NotFound:
+            return f"Message {message_id} not found in this channel."
+        except discord.Forbidden:
+            return "Permission denied to add reaction."
+        except Exception as e:
+            return f"Failed to add reaction: {e}"
+
+    async def _handle_create_poll(self, message: discord.Message, inp: dict) -> str:
+        """Create a Discord native poll in the current channel."""
+        from datetime import timedelta
+
+        question = inp.get("question")
+        options = inp.get("options", [])
+        if not question or not options:
+            return "Both 'question' and 'options' are required."
+        if len(options) > 10:
+            return "Discord polls support a maximum of 10 options."
+        duration_hours = min(inp.get("duration_hours", 24), 168)
+        multiple = inp.get("multiple", False)
+        try:
+            poll = discord.Poll(
+                question=question,
+                duration=timedelta(hours=duration_hours),
+                multiple=multiple,
+            )
+            for opt in options:
+                poll.add_answer(text=str(opt))
+            await message.channel.send(poll=poll)
+            return "Poll created."
+        except Exception as e:
+            return f"Failed to create poll: {e}"
+
+    async def _handle_broadcast(self, message: discord.Message, inp: dict) -> str:
+        """Send a message with optional rich embed to the current channel."""
+        text = inp.get("text")
+        embed_data = inp.get("embed")
+        embed_obj = None
+
+        if embed_data and isinstance(embed_data, dict):
+            color_str = embed_data.get("color", "#000000")
+            try:
+                color_val = int(color_str.lstrip("#"), 16)
+            except (ValueError, AttributeError):
+                color_val = 0
+            embed_obj = discord.Embed(
+                title=embed_data.get("title"),
+                description=embed_data.get("description"),
+                color=color_val,
+            )
+            for field in embed_data.get("fields", []):
+                embed_obj.add_field(
+                    name=field.get("name", "\u200b"),
+                    value=field.get("value", "\u200b"),
+                    inline=field.get("inline", False),
+                )
+
+        if not text and not embed_obj:
+            return "Provide 'text' and/or 'embed' content."
+
+        await message.channel.send(content=text, embed=embed_obj)
+        return "Message sent."
 
     async def _run_scheduled_workflow(
         self, channel: discord.abc.Messageable, schedule: dict,
