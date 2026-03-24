@@ -22,7 +22,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "check_docker",
-        "description": "Lists running Docker containers on a managed host. With container name, returns detailed inspect output for that container.",
+        "description": "Lists running Docker containers on a managed host. With container name, returns detailed inspect output for that container. For container logs, use docker_logs. For resource stats, use docker_stats.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -221,7 +221,7 @@ TOOLS: list[dict] = [
     # --- File operations ---
     {
         "name": "read_file",
-        "description": "Returns the contents of a file on a managed host. Default 200 lines, max 1000. To write, use write_file.",
+        "description": "Returns the contents of a file on a managed host. Default 200 lines, max 1000. To write, use write_file. For multi-file analysis, use claude_code with allow_edits=false.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -434,7 +434,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "delete_schedule",
-        "description": "Deletes a scheduled task by ID.",
+        "description": "Deletes a scheduled task by ID. To list schedules first, use list_schedules.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -451,7 +451,8 @@ TOOLS: list[dict] = [
         "description": (
             "Converts a natural language time expression to ISO datetime string. "
             "Handles: 'in 30 minutes', 'in 2 hours', 'tomorrow at 9am', 'next Monday at 3pm', "
-            "'at 5pm', 'friday at noon'. Uses the bot's configured timezone."
+            "'at 5pm', 'friday at noon'. Uses the bot's configured timezone. "
+            "Use this to get the run_at value for schedule_task."
         ),
         "input_schema": {
             "type": "object",
@@ -640,7 +641,7 @@ TOOLS: list[dict] = [
     # --- Docker tools ---
     {
         "name": "docker_logs",
-        "description": "Returns recent logs from a Docker container. Supports --since for time-filtered output. For container status, use check_docker.",
+        "description": "Returns recent logs from a Docker container. Supports --since for time-filtered output. For container status, use check_docker. For resource stats, use docker_stats.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -774,7 +775,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "git_log",
-        "description": "Returns recent commit history (git log --oneline --graph) from a repository. Max 50 commits. For commit details, use git_show. For diffs, use git_diff.",
+        "description": "Returns recent commit history (git log --oneline --graph) from a repository. Max 50 commits. For commit details, use git_show. For diffs, use git_diff. For working tree status, use git_status.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -796,7 +797,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "git_diff",
-        "description": "Returns unified diff output for a repository. Without commit: shows uncommitted changes. With commit: shows that commit's diff. For commit messages, use git_log or git_show.",
+        "description": "Returns unified diff output for a repository. Without commit: shows uncommitted changes. With commit: shows that commit's diff. For commit messages, use git_log or git_show. For working tree status, use git_status.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -885,7 +886,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "git_push",
-        "description": "Pushes commits to the remote repository.",
+        "description": "Pushes commits to the remote repository. To commit first, use git_commit.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1029,7 +1030,7 @@ TOOLS: list[dict] = [
             "Searches the knowledge base of ingested documentation, runbooks, configs, and notes. "
             "Returns ranked chunks: '[source] (score: N) content'. "
             "Search here FIRST for environment-specific questions before falling back to web_search. "
-            "To add documents, use ingest_document."
+            "To add documents, use ingest_document. To list sources, use list_knowledge."
         ),
         "input_schema": {
             "type": "object",
@@ -1078,7 +1079,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "delete_knowledge",
-        "description": "Removes a document from the knowledge base by source name.",
+        "description": "Removes a document from the knowledge base by source name. To list sources first, use list_knowledge.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1275,7 +1276,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "incus_info",
-        "description": "Returns detailed info for an Incus instance: config, devices, snapshots, and resource usage.",
+        "description": "Returns detailed info for an Incus instance: config, devices, snapshots, and resource usage. For a list of all instances, use incus_list.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1289,7 +1290,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "incus_exec",
-        "description": "Executes a command inside an Incus instance. Returns exit code and output. For host-level commands, use run_command instead.",
+        "description": "Executes a command inside an Incus instance. Returns exit code and output. For host-level commands, use run_command instead. For console logs, use incus_logs.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1425,7 +1426,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "incus_delete",
-        "description": "Deletes an Incus instance. With force=true, deletes even if running.",
+        "description": "Deletes an Incus instance. With force=true, deletes even if running. To create, use incus_launch.",
         "input_schema": {
             "type": "object",
             "properties": {
