@@ -1586,6 +1586,9 @@ class LokiBot(discord.Client):
             if tools is not None and not tools:
                 tools = None
 
+        # Collect image blocks from analyze_image calls for vision injection
+        pending_image_blocks: list[dict] = []
+
         log.info("Tool loop starting: %d tools available, %d messages in history",
                  len(tools) if tools else 0, len(messages))
 
@@ -1763,7 +1766,7 @@ class LokiBot(discord.Client):
 
             # Execute tools in parallel
             async def _run_tool(block):
-                nonlocal system_prompt
+                nonlocal system_prompt, pending_image_blocks
                 tool_name = block.name
                 tool_input = block.input
                 log.info("Tool call: %s(%s)", tool_name, tool_input)
@@ -1839,6 +1842,8 @@ class LokiBot(discord.Client):
                         result = await self._handle_create_poll(message, tool_input)
                     elif tool_name == "broadcast":
                         result = await self._handle_broadcast(message, tool_input)
+                    elif tool_name == "analyze_image":
+                        result = await self._handle_analyze_image(message, tool_input)
                     elif tool_name == "list_skills":
                         skills = self.skill_manager.list_skills()
                         if not skills:
@@ -1866,6 +1871,11 @@ class LokiBot(discord.Client):
                     result = f"Error executing {tool_name}: {e}"
 
                 elapsed_ms = int((time.monotonic() - t0) * 1000)
+
+                # Handle special image block return from analyze_image
+                if isinstance(result, dict) and "__image_block__" in result:
+                    pending_image_blocks.append(result["__image_block__"])
+                    result = f"[Image loaded. Analyze it with this instruction: {result['__prompt__']}]"
 
                 # Scrub secrets from tool output
                 result = scrub_output_secrets(result)
@@ -1938,6 +1948,18 @@ class LokiBot(discord.Client):
                 *[_run_tool_with_timeout(b) for b in tool_calls],
             )
             messages.append({"role": "user", "content": list(tool_results)})
+
+            # Inject pending image blocks as vision content for the next LLM call.
+            # This reuses the same base64 image block format as _process_attachments.
+            if pending_image_blocks:
+                vision_content: list[dict] = list(pending_image_blocks)
+                vision_content.append({
+                    "type": "text",
+                    "text": "The image(s) above were fetched by analyze_image. Describe and analyze them.",
+                })
+                messages.append({"role": "user", "content": vision_content})
+                log.info("Injected %d image block(s) into tool loop messages", len(pending_image_blocks))
+                pending_image_blocks.clear()
 
             # Update progress step to done with elapsed time
             step_elapsed_ms = int((time.monotonic() - step_t0) * 1000)
@@ -2679,6 +2701,82 @@ class LokiBot(discord.Client):
 
         await message.channel.send(content=text, embed=embed_obj)
         return "Message sent."
+
+    async def _handle_analyze_image(self, message: discord.Message, inp: dict) -> str | dict:
+        """Fetch an image and return a vision block for the LLM to analyze.
+
+        Returns either an error string or a dict with ``__image_block__`` key
+        that the tool loop injects as a vision content block.
+        """
+        import aiohttp
+
+        url = inp.get("url")
+        host = inp.get("host")
+        path = inp.get("path")
+        prompt = inp.get("prompt", "Describe this image in detail.")
+
+        image_bytes: bytes | None = None
+
+        if url:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                        if resp.status != 200:
+                            return f"Failed to fetch image from URL (HTTP {resp.status})"
+                        ct = resp.headers.get("Content-Type", "")
+                        if not ct.startswith("image/"):
+                            return f"URL does not point to an image (Content-Type: {ct})"
+                        image_bytes = await resp.read()
+            except Exception as e:
+                return f"Failed to fetch image from URL: {e}"
+        elif host and path:
+            # Use executor to fetch from host via base64
+            import shlex
+            resolved = self.tool_executor._resolve_host(host)
+            if not resolved:
+                return f"Unknown or disallowed host: {host}"
+            address, ssh_user, _os = resolved
+            safe_path = shlex.quote(path)
+            code, output = await self.tool_executor._exec_command(
+                address, f"base64 -w0 {safe_path}", ssh_user,
+            )
+            if code != 0:
+                return f"Failed to read image from host: {output}"
+            try:
+                image_bytes = base64.b64decode(output.strip())
+            except Exception as e:
+                return f"Failed to decode image data: {e}"
+        else:
+            return "Provide either 'url' or both 'host' and 'path'."
+
+        if not image_bytes:
+            return "No image data retrieved."
+
+        # Enforce 5MB limit (same as Discord attachment limit)
+        if len(image_bytes) > 5 * 1024 * 1024:
+            return "Image exceeds 5MB size limit."
+
+        media_type = self._detect_image_type(image_bytes)
+        if not media_type:
+            return "Unsupported image format. Supported: PNG, JPEG, GIF, WEBP."
+
+        b64 = base64.b64encode(image_bytes).decode("ascii")
+
+        # Return a special marker dict that the tool loop will inject as a
+        # vision content block.  The tool result text sent to the LLM will be
+        # the prompt, while the image block gets appended to the next user
+        # message so Codex can see it.
+        return {
+            "__image_block__": {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": media_type,
+                    "data": b64,
+                },
+            },
+            "__prompt__": prompt,
+        }
 
     async def _run_scheduled_workflow(
         self, channel: discord.abc.Messageable, schedule: dict,

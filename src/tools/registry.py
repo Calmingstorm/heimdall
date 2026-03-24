@@ -1734,6 +1734,27 @@ TOOLS: list[dict] = [
             "required": ["action"],
         },
     },
+    # --- Image analysis ---
+    {
+        "name": "analyze_image",
+        "description": (
+            "Fetches an image from a URL or host file path and analyzes it. "
+            "Returns a text description of the image content. "
+            "For screenshots of web pages, use browser_screenshot instead."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "URL of the image"},
+                "host": {"type": "string", "description": "Host alias for file-based image"},
+                "path": {"type": "string", "description": "File path on host"},
+                "prompt": {
+                    "type": "string",
+                    "description": "What to look for (default: describe the image)",
+                },
+            },
+        },
+    },
 ]
 
 
