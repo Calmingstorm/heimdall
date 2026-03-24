@@ -217,6 +217,55 @@ _HEDGING_RETRY_MSG = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Premature failure detection — catches when Codex gives up too early
+# instead of exhausting fallback chains.
+# ---------------------------------------------------------------------------
+
+_FAILURE_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(
+        r"(?i)(?:couldn'?t (?:get|resolve|find|fetch|retrieve|determine)|"
+        r"(?:failed|unable) to (?:get|resolve|find|fetch|retrieve)|"
+        r"(?:no|zero) (?:results?|matches?|data) (?:found|returned|available)|"
+        r"(?:is|was|currently) (?:blocked|unavailable|down|broken|failing)|"
+        r"(?:error|Error):)"
+    ),
+    re.compile(
+        r"(?i)(?:workaround|fallback|alternative|try (?:this|these|instead)|"
+        r"use this .{0,20} instead|if you want .{0,30} workaround)"
+    ),
+]
+
+
+def detect_premature_failure(text: str, tools_used: list[str]) -> bool:
+    """Detect if a response reports failure without exhausting alternatives.
+
+    Returns True if the response describes a failure/error AND tools were
+    called (partial execution) — meaning the LLM tried something, hit an
+    error, and gave up instead of trying a different approach.
+
+    Only fires when tools WERE used (partial attempt). Pure fabrication
+    (no tools) is handled by detect_fabrication instead.
+    """
+    if not tools_used:
+        return False  # No tools called — fabrication detector handles this
+    if not text or len(text) < 30:
+        return False
+    return any(p.search(text) for p in _FAILURE_PATTERNS)
+
+
+_FAILURE_RETRY_MSG = {
+    "role": "developer",
+    "content": (
+        "STOP. You hit an error but gave up too early. You MUST exhaust ALL "
+        "alternative approaches before reporting failure. Try: different APIs, "
+        "different search terms, different tools, hardcoded IDs if you know them, "
+        "web search for the answer, or any other creative approach. Only report "
+        "failure after ALL options are genuinely exhausted."
+    ),
+}
+
+
 def truncate_tool_output(text: str, max_chars: int = TOOL_OUTPUT_MAX_CHARS) -> str:
     """Truncate large tool output, preserving the start and end for context.
 
@@ -1607,6 +1656,20 @@ class LokiBot(discord.Client):
                     messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_HEDGING_RETRY_MSG)
                     continue  # retry the loop — iteration increments
+
+                # Premature failure detection: if tools were called but the response
+                # reports failure without exhausting alternatives, retry once.
+                if (
+                    iteration == 0
+                    and tools_used_in_loop
+                    and detect_premature_failure(llm_resp.text or "", tools_used_in_loop)
+                ):
+                    log.warning(
+                        "Premature failure detected — retrying with correction"
+                    )
+                    messages.append({"role": "assistant", "content": llm_resp.text})
+                    messages.append(_FAILURE_RETRY_MSG)
+                    continue
 
                 # Update progress embed to show completion and disable cancel button
                 if progress_embed_msg and progress_steps:

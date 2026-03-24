@@ -765,7 +765,7 @@ class TestHedgingDetectionInContext:
         ]
         assert len(corrections) >= 1
 
-    async def test_hedging_not_retried_for_human(self):
+    async def test_hedging_retried_for_human_too(self):
         """Human message hedging should NOT trigger retry."""
         stub = _make_process_with_tools_stub(respond_to_bots=True)
         msg = _make_msg(is_bot=False)
@@ -779,7 +779,7 @@ class TestHedgingDetectionInContext:
         ))
         result = await LokiBot._process_with_tools(stub, msg, history)
         # Only 1 call — no retry for human hedging
-        assert stub.codex_client.chat_with_tools.call_count == 1
+        assert stub.codex_client.chat_with_tools.call_count >= 2  # hedging retries for all messages now
 
     async def test_hedging_bypassed_when_tools_used(self):
         """If tools were used, hedging detection should not fire."""

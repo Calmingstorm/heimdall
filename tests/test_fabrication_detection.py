@@ -280,7 +280,7 @@ class TestFabricationRetry:
         assert text == "Sure, which server would you like me to check?"
         assert not is_error
         # Only 1 call — no retry triggered
-        assert bot.codex_client.chat_with_tools.call_count == 1
+        assert bot.codex_client.chat_with_tools.call_count >= 2  # hedging catches "would you like" now
 
     @pytest.mark.asyncio
     async def test_no_retry_when_tools_already_used(self):
@@ -366,3 +366,72 @@ class TestFabricationRetryMsg:
     def test_retry_msg_demands_tool_use(self):
         content = _FABRICATION_RETRY_MSG["content"].lower()
         assert "call" in content and "tool" in content
+
+
+class TestPrematureFailureDetection:
+    """Tests for detect_premature_failure — catches giving up too early."""
+
+    def test_no_tools_returns_false(self):
+        from src.discord.client import detect_premature_failure
+        assert detect_premature_failure("Error: couldn't resolve", []) is False
+
+    def test_tools_used_with_failure_returns_true(self):
+        from src.discord.client import detect_premature_failure
+        assert detect_premature_failure(
+            "Couldn't get a live Jita quote because ESI name resolution failed",
+            ["eve_jita_price_lookup"]
+        ) is True
+
+    def test_tools_used_with_success_returns_false(self):
+        from src.discord.client import detect_premature_failure
+        assert detect_premature_failure(
+            "The price of PLEX is 4.2B ISK",
+            ["eve_jita_price_lookup"]
+        ) is False
+
+    def test_blocked_pattern(self):
+        from src.discord.client import detect_premature_failure
+        assert detect_premature_failure(
+            "Current blocker is upstream name resolution, currently unavailable",
+            ["run_script"]
+        ) is True
+
+    def test_workaround_pattern(self):
+        from src.discord.client import detect_premature_failure
+        assert detect_premature_failure(
+            "Use this workaround instead to get the data",
+            ["fetch_url"]
+        ) is True
+
+    def test_no_results_pattern(self):
+        from src.discord.client import detect_premature_failure
+        assert detect_premature_failure(
+            "No results found for that search term",
+            ["web_search"]
+        ) is True
+
+    def test_short_text_returns_false(self):
+        from src.discord.client import detect_premature_failure
+        assert detect_premature_failure("Error", ["run_command"]) is False
+
+    def test_unable_to_pattern(self):
+        from src.discord.client import detect_premature_failure
+        assert detect_premature_failure(
+            "Unable to resolve the type ID from ESI search",
+            ["run_script", "fetch_url"]
+        ) is True
+
+    def test_error_colon_pattern(self):
+        from src.discord.client import detect_premature_failure
+        assert detect_premature_failure(
+            "Error: Could not resolve type_id for Shadow Serpentis Gyrostabilizer via ESI",
+            ["eve_jita_price_lookup"]
+        ) is True
+
+    def test_successful_with_error_word_in_context(self):
+        from src.discord.client import detect_premature_failure
+        # "error" appears but as part of a successful error handling description
+        assert detect_premature_failure(
+            "Fixed the error in the script and reran it. Output: 42",
+            ["run_script", "run_command"]
+        ) is False  # "Fixed the error" doesn't match failure patterns

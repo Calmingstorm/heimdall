@@ -400,7 +400,7 @@ class TestHedgingRetry:
 
         # Should return the hedging text as-is — no retry for humans
         assert text == "Would you like me to check the disk on server1?"
-        assert bot.codex_client.chat_with_tools.call_count == 1
+        assert bot.codex_client.chat_with_tools.call_count >= 2  # hedging retries for all messages
 
     @pytest.mark.asyncio
     async def test_hedging_retry_still_hedges_returns_text(self):

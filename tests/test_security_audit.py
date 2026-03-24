@@ -261,7 +261,7 @@ class TestEnvExampleSafety:
         content = Path(".env.example").read_text()
         # Should contain placeholder text, not real tokens
         assert "your-discord-bot-token" in content
-        assert "your-anthropic-api-key" in content
+        # Anthropic API key removed — no classifier
 
     def test_no_real_discord_token_format(self):
         """Real Discord tokens are base64-encoded, not plaintext."""
@@ -328,7 +328,7 @@ class TestConfigSecretHandling:
         """config.yml should use ${VAR} syntax for all secrets, not hardcoded values."""
         content = Path("config.yml").read_text()
         assert "${DISCORD_TOKEN}" in content
-        assert "${ANTHROPIC_API_KEY}" in content
+        # Anthropic API key removed — classifier was deleted in redesign
 
 
 class TestNoHardcodedTimezone:

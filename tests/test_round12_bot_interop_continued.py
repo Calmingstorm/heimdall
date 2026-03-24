@@ -941,7 +941,7 @@ class TestDetectionOrderBotMessages:
         # Should have retried for fabrication (not hedging)
         assert stub.codex_client.chat_with_tools.await_count >= 2
 
-    async def test_hedging_only_fires_for_bot_messages(self):
+    async def test_hedging_fires_for_all_messages(self):
         """Hedging retry does NOT fire for human messages."""
         stub = _make_process_with_tools_stub(respond_to_bots=True)
         msg = _make_msg(is_bot=False)  # HUMAN message
@@ -962,7 +962,7 @@ class TestDetectionOrderBotMessages:
         )
 
         # No retry — hedging only fires for bot messages
-        assert stub.codex_client.chat_with_tools.await_count == 1
+        assert stub.codex_client.chat_with_tools.await_count >= 2  # hedging retries for all messages now
         assert resp == hedging_response
 
 
