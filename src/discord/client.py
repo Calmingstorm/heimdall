@@ -387,7 +387,7 @@ class LokiBot(discord.Client):
             self._embedder = LocalEmbedder()
             # Initialize FTS5 index (SQLite, no external deps)
             from pathlib import Path
-            fts_db_path = str(Path(config.search.chromadb_path).parent / "fts.db")
+            fts_db_path = str(Path(config.search.chromadb_path).parent / "fts.db")  # noqa: chromadb_path kept for config compat
             from ..search.fts import FullTextIndex
             self._fts_index = FullTextIndex(fts_db_path)
             if not self._fts_index.available:
@@ -927,7 +927,7 @@ class LokiBot(discord.Client):
                 log.info("Backfilled %d archive sessions into vector store", count)
             else:
                 log.info("Vector store up to date")
-            # Backfill knowledge FTS from existing ChromaDB data
+            # Backfill knowledge FTS from existing data
             if self._knowledge_store and self._fts_index:
                 kb_count = self._knowledge_store.backfill_fts()
                 if kb_count:
@@ -2220,7 +2220,7 @@ class LokiBot(discord.Client):
     async def _handle_search_knowledge(self, inp: dict) -> str:
         """Semantic search over the knowledge base."""
         if not self._knowledge_store or not self._embedder:
-            return "Knowledge base is not available (search not enabled or ChromaDB not initialized)."
+            return "Knowledge base is not available (search not enabled or not initialized)."
 
         query = inp.get("query", "")
         limit = min(inp.get("limit", 5), 10)
@@ -2243,7 +2243,7 @@ class LokiBot(discord.Client):
     async def _handle_ingest_document(self, inp: dict, uploader: str) -> str:
         """Ingest a document into the knowledge base."""
         if not self._knowledge_store or not self._embedder:
-            return "Knowledge base is not available (search not enabled or ChromaDB not initialized)."
+            return "Knowledge base is not available (search not enabled or not initialized)."
 
         source = inp.get("source", "")
         content = inp.get("content", "")
