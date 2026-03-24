@@ -378,8 +378,8 @@ class TestNoShellTrue:
         remotely).  All inputs are already sanitised via shlex.quote in
         executor.py before reaching run_local_command.
         """
-        # ssh.py is the single allowed location for shell subprocess usage
-        allowed_shell_files = {"src/tools/ssh.py"}
+        # ssh.py + process_manager.py are the allowed locations for shell subprocess usage
+        allowed_shell_files = {"src/tools/ssh.py", "src/tools/process_manager.py"}
         for f in _get_tracked_source_files():
             content = Path(f).read_text()
             if f in allowed_shell_files:

@@ -81,7 +81,7 @@ _CORE_PATCHES = [
     "AuditLogger",
     "PermissionManager",
     "ToolMemory",
-    "OllamaEmbedder",
+    "LocalEmbedder",
     "SessionVectorStore",
     "KnowledgeStore",
     "VoiceManager",
@@ -346,7 +346,7 @@ class TestLokiBotInit:
         }
         bot, mocks = _construct_bot(config, mock_overrides=overrides)
 
-        mocks["OllamaEmbedder"].assert_called_once()
+        mocks["LocalEmbedder"].assert_called_once()
         assert bot._embedder is not None
         assert bot._vector_store is not None
         assert bot._knowledge_store is not None

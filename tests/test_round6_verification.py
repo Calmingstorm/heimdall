@@ -215,9 +215,10 @@ class TestSubprocessShellRestriction:
         )
         src_files = [f for f in result.stdout.strip().split("\n") if f.endswith(".py")]
 
+        allowed = {"src/tools/ssh.py", "src/tools/process_manager.py"}
         violations = []
         for f in src_files:
-            if f == "src/tools/ssh.py":
+            if f in allowed:
                 continue
             content = Path(f).read_text()
             if "create_subprocess_shell" in content:

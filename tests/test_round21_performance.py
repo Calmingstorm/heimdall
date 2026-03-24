@@ -45,6 +45,7 @@ def _make_bot_stub(**overrides):
     stub.config = MagicMock()
     stub.config.tools.enabled = True
     stub.config.tools.tool_timeout_seconds = 300
+    stub.config.tools.tool_packs = []
     stub.config.discord.allowed_users = ["12345"]
     stub.config.discord.channels = ["67890"]
     stub.config.discord.respond_to_bots = False
