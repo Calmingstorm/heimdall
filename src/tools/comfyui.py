@@ -104,6 +104,12 @@ class ComfyUIClient:
                     if not prompt_id:
                         log.warning("ComfyUI returned no prompt_id")
                         return None
+                    # Validate prompt_id to prevent path traversal in URL
+                    if not isinstance(prompt_id, str) or not all(
+                        c.isalnum() or c in "-_" for c in prompt_id
+                    ) or len(prompt_id) > 100:
+                        log.warning("ComfyUI returned suspicious prompt_id: %s", str(prompt_id)[:50])
+                        return None
 
                 # Poll /history until complete
                 image_filename = await self._poll_history(session, prompt_id)

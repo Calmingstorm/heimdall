@@ -651,12 +651,16 @@ class ToolExecutor:
                 return list(range(total))
 
     async def _handle_analyze_pdf(self, inp: dict) -> str:
-        import fitz
-
         url = inp.get("url")
         host = inp.get("host")
         path = inp.get("path")
         pages_str = inp.get("pages")
+
+        # Validate URL scheme early (before heavy imports) to prevent SSRF
+        if url and not url.startswith(("http://", "https://")):
+            return "Only http:// and https:// URLs are supported."
+
+        import fitz
 
         pdf_bytes: bytes | None = None
 
@@ -734,6 +738,10 @@ class ToolExecutor:
                 return "command is required for start action."
             if not host:
                 return "host is required for start action."
+            # Validate host against configured hosts
+            resolved = self._resolve_host(host)
+            if not resolved:
+                return f"Unknown or disallowed host: {host}"
             # Periodic cleanup
             registry.cleanup()
             return await registry.start(host, command)

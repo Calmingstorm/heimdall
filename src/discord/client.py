@@ -2659,6 +2659,9 @@ class LokiBot(discord.Client):
             return "Both 'question' and 'options' are required."
         if len(options) > 10:
             return "Discord polls support a maximum of 10 options."
+        # Scrub secrets from poll content before sending to Discord
+        question = scrub_response_secrets(str(question))
+        options = [scrub_response_secrets(str(opt)) for opt in options]
         duration_hours = min(inp.get("duration_hours", 24), 168)
         multiple = inp.get("multiple", False)
         try:
@@ -2668,7 +2671,7 @@ class LokiBot(discord.Client):
                 multiple=multiple,
             )
             for opt in options:
-                poll.add_answer(text=str(opt))
+                poll.add_answer(text=opt)
             await message.channel.send(poll=poll)
             return "Poll created."
         except Exception as e:
@@ -2701,6 +2704,9 @@ class LokiBot(discord.Client):
         if not text and not embed_obj:
             return "Provide 'text' and/or 'embed' content."
 
+        # Scrub secrets before sending to Discord (broadcast bypasses LLM response scrubbing)
+        if text:
+            text = scrub_response_secrets(text)
         await message.channel.send(content=text, embed=embed_obj)
         return "Message sent."
 
@@ -2720,6 +2726,9 @@ class LokiBot(discord.Client):
         image_bytes: bytes | None = None
 
         if url:
+            # Validate URL scheme to prevent SSRF via file://, ftp://, etc.
+            if not url.startswith(("http://", "https://")):
+                return "Only http:// and https:// URLs are supported."
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
@@ -2812,7 +2821,7 @@ class LokiBot(discord.Client):
 
         try:
             file = discord.File(io.BytesIO(image_bytes), filename="generated.png")
-            caption = f"Generated: {prompt_text[:100]}"
+            caption = scrub_response_secrets(f"Generated: {prompt_text[:100]}")
             await message.channel.send(content=caption, file=file)
             return f"Image generated and posted ({len(image_bytes) / 1024:.1f} KB)."
         except discord.HTTPException as e:
