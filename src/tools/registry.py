@@ -4,7 +4,7 @@ TOOLS: list[dict] = [
     # --- Host monitoring ---
     {
         "name": "check_service",
-        "description": "Returns systemd service status on a managed host. Output includes active state, PID, memory, and recent journal lines.",
+        "description": "Returns systemd service status on a managed host. Output includes active state, PID, memory, and recent journal lines. For logs only, use check_logs. To restart, use restart_service.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -68,7 +68,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "check_logs",
-        "description": "Returns recent journalctl lines from a systemd service. Max 50 lines.",
+        "description": "Returns recent journalctl lines from a systemd service. Max 50 lines. For full service status, use check_service.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -91,7 +91,7 @@ TOOLS: list[dict] = [
     # --- Prometheus ---
     {
         "name": "query_prometheus",
-        "description": "Runs a PromQL instant query against Prometheus. Returns current metric values. Read-only.",
+        "description": "Runs a PromQL instant query against Prometheus. Returns current metric values as 'N result(s): metric{labels}: value'. Read-only. For historical trends, use query_prometheus_range.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -106,7 +106,7 @@ TOOLS: list[dict] = [
     # --- Service management ---
     {
         "name": "restart_service",
-        "description": "Restarts a systemd service on a managed host. Runs systemctl restart then returns the new status.",
+        "description": "Restarts a systemd service on a managed host. Runs systemctl restart then returns the new status. To check without restarting, use check_service.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -151,7 +151,7 @@ TOOLS: list[dict] = [
     # --- Shell execution ---
     {
         "name": "run_command",
-        "description": "Runs a single shell command on a managed host. Returns exit code and output. For multi-line scripts, heredocs, or code blocks use run_script instead.",
+        "description": "Runs a single shell command on a managed host. Returns stdout/stderr (truncated at 200 lines). On failure: 'Command failed (exit N): output'. For multi-line scripts or code blocks, use run_script. For the same command on multiple hosts, use run_command_multi.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -172,7 +172,9 @@ TOOLS: list[dict] = [
         "description": (
             "Writes a script to a temp file on a managed host and executes it. Handles multi-line scripts, "
             "heredocs, code blocks, and complex commands without quoting issues. Temp file is cleaned up after "
-            "execution. Interpreters: bash (default), python3, python, sh, node, ruby, perl."
+            "execution. Returns stdout/stderr (truncated at 200 lines). On failure: 'Script failed (exit N): output'. "
+            "Interpreters: bash (default), python3, python, sh, node, ruby, perl. "
+            "For single commands, use run_command instead."
         ),
         "input_schema": {
             "type": "object",
@@ -199,7 +201,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "run_command_multi",
-        "description": "Runs the same shell command on multiple managed hosts in parallel. Returns per-host results. Pass ['all'] for every configured host.",
+        "description": "Runs the same shell command on multiple managed hosts in parallel. Returns per-host results as markdown blocks: '### hostname\\n```\\noutput\\n```'. Pass ['all'] for every configured host. For a single host, use run_command.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -219,7 +221,7 @@ TOOLS: list[dict] = [
     # --- File operations ---
     {
         "name": "read_file",
-        "description": "Returns the contents of a file on a managed host. Default 200 lines, max 1000.",
+        "description": "Returns the contents of a file on a managed host. Default 200 lines, max 1000. To write, use write_file.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -241,7 +243,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "write_file",
-        "description": "Writes content to a file on a managed host. Creates the file if missing, overwrites if it exists.",
+        "description": "Writes content to a file on a managed host. Creates the file if missing, overwrites if it exists. To read first, use read_file. For multi-file edits, use claude_code with allow_edits=true.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -277,7 +279,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "post_file",
-        "description": "Fetches a file from a managed host and posts it as a Discord attachment. Supports images (png, jpg, gif, webp) and text files. Max 25MB.",
+        "description": "Fetches a file from a managed host and posts it as a Discord attachment. Supports images (png, jpg, gif, webp) and text files. Max 25MB. For generated content, use generate_file instead.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -299,7 +301,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "generate_file",
-        "description": "Creates a file and posts it as a Discord attachment. For script, code, CSV, report, config, or any downloadable content. Returns the file as a Discord attachment.",
+        "description": "Creates a file and posts it as a Discord attachment. For script, code, CSV, report, config, or any downloadable content. Returns the file as a Discord attachment. For files already on a host, use post_file instead.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -424,7 +426,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "list_schedules",
-        "description": "Returns all scheduled tasks (recurring, one-time, and webhook-triggered) with their IDs, descriptions, and next run times.",
+        "description": "Returns all scheduled tasks (recurring, one-time, and webhook-triggered) with their IDs, descriptions, and next run times. To delete, use delete_schedule.",
         "input_schema": {
             "type": "object",
             "properties": {},
@@ -465,7 +467,7 @@ TOOLS: list[dict] = [
     # --- History and memory ---
     {
         "name": "search_history",
-        "description": "Searches past conversation history (current and archived sessions) using keyword and semantic matching. Finds conversations by meaning even without exact keyword matches.",
+        "description": "Searches past conversation history (current and archived sessions) using keyword and semantic matching. Returns timestamped entries: '[date] (role): content'. For ingested docs, use search_knowledge instead.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -512,7 +514,7 @@ TOOLS: list[dict] = [
     # --- Audit ---
     {
         "name": "search_audit",
-        "description": "Searches the audit log of past tool executions. Returns tool calls with who ran them, inputs, and results. Filterable by tool name, user, host, keyword, and date.",
+        "description": "Searches the audit log of past tool executions. Returns entries: '[date] tool_name by user (status, Nms)' with result summary. Filterable by tool name, user, host, keyword, and date.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -638,7 +640,7 @@ TOOLS: list[dict] = [
     # --- Docker tools ---
     {
         "name": "docker_logs",
-        "description": "Returns recent logs from a Docker container. Supports --since for time-filtered output.",
+        "description": "Returns recent logs from a Docker container. Supports --since for time-filtered output. For container status, use check_docker.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -735,7 +737,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "docker_stats",
-        "description": "Returns CPU, memory, and network I/O stats for Docker containers on a managed host.",
+        "description": "Returns CPU, memory, and network I/O stats for Docker containers on a managed host. For container logs, use docker_logs.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -754,7 +756,7 @@ TOOLS: list[dict] = [
     # --- Git tools ---
     {
         "name": "git_status",
-        "description": "Returns git status for a repository. Shows modified, staged, and untracked files.",
+        "description": "Returns git status for a repository. Shows modified, staged, and untracked files. For commit history, use git_log. For diffs, use git_diff.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -772,7 +774,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "git_log",
-        "description": "Returns recent commit history from a repository. Max 50 commits.",
+        "description": "Returns recent commit history (git log --oneline --graph) from a repository. Max 50 commits. For commit details, use git_show. For diffs, use git_diff.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -794,7 +796,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "git_diff",
-        "description": "Returns git diff for a repository. Without commit: shows uncommitted changes. With commit: shows that commit's diff.",
+        "description": "Returns unified diff output for a repository. Without commit: shows uncommitted changes. With commit: shows that commit's diff. For commit messages, use git_log or git_show.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -816,7 +818,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "git_show",
-        "description": "Returns full details and diff of a specific git commit. Includes author, date, message, and changed files.",
+        "description": "Returns full details and diff of a specific git commit. Includes author, date, message, and changed files. For log overview, use git_log. For working directory changes, use git_diff without commit.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -856,7 +858,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "git_commit",
-        "description": "Stages files and commits in a repository. Without files list, stages all changed files.",
+        "description": "Stages files and commits in a repository. Without files list, stages all changed files. To push after committing, use git_push.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -937,7 +939,7 @@ TOOLS: list[dict] = [
     # --- Prometheus range query ---
     {
         "name": "query_prometheus_range",
-        "description": "Runs a PromQL range query over a time window. Returns data points for trend analysis (e.g. CPU over 6 hours).",
+        "description": "Runs a PromQL range query over a time window. Returns series as 'metric{labels}: N points [first → last]'. For trend analysis (e.g. CPU over 6 hours). For current values only, use query_prometheus.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -961,10 +963,10 @@ TOOLS: list[dict] = [
     {
         "name": "delegate_task",
         "description": (
-            "Runs a multi-step task in the background. Each step executes sequentially with progress updates posted to Discord. "
-            "Steps support: conditions (substring match on previous output, prefix ! to negate), on_failure (abort/continue), "
-            "store_as (save output to named variable, reference via {var.name}), {prev_output} substitution.\n"
-            "The conversation continues while the task runs."
+            "Runs a multi-step task in the background. Returns immediately with task ID; progress updates post to Discord. "
+            "Steps execute sequentially. Support: conditions (substring match on previous output, prefix ! to negate), "
+            "on_failure (abort/continue), store_as (save output to named variable, reference via {var.name}), "
+            "{prev_output} substitution. Track with list_tasks, stop with cancel_task."
         ),
         "input_schema": {
             "type": "object",
@@ -995,7 +997,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "list_tasks",
-        "description": "Returns background tasks. Without task_id: overview of all tasks. With task_id: detailed step-by-step results for that task.",
+        "description": "Returns background tasks. Without task_id: overview of all (running/completed/failed). With task_id: detailed step-by-step results. See delegate_task to create, cancel_task to stop.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1008,7 +1010,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "cancel_task",
-        "description": "Cancels a running background task.",
+        "description": "Cancels a running background task. Get task IDs from list_tasks.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1025,8 +1027,9 @@ TOOLS: list[dict] = [
         "name": "search_knowledge",
         "description": (
             "Searches the knowledge base of ingested documentation, runbooks, configs, and notes. "
-            "Returns relevant chunks ranked by semantic similarity. "
-            "Search here FIRST for environment-specific questions before falling back to web_search."
+            "Returns ranked chunks: '[source] (score: N) content'. "
+            "Search here FIRST for environment-specific questions before falling back to web_search. "
+            "To add documents, use ingest_document."
         ),
         "input_schema": {
             "type": "object",
@@ -1048,7 +1051,7 @@ TOOLS: list[dict] = [
         "description": (
             "Ingests a document into the knowledge base. Content is chunked and embedded for semantic search. "
             "Re-ingesting the same source name replaces the previous version. "
-            "For files on a host, read_file first then pass the content here."
+            "For files on a host, read_file first then pass the content here. Search with search_knowledge."
         ),
         "input_schema": {
             "type": "object",
@@ -1067,7 +1070,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "list_knowledge",
-        "description": "Returns all documents in the knowledge base with source names and chunk counts.",
+        "description": "Returns all documents in the knowledge base with source names and chunk counts. To search, use search_knowledge. To remove, use delete_knowledge.",
         "input_schema": {
             "type": "object",
             "properties": {},
@@ -1090,7 +1093,7 @@ TOOLS: list[dict] = [
     # --- Browser automation ---
     {
         "name": "browser_screenshot",
-        "description": "Navigates to a URL in a headless browser, takes a screenshot, and posts it to Discord. Renders JavaScript — works on dashboards (Grafana, Semaphore, Pi-hole), SPAs, and dynamic pages that fetch_url cannot handle.",
+        "description": "Navigates to a URL in a headless browser, takes a screenshot, and posts it to Discord. Renders JavaScript — works on dashboards (Grafana, Semaphore, Pi-hole), SPAs, and dynamic pages that fetch_url cannot handle. For text extraction, use browser_read_page.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1112,7 +1115,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "browser_read_page",
-        "description": "Navigates to a URL in a headless browser and returns visible text content. Renders JavaScript first — works on SPAs and dynamic pages unlike fetch_url. Optionally scoped to a CSS selector.",
+        "description": "Navigates to a URL in a headless browser and returns 'Title (url)\\n\\ntext'. Renders JavaScript first — works on SPAs and dynamic pages unlike fetch_url. Optionally scoped to a CSS selector. For tables, use browser_read_table. For screenshots, use browser_screenshot.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1138,7 +1141,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "browser_read_table",
-        "description": "Navigates to a URL in a headless browser and extracts an HTML table as markdown. Returns structured tabular data.",
+        "description": "Navigates to a URL in a headless browser and extracts an HTML table as markdown (| col | col |). Returns structured tabular data. For general text, use browser_read_page.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1160,7 +1163,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "browser_click",
-        "description": "Navigates to a URL and clicks an element by CSS selector. Returns the page state after clicking.",
+        "description": "Navigates to a URL and clicks an element by CSS selector. Returns visible page text after clicking. To fill forms, use browser_fill.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1182,7 +1185,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "browser_fill",
-        "description": "Navigates to a URL and fills a form field by CSS selector. Optionally submits by pressing Enter.",
+        "description": "Navigates to a URL and fills a form field by CSS selector. Optionally submits by pressing Enter. To click buttons, use browser_click.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1231,7 +1234,7 @@ TOOLS: list[dict] = [
     # --- Web tools ---
     {
         "name": "web_search",
-        "description": "Searches the web via DuckDuckGo. Returns titles, URLs, and snippets. Max 10 results.",
+        "description": "Searches the web via DuckDuckGo. Returns numbered results: 'N. title\\nurl\\nsnippet'. Max 10 results. For full page content, follow up with fetch_url or browser_read_page.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1249,7 +1252,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "fetch_url",
-        "description": "Fetches a URL and returns content as text. Converts HTML to readable text, passes through JSON and plain text. Static only — for JavaScript-rendered pages use browser_read_page.",
+        "description": "Fetches a URL and returns content as text (HTML converted to readable text, JSON passed through). Static only — for JavaScript-rendered pages use browser_read_page. To find URLs first, use web_search.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1264,7 +1267,7 @@ TOOLS: list[dict] = [
     # --- Incus tools ---
     {
         "name": "incus_list",
-        "description": "Returns all Incus instances (containers/VMs) with status, type, and IP addresses.",
+        "description": "Returns all Incus instances (containers/VMs) as a formatted table: name, status, type, IPv4. For details on one instance, use incus_info.",
         "input_schema": {
             "type": "object",
             "properties": {},
@@ -1286,7 +1289,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "incus_exec",
-        "description": "Executes a command inside an Incus instance. Returns exit code and output.",
+        "description": "Executes a command inside an Incus instance. Returns exit code and output. For host-level commands, use run_command instead.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1395,7 +1398,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "incus_launch",
-        "description": "Launches a new Incus instance from an image. Supports containers and VMs.",
+        "description": "Launches a new Incus instance from an image. Supports containers and VMs. To remove, use incus_delete.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1440,7 +1443,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "incus_logs",
-        "description": "Returns console log output from an Incus instance. Max 200 lines.",
+        "description": "Returns console log output from an Incus instance. Max 200 lines. To run commands inside, use incus_exec.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1463,9 +1466,10 @@ TOOLS: list[dict] = [
             "Deep reasoning agent for complex multi-step tasks: code generation, repo analysis, debugging, "
             "building/deploying projects, reading docs and following instructions, architecture review — "
             "anything that would take 3+ direct tool calls step-by-step. Runs the entire chain in one session "
-            "with no context loss. Results return as text + files on disk.\n"
+            "with no context loss. Results return as text + files on disk. "
+            "With allow_edits=true, appends 'FILES ON DISK: ...' manifest listing written files.\n"
             "NOT for: git history (use git_log/git_show/git_diff), reading single files (use read_file), "
-            "running single commands (use run_command).\n"
+            "running single commands (use run_command). For single-file writes, use write_file.\n"
             "For code+deploy: call this first to write code, then use infrastructure tools to deploy."
         ),
         "input_schema": {
