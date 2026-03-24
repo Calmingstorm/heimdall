@@ -149,7 +149,7 @@ class SessionVectorStore:
         for row in rows:
             distance = row[1]
             # Cosine distance: 0 = identical, higher = more different. Skip poor matches.
-            if distance > 1.0:
+            if distance > 0.8:
                 continue
             out.append({
                 "type": "semantic",

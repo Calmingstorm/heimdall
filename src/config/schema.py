@@ -49,7 +49,7 @@ class ToolsConfig(BaseModel):
     claude_code_user: str = ""
     claude_code_dir: str = "/opt/project"
     incus_host: str = ""
-    # Empty = all tools. Options: docker, systemd, incus, ansible, prometheus, git
+    # Empty = all tools. Options: docker, systemd, incus, ansible, prometheus, git, comfyui
     tool_packs: list[str] = Field(default_factory=list)
 
 
