@@ -1,5 +1,44 @@
 from __future__ import annotations
 
+# Tool packs: infrastructure tools that are opt-in via config.
+# Empty/absent tool_packs in config = ALL tools loaded (backward compatible).
+TOOL_PACKS: dict[str, list[str]] = {
+    "docker": [
+        "check_docker", "docker_logs", "docker_compose_action",
+        "docker_compose_status", "docker_compose_logs", "docker_stats",
+    ],
+    "systemd": ["check_service", "restart_service", "check_logs"],
+    "incus": [
+        "incus_list", "incus_info", "incus_exec", "incus_start", "incus_stop",
+        "incus_restart", "incus_snapshot_list", "incus_snapshot",
+        "incus_launch", "incus_delete", "incus_logs",
+    ],
+    "ansible": ["run_ansible_playbook"],
+    "prometheus": [
+        "query_prometheus", "query_prometheus_range",
+        "check_disk", "check_memory",
+    ],
+    "git": [
+        "git_status", "git_log", "git_diff", "git_show",
+        "git_pull", "git_commit", "git_push", "git_branch",
+    ],
+}
+
+# All tool names that belong to any pack
+_ALL_PACK_TOOLS: set[str] = {
+    name for tools in TOOL_PACKS.values() for name in tools
+}
+
+
+def get_pack_tool_names(packs: list[str]) -> set[str]:
+    """Return the set of tool names enabled by the given packs."""
+    result: set[str] = set()
+    for pack in packs:
+        if pack in TOOL_PACKS:
+            result.update(TOOL_PACKS[pack])
+    return result
+
+
 TOOLS: list[dict] = [
     # --- Host monitoring ---
     {
@@ -1573,8 +1612,23 @@ TOOLS: list[dict] = [
 ]
 
 
-def get_tool_definitions() -> list[dict]:
-    """Return tool definitions (without internal fields)."""
+def get_tool_definitions(enabled_packs: list[str] | None = None) -> list[dict]:
+    """Return tool definitions filtered by enabled packs.
+
+    When enabled_packs is None or empty: returns ALL tools (backward compatible).
+    When packs specified: returns core tools (not in any pack) + tools from enabled packs.
+    """
+    if enabled_packs:
+        allowed = get_pack_tool_names(enabled_packs)
+        return [
+            {
+                "name": t["name"],
+                "description": t["description"],
+                "input_schema": t["input_schema"],
+            }
+            for t in TOOLS
+            if t["name"] not in _ALL_PACK_TOOLS or t["name"] in allowed
+        ]
     return [
         {
             "name": t["name"],

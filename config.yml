@@ -55,6 +55,7 @@ tools:
   # claude_code_user: ""         # Non-root user for claude -p edits (e.g. "deploy")
   # claude_code_dir: "/opt/project"  # Default working directory for claude -p
   # incus_host: "myhost"         # Host alias where Incus runs
+  # tool_packs: [docker, systemd, git]  # Empty or absent = all tools loaded
 
 webhook:
   enabled: false

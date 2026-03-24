@@ -734,7 +734,7 @@ class LokiBot(discord.Client):
         """
         if self._cached_merged_tools is not None:
             return self._cached_merged_tools
-        builtin = get_tool_definitions()
+        builtin = get_tool_definitions(enabled_packs=self.config.tools.tool_packs)
         builtin_names = {t["name"] for t in builtin}
         skill_defs = [
             t for t in self.skill_manager.get_tool_definitions()
@@ -898,6 +898,11 @@ class LokiBot(discord.Client):
 
     async def on_ready(self) -> None:
         log.info("Logged in as %s (ID: %s)", self.user, self.user.id)
+        packs = self.config.tools.tool_packs
+        if packs:
+            log.info("Tool packs enabled: %s", ", ".join(packs))
+        else:
+            log.info("Tool packs: all tools loaded (no filtering)")
         # Prune stale sessions loaded from disk.  load() reads ALL persisted
         # session files regardless of age; pruning here removes expired ones
         # immediately instead of waiting for the first user message.
