@@ -86,7 +86,7 @@ class KnowledgeStore:
         self,
         content: str,
         source: str,
-        embedder: LocalEmbedder,
+        embedder: LocalEmbedder | None = None,
         *,
         uploader: str = "system",
     ) -> int:
@@ -124,7 +124,7 @@ class KnowledgeStore:
                     self._fts.index_knowledge_chunk(chunk_id, chunk, source, i)
 
                 # Try vector embedding (optional — FTS still works without it)
-                if self._has_vec:
+                if self._has_vec and embedder:
                     vector = await embedder.embed(chunk)
                     if vector is not None:
                         vec_bytes = serialize_vector(vector)
@@ -146,14 +146,14 @@ class KnowledgeStore:
     async def search(
         self,
         query: str,
-        embedder: LocalEmbedder,
+        embedder: LocalEmbedder | None = None,
         limit: int = 5,
     ) -> list[dict]:
         """Semantic search across the knowledge base.
 
         Returns list of dicts with: content, source, score, chunk_index.
         """
-        if not self.available or not self._has_vec:
+        if not self.available or not self._has_vec or not embedder:
             return []
 
         vector = await embedder.embed(query)
@@ -256,10 +256,15 @@ class KnowledgeStore:
         return 0
 
     async def search_hybrid(
-        self, query: str, embedder: LocalEmbedder, limit: int = 5,
+        self, query: str, embedder: LocalEmbedder | None = None, limit: int = 5,
     ) -> list[dict]:
-        """Combined FTS5 + semantic search with Reciprocal Rank Fusion."""
-        semantic_results = await self.search(query, embedder, limit=limit * 2)
+        """Combined FTS5 + semantic search with Reciprocal Rank Fusion.
+
+        Works in FTS-only mode when embedder is None or vector search unavailable.
+        """
+        semantic_results = []
+        if embedder:
+            semantic_results = await self.search(query, embedder, limit=limit * 2)
         fts_results = []
         if self._fts:
             fts_results = self._fts.search_knowledge(query, limit=limit * 2)

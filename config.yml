@@ -71,7 +71,7 @@ learning:
 
 search:
   enabled: true
-  chromadb_path: "./data/chromadb"
+  chromadb_path: "./data/chromadb"  # Directory for search SQLite DBs (sessions.db, knowledge.db)
 
 logging:
   level: "INFO"

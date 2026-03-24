@@ -387,19 +387,29 @@ class LokiBot(discord.Client):
             self._embedder = LocalEmbedder()
             # Initialize FTS5 index (SQLite, no external deps)
             from pathlib import Path
-            fts_db_path = str(Path(config.search.chromadb_path).parent / "fts.db")  # noqa: chromadb_path kept for config compat
+            search_db_path = config.search.chromadb_path  # now used for SQLite DBs
+            fts_db_path = str(Path(search_db_path).parent / "fts.db")
             from ..search.fts import FullTextIndex
             self._fts_index = FullTextIndex(fts_db_path)
             if not self._fts_index.available:
                 self._fts_index = None
 
+            # Always initialize stores — they work in FTS-only mode even without
+            # sqlite-vec or embedder. Don't null them out on vec init failure.
+            session_db = str(Path(search_db_path) / "sessions.db") if Path(search_db_path).is_dir() else search_db_path + "_sessions.db"
+            knowledge_db = str(Path(search_db_path) / "knowledge.db") if Path(search_db_path).is_dir() else search_db_path + "_knowledge.db"
+            # Ensure the directory exists
+            Path(search_db_path).mkdir(parents=True, exist_ok=True)
+            session_db = str(Path(search_db_path) / "sessions.db")
+            knowledge_db = str(Path(search_db_path) / "knowledge.db")
+
             self._vector_store = SessionVectorStore(
-                config.search.chromadb_path, fts_index=self._fts_index,
+                session_db, fts_index=self._fts_index,
             )
             if not self._vector_store.available:
                 self._vector_store = None
             self._knowledge_store = KnowledgeStore(
-                config.search.chromadb_path, fts_index=self._fts_index,
+                knowledge_db, fts_index=self._fts_index,
             )
             if not self._knowledge_store.available:
                 self._knowledge_store = None
@@ -912,7 +922,7 @@ class LokiBot(discord.Client):
             await self.tree.sync(guild=guild)
             log.info("Slash commands synced to guild: %s", guild.name)
         self.scheduler.start(self._on_scheduled_task)
-        if self._vector_store and self._embedder:
+        if self._vector_store:
             asyncio.create_task(self._backfill_archives())
         # Start proactive monitoring if configured
         if hasattr(self, "infra_watcher") and self.infra_watcher:
@@ -2218,8 +2228,8 @@ class LokiBot(discord.Client):
         return f"**Found {len(results)} result(s) for '{query}':**\n" + "\n".join(lines)
 
     async def _handle_search_knowledge(self, inp: dict) -> str:
-        """Semantic search over the knowledge base."""
-        if not self._knowledge_store or not self._embedder:
+        """Semantic + FTS search over the knowledge base."""
+        if not self._knowledge_store:
             return "Knowledge base is not available (search not enabled or not initialized)."
 
         query = inp.get("query", "")
@@ -2242,7 +2252,7 @@ class LokiBot(discord.Client):
 
     async def _handle_ingest_document(self, inp: dict, uploader: str) -> str:
         """Ingest a document into the knowledge base."""
-        if not self._knowledge_store or not self._embedder:
+        if not self._knowledge_store:
             return "Knowledge base is not available (search not enabled or not initialized)."
 
         source = inp.get("source", "")
@@ -2257,7 +2267,7 @@ class LokiBot(discord.Client):
             uploader=uploader,
         )
         if count == 0:
-            return f"Failed to ingest '{source}' — no chunks could be embedded."
+            return f"Failed to ingest '{source}' — no chunks could be indexed."
         return f"Ingested '{source}' into knowledge base ({count} chunks indexed)."
 
     def _handle_list_knowledge(self) -> str:
