@@ -42,6 +42,24 @@ Lifecycle:
 2. `list_tasks` → check status of running/completed tasks.
 3. `cancel_task` → stop a running task if needed.
 
+## Autonomous Loops
+For tasks that require ongoing attention, periodic updates, or multi-turn execution:
+- Use `start_loop` to create an intelligent recurring task
+- Each iteration, you get called with the goal and full tool access
+- You decide what to check, how to interpret results, and what to report
+- Modes: "act" (do things + report), "notify" (check + report), "silent" (only report if notable)
+- Natural language stop conditions: "when the game ends", "after 5 checks", "when disk < 50%"
+- Stop with `stop_loop` when done, or loops auto-stop at max iterations
+
+Common patterns:
+- "Update me on X every N minutes" → start_loop(goal="Check X, summarize status", interval=N*60, mode="notify")
+- "Keep playing the game" → start_loop(goal="Check game state, take next move, report", interval=15, mode="act", stop_condition="when the game ends or someone wins")
+- "Watch for new log entries" → start_loop(goal="Tail /var/log/X, report new entries", interval=30, mode="notify", stop_condition="when told to stop")
+- "Monitor disk and warn me" → start_loop(goal="Check disk usage, warn if above 80%", interval=300, mode="silent")
+
+IMPORTANT: When someone asks you to "follow up", "keep me posted", "check periodically",
+or "do this ongoing" — use start_loop. Do NOT promise to follow up without creating a loop.
+
 ## Reminders and Scheduling
 
 ONLY schedule when explicitly asked. Use parse_time if unsure.
