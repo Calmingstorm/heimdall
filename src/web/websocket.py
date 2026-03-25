@@ -30,8 +30,9 @@ _LOG_POLL_INTERVAL = 1.0
 class WebSocketManager:
     """Manages WebSocket connections and broadcasts events."""
 
-    def __init__(self, bot: LokiBot) -> None:
+    def __init__(self, bot: LokiBot, *, api_token: str = "") -> None:
         self._bot = bot
+        self._api_token = api_token
         self._clients: set[web.WebSocketResponse] = set()
         self._log_subscribers: set[web.WebSocketResponse] = set()
         self._event_subscribers: set[web.WebSocketResponse] = set()
@@ -42,6 +43,15 @@ class WebSocketManager:
 
     async def handle(self, request: web.Request) -> web.WebSocketResponse:
         """Handle a WebSocket connection at /api/ws."""
+        # Authenticate via query param token (if configured)
+        if self._api_token:
+            token = request.query.get("token", "")
+            if token != self._api_token:
+                ws = web.WebSocketResponse()
+                await ws.prepare(request)
+                await ws.close(code=4001, message=b"unauthorized")
+                return ws
+
         ws = web.WebSocketResponse(heartbeat=30.0)
         await ws.prepare(request)
         self._clients.add(ws)
@@ -155,9 +165,11 @@ class WebSocketManager:
                 break
 
 
-def setup_websocket(app: web.Application, bot: LokiBot) -> WebSocketManager:
+def setup_websocket(
+    app: web.Application, bot: LokiBot, *, api_token: str = "",
+) -> WebSocketManager:
     """Register the WebSocket endpoint and return the manager."""
-    manager = WebSocketManager(bot)
+    manager = WebSocketManager(bot, api_token=api_token)
     app.router.add_get("/api/ws", manager.handle)
     log.info("WebSocket endpoint registered at /api/ws")
     return manager

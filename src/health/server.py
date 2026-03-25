@@ -151,7 +151,9 @@ class HealthServer:
         from ..web.api import setup_api
         from ..web.websocket import setup_websocket
         setup_api(self._app, bot)
-        self._ws_manager = setup_websocket(self._app, bot)
+        self._ws_manager = setup_websocket(
+            self._app, bot, api_token=self._web_config.api_token,
+        )
         log.info("Web management API enabled")
 
     async def _redirect_to_ui(self, _request: web.Request) -> web.Response:

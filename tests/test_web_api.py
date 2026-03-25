@@ -12,6 +12,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import aiohttp
 from aiohttp import web
 from aiohttp.test_utils import AioHTTPTestCase, TestClient, TestServer
 
@@ -1087,6 +1088,17 @@ class TestWebSocketManager:
         mgr = WebSocketManager(bot)
         assert mgr.client_count == 0
 
+    def test_stores_api_token(self):
+        bot = _make_bot()
+        mgr = WebSocketManager(bot, api_token="secret-ws")
+        assert mgr._api_token == "secret-ws"
+
+    def test_empty_token_allows_all(self):
+        """When api_token is empty, no auth is enforced (dev mode)."""
+        bot = _make_bot()
+        mgr = WebSocketManager(bot, api_token="")
+        assert mgr._api_token == ""
+
     @pytest.mark.asyncio
     async def test_broadcast_no_subscribers(self):
         """broadcast_event with no subscribers should be a no-op."""
@@ -1127,6 +1139,82 @@ class TestWebSocketManager:
 
 
 # ===================================================================
+# WebSocket authentication tests
+# ===================================================================
+
+
+def _make_ws_app(bot=None, *, api_token="ws-secret"):
+    """Create an aiohttp Application with a WebSocket endpoint for testing."""
+    if bot is None:
+        bot = _make_bot()
+    app = web.Application()
+    mgr = WebSocketManager(bot, api_token=api_token)
+    app.router.add_get("/api/ws", mgr.handle)
+    return app, mgr
+
+
+class TestWebSocketAuth:
+    @pytest.mark.asyncio
+    async def test_ws_rejects_missing_token(self):
+        """WebSocket connection without token is closed with 4001."""
+        app, mgr = _make_ws_app(api_token="my-secret")
+        async with TestClient(TestServer(app)) as client:
+            ws = await client.ws_connect("/api/ws")
+            msg = await ws.receive()
+            assert msg.type == aiohttp.WSMsgType.CLOSE
+            assert ws.close_code == 4001
+            # Client was never added to the active set
+            assert mgr.client_count == 0
+
+    @pytest.mark.asyncio
+    async def test_ws_rejects_wrong_token(self):
+        """WebSocket connection with wrong token is closed with 4001."""
+        app, mgr = _make_ws_app(api_token="my-secret")
+        async with TestClient(TestServer(app)) as client:
+            ws = await client.ws_connect("/api/ws?token=wrong-token")
+            msg = await ws.receive()
+            assert msg.type == aiohttp.WSMsgType.CLOSE
+            assert ws.close_code == 4001
+            assert mgr.client_count == 0
+
+    @pytest.mark.asyncio
+    async def test_ws_accepts_valid_token(self):
+        """WebSocket connection with correct token is accepted."""
+        app, mgr = _make_ws_app(api_token="my-secret")
+        async with TestClient(TestServer(app)) as client:
+            ws = await client.ws_connect("/api/ws?token=my-secret")
+            # Connection should be open and client registered
+            assert mgr.client_count == 1
+            # Send a subscribe message to verify the connection works
+            await ws.send_json({"subscribe": "events"})
+            msg = await ws.receive_json()
+            assert msg["type"] == "subscribed"
+            assert msg["channel"] == "events"
+            await ws.close()
+
+    @pytest.mark.asyncio
+    async def test_ws_allows_all_when_no_token(self):
+        """When api_token is empty (dev mode), all connections allowed."""
+        app, mgr = _make_ws_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            ws = await client.ws_connect("/api/ws")
+            assert mgr.client_count == 1
+            await ws.send_json({"subscribe": "events"})
+            msg = await ws.receive_json()
+            assert msg["type"] == "subscribed"
+            await ws.close()
+
+    @pytest.mark.asyncio
+    async def test_ws_allows_no_token_param_in_dev_mode(self):
+        """Dev mode: connection without any token param succeeds."""
+        app, mgr = _make_ws_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            ws = await client.ws_connect("/api/ws?other=param")
+            assert mgr.client_count == 1
+            await ws.close()
+
+
+# ===================================================================
 # HealthServer integration tests
 # ===================================================================
 
@@ -1136,7 +1224,7 @@ class TestHealthServerWebIntegration:
         """set_bot() should register API + WebSocket routes."""
         server = HealthServer(
             port=0,
-            web_config=WebConfig(enabled=True, api_token=""),
+            web_config=WebConfig(enabled=True, api_token="test-tok"),
         )
         bot = _make_bot()
         with patch("src.web.api.setup_api") as mock_setup_api, \
@@ -1145,6 +1233,9 @@ class TestHealthServerWebIntegration:
             server.set_bot(bot)
             mock_setup_api.assert_called_once()
             mock_setup_ws.assert_called_once()
+            # Verify api_token is passed through to WebSocket setup
+            ws_call_kwargs = mock_setup_ws.call_args
+            assert ws_call_kwargs[1]["api_token"] == "test-tok"
 
     def test_set_bot_disabled(self):
         """When web is disabled, set_bot() should be a no-op."""
