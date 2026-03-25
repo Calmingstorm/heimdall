@@ -27,6 +27,8 @@ from src.health.server import (
 from src.web.api import (
     _redact_config,
     _validate_string,
+    _contains_blocked_fields,
+    _deep_merge,
     _SENSITIVE_FIELDS,
     _MAX_NAME_LEN,
     _MAX_CODE_LEN,
@@ -375,11 +377,153 @@ class TestConfigEndpoint:
             assert body["web"]["enabled"] is True
 
     @pytest.mark.asyncio
-    async def test_config_update_returns_501(self):
+    async def test_config_put_partial_update(self):
+        """PUT /api/config with valid partial update succeeds."""
+        from src.config.schema import Config
+        real_config = Config(discord={"token": "tok"}, tools={"tool_packs": []}, web={"enabled": True})
+        bot = _make_bot()
+        bot.config = real_config
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            with patch("src.web.api._write_config"):
+                resp = await client.put(
+                    "/api/config",
+                    json={"tools": {"tool_packs": ["docker", "git"]}},
+                )
+            assert resp.status == 200
+            body = await resp.json()
+            assert body["tools"]["tool_packs"] == ["docker", "git"]
+            # Verify the bot's config was updated
+            assert bot.config.tools.tool_packs == ["docker", "git"]
+
+    @pytest.mark.asyncio
+    async def test_config_put_blocks_sensitive_fields(self):
+        """PUT /api/config rejects sensitive field updates with 403."""
         app, _ = _make_app(api_token="")
         async with TestClient(TestServer(app)) as client:
-            resp = await client.put("/api/config", json={})
-            assert resp.status == 501
+            resp = await client.put(
+                "/api/config",
+                json={"discord": {"token": "hacked"}},
+            )
+            assert resp.status == 403
+            body = await resp.json()
+            assert "sensitive" in body["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_config_put_blocks_nested_sensitive(self):
+        """PUT /api/config rejects nested sensitive fields."""
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.put(
+                "/api/config",
+                json={"web": {"api_token": "new-secret"}},
+            )
+            assert resp.status == 403
+
+    @pytest.mark.asyncio
+    async def test_config_put_invalid_config(self):
+        """PUT /api/config rejects invalid config with 400."""
+        from src.config.schema import Config
+        real_config = Config(discord={"token": "tok"})
+        bot = _make_bot()
+        bot.config = real_config
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            # discord is required and must be a dict — setting it to a string should fail
+            resp = await client.put(
+                "/api/config",
+                json={"discord": "not-a-dict"},
+            )
+            assert resp.status == 400
+            body = await resp.json()
+            assert "invalid config" in body["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_config_put_invalid_json(self):
+        """PUT /api/config rejects malformed JSON."""
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.put(
+                "/api/config",
+                data=b"not json",
+                headers={"Content-Type": "application/json"},
+            )
+            assert resp.status == 400
+
+    @pytest.mark.asyncio
+    async def test_config_put_preserves_unrelated_fields(self):
+        """PUT /api/config merges correctly without overwriting unrelated fields."""
+        from src.config.schema import Config
+        real_config = Config(
+            discord={"token": "tok"},
+            tools={"tool_packs": ["docker"]},
+            timezone="US/Eastern",
+        )
+        bot = _make_bot()
+        bot.config = real_config
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            with patch("src.web.api._write_config"):
+                resp = await client.put(
+                    "/api/config",
+                    json={"tools": {"tool_packs": ["git"]}},
+                )
+            assert resp.status == 200
+            # timezone should be preserved
+            assert bot.config.timezone == "US/Eastern"
+            # tool_packs should be updated
+            assert bot.config.tools.tool_packs == ["git"]
+
+    @pytest.mark.asyncio
+    async def test_config_put_writes_to_disk(self):
+        """PUT /api/config writes updated config to disk."""
+        from src.config.schema import Config
+        real_config = Config(discord={"token": "tok"})
+        bot = _make_bot()
+        bot.config = real_config
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            with patch("src.web.api._write_config") as mock_write:
+                resp = await client.put(
+                    "/api/config",
+                    json={"timezone": "US/Pacific"},
+                )
+            assert resp.status == 200
+            mock_write.assert_called_once()
+            written_data = mock_write.call_args[0][1]
+            assert written_data["timezone"] == "US/Pacific"
+
+
+class TestContainsBlockedFields:
+    def test_top_level_blocked(self):
+        assert _contains_blocked_fields({"token": "x"}, _SENSITIVE_FIELDS) is True
+
+    def test_nested_blocked(self):
+        assert _contains_blocked_fields({"discord": {"api_key": "x"}}, _SENSITIVE_FIELDS) is True
+
+    def test_no_blocked(self):
+        assert _contains_blocked_fields({"timezone": "UTC"}, _SENSITIVE_FIELDS) is False
+
+    def test_empty_dict(self):
+        assert _contains_blocked_fields({}, _SENSITIVE_FIELDS) is False
+
+
+class TestDeepMerge:
+    def test_shallow_merge(self):
+        base = {"a": 1, "b": 2}
+        _deep_merge(base, {"b": 3, "c": 4})
+        assert base == {"a": 1, "b": 3, "c": 4}
+
+    def test_nested_merge(self):
+        base = {"tools": {"packs": [], "enabled": True}}
+        _deep_merge(base, {"tools": {"packs": ["docker"]}})
+        assert base["tools"]["packs"] == ["docker"]
+        assert base["tools"]["enabled"] is True
+
+    def test_overwrite_non_dict(self):
+        base = {"a": "old"}
+        _deep_merge(base, {"a": "new"})
+        assert base["a"] == "new"
 
 
 # ===================================================================

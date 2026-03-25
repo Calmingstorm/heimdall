@@ -7,10 +7,13 @@ from __future__ import annotations
 
 import asyncio
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import yaml
 from aiohttp import web
 
+from ..config.schema import Config
 from ..logging import get_logger
 from ..tools.registry import TOOL_PACKS, get_tool_definitions, get_pack_tool_names
 
@@ -40,6 +43,29 @@ def _validate_string(value: str, field: str, max_len: int) -> str | None:
     return None
 
 
+def _contains_blocked_fields(d: dict, blocked: frozenset[str], *, _depth: int = 0) -> bool:
+    """Recursively check if any keys in *d* are in *blocked*."""
+    if _depth > 10:
+        return False
+    for key, value in d.items():
+        if key in blocked:
+            return True
+        if isinstance(value, dict) and _contains_blocked_fields(value, blocked, _depth=_depth + 1):
+            return True
+    return False
+
+
+def _deep_merge(base: dict, updates: dict, *, _depth: int = 0) -> None:
+    """Recursively merge *updates* into *base* in-place."""
+    if _depth > 10:
+        return
+    for key, value in updates.items():
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            _deep_merge(base[key], value, _depth=_depth + 1)
+        else:
+            base[key] = value
+
+
 def _redact_config(obj: Any, *, _depth: int = 0) -> Any:
     """Recursively redact sensitive fields from config dicts."""
     if _depth > 10:
@@ -53,6 +79,12 @@ def _redact_config(obj: Any, *, _depth: int = 0) -> Any:
     if isinstance(obj, list):
         return [_redact_config(v, _depth=_depth + 1) for v in obj]
     return obj
+
+
+def _write_config(path: Path, data: dict) -> None:
+    """Write config dict to YAML file."""
+    with open(path, "w") as f:
+        yaml.dump(data, f, default_flow_style=False)
 
 
 def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
@@ -89,8 +121,39 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
 
     @routes.put("/api/config")
     async def update_config(request: web.Request) -> web.Response:
-        # Read-only for now — Round 22+ may add selective updates
-        return web.json_response({"error": "config updates not yet supported"}, status=501)
+        try:
+            updates = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid JSON"}, status=400)
+
+        if not isinstance(updates, dict):
+            return web.json_response({"error": "expected JSON object"}, status=400)
+
+        # Block sensitive field updates
+        if _contains_blocked_fields(updates, _SENSITIVE_FIELDS):
+            return web.json_response(
+                {"error": "Cannot update sensitive fields via API"}, status=403
+            )
+
+        # Deep merge updates into current config
+        current = bot.config.model_dump()
+        _deep_merge(current, updates)
+
+        # Validate by reconstructing the config model
+        try:
+            new_config = Config(**current)
+        except Exception as e:
+            return web.json_response({"error": f"Invalid config: {e}"}, status=400)
+
+        # Apply to bot
+        bot.config = new_config
+
+        # Write to disk
+        config_path = Path("config.yml")
+        if config_path.exists():
+            await asyncio.to_thread(_write_config, config_path, current)
+
+        return web.json_response(_redact_config(new_config.model_dump()))
 
     # ------------------------------------------------------------------
     # Sessions

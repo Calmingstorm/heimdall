@@ -1,6 +1,6 @@
 /**
  * Loki Management UI — Config Page
- * Display config as structured form with sensitive field redaction
+ * Display config as structured form with sensitive field redaction + inline editing
  */
 import { api } from '../api.js';
 
@@ -12,10 +12,25 @@ export default {
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-xl font-semibold">Configuration</h1>
         <div class="flex gap-2">
+          <button v-if="editing" @click="cancelEdit" class="btn btn-ghost text-xs">Cancel</button>
+          <button v-if="editing" @click="saveConfig" class="btn btn-ghost text-xs text-green-400"
+                  :disabled="saving">
+            {{ saving ? 'Saving...' : 'Save Changes' }}
+          </button>
+          <button v-if="!editing" @click="startEdit" class="btn btn-ghost text-xs" :disabled="!config">
+            Edit
+          </button>
           <button @click="fetchConfig" class="btn btn-ghost text-xs" :disabled="loading">
             {{ loading ? 'Loading...' : 'Refresh' }}
           </button>
         </div>
+      </div>
+
+      <div v-if="saveError" class="loki-card border-red-900 mb-3">
+        <p class="text-red-400 text-sm">{{ saveError }}</p>
+      </div>
+      <div v-if="saveSuccess" class="loki-card border-green-900 mb-3">
+        <p class="text-green-400 text-sm">Config saved successfully.</p>
       </div>
 
       <div v-if="loading && !config" class="space-y-3">
@@ -29,7 +44,15 @@ export default {
         <button @click="fetchConfig" class="btn btn-ghost text-xs">Retry</button>
       </div>
       <div v-else-if="config">
-        <div class="space-y-3">
+        <!-- Edit mode: JSON editor -->
+        <div v-if="editing" class="loki-card">
+          <p class="text-xs text-gray-400 mb-2">Edit config as JSON (partial updates — only include fields you want to change). Sensitive fields (token, api_key, etc.) cannot be changed here.</p>
+          <textarea v-model="editJson" rows="20"
+                    class="w-full bg-gray-900 text-gray-300 font-mono text-xs p-3 rounded border border-gray-700 focus:border-blue-500 focus:outline-none"></textarea>
+        </div>
+
+        <!-- Read mode: structured view -->
+        <div v-else class="space-y-3">
           <div v-for="(value, section) in config" :key="section" class="loki-card">
             <div class="flex items-center gap-2 mb-2 cursor-pointer select-none"
                  @click="toggleSection(section)">
@@ -110,6 +133,11 @@ export default {
     const expanded = ref({});
     const expandedNested = ref({});
     const revealed = ref({});
+    const editing = ref(false);
+    const editJson = ref('');
+    const saving = ref(false);
+    const saveError = ref(null);
+    const saveSuccess = ref(false);
 
     function isRedacted(value) {
       return value === '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
@@ -129,6 +157,37 @@ export default {
       } catch {
         return String(obj);
       }
+    }
+
+    function startEdit() {
+      saveError.value = null;
+      saveSuccess.value = false;
+      editJson.value = JSON.stringify(config.value, null, 2);
+      editing.value = true;
+    }
+
+    function cancelEdit() {
+      editing.value = false;
+      editJson.value = '';
+      saveError.value = null;
+    }
+
+    async function saveConfig() {
+      saving.value = true;
+      saveError.value = null;
+      saveSuccess.value = false;
+      try {
+        const updates = JSON.parse(editJson.value);
+        const result = await api.put('/api/config', updates);
+        config.value = result;
+        editing.value = false;
+        editJson.value = '';
+        saveSuccess.value = true;
+        setTimeout(() => { saveSuccess.value = false; }, 3000);
+      } catch (e) {
+        saveError.value = e.message || 'Failed to save config';
+      }
+      saving.value = false;
     }
 
     async function fetchConfig() {
@@ -153,7 +212,9 @@ export default {
     return {
       config, loading, error,
       expanded, expandedNested, revealed,
+      editing, editJson, saving, saveError, saveSuccess,
       isRedacted, toggleSection, toggleNested, formatJson, fetchConfig,
+      startEdit, cancelEdit, saveConfig,
     };
   },
 };
