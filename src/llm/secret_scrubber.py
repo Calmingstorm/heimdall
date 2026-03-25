@@ -10,7 +10,7 @@ import re
 
 # Patterns to scrub from tool output before it reaches the LLM
 OUTPUT_SECRET_PATTERNS = [
-    re.compile(r"(password|passwd|pwd)\s*[:=]\s*\S+", re.IGNORECASE),
+    re.compile(r"(?<![a-zA-Z])(password|passwd|pwd)\s*[:=]\s*\S+", re.IGNORECASE),
     re.compile(r"(api[_-]?key|apikey)\s*[:=]\s*\S+", re.IGNORECASE),
     re.compile(r"(secret|token|access_token|auth_token)\s*[:=]\s*['\"]?\S{16,}", re.IGNORECASE),
     re.compile(r"sk-[a-zA-Z0-9]{20,}"),

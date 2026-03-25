@@ -2992,6 +2992,7 @@ class LokiBot(discord.Client):
         chunks: list[str] = []
         current = ""
         in_code_block = False
+        code_block_lang = ""
 
         # Pre-split any lines longer than the chunk limit so the chunker
         # never encounters a single line that can't fit in one chunk.
@@ -3004,8 +3005,14 @@ class LokiBot(discord.Client):
             lines.append(raw_line)
 
         for line in lines:
+            # Track code block state (toggle on ``` lines)
             if line.startswith("```"):
-                in_code_block = not in_code_block
+                if in_code_block:
+                    in_code_block = False
+                    code_block_lang = ""
+                else:
+                    in_code_block = True
+                    code_block_lang = line[3:].strip()
 
             if len(current) + len(line) + 1 > DISCORD_MAX_LEN - 10:
                 if in_code_block:
@@ -3014,7 +3021,7 @@ class LokiBot(discord.Client):
                     chunks.append(current)
                 current = ""
                 if in_code_block:
-                    current = "```\n"
+                    current = f"```{code_block_lang}\n"
             current += line + "\n"
 
         if current.strip():

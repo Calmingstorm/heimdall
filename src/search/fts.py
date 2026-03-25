@@ -15,6 +15,9 @@ log = get_logger("search.fts")
 # Characters that have special meaning in FTS5 query syntax
 _FTS5_SPECIAL = re.compile(r'[*"{}()\[\]:^~]')
 
+# FTS5 keywords that cause "no such column" errors when used as bare terms
+_FTS5_KEYWORDS = frozenset({"AND", "OR", "NOT", "NEAR", "TO"})
+
 
 class FullTextIndex:
     """SQLite FTS5 index for sessions and knowledge chunks."""
@@ -189,6 +192,7 @@ def _prepare_query(raw: str) -> str:
 
     - Wraps in quotes if it contains FTS5 special characters (for literal matching)
     - Handles IP addresses, PromQL expressions, error codes, etc.
+    - Quotes individual terms that are FTS5 reserved keywords (AND, OR, NOT, NEAR, TO)
     """
     raw = raw.strip()
     if not raw:
@@ -198,4 +202,13 @@ def _prepare_query(raw: str) -> str:
         # Escape any internal double quotes
         escaped = raw.replace('"', '""')
         return f'"{escaped}"'
-    return raw
+    # Quote individual terms that are FTS5 reserved keywords to prevent
+    # "no such column" errors (e.g. "to" being treated as a column reference)
+    terms = raw.split()
+    escaped_terms = []
+    for term in terms:
+        if term.upper() in _FTS5_KEYWORDS:
+            escaped_terms.append(f'"{term}"')
+        else:
+            escaped_terms.append(term)
+    return " ".join(escaped_terms)
