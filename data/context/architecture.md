@@ -77,7 +77,7 @@ absent in config, ALL tools are loaded (backward compatible). When packs are spe
 only core tools plus the selected packs are available.
 
 Available packs: `docker` (6 tools), `systemd` (3), `incus` (11), `ansible` (1),
-`prometheus` (4), `git` (8), `comfyui` (1). Core tools (44) are always available.
+`prometheus` (4), `git` (8), `comfyui` (1). Core tools (47) are always available.
 
 Example config: `tool_packs: [docker, systemd, git]`
 
