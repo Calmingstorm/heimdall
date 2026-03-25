@@ -113,6 +113,11 @@ class PermissionsConfig(BaseModel):
     overrides_path: str = "./data/permissions.json"
 
 
+class WebConfig(BaseModel):
+    enabled: bool = True
+    api_token: str = ""  # Empty = no auth required (dev mode)
+
+
 class ComfyUIConfig(BaseModel):
     enabled: bool = False
     url: str = "http://localhost:8188"
@@ -152,6 +157,7 @@ class Config(BaseModel):
     browser: BrowserConfig = BrowserConfig()
     permissions: PermissionsConfig = PermissionsConfig()
     comfyui: ComfyUIConfig = ComfyUIConfig()
+    web: WebConfig = WebConfig()
 
 
 def _substitute_env_vars(text: str) -> str:

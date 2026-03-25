@@ -25,8 +25,9 @@ def main() -> None:
 
     log.info("Starting Loki")
 
-    health = HealthServer(webhook_config=config.webhook)
+    health = HealthServer(webhook_config=config.webhook, web_config=config.web)
     bot = LokiBot(config)
+    health.set_bot(bot)
 
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)

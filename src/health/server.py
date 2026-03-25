@@ -4,16 +4,49 @@ import hashlib
 import hmac
 import json
 from collections.abc import Awaitable, Callable
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 from aiohttp import web
 
-from ..config.schema import WebhookConfig
+from ..config.schema import WebConfig, WebhookConfig
 from ..logging import get_logger
+
+if TYPE_CHECKING:
+    from ..discord.client import LokiBot
 
 log = get_logger("health")
 
 SendMessageCallback = Callable[[str, str], Awaitable[None]]
 TriggerCallback = Callable[[str, dict], Awaitable[int]]
+
+# Paths that skip API token authentication
+_AUTH_SKIP_PREFIXES = ("/health", "/webhook/", "/ui")
+
+
+def _make_auth_middleware(web_config: WebConfig) -> web.middleware:
+    """Create middleware that enforces Bearer token auth on /api/ routes."""
+
+    @web.middleware
+    async def auth_middleware(
+        request: web.Request,
+        handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
+    ) -> web.StreamResponse:
+        path = request.path
+        # Skip auth for non-API routes
+        if not path.startswith("/api/"):
+            return await handler(request)
+        # Skip auth if no token configured (dev mode)
+        token = web_config.api_token
+        if not token:
+            return await handler(request)
+        # Check Bearer token
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header == f"Bearer {token}":
+            return await handler(request)
+        return web.json_response({"error": "unauthorized"}, status=401)
+
+    return auth_middleware
 
 
 class HealthServer:
@@ -21,19 +54,31 @@ class HealthServer:
         self,
         port: int = 3000,
         webhook_config: WebhookConfig | None = None,
+        web_config: WebConfig | None = None,
     ) -> None:
         self.port = port
         self._ready = False
         self._webhook_config = webhook_config or WebhookConfig()
+        self._web_config = web_config or WebConfig()
         self._send_message: SendMessageCallback | None = None
         self._trigger_callback: TriggerCallback | None = None
-        self._app = web.Application()
+        middlewares = []
+        if self._web_config.enabled:
+            middlewares.append(_make_auth_middleware(self._web_config))
+        self._app = web.Application(middlewares=middlewares)
         self._app.router.add_get("/health", self._health)
         if self._webhook_config.enabled:
             self._app.router.add_post("/webhook/gitea", self._webhook_gitea)
             self._app.router.add_post("/webhook/grafana", self._webhook_grafana)
             self._app.router.add_post("/webhook/generic", self._webhook_generic)
             log.info("Webhook endpoints enabled")
+        # Serve static UI files if the directory exists
+        if self._web_config.enabled:
+            ui_dir = Path(__file__).resolve().parent.parent.parent / "ui"
+            if ui_dir.is_dir():
+                self._app.router.add_get("/", self._redirect_to_ui)
+                self._app.router.add_static("/ui", ui_dir, show_index=True)
+                log.info("Serving web UI from %s", ui_dir)
         self._runner: web.AppRunner | None = None
 
     def set_ready(self, ready: bool = True) -> None:
@@ -45,6 +90,18 @@ class HealthServer:
     def set_trigger_callback(self, callback: TriggerCallback) -> None:
         """Set callback for webhook-triggered scheduler actions."""
         self._trigger_callback = callback
+
+    def set_bot(self, bot: LokiBot) -> None:
+        """Wire the bot instance to enable the REST API endpoints."""
+        if not self._web_config.enabled:
+            return
+        from ..web.api import setup_api
+        setup_api(self._app, bot)
+        log.info("Web management API enabled")
+
+    async def _redirect_to_ui(self, _request: web.Request) -> web.Response:
+        """Redirect / to /ui/."""
+        raise web.HTTPFound("/ui/")
 
     async def start(self) -> None:
         self._runner = web.AppRunner(self._app)

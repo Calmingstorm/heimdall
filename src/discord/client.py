@@ -423,6 +423,7 @@ class LokiBot(discord.Client):
 
         self.config = config
         self.tree = app_commands.CommandTree(self)
+        self._start_time = time.monotonic()
 
         # Configure timezone for time parser module
         from ..tools.time_parser import set_default_timezone
