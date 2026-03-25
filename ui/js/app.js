@@ -5,6 +5,9 @@
 import { api, ws } from './api.js';
 import DashboardPage from './pages/dashboard.js';
 import SessionsPage from './pages/sessions.js';
+import ToolsPage from './pages/tools.js';
+import SkillsPage from './pages/skills.js';
+import KnowledgePage from './pages/knowledge.js';
 
 const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
 const { createRouter, createWebHashHistory } = VueRouter;
@@ -27,9 +30,7 @@ function makePage(name, icon) {
 // ---------------------------------------------------------------------------
 // Page stubs (expanded in Rounds 25-28)
 // ---------------------------------------------------------------------------
-const ToolsPage       = makePage('Tools', '');
-const SkillsPage      = makePage('Skills', '');
-const KnowledgePage   = makePage('Knowledge', '');
+// ToolsPage, SkillsPage, KnowledgePage imported above
 const SchedulesPage   = makePage('Schedules', '');
 const LoopsPage       = makePage('Loops', '');
 const ProcessesPage   = makePage('Processes', '');
