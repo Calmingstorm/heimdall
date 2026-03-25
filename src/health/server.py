@@ -130,7 +130,10 @@ class HealthServer:
             ui_dir = Path(__file__).resolve().parent.parent.parent / "ui"
             if ui_dir.is_dir():
                 self._app.router.add_get("/", self._redirect_to_ui)
-                self._app.router.add_static("/ui", ui_dir, show_index=True)
+                self._ui_dir = ui_dir
+                # Serve static files with a fallback to index.html for SPA routing
+                self._app.router.add_get("/ui/{path:.*}", self._serve_ui_file)
+                self._app.router.add_get("/ui", self._redirect_to_ui)
                 log.info("Serving web UI from %s", ui_dir)
         self._runner: web.AppRunner | None = None
 
@@ -159,6 +162,20 @@ class HealthServer:
     async def _redirect_to_ui(self, _request: web.Request) -> web.Response:
         """Redirect / to /ui/."""
         raise web.HTTPFound("/ui/")
+
+    async def _serve_ui_file(self, request: web.Request) -> web.Response:
+        """Serve static UI files, defaulting to index.html for SPA routing."""
+        path = request.match_info.get("path", "")
+        if not path or path == "/":
+            return web.FileResponse(self._ui_dir / "index.html")
+        file = (self._ui_dir / path).resolve()
+        # Prevent path traversal
+        if not str(file).startswith(str(self._ui_dir.resolve())):
+            raise web.HTTPForbidden()
+        if file.is_file():
+            return web.FileResponse(file)
+        # SPA fallback — serve index.html for unmatched routes
+        return web.FileResponse(self._ui_dir / "index.html")
 
     async def start(self) -> None:
         self._runner = web.AppRunner(self._app)
