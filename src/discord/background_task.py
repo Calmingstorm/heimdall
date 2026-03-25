@@ -209,6 +209,17 @@ async def run_background_task(
     )
 
 
+def _get_default_host(executor: ToolExecutor) -> str:
+    """Get the first configured host alias, falling back to 'localhost'."""
+    try:
+        hosts = executor.config.hosts
+        if hosts and isinstance(hosts, dict):
+            return next(iter(hosts))
+    except (AttributeError, StopIteration):
+        pass
+    return "localhost"
+
+
 async def _execute_tool(
     tool_name: str,
     tool_input: dict,
@@ -250,7 +261,9 @@ async def _execute_tool(
     if skill_manager.has_skill(tool_name):
         return await skill_manager.execute(tool_name, tool_input)
 
-    # Built-in tools via executor
+    # Built-in tools via executor — default 'host' if missing
+    if "host" not in tool_input:
+        tool_input = {**tool_input, "host": _get_default_host(executor)}
     return await executor.execute(tool_name, tool_input)
 
 

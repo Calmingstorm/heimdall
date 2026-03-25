@@ -31,6 +31,7 @@ from src.discord.background_task import (  # noqa: E402
     PROGRESS_UPDATE_INTERVAL,
     run_background_task,
     _execute_tool,
+    _get_default_host,
     _substitute_vars,
     _check_condition,
     _send_progress,
@@ -598,7 +599,7 @@ class TestExecuteTool:
         assert result == "skill result"
 
     async def test_routes_to_executor(self):
-        """Unknown tool names fall through to executor."""
+        """Unknown tool names fall through to executor with host default."""
         ex = _make_executor()
         sm = _make_skill_manager(has=False)
         result = await _execute_tool(
@@ -606,7 +607,33 @@ class TestExecuteTool:
             ex, sm,
             knowledge_store=None, embedder=None, requester="user1",
         )
-        ex.execute.assert_called_once_with("run_command", {"command": "ls"})
+        # host defaults to "localhost" when executor.config.hosts is not a real dict
+        ex.execute.assert_called_once_with("run_command", {"command": "ls", "host": "localhost"})
+        assert result == "executed ok"
+
+    async def test_routes_to_executor_with_explicit_host(self):
+        """Explicit host in tool_input is preserved, not overridden."""
+        ex = _make_executor()
+        sm = _make_skill_manager(has=False)
+        result = await _execute_tool(
+            "run_command", {"command": "ls", "host": "myserver"},
+            ex, sm,
+            knowledge_store=None, embedder=None, requester="user1",
+        )
+        ex.execute.assert_called_once_with("run_command", {"command": "ls", "host": "myserver"})
+        assert result == "executed ok"
+
+    async def test_routes_to_executor_uses_first_configured_host(self):
+        """When executor has configured hosts, the first one is used as default."""
+        ex = _make_executor()
+        ex.config.hosts = {"prod": MagicMock(), "staging": MagicMock()}
+        sm = _make_skill_manager(has=False)
+        result = await _execute_tool(
+            "check_disk", {},
+            ex, sm,
+            knowledge_store=None, embedder=None, requester="user1",
+        )
+        ex.execute.assert_called_once_with("check_disk", {"host": "prod"})
         assert result == "executed ok"
 
 
