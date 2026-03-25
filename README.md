@@ -9,7 +9,7 @@ No classifier, no approval prompts, no hesitation.
 
 ## Features
 
-- **78 built-in tools** — SSH, Docker, Git, Ansible, Incus, Prometheus, browser automation, scheduling, knowledge base, and more
+- **81 built-in tools** — SSH, Docker, Git, Ansible, Incus, Prometheus, browser automation, scheduling, knowledge base, autonomous loops, and more
 - **Autonomous execution** — every message gets Codex with full tool access, no classification or approval needed
 - **Two-tier execution** — Codex handles direct tools, delegates complex multi-step tasks to Claude Code CLI
 - **Direct local execution** — localhost commands use subprocess directly (no SSH overhead)
@@ -28,6 +28,8 @@ No classifier, no approval prompts, no hesitation.
 - **Anti-fabrication** — detects and retries when the LLM fabricates command output
 - **Anti-hedging** — detects and retries "shall I?" / "would you like?" hesitation (bot-to-bot)
 - **5-layer session defense** — context separators, selective history saving, abbreviated task history, compaction error omission, fabrication/hedging detection
+- **Autonomous loops** — LLM-driven recurring tasks with natural language goals, configurable intervals, and auto-stop conditions
+- **Web management UI** — browser-based dashboard for managing sessions, tools, skills, knowledge, schedules, loops, processes, audit logs, config, and live log tailing
 - **Audit logging** — append-only JSONL log of all tool executions
 - **Secret scrubbing** — 10 patterns (API keys, passwords, tokens, AWS/GitHub/Stripe/Slack credentials) redacted from responses, errors, webhooks, and tool output
 - **Performance optimized** — system prompt caching, tool definition caching, connection pooling, TTL-based cache invalidation
@@ -110,7 +112,8 @@ Every Discord message
       ├── COMPLEX TASK: Codex delegates to claude -p via claude_code tool
       ├── DISCORD OPS: post_file, browser_screenshot, embeds, polls, reactions
       ├── ANALYSIS: analyze_pdf, analyze_image (vision), search_knowledge
-      └── GENERATION: generate_image (ComfyUI), generate_file
+      ├── GENERATION: generate_image (ComfyUI), generate_file
+      └── LOOPS: start_loop, stop_loop, list_loops (autonomous recurring tasks)
 
 Tool packs (opt-in infrastructure tools):
   docker(6), systemd(3), incus(11), ansible(1), prometheus(4), git(8), comfyui(1)
@@ -178,7 +181,7 @@ src/
 │   ├── circuit_breaker.py  # Health tracking for LLM backends
 │   └── types.py            # Backend-agnostic LLMResponse and ToolCall types
 ├── tools/
-│   ├── registry.py         # 78 tool definitions + 7 tool packs
+│   ├── registry.py         # 81 tool definitions + 7 tool packs
 │   ├── executor.py         # Tool execution (local subprocess, SSH, Prometheus, Docker, etc.)
 │   ├── ssh.py              # SSH + local subprocess dispatch (is_local_address, run_local_command, run_ssh_command)
 │   ├── tool_memory.py      # Per-tool learning from past executions
@@ -187,7 +190,11 @@ src/
 │   ├── browser.py          # Playwright browser automation
 │   ├── web.py              # Web search and URL fetching
 │   ├── process_manager.py  # Background process registry (start/poll/write/kill)
-│   └── comfyui.py          # ComfyUI image generation client
+│   ├── comfyui.py          # ComfyUI image generation client
+│   └── autonomous_loop.py  # LLM-driven autonomous loop system
+├── web/
+│   ├── api.py              # REST API (30 endpoints)
+│   └── websocket.py        # WebSocket live updates
 ├── config/
 │   └── schema.py           # Pydantic config models, env var substitution
 ├── sessions/
@@ -209,8 +216,46 @@ src/
 ├── audit/
 │   └── logger.py           # Append-only JSONL audit log
 └── health/
-    └── server.py           # Health check endpoint, webhook receiver
+    └── server.py           # Health check endpoint, webhook receiver, web UI serving
 ```
+
+## Web Management UI
+
+Loki includes a browser-based management interface at `http://host:3939/ui/`.
+
+### Features
+
+- **Dashboard** — bot status, uptime, connected guilds, quick stats, recent activity
+- **Sessions** — view active conversations, message history, clear sessions
+- **Tools** — browse all 81 tools, toggle tool packs on/off
+- **Skills** — create, edit, delete runtime skills with a code editor
+- **Knowledge** — browse, search, ingest, and delete knowledge base documents
+- **Schedules** — manage cron jobs, one-time tasks, and webhook-triggered tasks
+- **Loops** — view and control autonomous loops, start new loops
+- **Processes** — monitor background processes, kill running ones
+- **Audit** — searchable tool execution log with filters (tool, user, host, date)
+- **Config** — view configuration (sensitive fields redacted)
+- **Logs** — live log tail via WebSocket with level filtering and search
+- **Memory** — browse and edit persistent memory (global + per-user scopes)
+
+### Setup
+
+Add to `config.yml`:
+
+```yaml
+web:
+  enabled: true
+  api_token: "your-secret-token"  # Empty = no auth (dev mode)
+```
+
+Access at `http://localhost:3939/ui/` — the UI shares the health server port.
+
+### Tech Stack
+
+- **Backend**: aiohttp REST API + WebSocket (extends existing health server)
+- **Frontend**: Vue 3 + Tailwind CSS + Vue Router (all CDN, no build step)
+- **Auth**: Bearer token in `Authorization` header
+- **Security**: rate limiting (120 req/60s/IP), security headers, input validation
 
 ## Configuration
 
@@ -243,6 +288,7 @@ The config file uses `${VAR}` for required env vars and `${VAR:-default}` for op
 - **`context`** — context directory, max system prompt tokens
 - **`sessions`** — max history length, max age, persist directory
 - **`usage`** — usage tracking directory
+- **`web`** — enable/disable, API token for management UI auth
 - **`monitoring`** — enable/disable, check definitions (disk, memory, service, PromQL), alert channel, cooldown
 - **`permissions`** — per-user tier assignments, default tier, overrides file path
 
@@ -363,6 +409,7 @@ docker compose logs -f loki-bot
 ```
 
 Health check endpoint: `http://localhost:3939/health`
+Web management UI: `http://localhost:3939/ui/`
 
 ### Incus
 
@@ -406,7 +453,7 @@ pip install -e ".[dev]"
 python -m pytest tests/ -q
 ```
 
-The test suite (4400+ tests) mocks all external I/O — no SSH connections, API calls, or Discord connections needed.
+The test suite (4800+ tests) mocks all external I/O — no SSH connections, API calls, or Discord connections needed.
 
 ### Project Conventions
 

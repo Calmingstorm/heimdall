@@ -90,6 +90,10 @@ browser:
   enabled: false
   cdp_url: "ws://loki-browser:3000?token=${BROWSER_TOKEN:-loki-internal}"
 
+web:
+  enabled: true
+  api_token: ""  # Empty = no auth (dev mode). Set a secret token for production.
+
 # comfyui:
 #   enabled: false
 #   url: http://localhost:8188

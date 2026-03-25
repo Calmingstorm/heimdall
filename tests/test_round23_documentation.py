@@ -109,8 +109,8 @@ class TestReadmeAccuracy:
 
     def test_test_suite_count_accurate(self):
         """README test count should be reasonable."""
-        # README says 4400+ which is accurate for the current suite
-        assert "4400+" in self.readme or "4497" in self.readme
+        # README says 4800+ which is accurate for the current suite
+        assert "4800+" in self.readme or "4827" in self.readme
 
     def test_no_classification_in_env_vars(self):
         """Environment variables table should not reference classification."""
