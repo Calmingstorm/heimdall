@@ -619,6 +619,7 @@ class LokiBot(discord.Client):
             playbooks=self.config.tools.allowed_playbooks,
             voice_info=voice_info,
             tz=self.config.timezone,
+            claude_code_dir=self.config.tools.claude_code_dir,
         )
 
         # Inject persistent memory into the system prompt (per-user + global)
