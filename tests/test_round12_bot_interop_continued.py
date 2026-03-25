@@ -495,8 +495,8 @@ class TestBotPreambleEdgeCases:
         if separators:
             assert "ANOTHER BOT" not in separators[0]["content"]
 
-    async def test_no_separator_with_single_message_history(self):
-        """Single-message history gets no separator at all."""
+    async def test_no_full_separator_with_single_message_history(self):
+        """Single-message history gets no full separator, only message ID note."""
         stub = _make_process_with_tools_stub(respond_to_bots=True)
         msg = _make_msg(is_bot=True)
 
@@ -512,7 +512,10 @@ class TestBotPreambleEdgeCases:
         chat_call = stub.codex_client.chat_with_tools.call_args
         messages_sent = chat_call[1]["messages"] if "messages" in chat_call[1] else chat_call[0][0]
         separators = [m for m in messages_sent if m.get("role") == "developer"]
-        assert len(separators) == 0
+        # Should have a lightweight message ID note but NOT the full separator
+        assert len(separators) == 1
+        assert "Current message ID" in separators[0]["content"]
+        assert "CURRENT REQUEST" not in separators[0]["content"]
 
     async def test_bot_preamble_not_injected_when_respond_to_bots_false(self):
         """Bot message with respond_to_bots=False gets no bot preamble."""

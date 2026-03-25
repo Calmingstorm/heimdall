@@ -57,11 +57,16 @@ class TestAddReaction:
         target_msg.add_reaction.assert_awaited_once_with("\U0001f44d")
         assert result == "Reaction added."
 
-    async def test_add_reaction_missing_message_id(self):
+    async def test_add_reaction_missing_message_id_uses_current(self):
+        """Missing message_id falls back to the triggering message."""
         bot = _make_bot()
         msg = _make_message()
+        msg.id = 999888
+        target_msg = AsyncMock()
+        msg.channel.fetch_message = AsyncMock(return_value=target_msg)
         result = await bot._handle_add_reaction(msg, {"emoji": "\U0001f44d"})
-        assert "required" in result.lower()
+        msg.channel.fetch_message.assert_awaited_once_with(999888)
+        assert result == "Reaction added."
 
     async def test_add_reaction_missing_emoji(self):
         bot = _make_bot()

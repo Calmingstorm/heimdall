@@ -1048,7 +1048,10 @@ class TestSessionPoisoningDefense:
 
         first_msgs = captured[0]
         dev_msgs = [m for m in first_msgs if m.get("role") == "developer"]
-        assert len(dev_msgs) == 0  # No separator for single message
+        # No full separator for single message, but a message ID note is present
+        assert len(dev_msgs) == 1
+        assert "Current message ID" in dev_msgs[0]["content"]
+        assert "CURRENT REQUEST" not in dev_msgs[0]["content"]
 
     # -- Layer 2: Selective Saving --
 

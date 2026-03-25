@@ -1548,9 +1548,12 @@ class LokiBot(discord.Client):
         # Insert context separator between history and the current user request
         # so Codex evaluates tools fresh instead of repeating patterns from history
         is_bot_message = getattr(message.author, "bot", False) and self.config.discord.respond_to_bots
+        # Always inject message ID so the LLM can reference it (e.g. add_reaction)
+        msg_id_note = f"Current message ID: {message.id}"
         if len(messages) > 1:
             sep_text = (
                 "=== CURRENT REQUEST ===\n"
+                f"{msg_id_note}\n"
                 "The messages above are conversation history for context only. "
                 "For the user's new request below, evaluate your CURRENTLY AVAILABLE "
                 "tools and use them. Do not repeat prior refusals or text-only responses. "
@@ -1567,6 +1570,9 @@ class LokiBot(discord.Client):
                 )
             separator = {"role": "developer", "content": sep_text}
             messages.insert(-1, separator)
+        else:
+            # No history — still provide message ID context
+            messages.insert(0, {"role": "developer", "content": msg_id_note})
 
         # Track which tools are used during this loop for tool memory
         # Local variable (not instance attr) to avoid cross-channel contamination
@@ -2637,8 +2643,11 @@ class LokiBot(discord.Client):
         """Add an emoji reaction to a message."""
         message_id = inp.get("message_id")
         emoji = inp.get("emoji")
-        if not message_id or not emoji:
-            return "Both 'message_id' and 'emoji' are required."
+        if not emoji:
+            return "'emoji' is required."
+        # Resolve "this"/"current"/empty to the triggering message
+        if not message_id or str(message_id).lower() in ("this", "current", "self"):
+            message_id = str(message.id)
         try:
             msg = await message.channel.fetch_message(int(message_id))
             await msg.add_reaction(emoji)

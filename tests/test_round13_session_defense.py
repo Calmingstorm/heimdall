@@ -222,8 +222,9 @@ class TestContextSeparatorInjection:
         assert "CURRENT REQUEST" in sep["content"]
         assert "CURRENTLY AVAILABLE" in sep["content"]
 
-    async def test_separator_not_injected_with_single_message(self):
-        """Separator should NOT be injected when history has only 1 message."""
+    async def test_no_full_separator_with_single_message(self):
+        """Full separator should NOT be injected when history has only 1 message,
+        but a lightweight message ID note should be present."""
         stub = _make_process_with_tools_stub()
         msg = _make_msg()
         history = [{"role": "user", "content": "only message"}]
@@ -237,7 +238,9 @@ class TestContextSeparatorInjection:
         await LokiBot._process_with_tools(stub, msg, history)
         first_call_messages = stub.codex_client.chat_with_tools.call_args_list[0][1]["messages"]
         developer_msgs = [m for m in first_call_messages if m.get("role") == "developer"]
-        assert len(developer_msgs) == 0
+        assert len(developer_msgs) == 1
+        assert "Current message ID" in developer_msgs[0]["content"]
+        assert "CURRENT REQUEST" not in developer_msgs[0]["content"]
 
     async def test_separator_position_before_last_message(self):
         """Separator should be inserted before the current user message."""
