@@ -32,6 +32,9 @@ MIN_INTERVAL_SECONDS = 10
 DEFAULT_INTERVAL_SECONDS = 60
 DEFAULT_MAX_ITERATIONS = 50
 MAX_CONTEXT_HISTORY = 3  # Keep last N iteration summaries for context
+MAX_CONSECUTIVE_ERRORS = 5  # Stop loop after this many consecutive failures
+MAX_BACKOFF_SECONDS = 300  # Cap exponential backoff at 5 minutes
+RUNAWAY_THRESHOLD = 3  # Identical outputs before interval increase
 
 LOOP_STOP_SENTINEL = "LOOP_STOP"
 
@@ -172,6 +175,7 @@ class LoopManager:
         """Main loop coroutine — runs iterations until stopped."""
         start_time = time.monotonic()
         consecutive_identical = 0
+        consecutive_errors = 0
         last_output = ""
 
         try:
@@ -191,11 +195,24 @@ class LoopManager:
                         pass
                     break
 
+                # Calculate wait time: normal interval + exponential backoff on errors
+                wait_seconds = info.interval_seconds
+                if consecutive_errors > 0:
+                    backoff = min(
+                        info.interval_seconds * (2 ** consecutive_errors),
+                        MAX_BACKOFF_SECONDS,
+                    )
+                    wait_seconds = backoff
+                    log.info(
+                        "Loop %s: backing off %ds after %d consecutive errors",
+                        info.id, wait_seconds, consecutive_errors,
+                    )
+
                 # Wait for interval (interruptible by cancel)
                 try:
                     await asyncio.wait_for(
                         info._cancel_event.wait(),
-                        timeout=info.interval_seconds,
+                        timeout=wait_seconds,
                     )
                     # If we get here, cancel was set during the wait
                     break
@@ -221,15 +238,28 @@ class LoopManager:
                 try:
                     response = await iteration_callback(prompt, channel, prev_context)
                     response = scrub_output_secrets(response.strip()) if response else ""
+                    consecutive_errors = 0  # Reset on success
                 except Exception as e:
+                    consecutive_errors += 1
                     log.warning(
-                        "Loop %s iteration %d failed: %s",
-                        info.id, info.iteration_count, e,
+                        "Loop %s iteration %d failed (%d consecutive): %s",
+                        info.id, info.iteration_count, consecutive_errors, e,
                     )
                     # Store error in history but don't crash the loop
                     info._iteration_history.append(
                         f"Iteration {info.iteration_count}: ERROR - {str(e)[:200]}"
                     )
+                    # Stop loop after too many consecutive errors
+                    if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                        info.status = "error"
+                        try:
+                            await channel.send(
+                                f"Loop `{info.id}` stopped after {MAX_CONSECUTIVE_ERRORS} "
+                                f"consecutive errors. Last error: {str(e)[:200]}"
+                            )
+                        except Exception:
+                            pass
+                        break
                     continue
 
                 # Store iteration result (truncated) in history
@@ -250,14 +280,24 @@ class LoopManager:
                 # Runaway detection: identical consecutive outputs
                 if response == last_output and response:
                     consecutive_identical += 1
-                    if consecutive_identical >= 3:
-                        log.warning(
-                            "Loop %s: 3 identical outputs, increasing interval",
-                            info.id,
-                        )
+                    if consecutive_identical >= RUNAWAY_THRESHOLD:
+                        old_interval = info.interval_seconds
                         info.interval_seconds = min(
                             info.interval_seconds * 2, 3600,
                         )
+                        log.warning(
+                            "Loop %s: %d identical outputs, interval %ds -> %ds",
+                            info.id, RUNAWAY_THRESHOLD,
+                            old_interval, info.interval_seconds,
+                        )
+                        try:
+                            await channel.send(
+                                f"Loop `{info.id}`: {RUNAWAY_THRESHOLD} identical "
+                                f"outputs detected — increasing interval from "
+                                f"{old_interval}s to {info.interval_seconds}s."
+                            )
+                        except Exception:
+                            pass
                         consecutive_identical = 0
                 else:
                     consecutive_identical = 0
