@@ -164,6 +164,43 @@ _FABRICATION_RETRY_MSG = {
 
 
 # ---------------------------------------------------------------------------
+# Tool-unavailability fabrication — catches Codex claiming tools are disabled
+# without actually trying them. Only fires when no tools were called.
+# ---------------------------------------------------------------------------
+
+_TOOL_UNAVAIL_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(
+        r"(?i)\b(?:not (?:enabled|available|configured)|"
+        r"is(?:n't| not) (?:enabled|available|configured|supported)|"
+        r"is disabled|cannot be used)\b"
+    ),
+]
+
+
+def detect_tool_unavailable(text: str, tools_used: list[str]) -> bool:
+    """Detect if a response falsely claims a tool is unavailable.
+
+    Returns True if the response claims a tool is not enabled/available/etc.
+    without actually trying to call it.  Only meaningful when tools_used is
+    empty — if tools were called and returned a real error, that's legitimate.
+    """
+    if tools_used:
+        return False
+    if not text or len(text) < 15:
+        return False
+    return any(p.search(text) for p in _TOOL_UNAVAIL_PATTERNS)
+
+
+_TOOL_UNAVAIL_RETRY_MSG = {
+    "role": "developer",
+    "content": (
+        "Every tool in your tool list is available. Call the "
+        "tool instead of claiming it's unavailable."
+    ),
+}
+
+
+# ---------------------------------------------------------------------------
 # Hedging detection — catches "shall I", "if you want", etc.
 # Used for bot-to-bot interactions where hedging is never appropriate.
 # ---------------------------------------------------------------------------
@@ -213,6 +250,38 @@ _HEDGING_RETRY_MSG = {
         "Do NOT ask permission, suggest plans, or hedge. EXECUTE the requested "
         "action NOW by calling the appropriate tools. Never say 'if you want', "
         "'shall I', or 'would you like' — just DO IT."
+    ),
+}
+
+
+# ---------------------------------------------------------------------------
+# Code-block hedging — catches Codex showing a bash/shell command instead
+# of executing it via run_command.  Only fires when no tools were called.
+# ---------------------------------------------------------------------------
+
+_CODE_BLOCK_HEDGING_PATTERN: re.Pattern[str] = re.compile(
+    r"```(?:bash|sh)\s*\n",
+)
+
+
+def detect_code_hedging(text: str, tools_used: list[str]) -> bool:
+    """Detect if a response shows a bash code block instead of executing it.
+
+    Returns True if the response contains a bash/sh code block but no tools
+    were called — meaning the LLM showed what it should have run.
+    """
+    if tools_used:
+        return False
+    if not text or len(text) < 15:
+        return False
+    return bool(_CODE_BLOCK_HEDGING_PATTERN.search(text))
+
+
+_CODE_HEDGING_RETRY_MSG = {
+    "role": "developer",
+    "content": (
+        "Execute the command using run_command instead of showing it. "
+        "You are an executor, not a manual."
     ),
 }
 
@@ -1691,6 +1760,20 @@ class LokiBot(discord.Client):
                     messages.append(_FABRICATION_RETRY_MSG)
                     continue  # retry the loop — iteration increments
 
+                # Tool-unavailability fabrication: Codex claims a tool is
+                # "not enabled" / "not available" without trying it.
+                if (
+                    iteration == 0
+                    and not tools_used_in_loop
+                    and detect_tool_unavailable(llm_resp.text or "", tools_used_in_loop)
+                ):
+                    log.warning(
+                        "Tool-unavailability fabrication detected — retrying with correction"
+                    )
+                    messages.append({"role": "assistant", "content": llm_resp.text})
+                    messages.append(_TOOL_UNAVAIL_RETRY_MSG)
+                    continue  # retry the loop — iteration increments
+
                 # Hedging detection for bot messages: if no tools were called
                 # and the response hedges ("shall I", "if you want"), retry once.
                 if (
@@ -1703,6 +1786,20 @@ class LokiBot(discord.Client):
                     )
                     messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_HEDGING_RETRY_MSG)
+                    continue  # retry the loop — iteration increments
+
+                # Code-block hedging: Codex shows a bash/shell command instead
+                # of executing it via run_command.
+                if (
+                    iteration == 0
+                    and not tools_used_in_loop
+                    and detect_code_hedging(llm_resp.text or "", tools_used_in_loop)
+                ):
+                    log.warning(
+                        "Code-block hedging detected — retrying with correction"
+                    )
+                    messages.append({"role": "assistant", "content": llm_resp.text})
+                    messages.append(_CODE_HEDGING_RETRY_MSG)
                     continue  # retry the loop — iteration increments
 
                 # Premature failure detection: if tools were called but the response
