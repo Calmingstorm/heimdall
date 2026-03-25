@@ -96,6 +96,32 @@ class ToolLoopCancelView(discord.ui.View):
                 item.disabled = True
         self.stop()  # Unregister from discord.py event listener
 
+class _LoopMessageProxy:
+    """Lightweight proxy providing a discord.Message-like interface for loop iterations.
+
+    Allows Discord-native tool handlers to be called from autonomous loop
+    iterations without a real Discord message object.
+    """
+
+    def __init__(self, channel: object, user_id: str, user_name: str = "loop") -> None:
+        self.channel = channel
+        self.id = 0  # No triggering message
+        self.webhook_id = None
+        self.author = _LoopAuthorProxy(user_id, user_name)
+
+
+class _LoopAuthorProxy:
+    """Lightweight proxy for message.author in loop context."""
+
+    def __init__(self, user_id: str, name: str) -> None:
+        self.id = int(user_id) if user_id.isdigit() else 0
+        self.bot = False
+        self._name = name
+
+    def __str__(self) -> str:
+        return self._name
+
+
 # Additional patterns for scrubbing LLM responses before Discord delivery.
 # These extend OUTPUT_SECRET_PATTERNS (applied via scrub_output_secrets) with
 # patterns more likely to appear in natural-language LLM output.
@@ -2814,10 +2840,20 @@ class LokiBot(discord.Client):
     ) -> str:
         """Run a single loop iteration through Codex with full tool access.
 
-        This is a simplified version of _process_with_tools for autonomous loops.
+        Simplified version of _process_with_tools for autonomous loops:
+        same Codex + tool execution pipeline but without progress embeds,
+        cancel buttons, or detection retries.
         """
         if not self.codex_client:
             return "Codex client not available."
+
+        # Resolve requester name for audit logging and message proxy
+        requester_name = "loop"
+        for loop_info in self.loop_manager._loops.values():
+            if loop_info.requester_id == user_id:
+                requester_name = loop_info.requester_name
+                break
+        msg_proxy = _LoopMessageProxy(channel, user_id, requester_name)
 
         # Build messages for the iteration
         messages: list[dict] = []
@@ -2834,60 +2870,107 @@ class LokiBot(discord.Client):
 
         # Build system prompt and tool definitions
         system_prompt = self._build_system_prompt(channel=channel, user_id=user_id)
-        tools = self._get_merged_tools()
+        tools = self._merged_tool_definitions() if self.config.tools.enabled else None
 
-        # Run tool loop (simplified — no progress embed, no cancel button)
         final_text = ""
-        for iteration in range(MAX_TOOL_ITERATIONS):
+        tool_timeout = self.config.tools.tool_timeout_seconds
+        channel_id_str = str(getattr(channel, "id", ""))
+
+        for _iteration in range(MAX_TOOL_ITERATIONS):
             try:
                 response = await self.codex_client.chat_with_tools(
-                    messages=messages, system=system_prompt, tools=tools,
+                    messages=messages, system=system_prompt, tools=tools or [],
                 )
             except Exception as e:
                 log.warning("Loop iteration Codex call failed: %s", e)
                 return f"LLM call failed: {e}"
 
-            # Collect text
             if response.text:
                 final_text = response.text
 
-            # If no tool calls, we're done
             if not response.tool_calls:
                 break
 
-            # Execute tool calls
-            tool_results = []
+            # Build assistant content with tool_use blocks (matches _process_with_tools format)
+            assistant_content: list[dict] = []
+            if response.text:
+                assistant_content.append({"type": "text", "text": response.text})
             for tc in response.tool_calls:
-                try:
-                    result = await self.tool_executor.execute(tc.name, tc.input)
-                except Exception as e:
-                    result = f"Error: {e}"
-                result = scrub_output_secrets(str(result))
-                if len(result) > TOOL_OUTPUT_MAX_CHARS:
-                    result = result[:TOOL_OUTPUT_MAX_CHARS] + "\n... (truncated)"
-                tool_results.append((tc, result))
-
-            # Build tool result messages for the next iteration
-            messages.append({
-                "role": "assistant",
-                "content": response.text or "",
-                "tool_calls": [
-                    {"id": tc.id, "name": tc.name, "input": tc.input}
-                    for tc, _ in tool_results
-                ],
-            })
-            for tc, result in tool_results:
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "content": result,
+                assistant_content.append({
+                    "type": "tool_use", "id": tc.id,
+                    "name": tc.name, "input": tc.input,
                 })
+            messages.append({"role": "assistant", "content": assistant_content})
+
+            # Execute tools concurrently with per-tool timeout
+            async def _run_loop_tool(block):
+                nonlocal system_prompt
+                tool_name = block.name
+                tool_input = block.input
+                log.info("Loop tool call: %s(%s)", tool_name, tool_input)
+
+                t0 = time.monotonic()
+                error = None
+                try:
+                    raw = await asyncio.wait_for(
+                        self._dispatch_loop_tool(
+                            tool_name, tool_input, msg_proxy, user_id,
+                        ),
+                        timeout=tool_timeout,
+                    )
+                    # Skill CRUD invalidates caches
+                    if tool_name in ("create_skill", "edit_skill", "delete_skill"):
+                        self._cached_merged_tools = None
+                        self._cached_skills_text = None
+                        system_prompt = self._build_system_prompt(
+                            channel=channel, user_id=user_id,
+                        )
+                except asyncio.TimeoutError:
+                    error = f"Tool '{tool_name}' timed out after {tool_timeout}s"
+                    raw = error
+                except Exception as e:
+                    error = str(e)
+                    raw = f"Error executing {tool_name}: {e}"
+
+                elapsed_ms = int((time.monotonic() - t0) * 1000)
+
+                # Handle image block returns from analyze_image
+                if isinstance(raw, dict) and "__image_block__" in raw:
+                    raw = f"[Image loaded: {raw.get('__prompt__', '')}]"
+
+                result = truncate_tool_output(scrub_output_secrets(str(raw)))
+
+                # Audit log
+                try:
+                    await self.audit.log_execution(
+                        user_id=user_id,
+                        user_name=requester_name,
+                        channel_id=channel_id_str,
+                        tool_name=tool_name,
+                        tool_input=tool_input,
+                        approved=True,
+                        result_summary=result,
+                        execution_time_ms=elapsed_ms,
+                        error=error,
+                    )
+                except Exception:
+                    pass
+
+                return {
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": result,
+                }
+
+            tool_results = await asyncio.gather(
+                *[_run_loop_tool(tc) for tc in response.tool_calls],
+            )
+            messages.append({"role": "user", "content": list(tool_results)})
 
         # Post the final response to the channel
         if final_text:
             final_text = scrub_output_secrets(final_text)
             try:
-                # Truncate for Discord
                 if len(final_text) > DISCORD_MAX_LEN:
                     final_text = final_text[:DISCORD_MAX_LEN - 50] + "\n... (truncated)"
                 await channel.send(final_text)
@@ -2895,6 +2978,116 @@ class LokiBot(discord.Client):
                 log.warning("Failed to post loop iteration result: %s", e)
 
         return final_text or "(no response)"
+
+    async def _dispatch_loop_tool(
+        self,
+        tool_name: str,
+        tool_input: dict,
+        msg_proxy: _LoopMessageProxy,
+        user_id: str,
+    ) -> str | dict:
+        """Dispatch a tool call to the correct handler within a loop iteration.
+
+        Mirrors the Discord-native tool dispatch in _process_with_tools, using
+        a lightweight message proxy instead of a real Discord message.
+        """
+        # --- Discord-native tools (message + input) ---
+        if tool_name == "purge_messages":
+            return await self._handle_purge(msg_proxy, tool_input)
+        if tool_name == "browser_screenshot":
+            return await self._handle_browser_screenshot(msg_proxy, tool_input)
+        if tool_name == "generate_file":
+            return await self._handle_generate_file(msg_proxy, tool_input)
+        if tool_name == "post_file":
+            return await self._handle_post_file(msg_proxy, tool_input)
+        if tool_name == "schedule_task":
+            return self._handle_schedule_task(msg_proxy, tool_input)
+        if tool_name == "delegate_task":
+            return await self._handle_delegate_task(msg_proxy, tool_input)
+        if tool_name == "start_loop":
+            return self._handle_start_loop(msg_proxy, tool_input)
+        if tool_name == "add_reaction":
+            return await self._handle_add_reaction(msg_proxy, tool_input)
+        if tool_name == "create_poll":
+            return await self._handle_create_poll(msg_proxy, tool_input)
+        if tool_name == "broadcast":
+            return await self._handle_broadcast(msg_proxy, tool_input)
+        if tool_name == "analyze_image":
+            return await self._handle_analyze_image(msg_proxy, tool_input)
+        if tool_name == "generate_image":
+            return await self._handle_generate_image(msg_proxy, tool_input)
+        if tool_name == "create_digest":
+            return self._handle_create_digest(msg_proxy, tool_input)
+
+        # --- Discord-native tools (input only) ---
+        if tool_name == "list_schedules":
+            return self._handle_list_schedules()
+        if tool_name == "delete_schedule":
+            return self._handle_delete_schedule(tool_input)
+        if tool_name == "parse_time":
+            return self._handle_parse_time(tool_input)
+        if tool_name == "search_history":
+            return await self._handle_search_history(tool_input)
+        if tool_name == "list_tasks":
+            return self._handle_list_tasks(tool_input)
+        if tool_name == "cancel_task":
+            return self._handle_cancel_task(tool_input)
+        if tool_name == "stop_loop":
+            return self._handle_stop_loop(tool_input)
+        if tool_name == "list_loops":
+            return self._handle_list_loops()
+        if tool_name == "search_knowledge":
+            return await self._handle_search_knowledge(tool_input)
+        if tool_name == "ingest_document":
+            return await self._handle_ingest_document(tool_input, str(msg_proxy.author))
+        if tool_name == "list_knowledge":
+            return self._handle_list_knowledge()
+        if tool_name == "delete_knowledge":
+            return self._handle_delete_knowledge(tool_input)
+        if tool_name == "set_permission":
+            return self._handle_set_permission(user_id, tool_input)
+        if tool_name == "search_audit":
+            return await self._handle_search_audit(tool_input)
+
+        # --- Skill CRUD ---
+        if tool_name == "create_skill":
+            return await asyncio.to_thread(
+                self.skill_manager.create_skill, tool_input["name"], tool_input["code"],
+            )
+        if tool_name == "edit_skill":
+            return await asyncio.to_thread(
+                self.skill_manager.edit_skill, tool_input["name"], tool_input["code"],
+            )
+        if tool_name == "delete_skill":
+            return await asyncio.to_thread(
+                self.skill_manager.delete_skill, tool_input["name"],
+            )
+        if tool_name == "list_skills":
+            skills = self.skill_manager.list_skills()
+            if not skills:
+                return "No user-created skills."
+            lines = [f"**{s['name']}**: {s['description']}" for s in skills]
+            return f"**User-created skills ({len(skills)}):**\n" + "\n".join(lines)
+
+        # --- User-created skills ---
+        if self.skill_manager.has_skill(tool_name):
+            ch = msg_proxy.channel
+
+            async def _skill_msg(text: str) -> None:
+                await ch.send(scrub_response_secrets(text))
+
+            async def _skill_file(data: bytes, filename: str, caption: str = "") -> None:
+                ch_id_key = str(getattr(ch, "id", ""))
+                self._pending_files.setdefault(ch_id_key, []).append((data, filename))
+
+            return await self.skill_manager.execute(
+                tool_name, tool_input,
+                message_callback=_skill_msg,
+                file_callback=_skill_file,
+            )
+
+        # --- Executor-routed tools (run_command, check_disk, SSH, etc.) ---
+        return await self.tool_executor.execute(tool_name, tool_input, user_id=user_id)
 
     async def _handle_add_reaction(self, message: discord.Message, inp: dict) -> str:
         """Add an emoji reaction to a message."""
