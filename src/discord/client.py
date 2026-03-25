@@ -2665,6 +2665,15 @@ class LokiBot(discord.Client):
 
         self._background_tasks[task.task_id] = task
 
+        # Build Codex callback for conversational follow-up
+        codex_cb = None
+        if self.codex_client:
+            async def _codex_followup(messages: list[dict], system: str, max_tokens: int) -> str:
+                return await self.codex_client.chat(
+                    messages=messages, system=system, max_tokens=max_tokens,
+                )
+            codex_cb = _codex_followup
+
         # Launch in background
         async def _run():
             try:
@@ -2673,6 +2682,7 @@ class LokiBot(discord.Client):
                     knowledge_store=self._knowledge_store,
                     embedder=self._embedder,
                     audit_logger=self.audit,
+                    codex_callback=codex_cb,
                 )
             except Exception as e:
                 log.error("Background task %s crashed: %s", task.task_id, e, exc_info=True)

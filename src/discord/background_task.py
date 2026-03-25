@@ -10,6 +10,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
+from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
 
 import discord
@@ -23,6 +24,9 @@ if TYPE_CHECKING:
     from ..tools.skill_manager import SkillManager
     from ..knowledge.store import KnowledgeStore
     from ..search.embedder import LocalEmbedder
+
+# Type for Codex chat callback: takes (messages, system, max_tokens) -> response text
+CodexCallback = Callable[[list[dict], str, int], Awaitable[str]]
 
 log = get_logger("background_task")
 
@@ -75,6 +79,7 @@ async def run_background_task(
     knowledge_store: KnowledgeStore | None = None,
     embedder: LocalEmbedder | None = None,
     audit_logger: AuditLogger | None = None,
+    codex_callback: CodexCallback | None = None,
 ) -> None:
     """Execute a background task's steps sequentially with progress updates."""
 
@@ -212,6 +217,10 @@ async def run_background_task(
     # Final progress update
     await _send_progress(task, progress_msg)
     await _send_summary(task)
+
+    # Generate conversational follow-up via LLM
+    if codex_callback:
+        await _send_conversational_followup(task, codex_callback)
 
     log.info(
         "Background task %s finished: %s (%d/%d steps)",
@@ -445,6 +454,48 @@ async def _send_summary(task: BackgroundTask) -> None:
             await task.channel.send(text)
     except Exception as e:
         log.warning("Failed to send task summary: %s", e)
+
+
+async def _send_conversational_followup(
+    task: BackgroundTask,
+    codex_callback: CodexCallback,
+) -> None:
+    """Generate and post an LLM-written conversational summary of the task results."""
+    # Build a concise context of what happened
+    result_lines = []
+    for r in task.results:
+        icon = {"ok": "OK", "error": "ERROR", "skipped": "SKIPPED"}.get(r.status, r.status)
+        output_preview = r.output.strip()[:150] if r.output else ""
+        result_lines.append(f"[{icon}] {r.description}: {output_preview}")
+
+    results_text = "\n".join(result_lines) if result_lines else "No step results."
+
+    messages = [
+        {
+            "role": "user",
+            "content": (
+                f"A background task just finished. Summarize the results conversationally.\n\n"
+                f"Task: {task.description}\n"
+                f"Status: {task.status}\n"
+                f"Requested by: {task.requester}\n\n"
+                f"Step results:\n{results_text}\n\n"
+                f"Write a concise, personality-infused summary (2-4 sentences). "
+                f"Highlight any failures. Do NOT repeat every step — focus on the outcome."
+            ),
+        }
+    ]
+    system = (
+        "You are Loki, a capable but existentially weary infrastructure bot. "
+        "Summarize this background task result conversationally. Be concise and direct."
+    )
+
+    try:
+        response = await codex_callback(messages, system, 200)
+        response = scrub_output_secrets(response.strip())
+        if response:
+            await task.channel.send(response)
+    except Exception as e:
+        log.warning("Failed to generate conversational follow-up for task %s: %s", task.task_id, e)
 
 
 def create_task_id() -> str:
