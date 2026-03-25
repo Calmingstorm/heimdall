@@ -136,12 +136,24 @@ class SkillContext:
         return list(self._executor.config.allowed_services)
 
     async def http_get(
-        self, url: str, params: dict | None = None, timeout: int = 15,
+        self,
+        url: str,
+        params: dict | None = None,
+        timeout: int = 15,
+        headers: dict[str, str] | None = None,
     ) -> dict | list | str:
-        """Perform an HTTP GET request. Auto-parses JSON responses, otherwise returns string."""
+        """Perform an HTTP GET request. Auto-parses JSON responses, otherwise returns string.
+
+        Custom headers can be passed via *headers*. By default ``Accept: application/json``
+        is included unless overridden.
+        """
+        merged = {"Accept": "application/json"}
+        if headers:
+            merged.update(headers)
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                url, params=params, timeout=aiohttp.ClientTimeout(total=timeout),
+                url, params=params, headers=merged,
+                timeout=aiohttp.ClientTimeout(total=timeout),
             ) as resp:
                 ct = resp.content_type or ""
                 if "json" in ct:
@@ -158,11 +170,19 @@ class SkillContext:
         json: dict | None = None,
         data: str | None = None,
         timeout: int = 15,
+        headers: dict[str, str] | None = None,
     ) -> dict | list | str:
-        """Perform an HTTP POST request. Auto-parses JSON responses, otherwise returns string."""
+        """Perform an HTTP POST request. Auto-parses JSON responses, otherwise returns string.
+
+        Custom headers can be passed via *headers*.
+        """
+        merged: dict[str, str] = {}
+        if headers:
+            merged.update(headers)
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                url, json=json, data=data, timeout=aiohttp.ClientTimeout(total=timeout),
+                url, json=json, data=data, headers=merged or None,
+                timeout=aiohttp.ClientTimeout(total=timeout),
             ) as resp:
                 ct = resp.content_type or ""
                 if "json" in ct:
