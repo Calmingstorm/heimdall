@@ -191,7 +191,7 @@ class TestFTSQueryEscaping:
         assert result.endswith('"')
 
     def test_ip_address_wrapped(self):
-        result = _prepare_query("192.168.1.1")
+        result = _prepare_query("10.0.0.1")
         assert result.startswith('"')
         assert result.endswith('"')
 
