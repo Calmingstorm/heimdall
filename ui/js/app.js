@@ -3,6 +3,8 @@
  * Vue 3 + Vue Router (CDN globals) + Tailwind CSS
  */
 import { api, ws } from './api.js';
+import DashboardPage from './pages/dashboard.js';
+import SessionsPage from './pages/sessions.js';
 
 const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
 const { createRouter, createWebHashHistory } = VueRouter;
@@ -23,83 +25,8 @@ function makePage(name, icon) {
 }
 
 // ---------------------------------------------------------------------------
-// Dashboard — quick implementation (expanded in Round 24)
+// Page stubs (expanded in Rounds 25-28)
 // ---------------------------------------------------------------------------
-const DashboardPage = {
-  template: `
-    <div class="p-6">
-      <h1 class="text-xl font-semibold mb-4">Dashboard</h1>
-      <div v-if="loading" class="flex items-center gap-2 text-gray-400">
-        <div class="spinner"></div> Loading...
-      </div>
-      <div v-else-if="error" class="loki-card border-red-900">
-        <p class="text-red-400">{{ error }}</p>
-      </div>
-      <div v-else>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div class="loki-card text-center">
-            <div class="text-2xl font-bold">{{ status.guild_count }}</div>
-            <div class="text-gray-400 text-sm">Guilds</div>
-          </div>
-          <div class="loki-card text-center">
-            <div class="text-2xl font-bold">{{ status.tool_count }}</div>
-            <div class="text-gray-400 text-sm">Tools</div>
-          </div>
-          <div class="loki-card text-center">
-            <div class="text-2xl font-bold">{{ status.skill_count }}</div>
-            <div class="text-gray-400 text-sm">Skills</div>
-          </div>
-          <div class="loki-card text-center">
-            <div class="text-2xl font-bold">{{ status.session_count }}</div>
-            <div class="text-gray-400 text-sm">Sessions</div>
-          </div>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div class="loki-card">
-            <div class="text-gray-400 text-sm mb-1">Uptime</div>
-            <div class="font-mono">{{ uptime }}</div>
-          </div>
-          <div class="loki-card">
-            <div class="text-gray-400 text-sm mb-1">Active Loops</div>
-            <div class="font-mono">{{ status.loop_count }}</div>
-          </div>
-          <div class="loki-card">
-            <div class="text-gray-400 text-sm mb-1">Schedules</div>
-            <div class="font-mono">{{ status.schedule_count }}</div>
-          </div>
-        </div>
-      </div>
-    </div>`,
-  setup() {
-    const status = ref({});
-    const loading = ref(true);
-    const error = ref(null);
-
-    const uptime = computed(() => {
-      const s = status.value.uptime_seconds || 0;
-      const h = Math.floor(s / 3600);
-      const m = Math.floor((s % 3600) / 60);
-      return `${h}h ${m}m`;
-    });
-
-    onMounted(async () => {
-      try {
-        status.value = await api.get('/api/status');
-      } catch (e) {
-        error.value = e.message;
-      } finally {
-        loading.value = false;
-      }
-    });
-
-    return { status, loading, error, uptime };
-  },
-};
-
-// ---------------------------------------------------------------------------
-// Page stubs (expanded in Rounds 24-28)
-// ---------------------------------------------------------------------------
-const SessionsPage    = makePage('Sessions', '');
 const ToolsPage       = makePage('Tools', '');
 const SkillsPage      = makePage('Skills', '');
 const KnowledgePage   = makePage('Knowledge', '');
