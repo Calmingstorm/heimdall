@@ -11,33 +11,15 @@ import KnowledgePage from './pages/knowledge.js';
 import SchedulesPage from './pages/schedules.js';
 import LoopsPage from './pages/loops.js';
 import ProcessesPage from './pages/processes.js';
+import ConfigPage from './pages/config.js';
+import LogsPage from './pages/logs.js';
+import AuditPage from './pages/audit.js';
+import MemoryPage from './pages/memory.js';
 
 const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
 const { createRouter, createWebHashHistory } = VueRouter;
 
-// ---------------------------------------------------------------------------
-// Placeholder page component factory
-// ---------------------------------------------------------------------------
-function makePage(name, icon) {
-  return {
-    template: `
-      <div class="p-6">
-        <h1 class="text-xl font-semibold mb-4">${icon} ${name}</h1>
-        <div class="loki-card">
-          <p class="text-gray-400">This page will be implemented in a future round.</p>
-        </div>
-      </div>`,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Page stubs (expanded in Rounds 27-28)
-// ---------------------------------------------------------------------------
-// ToolsPage, SkillsPage, KnowledgePage, SchedulesPage, LoopsPage, ProcessesPage imported above
-const AuditPage       = makePage('Audit Log', '');
-const ConfigPage      = makePage('Config', '');
-const LogsPage        = makePage('Logs', '');
-const MemoryPage      = makePage('Memory', '');
+// All page components imported above
 
 // ---------------------------------------------------------------------------
 // Router
