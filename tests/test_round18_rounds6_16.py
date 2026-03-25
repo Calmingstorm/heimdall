@@ -1368,3 +1368,237 @@ class TestLoopBuildPrompt:
         )
         prompt = mgr._build_iteration_prompt(info)
         assert "notable" in prompt.lower() or "urgent" in prompt.lower()
+
+    def test_silent_mode_prompt_mentions_notify_marker(self):
+        mgr = LoopManager()
+        info = LoopInfo(
+            id="test1",
+            goal="monitor disk",
+            mode="silent",
+            interval_seconds=60,
+            stop_condition=None,
+            max_iterations=50,
+            channel_id="123",
+            requester_id="user1",
+            requester_name="TestUser",
+        )
+        prompt = mgr._build_iteration_prompt(info)
+        assert "[NOTIFY]" in prompt
+        assert "[ALERT]" in prompt
+        assert "suppressed" in prompt.lower()
+
+
+class TestLoopPostResponse:
+    """_post_response enforces mode-based output filtering."""
+
+    async def test_notify_mode_always_posts(self):
+        mgr = LoopManager()
+        channel = MagicMock()
+        channel.send = AsyncMock()
+        info = LoopInfo(
+            id="test1",
+            goal="check stuff",
+            mode="notify",
+            interval_seconds=60,
+            stop_condition=None,
+            max_iterations=50,
+            channel_id="123",
+            requester_id="user1",
+            requester_name="TestUser",
+        )
+        await mgr._post_response(info, channel, "All good, nothing to report.")
+        channel.send.assert_called_once_with("All good, nothing to report.")
+
+    async def test_act_mode_always_posts(self):
+        mgr = LoopManager()
+        channel = MagicMock()
+        channel.send = AsyncMock()
+        info = LoopInfo(
+            id="test1",
+            goal="do stuff",
+            mode="act",
+            interval_seconds=60,
+            stop_condition=None,
+            max_iterations=50,
+            channel_id="123",
+            requester_id="user1",
+            requester_name="TestUser",
+        )
+        await mgr._post_response(info, channel, "Completed the task.")
+        channel.send.assert_called_once_with("Completed the task.")
+
+    async def test_silent_mode_suppresses_normal_output(self):
+        mgr = LoopManager()
+        channel = MagicMock()
+        channel.send = AsyncMock()
+        info = LoopInfo(
+            id="test1",
+            goal="monitor disk",
+            mode="silent",
+            interval_seconds=60,
+            stop_condition=None,
+            max_iterations=50,
+            channel_id="123",
+            requester_id="user1",
+            requester_name="TestUser",
+        )
+        await mgr._post_response(info, channel, "Everything is fine, disk at 20%.")
+        channel.send.assert_not_called()
+
+    async def test_silent_mode_allows_notify_marker(self):
+        mgr = LoopManager()
+        channel = MagicMock()
+        channel.send = AsyncMock()
+        info = LoopInfo(
+            id="test1",
+            goal="monitor disk",
+            mode="silent",
+            interval_seconds=60,
+            stop_condition=None,
+            max_iterations=50,
+            channel_id="123",
+            requester_id="user1",
+            requester_name="TestUser",
+        )
+        msg = "[NOTIFY] Disk usage is at 85%, above threshold."
+        await mgr._post_response(info, channel, msg)
+        channel.send.assert_called_once_with(msg)
+
+    async def test_silent_mode_allows_alert_marker(self):
+        mgr = LoopManager()
+        channel = MagicMock()
+        channel.send = AsyncMock()
+        info = LoopInfo(
+            id="test1",
+            goal="monitor disk",
+            mode="silent",
+            interval_seconds=60,
+            stop_condition=None,
+            max_iterations=50,
+            channel_id="123",
+            requester_id="user1",
+            requester_name="TestUser",
+        )
+        msg = "[ALERT] Disk is 99% full! Immediate action required."
+        await mgr._post_response(info, channel, msg)
+        channel.send.assert_called_once_with(msg)
+
+    async def test_silent_mode_notify_marker_mid_response(self):
+        """[NOTIFY] doesn't have to be at the start — anywhere in response works."""
+        mgr = LoopManager()
+        channel = MagicMock()
+        channel.send = AsyncMock()
+        info = LoopInfo(
+            id="test1",
+            goal="watch logs",
+            mode="silent",
+            interval_seconds=60,
+            stop_condition=None,
+            max_iterations=50,
+            channel_id="123",
+            requester_id="user1",
+            requester_name="TestUser",
+        )
+        msg = "Checked logs. [NOTIFY] Found 3 new error entries."
+        await mgr._post_response(info, channel, msg)
+        channel.send.assert_called_once_with(msg)
+
+    async def test_post_response_truncates_long_messages(self):
+        mgr = LoopManager()
+        channel = MagicMock()
+        channel.send = AsyncMock()
+        info = LoopInfo(
+            id="test1",
+            goal="test",
+            mode="notify",
+            interval_seconds=60,
+            stop_condition=None,
+            max_iterations=50,
+            channel_id="123",
+            requester_id="user1",
+            requester_name="TestUser",
+        )
+        long_msg = "x" * 3000
+        await mgr._post_response(info, channel, long_msg)
+        channel.send.assert_called_once()
+        sent = channel.send.call_args[0][0]
+        assert len(sent) <= 2000
+        assert "truncated" in sent
+
+    async def test_post_response_handles_send_error(self):
+        """channel.send failure doesn't raise — just logs."""
+        mgr = LoopManager()
+        channel = MagicMock()
+        channel.send = AsyncMock(side_effect=Exception("Discord error"))
+        info = LoopInfo(
+            id="test1",
+            goal="test",
+            mode="notify",
+            interval_seconds=60,
+            stop_condition=None,
+            max_iterations=50,
+            channel_id="123",
+            requester_id="user1",
+            requester_name="TestUser",
+        )
+        # Should not raise
+        await mgr._post_response(info, channel, "test message")
+
+    async def test_silent_loop_integration_suppresses_output(self):
+        """Full loop in silent mode without markers never posts to channel."""
+        mgr = LoopManager()
+        channel = MagicMock()
+        channel.id = 12345
+        channel.send = AsyncMock()
+
+        callback = AsyncMock(return_value="all clear, nothing to report")
+        loop_id = mgr.start_loop(
+            goal="monitor",
+            channel=channel,
+            requester_id="user1",
+            requester_name="TestUser",
+            iteration_callback=callback,
+            interval_seconds=10,
+            mode="silent",
+            max_iterations=1,
+        )
+        info = mgr._loops[loop_id]
+        # Wait for loop to complete
+        await asyncio.sleep(0.5)
+        while info.status == "running":
+            await asyncio.sleep(0.1)
+
+        # channel.send should only be called for the completion message, not the response
+        for call in channel.send.call_args_list:
+            msg = call[0][0]
+            assert "all clear" not in msg
+
+    async def test_silent_loop_integration_posts_with_notify(self):
+        """Full loop in silent mode WITH [NOTIFY] marker posts to channel."""
+        mgr = LoopManager()
+        channel = MagicMock()
+        channel.id = 12345
+        channel.send = AsyncMock()
+
+        callback = AsyncMock(return_value="[NOTIFY] Disk is at 90%!")
+        loop_id = mgr.start_loop(
+            goal="monitor disk",
+            channel=channel,
+            requester_id="user1",
+            requester_name="TestUser",
+            iteration_callback=callback,
+            interval_seconds=10,
+            mode="silent",
+            max_iterations=1,
+        )
+        info = mgr._loops[loop_id]
+        await asyncio.sleep(0.5)
+        while info.status == "running":
+            await asyncio.sleep(0.1)
+
+        # Should find the [NOTIFY] message in the sends
+        notify_found = any(
+            "[NOTIFY]" in call[0][0]
+            for call in channel.send.call_args_list
+        )
+        assert notify_found, "Silent mode with [NOTIFY] should post to channel"

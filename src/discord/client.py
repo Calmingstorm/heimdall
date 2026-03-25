@@ -2968,15 +2968,11 @@ class LokiBot(discord.Client):
             )
             messages.append({"role": "user", "content": list(tool_results)})
 
-        # Post the final response to the channel
+        # Scrub final text; posting is handled by _post_response in LoopManager
         if final_text:
             final_text = scrub_output_secrets(final_text)
-            try:
-                if len(final_text) > DISCORD_MAX_LEN:
-                    final_text = final_text[:DISCORD_MAX_LEN - 50] + "\n... (truncated)"
-                await channel.send(final_text)
-            except Exception as e:
-                log.warning("Failed to post loop iteration result: %s", e)
+            if len(final_text) > DISCORD_MAX_LEN:
+                final_text = final_text[:DISCORD_MAX_LEN - 50] + "\n... (truncated)"
 
         return final_text or "(no response)"
 

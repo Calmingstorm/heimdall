@@ -346,7 +346,12 @@ class LoopManager:
         if info.mode in ("notify", "act"):
             parts.append("- Post a concise update to the channel.")
         elif info.mode == "silent":
-            parts.append("- Only post if something notable or urgent happened.")
+            parts.append(
+                "- Only respond if something notable or urgent happened. "
+                "If you need to report something, include [NOTIFY] at the start "
+                "of your response. For critical issues, use [ALERT] instead. "
+                "Responses without these markers will be suppressed."
+            )
 
         if info.stop_condition:
             parts.append(
@@ -359,12 +364,24 @@ class LoopManager:
     async def _post_response(
         self, info: LoopInfo, channel: Any, response: str,
     ) -> None:
-        """Post the loop iteration response to the channel, respecting mode."""
-        # In silent mode, the LLM itself decides whether to respond.
-        # The callback handles posting for notify/act modes.
-        # If we get here with a response, the LLM decided to post.
-        # The actual posting happens inside the iteration callback
-        # (which runs through _process_with_tools / chat_with_tools).
-        # This method is a no-op since the callback already handles
-        # sending messages via the normal tool loop flow.
-        pass
+        """Post the loop iteration response to the channel, respecting mode.
+
+        - notify/act: always post the response.
+        - silent: only post if the response contains [NOTIFY] or [ALERT].
+        """
+        if info.mode == "silent":
+            if "[NOTIFY]" not in response and "[ALERT]" not in response:
+                log.debug(
+                    "Loop %s: silent mode suppressed output (%d chars)",
+                    info.id, len(response),
+                )
+                return
+
+        # Post to channel (truncate for Discord limit)
+        try:
+            text = response
+            if len(text) > 2000:
+                text = text[:1950] + "\n... (truncated)"
+            await channel.send(text)
+        except Exception as e:
+            log.warning("Loop %s: failed to post response: %s", info.id, e)
