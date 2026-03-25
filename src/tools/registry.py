@@ -1765,7 +1765,7 @@ TOOLS: list[dict] = [
             "and what to report. Use for: monitoring, game playing, event watching, "
             "periodic status updates. The 'goal' describes what you're trying to "
             "accomplish — you will be called repeatedly with this goal and can use "
-            "any tools. Returns a loop ID. Stop with stop_loop."
+            "any tools. Returns a loop ID. Check status with list_loops, stop with stop_loop."
         ),
         "input_schema": {
             "type": "object",
@@ -1811,7 +1811,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "stop_loop",
-        "description": "Stops an autonomous loop by ID. Use 'all' to stop all loops.",
+        "description": "Stops an autonomous loop by ID. Use 'all' to stop all loops. To list loops first, use list_loops.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1827,7 +1827,7 @@ TOOLS: list[dict] = [
         "name": "list_loops",
         "description": (
             "Lists all active autonomous loops with their status, iteration count, "
-            "and last activity time."
+            "and last activity time. To create a loop, use start_loop. To stop, use stop_loop."
         ),
         "input_schema": {
             "type": "object",
