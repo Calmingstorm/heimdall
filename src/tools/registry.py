@@ -1756,6 +1756,84 @@ TOOLS: list[dict] = [
             },
         },
     },
+    # --- Autonomous loops ---
+    {
+        "name": "start_loop",
+        "description": (
+            "Starts an intelligent autonomous loop. Each iteration triggers a full "
+            "LLM reasoning cycle — you decide what to check, how to interpret results, "
+            "and what to report. Use for: monitoring, game playing, event watching, "
+            "periodic status updates. The 'goal' describes what you're trying to "
+            "accomplish — you will be called repeatedly with this goal and can use "
+            "any tools. Returns a loop ID. Stop with stop_loop."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "goal": {
+                    "type": "string",
+                    "description": (
+                        "What this loop should accomplish. This is passed to you "
+                        "each iteration as your instruction. Be specific: "
+                        "'Check game state at http://X, take the next move, report score' or "
+                        "'Monitor disk usage, warn if above 80%' or "
+                        "'Watch /tmp/events.log for new lines, summarize any new entries'"
+                    ),
+                },
+                "interval_seconds": {
+                    "type": "integer",
+                    "description": "Seconds between iterations (default: 60, min: 10)",
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["notify", "act", "silent"],
+                    "description": (
+                        "notify: check + report to channel. "
+                        "act: check + take actions + report. "
+                        "silent: check + take actions, only report if notable."
+                    ),
+                },
+                "stop_condition": {
+                    "type": "string",
+                    "description": (
+                        "Natural language condition to auto-stop: "
+                        "'when the game ends' or 'when disk is below 50%' or "
+                        "'after 5 iterations'. Evaluated by LLM each cycle."
+                    ),
+                },
+                "max_iterations": {
+                    "type": "integer",
+                    "description": "Hard max iterations before auto-stop (default: 50)",
+                },
+            },
+            "required": ["goal"],
+        },
+    },
+    {
+        "name": "stop_loop",
+        "description": "Stops an autonomous loop by ID. Use 'all' to stop all loops.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "loop_id": {
+                    "type": "string",
+                    "description": "Loop ID to stop, or 'all'",
+                },
+            },
+            "required": ["loop_id"],
+        },
+    },
+    {
+        "name": "list_loops",
+        "description": (
+            "Lists all active autonomous loops with their status, iteration count, "
+            "and last activity time."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
     # --- Image generation (ComfyUI) ---
     {
         "name": "generate_image",

@@ -97,6 +97,7 @@ class TestAllToolsHaveHandlers:
             "set_permission", "search_audit", "create_digest",
             "create_skill", "edit_skill", "delete_skill", "list_skills",
             "add_reaction", "create_poll", "broadcast", "analyze_image", "generate_image",
+            "start_loop", "stop_loop", "list_loops",
         }
         executor = _make_executor()
         for tool in TOOLS:

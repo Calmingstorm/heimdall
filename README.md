@@ -1,6 +1,6 @@
 # Loki
 
-Autonomous executor Discord bot with infrastructure management, 78 tools, and an existential crisis.
+Autonomous executor Discord bot with infrastructure management, 81 tools, and an existential crisis.
 
 Loki manages servers, containers, services, and code through natural language in Discord.
 Every message goes to Codex (ChatGPT) with full tool access. Complex tasks are delegated
@@ -104,7 +104,7 @@ python -m src
 
 ```
 Every Discord message
-  → Codex (with 78 tools + personality in system prompt)
+  → Codex (with 81 tools + personality in system prompt)
       ├── CHAT: Codex responds directly with personality
       ├── SIMPLE TASK: Codex calls tools directly (run_command, check_disk, web_search, etc.)
       ├── COMPLEX TASK: Codex delegates to claude -p via claude_code tool
@@ -114,7 +114,7 @@ Every Discord message
 
 Tool packs (opt-in infrastructure tools):
   docker(6), systemd(3), incus(11), ansible(1), prometheus(4), git(8), comfyui(1)
-  Empty config = all 78 tools loaded (backward compatible)
+  Empty config = all 81 tools loaded (backward compatible)
 ```
 
 No classifier. No routing. No approval buttons. Tools are capabilities, not suggestions.

@@ -416,9 +416,9 @@ class TestSystemInvariants:
         for tool in new_tools:
             assert tool in names, f"New tool {tool} not found in registry"
 
-    def test_tool_count_is_78(self):
-        """Total tool count should be 78."""
-        assert len(TOOLS) == 78
+    def test_tool_count_is_81(self):
+        """Total tool count should be 81."""
+        assert len(TOOLS) == 81
 
     def test_seven_tool_packs(self):
         """There should be 7 tool packs."""
@@ -433,11 +433,11 @@ class TestSystemInvariants:
             all_pack.update(tools)
         assert len(all_pack) == 34
 
-    def test_core_tool_count_is_44(self):
-        """44 core tools always available."""
+    def test_core_tool_count_is_47(self):
+        """47 core tools always available."""
         all_names = {t["name"] for t in TOOLS}
         core = all_names - _ALL_PACK_TOOLS
-        assert len(core) == 44
+        assert len(core) == 47
 
     def test_no_chromadb_imports_in_source(self):
         """No chromadb import statements should remain in source code.

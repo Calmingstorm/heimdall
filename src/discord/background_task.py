@@ -37,6 +37,7 @@ BLOCKED_TOOLS = {
     "delegate_task",  # no nesting
     "schedule_task", "delete_schedule", "create_digest",
     "create_skill", "edit_skill", "delete_skill",
+    "start_loop", "stop_loop",  # need LoopManager from client
 }
 
 MAX_STEPS = 200

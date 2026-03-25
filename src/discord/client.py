@@ -20,6 +20,7 @@ from ..monitoring import InfraWatcher
 from .background_task import (
     BackgroundTask, run_background_task, create_task_id, MAX_STEPS,
 )
+from ..tools.autonomous_loop import LoopManager
 from ..learning import ConversationReflector
 from ..llm import CircuitOpenError, CodexAuth, CodexChatClient
 from ..llm.secret_scrubber import scrub_output_secrets
@@ -421,6 +422,8 @@ class LokiBot(discord.Client):
         # Background task tracking
         self._background_tasks: dict[str, BackgroundTask] = {}
         self._background_tasks_max = 20
+        # Autonomous loop manager
+        self.loop_manager = LoopManager()
         # Cached merged tool definitions — invalidated on skill create/edit/delete
         self._cached_merged_tools: list[dict] | None = None
         # Cached host string dict — invalidated on context reload
@@ -1903,6 +1906,12 @@ class LokiBot(discord.Client):
                         result = self._handle_list_tasks(tool_input)
                     elif tool_name == "cancel_task":
                         result = self._handle_cancel_task(tool_input)
+                    elif tool_name == "start_loop":
+                        result = self._handle_start_loop(message, tool_input)
+                    elif tool_name == "stop_loop":
+                        result = self._handle_stop_loop(tool_input)
+                    elif tool_name == "list_loops":
+                        result = self._handle_list_loops()
                     elif tool_name == "search_knowledge":
                         result = await self._handle_search_knowledge(tool_input)
                     elif tool_name == "ingest_document":
@@ -2745,6 +2754,147 @@ class LokiBot(discord.Client):
             return f"Task `{task_id}` is not running (status: {task.status})."
         task.cancel()
         return f"Cancellation requested for task `{task_id}`."
+
+    def _handle_start_loop(self, message: discord.Message, inp: dict) -> str:
+        """Start an autonomous loop."""
+        goal = inp.get("goal", "")
+        if not goal:
+            return "A 'goal' is required to start a loop."
+
+        interval = inp.get("interval_seconds", 60)
+        mode = inp.get("mode", "notify")
+        stop_condition = inp.get("stop_condition")
+        max_iterations = inp.get("max_iterations", 50)
+
+        # Build iteration callback that runs through Codex with tools
+        async def _iteration_cb(
+            prompt: str, channel: object, prev_context: str | None,
+        ) -> str:
+            return await self._run_loop_iteration(
+                prompt, channel, prev_context, str(message.author.id),
+            )
+
+        result = self.loop_manager.start_loop(
+            goal=goal,
+            channel=message.channel,
+            requester_id=str(message.author.id),
+            requester_name=str(message.author),
+            iteration_callback=_iteration_cb,
+            interval_seconds=interval,
+            mode=mode,
+            stop_condition=stop_condition,
+            max_iterations=max_iterations,
+        )
+
+        # If result is a loop ID (short hex), format success message
+        if result.startswith("Error"):
+            return result
+        return (
+            f"Loop started (ID: `{result}`): **{goal[:100]}** "
+            f"(every {max(10, interval)}s, mode={mode}, max {max_iterations} iterations)"
+        )
+
+    def _handle_stop_loop(self, inp: dict) -> str:
+        """Stop an autonomous loop."""
+        loop_id = inp.get("loop_id", "")
+        if not loop_id:
+            return "A 'loop_id' is required."
+        return self.loop_manager.stop_loop(loop_id)
+
+    def _handle_list_loops(self) -> str:
+        """List all autonomous loops."""
+        return self.loop_manager.list_loops()
+
+    async def _run_loop_iteration(
+        self,
+        prompt: str,
+        channel: object,
+        prev_context: str | None,
+        user_id: str,
+    ) -> str:
+        """Run a single loop iteration through Codex with full tool access.
+
+        This is a simplified version of _process_with_tools for autonomous loops.
+        """
+        if not self.codex_client:
+            return "Codex client not available."
+
+        # Build messages for the iteration
+        messages: list[dict] = []
+        if prev_context:
+            messages.append({
+                "role": "user",
+                "content": f"Previous iteration results:\n{prev_context}",
+            })
+            messages.append({
+                "role": "assistant",
+                "content": "Understood, I have the context from previous iterations.",
+            })
+        messages.append({"role": "user", "content": prompt})
+
+        # Build system prompt and tool definitions
+        system_prompt = self._build_system_prompt(channel=channel, user_id=user_id)
+        tools = self._get_merged_tools()
+
+        # Run tool loop (simplified — no progress embed, no cancel button)
+        final_text = ""
+        for iteration in range(MAX_TOOL_ITERATIONS):
+            try:
+                response = await self.codex_client.chat_with_tools(
+                    messages=messages, system=system_prompt, tools=tools,
+                )
+            except Exception as e:
+                log.warning("Loop iteration Codex call failed: %s", e)
+                return f"LLM call failed: {e}"
+
+            # Collect text
+            if response.text:
+                final_text = response.text
+
+            # If no tool calls, we're done
+            if not response.tool_calls:
+                break
+
+            # Execute tool calls
+            tool_results = []
+            for tc in response.tool_calls:
+                try:
+                    result = await self.tool_executor.execute(tc.name, tc.input)
+                except Exception as e:
+                    result = f"Error: {e}"
+                result = scrub_output_secrets(str(result))
+                if len(result) > TOOL_OUTPUT_MAX_CHARS:
+                    result = result[:TOOL_OUTPUT_MAX_CHARS] + "\n... (truncated)"
+                tool_results.append((tc, result))
+
+            # Build tool result messages for the next iteration
+            messages.append({
+                "role": "assistant",
+                "content": response.text or "",
+                "tool_calls": [
+                    {"id": tc.id, "name": tc.name, "input": tc.input}
+                    for tc, _ in tool_results
+                ],
+            })
+            for tc, result in tool_results:
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": result,
+                })
+
+        # Post the final response to the channel
+        if final_text:
+            final_text = scrub_output_secrets(final_text)
+            try:
+                # Truncate for Discord
+                if len(final_text) > DISCORD_MAX_LEN:
+                    final_text = final_text[:DISCORD_MAX_LEN - 50] + "\n... (truncated)"
+                await channel.send(final_text)
+            except Exception as e:
+                log.warning("Failed to post loop iteration result: %s", e)
+
+        return final_text or "(no response)"
 
     async def _handle_add_reaction(self, message: discord.Message, inp: dict) -> str:
         """Add an emoji reaction to a message."""
