@@ -5,6 +5,7 @@ All endpoints are prefixed with /api/ and require Bearer token auth
 """
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import TYPE_CHECKING, Any
 
@@ -293,6 +294,246 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
         limit = min(int(request.query.get("limit", "10")), 50)
         results = await store.search_hybrid(query, embedder=bot._embedder, limit=limit)
         return web.json_response(results)
+
+    # ------------------------------------------------------------------
+    # Schedules
+    # ------------------------------------------------------------------
+
+    @routes.get("/api/schedules")
+    async def list_schedules(_request: web.Request) -> web.Response:
+        return web.json_response(bot.scheduler.list_all())
+
+    @routes.post("/api/schedules")
+    async def create_schedule(request: web.Request) -> web.Response:
+        data = await request.json()
+        description = data.get("description", "").strip()
+        action = data.get("action", "reminder")
+        channel_id = data.get("channel_id", "").strip()
+        if not description or not channel_id:
+            return web.json_response(
+                {"error": "description and channel_id are required"}, status=400
+            )
+        try:
+            schedule = bot.scheduler.add(
+                description=description,
+                action=action,
+                channel_id=channel_id,
+                cron=data.get("cron"),
+                run_at=data.get("run_at"),
+                message=data.get("message"),
+                tool_name=data.get("tool_name"),
+                tool_input=data.get("tool_input"),
+                steps=data.get("steps"),
+                trigger=data.get("trigger"),
+            )
+            return web.json_response(schedule, status=201)
+        except (ValueError, TypeError) as e:
+            return web.json_response({"error": str(e)}, status=400)
+
+    @routes.delete("/api/schedules/{schedule_id}")
+    async def delete_schedule(request: web.Request) -> web.Response:
+        sid = request.match_info["schedule_id"]
+        if bot.scheduler.delete(sid):
+            return web.json_response({"status": "deleted"})
+        return web.json_response({"error": "schedule not found"}, status=404)
+
+    # ------------------------------------------------------------------
+    # Autonomous loops
+    # ------------------------------------------------------------------
+
+    @routes.get("/api/loops")
+    async def list_loops(_request: web.Request) -> web.Response:
+        loops = []
+        for lid, info in bot.loop_manager._loops.items():
+            loops.append({
+                "id": lid,
+                "goal": info.goal,
+                "mode": info.mode,
+                "interval_seconds": info.interval_seconds,
+                "stop_condition": info.stop_condition,
+                "max_iterations": info.max_iterations,
+                "channel_id": info.channel_id,
+                "requester_id": info.requester_id,
+                "requester_name": info.requester_name,
+                "iteration_count": info.iteration_count,
+                "last_trigger": info.last_trigger,
+                "created_at": info.created_at,
+                "status": info.status,
+            })
+        return web.json_response(loops)
+
+    @routes.post("/api/loops")
+    async def start_loop(request: web.Request) -> web.Response:
+        data = await request.json()
+        goal = data.get("goal", "").strip()
+        if not goal:
+            return web.json_response({"error": "goal is required"}, status=400)
+        channel_id = data.get("channel_id", "").strip()
+        if not channel_id:
+            return web.json_response(
+                {"error": "channel_id is required"}, status=400
+            )
+        # Find the Discord channel to post to
+        try:
+            channel = bot.get_channel(int(channel_id))
+        except (ValueError, TypeError):
+            channel = None
+        if not channel:
+            return web.json_response({"error": "channel not found"}, status=404)
+
+        requester_id = data.get("requester_id", "web-api")
+
+        # Build iteration callback (same pattern as _handle_start_loop)
+        async def _iteration_cb(
+            prompt: str, ch: object, prev_context: str | None,
+        ) -> str:
+            return await bot._run_loop_iteration(
+                prompt, ch, prev_context, requester_id,
+            )
+
+        result = bot.loop_manager.start_loop(
+            goal=goal,
+            channel=channel,
+            requester_id=requester_id,
+            requester_name=data.get("requester_name", "Web API"),
+            iteration_callback=_iteration_cb,
+            interval_seconds=data.get("interval_seconds", 60),
+            mode=data.get("mode", "notify"),
+            stop_condition=data.get("stop_condition"),
+            max_iterations=data.get("max_iterations", 50),
+        )
+        if result.startswith("Error"):
+            return web.json_response({"error": result}, status=400)
+        return web.json_response({"loop_id": result}, status=201)
+
+    @routes.delete("/api/loops/{loop_id}")
+    async def stop_loop(request: web.Request) -> web.Response:
+        lid = request.match_info["loop_id"]
+        result = bot.loop_manager.stop_loop(lid)
+        is_error = "not found" in result.lower() or "not running" in result.lower()
+        return web.json_response(
+            {"result": result}, status=404 if is_error else 200
+        )
+
+    # ------------------------------------------------------------------
+    # Processes
+    # ------------------------------------------------------------------
+
+    @routes.get("/api/processes")
+    async def list_processes(_request: web.Request) -> web.Response:
+        registry = getattr(bot.tool_executor, "_process_registry", None)
+        if not registry:
+            return web.json_response([])
+        processes = []
+        now = time.time()
+        for pid, info in sorted(registry._processes.items()):
+            processes.append({
+                "pid": pid,
+                "command": info.command,
+                "host": info.host,
+                "status": info.status,
+                "exit_code": info.exit_code,
+                "uptime_seconds": round(now - info.start_time, 1),
+                "start_time": info.start_time,
+            })
+        return web.json_response(processes)
+
+    @routes.delete("/api/processes/{pid}")
+    async def kill_process(request: web.Request) -> web.Response:
+        registry = getattr(bot.tool_executor, "_process_registry", None)
+        if not registry:
+            return web.json_response({"error": "no process registry"}, status=404)
+        try:
+            pid = int(request.match_info["pid"])
+        except ValueError:
+            return web.json_response({"error": "invalid PID"}, status=400)
+        result = await registry.kill(pid)
+        is_error = "no process" in result.lower()
+        return web.json_response(
+            {"result": result}, status=404 if is_error else 200
+        )
+
+    # ------------------------------------------------------------------
+    # Audit log
+    # ------------------------------------------------------------------
+
+    @routes.get("/api/audit")
+    async def search_audit(request: web.Request) -> web.Response:
+        tool_name = request.query.get("tool") or None
+        user = request.query.get("user") or None
+        host = request.query.get("host") or None
+        keyword = request.query.get("q") or None
+        date = request.query.get("date") or None
+        limit = min(int(request.query.get("limit", "50")), 200)
+        results = await bot.audit.search(
+            tool_name=tool_name,
+            user=user,
+            host=host,
+            keyword=keyword,
+            date=date,
+            limit=limit,
+        )
+        return web.json_response(results)
+
+    # ------------------------------------------------------------------
+    # Memory (persistent notes — global + per-user scopes)
+    # ------------------------------------------------------------------
+
+    @routes.get("/api/memory")
+    async def list_memory(_request: web.Request) -> web.Response:
+        all_mem = await asyncio.to_thread(
+            bot.tool_executor._load_all_memory
+        )
+        result = {}
+        for scope, entries in all_mem.items():
+            result[scope] = {
+                "keys": list(entries.keys()),
+                "count": len(entries),
+            }
+        return web.json_response(result)
+
+    @routes.get("/api/memory/{scope}/{key}")
+    async def get_memory(request: web.Request) -> web.Response:
+        scope = request.match_info["scope"]
+        key = request.match_info["key"]
+        all_mem = await asyncio.to_thread(
+            bot.tool_executor._load_all_memory
+        )
+        section = all_mem.get(scope, {})
+        if key not in section:
+            return web.json_response({"error": "key not found"}, status=404)
+        return web.json_response({"scope": scope, "key": key, "value": section[key]})
+
+    @routes.put("/api/memory/{scope}/{key}")
+    async def set_memory(request: web.Request) -> web.Response:
+        scope = request.match_info["scope"]
+        key = request.match_info["key"]
+        data = await request.json()
+        value = data.get("value")
+        if value is None:
+            return web.json_response({"error": "value is required"}, status=400)
+        all_mem = await asyncio.to_thread(
+            bot.tool_executor._load_all_memory
+        )
+        if scope not in all_mem:
+            all_mem[scope] = {}
+        all_mem[scope][key] = str(value)
+        await asyncio.to_thread(bot.tool_executor._save_all_memory, all_mem)
+        return web.json_response({"status": "saved", "scope": scope, "key": key})
+
+    @routes.delete("/api/memory/{scope}/{key}")
+    async def delete_memory(request: web.Request) -> web.Response:
+        scope = request.match_info["scope"]
+        key = request.match_info["key"]
+        all_mem = await asyncio.to_thread(
+            bot.tool_executor._load_all_memory
+        )
+        section = all_mem.get(scope, {})
+        if key not in section:
+            return web.json_response({"error": "key not found"}, status=404)
+        del all_mem[scope][key]
+        await asyncio.to_thread(bot.tool_executor._save_all_memory, all_mem)
+        return web.json_response({"status": "deleted", "scope": scope, "key": key})
 
     return routes
 

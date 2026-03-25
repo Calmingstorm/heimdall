@@ -92,11 +92,13 @@ class HealthServer:
         self._trigger_callback = callback
 
     def set_bot(self, bot: LokiBot) -> None:
-        """Wire the bot instance to enable the REST API endpoints."""
+        """Wire the bot instance to enable the REST API and WebSocket endpoints."""
         if not self._web_config.enabled:
             return
         from ..web.api import setup_api
+        from ..web.websocket import setup_websocket
         setup_api(self._app, bot)
+        self._ws_manager = setup_websocket(self._app, bot)
         log.info("Web management API enabled")
 
     async def _redirect_to_ui(self, _request: web.Request) -> web.Response:
