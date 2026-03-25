@@ -1,22 +1,36 @@
 /**
  * Loki Management UI — Dashboard Page
- * Bot status, guilds, quick stats, recent activity feed
+ * Bot status, guilds, quick stats, recent activity feed with live WebSocket updates
  */
 import { api, ws } from '../api.js';
 
-const { ref, computed, onMounted, onUnmounted } = Vue;
+const { ref, computed, onMounted, onUnmounted, nextTick } = Vue;
 
 export default {
   template: `
     <div class="p-6">
       <h1 class="text-xl font-semibold mb-4">Dashboard</h1>
 
-      <div v-if="loading" class="flex items-center gap-2 text-gray-400">
-        <div class="spinner"></div> Loading...
+      <!-- Skeleton loading -->
+      <div v-if="loading" class="space-y-4">
+        <div class="loki-card flex items-center gap-3">
+          <div class="skeleton" style="width:12px;height:12px;border-radius:50%;flex-shrink:0;"></div>
+          <div><div class="skeleton skeleton-text" style="width:120px;"></div><div class="skeleton skeleton-text" style="width:80px;margin-bottom:0;"></div></div>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div v-for="n in 6" :key="n" class="loki-card text-center">
+            <div class="skeleton skeleton-stat"></div>
+            <div class="skeleton skeleton-text" style="width:60%;margin:0.25rem auto 0;"></div>
+          </div>
+        </div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900">
+
+      <!-- Error state with retry -->
+      <div v-else-if="error" class="loki-card border-red-900 error-state">
         <p class="text-red-400">{{ error }}</p>
+        <button @click="retry" class="btn btn-ghost text-xs">Retry</button>
       </div>
+
       <div v-else>
         <!-- Bot status banner -->
         <div class="loki-card mb-4 flex items-center gap-3">
@@ -53,36 +67,41 @@ export default {
           <!-- Recent Activity -->
           <div class="loki-card lg:col-span-2">
             <div class="flex items-center justify-between mb-2">
-              <div class="text-gray-400 text-sm font-medium">Recent Activity</div>
+              <div class="text-gray-400 text-sm font-medium">
+                Recent Activity
+                <span v-if="newEventCount > 0" class="badge badge-success ml-1" style="font-size:0.625rem;">+{{ newEventCount }}</span>
+              </div>
               <button @click="fetchActivity" class="btn btn-ghost text-xs" :disabled="activityLoading">
                 {{ activityLoading ? 'Loading...' : 'Refresh' }}
               </button>
             </div>
             <div v-if="activityLoading && activity.length === 0" class="text-gray-500 text-sm">Loading...</div>
             <div v-else-if="activity.length === 0" class="text-gray-500 text-sm">No recent activity</div>
-            <table v-else class="loki-table">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Tool</th>
-                  <th>User</th>
-                  <th>Duration</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(a, i) in activity" :key="i">
-                  <td class="text-gray-400 text-xs font-mono whitespace-nowrap">{{ formatTime(a.timestamp) }}</td>
-                  <td class="font-mono text-sm">{{ a.tool_name }}</td>
-                  <td class="text-gray-400 text-sm">{{ a.user_name || a.user_id || '—' }}</td>
-                  <td class="text-gray-400 text-xs font-mono">{{ a.execution_time_ms }}ms</td>
-                  <td>
-                    <span v-if="a.error" class="badge badge-danger">error</span>
-                    <span v-else class="badge badge-success">ok</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div v-else class="table-responsive">
+              <table class="loki-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Tool</th>
+                    <th>User</th>
+                    <th>Duration</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(a, i) in activity" :key="a._key || i" :class="{ 'flash-new': a._isNew }">
+                    <td class="text-gray-400 text-xs font-mono whitespace-nowrap">{{ formatTime(a.timestamp) }}</td>
+                    <td class="font-mono text-sm">{{ a.tool_name }}</td>
+                    <td class="text-gray-400 text-sm">{{ a.user_name || a.user_id || '\u2014' }}</td>
+                    <td class="text-gray-400 text-xs font-mono">{{ a.execution_time_ms }}ms</td>
+                    <td>
+                      <span v-if="a.error" class="badge badge-danger">error</span>
+                      <span v-else class="badge badge-success">ok</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -94,6 +113,8 @@ export default {
     const error = ref(null);
     const activity = ref([]);
     const activityLoading = ref(false);
+    const newEventCount = ref(0);
+    let eventKeyCounter = 0;
 
     const uptime = computed(() => {
       const s = status.value.uptime_seconds || 0;
@@ -114,7 +135,7 @@ export default {
     ]);
 
     function formatTime(ts) {
-      if (!ts) return '—';
+      if (!ts) return '\u2014';
       try {
         const d = new Date(ts);
         return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -124,6 +145,7 @@ export default {
     async function fetchStatus() {
       try {
         status.value = await api.get('/api/status');
+        error.value = null;
       } catch (e) {
         error.value = e.message;
       } finally {
@@ -135,18 +157,33 @@ export default {
       activityLoading.value = true;
       try {
         activity.value = await api.get('/api/audit?limit=10');
+        newEventCount.value = 0;
       } catch { /* ignore */ }
       activityLoading.value = false;
+    }
+
+    function retry() {
+      loading.value = true;
+      error.value = null;
+      fetchStatus();
+      fetchActivity();
     }
 
     // Auto-refresh status every 15s
     let interval = null;
 
     function onEvent(data) {
-      // Push new events to the top of the activity feed
+      // Push new events to the top of the activity feed with flash animation
       if (data.payload && data.payload.tool_name) {
-        activity.value.unshift(data.payload);
+        const entry = { ...data.payload, _isNew: true, _key: ++eventKeyCounter };
+        activity.value.unshift(entry);
         if (activity.value.length > 10) activity.value.pop();
+        newEventCount.value++;
+        // Remove flash class after animation
+        setTimeout(() => { entry._isNew = false; }, 1500);
+        // Reset new event counter after a while
+        clearTimeout(onEvent._resetTimer);
+        onEvent._resetTimer = setTimeout(() => { newEventCount.value = 0; }, 10000);
       }
     }
 
@@ -161,6 +198,6 @@ export default {
       ws.unsubscribe('events', onEvent);
     });
 
-    return { status, loading, error, uptime, stats, activity, activityLoading, fetchActivity, formatTime };
+    return { status, loading, error, uptime, stats, activity, activityLoading, newEventCount, fetchActivity, fetchStatus, formatTime, retry };
   },
 };

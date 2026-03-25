@@ -19,11 +19,12 @@ export default {
         </div>
       </div>
 
-      <div v-if="loading && skills.length === 0" class="flex items-center gap-2 text-gray-400">
-        <div class="spinner"></div> Loading skills...
+      <div v-if="loading && skills.length === 0" class="space-y-2">
+        <div v-for="n in 4" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900">
+      <div v-else-if="error" class="loki-card border-red-900 error-state">
         <p class="text-red-400">{{ error }}</p>
+        <button @click="fetchSkills" class="btn btn-ghost text-xs">Retry</button>
       </div>
       <div v-else-if="skills.length === 0 && !editing" class="loki-card">
         <p class="text-gray-400">No skills loaded. Create one to get started.</p>

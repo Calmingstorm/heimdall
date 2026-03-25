@@ -127,9 +127,13 @@ const App = {
           </router-link>
         </nav>
         <div class="px-3 py-2 border-t border-gray-800 text-xs text-gray-500 sidebar-header-text">
-          <div class="flex items-center gap-1.5">
+          <div class="flex items-center gap-1.5 mb-1">
             <span class="status-dot" :class="wsConnected ? 'online' : 'offline'"></span>
             {{ wsConnected ? 'Live' : 'Disconnected' }}
+          </div>
+          <div class="text-gray-600" style="font-size:0.625rem;">
+            <kbd class="px-1 py-0.5 bg-gray-800 rounded">/</kbd> search
+            <kbd class="px-1 py-0.5 bg-gray-800 rounded ml-1">Esc</kbd> close
           </div>
         </div>
       </aside>
@@ -164,8 +168,23 @@ const App = {
 
     const navRoutes = routes.filter(r => r.meta);
 
+    // Global keyboard shortcuts
+    function onKeydown(e) {
+      // Esc: close mobile sidebar, or modals (modals handle their own Esc via @click.self)
+      if (e.key === 'Escape') {
+        if (mobileOpen.value) { mobileOpen.value = false; e.preventDefault(); return; }
+      }
+      // / : focus first search input on page (unless already in an input)
+      if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
+        e.preventDefault();
+        const input = document.querySelector('.loki-main input[type="text"], .loki-main .loki-input:not(textarea):not(select)');
+        if (input) input.focus();
+      }
+    }
+
     // Check auth on mount
     onMounted(async () => {
+      document.addEventListener('keydown', onKeydown);
       const check = await api.check();
       if (check.ok) {
         authState.value = 'ready';
@@ -221,6 +240,7 @@ const App = {
     onUnmounted(() => {
       if (statusInterval) clearInterval(statusInterval);
       ws.disconnect();
+      document.removeEventListener('keydown', onKeydown);
     });
 
     return {

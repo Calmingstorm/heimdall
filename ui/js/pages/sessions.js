@@ -1,6 +1,7 @@
 /**
  * Loki Management UI — Sessions Page
  * View active sessions, conversation history, clear sessions
+ * Auto-refreshes via debounced WebSocket events
  */
 import { api, ws } from '../api.js';
 
@@ -16,45 +17,50 @@ export default {
         </button>
       </div>
 
-      <div v-if="loading && sessions.length === 0" class="flex items-center gap-2 text-gray-400">
-        <div class="spinner"></div> Loading sessions...
+      <!-- Skeleton loading -->
+      <div v-if="loading && sessions.length === 0" class="space-y-2">
+        <div v-for="n in 4" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900">
+      <div v-else-if="error" class="loki-card border-red-900 error-state">
         <p class="text-red-400">{{ error }}</p>
+        <button @click="retry" class="btn btn-ghost text-xs">Retry</button>
       </div>
       <div v-else-if="sessions.length === 0" class="loki-card">
         <p class="text-gray-400">No active sessions</p>
       </div>
       <div v-else>
-        <table class="loki-table">
-          <thead>
-            <tr>
-              <th>Channel</th>
-              <th>Messages</th>
-              <th>Last Active</th>
-              <th>Summary</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="s in sessions" :key="s.channel_id"
-                @click="toggleSession(s.channel_id)"
-                style="cursor:pointer;">
-              <td class="font-mono text-sm">{{ s.channel_id }}</td>
-              <td>
-                <span class="badge badge-info">{{ s.message_count }}</span>
-              </td>
-              <td class="text-gray-400 text-sm">{{ formatAge(s.last_active) }}</td>
-              <td>
-                <span v-if="s.has_summary" class="badge badge-success">yes</span>
-                <span v-else class="text-gray-500 text-xs">—</span>
-              </td>
-              <td @click.stop>
-                <button @click="confirmClear(s.channel_id)" class="btn btn-danger text-xs">Clear</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="loki-table">
+            <thead>
+              <tr>
+                <th>Channel</th>
+                <th>Messages</th>
+                <th>Last Active</th>
+                <th>Summary</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="s in sessions" :key="s.channel_id"
+                  @click="toggleSession(s.channel_id)"
+                  style="cursor:pointer;"
+                  :class="{ 'flash-new': s._updated }">
+                <td class="font-mono text-sm">{{ s.channel_id }}</td>
+                <td>
+                  <span class="badge badge-info">{{ s.message_count }}</span>
+                </td>
+                <td class="text-gray-400 text-sm">{{ formatAge(s.last_active) }}</td>
+                <td>
+                  <span v-if="s.has_summary" class="badge badge-success">yes</span>
+                  <span v-else class="text-gray-500 text-xs">\u2014</span>
+                </td>
+                <td @click.stop>
+                  <button @click="confirmClear(s.channel_id)" class="btn btn-danger text-xs">Clear</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Expanded session detail -->
@@ -95,7 +101,7 @@ export default {
       </div>
 
       <!-- Confirm clear modal -->
-      <div v-if="clearTarget" class="modal-overlay" @click.self="clearTarget = null">
+      <div v-if="clearTarget" class="modal-overlay" @click.self="clearTarget = null" @keyup.escape="clearTarget = null">
         <div class="modal-content">
           <h3 class="text-lg font-semibold mb-2">Clear Session</h3>
           <p class="text-gray-400 text-sm mb-4">
@@ -122,7 +128,7 @@ export default {
     const clearing = ref(false);
 
     function formatAge(ts) {
-      if (!ts) return '—';
+      if (!ts) return '\u2014';
       const diff = (Date.now() / 1000) - ts;
       if (diff < 60) return 'just now';
       if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
@@ -167,6 +173,11 @@ export default {
       loading.value = false;
     }
 
+    function retry() {
+      error.value = null;
+      fetchSessions();
+    }
+
     async function toggleSession(channelId) {
       if (expandedId.value === channelId) {
         expandedId.value = null;
@@ -193,7 +204,6 @@ export default {
       clearing.value = true;
       try {
         await api.del(`/api/sessions/${clearTarget.value}`);
-        // If we had this session expanded, close it
         if (expandedId.value === clearTarget.value) {
           expandedId.value = null;
           detail.value = null;
@@ -204,10 +214,21 @@ export default {
       clearTarget.value = null;
     }
 
-    // WebSocket: refresh on new message events
+    // WebSocket: debounced refresh on new message events
+    let debounceTimer = null;
     function onEvent(data) {
       if (data.payload && data.payload.channel_id) {
-        fetchSessions();
+        // Debounce rapid WS events (e.g. burst of tool calls) to avoid hammering API
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          fetchSessions();
+          // If the updated channel is currently expanded, refresh detail too
+          if (expandedId.value && data.payload.channel_id === expandedId.value) {
+            toggleSession(expandedId.value);
+            // Re-expand since toggleSession toggles
+            toggleSession(expandedId.value);
+          }
+        }, 2000);
       }
     }
 
@@ -218,6 +239,7 @@ export default {
 
     onUnmounted(() => {
       ws.unsubscribe('events', onEvent);
+      clearTimeout(debounceTimer);
     });
 
     return {
@@ -225,7 +247,7 @@ export default {
       expandedId, detail, detailLoading,
       clearTarget, clearing,
       formatAge, formatTimestamp, messageClass, roleBadge, truncateContent,
-      fetchSessions, toggleSession, confirmClear, clearSession,
+      fetchSessions, retry, toggleSession, confirmClear, clearSession,
     };
   },
 };

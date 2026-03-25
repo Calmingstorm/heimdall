@@ -16,11 +16,18 @@ export default {
         </button>
       </div>
 
-      <div v-if="loading && tools.length === 0" class="flex items-center gap-2 text-gray-400">
-        <div class="spinner"></div> Loading tools...
+      <div v-if="loading && tools.length === 0" class="space-y-3">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div v-for="n in 4" :key="n" class="loki-card text-center">
+            <div class="skeleton skeleton-stat"></div>
+            <div class="skeleton skeleton-text" style="width:60%;margin:0.25rem auto 0;"></div>
+          </div>
+        </div>
+        <div v-for="n in 5" :key="n + 4" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900">
+      <div v-else-if="error" class="loki-card border-red-900 error-state">
         <p class="text-red-400">{{ error }}</p>
+        <button @click="refresh" class="btn btn-ghost text-xs">Retry</button>
       </div>
       <div v-else>
         <!-- Summary -->

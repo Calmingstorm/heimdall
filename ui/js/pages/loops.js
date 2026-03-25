@@ -74,11 +74,12 @@ export default {
       </div>
 
       <!-- Loop list -->
-      <div v-if="loading && loops.length === 0" class="flex items-center gap-2 text-gray-400">
-        <div class="spinner"></div> Loading loops...
+      <div v-if="loading && loops.length === 0" class="space-y-2">
+        <div v-for="n in 3" :key="n" class="skeleton skeleton-row" style="height:5rem;"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900">
+      <div v-else-if="error" class="loki-card border-red-900 error-state">
         <p class="text-red-400">{{ error }}</p>
+        <button @click="fetchLoops" class="btn btn-ghost text-xs">Retry</button>
       </div>
       <div v-else-if="loops.length === 0 && !showCreate" class="loki-card">
         <p class="text-gray-400">No active loops. Click "Start Loop" to create one.</p>
@@ -122,6 +123,10 @@ export default {
               <div>
                 <span class="text-gray-500">Iterations:</span>
                 {{ loop.iteration_count }} / {{ loop.max_iterations }}
+                <div class="mt-1 w-full bg-gray-800 rounded-full h-1">
+                  <div class="bg-indigo-500 h-1 rounded-full transition-all duration-300"
+                       :style="{ width: Math.min(100, (loop.iteration_count / loop.max_iterations) * 100) + '%' }"></div>
+                </div>
               </div>
               <div>
                 <span class="text-gray-500">Last trigger:</span>

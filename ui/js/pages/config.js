@@ -18,11 +18,15 @@ export default {
         </div>
       </div>
 
-      <div v-if="loading && !config" class="flex items-center gap-2 text-gray-400">
-        <div class="spinner"></div> Loading configuration...
+      <div v-if="loading && !config" class="space-y-3">
+        <div v-for="n in 4" :key="n" class="loki-card">
+          <div class="skeleton skeleton-text" style="width:100px;"></div>
+          <div class="skeleton skeleton-row mt-2"></div>
+        </div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900">
+      <div v-else-if="error" class="loki-card border-red-900 error-state">
         <p class="text-red-400">{{ error }}</p>
+        <button @click="fetchConfig" class="btn btn-ghost text-xs">Retry</button>
       </div>
       <div v-else-if="config">
         <div class="space-y-3">

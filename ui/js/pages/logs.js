@@ -43,7 +43,7 @@ export default {
           {{ subscribed ? 'Live' : 'Disconnected' }}
         </div>
         <span>{{ filteredLogs.length }} / {{ logs.length }} entries</span>
-        <span v-if="paused" class="badge badge-warning">Paused</span>
+        <span v-if="paused" class="badge badge-warning">Paused ({{ pauseBuffer.length }} buffered)</span>
       </div>
 
       <!-- Log output -->
@@ -138,7 +138,11 @@ export default {
 
     function scrollToBottom() {
       const el = logContainer.value;
-      if (el) el.scrollTop = el.scrollHeight;
+      if (el) {
+        // Smooth scroll when close to bottom, instant jump when far away
+        const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+        el.scrollTo({ top: el.scrollHeight, behavior: distFromBottom < 500 ? 'smooth' : 'instant' });
+      }
     }
 
     function togglePause() {
@@ -180,14 +184,21 @@ export default {
       return 'text-blue-500';
     }
 
+    // Track WS connection status without overriding global handler
+    let statusCheckInterval = null;
+
     onMounted(() => {
       ws.subscribe('logs', onLog);
       subscribed.value = ws.connected;
-      ws.onStatusChange = (connected) => { subscribed.value = connected; };
+      // Poll connection status to avoid overriding app-level onStatusChange
+      statusCheckInterval = setInterval(() => {
+        subscribed.value = ws.connected;
+      }, 2000);
     });
 
     onUnmounted(() => {
       ws.unsubscribe('logs', onLog);
+      if (statusCheckInterval) clearInterval(statusCheckInterval);
     });
 
     return {

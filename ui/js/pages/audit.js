@@ -56,17 +56,19 @@ export default {
       </div>
 
       <!-- Results -->
-      <div v-if="loading && entries.length === 0" class="flex items-center gap-2 text-gray-400">
-        <div class="spinner"></div> Loading audit entries...
+      <div v-if="loading && entries.length === 0" class="space-y-2">
+        <div v-for="n in 5" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900">
+      <div v-else-if="error" class="loki-card border-red-900 error-state">
         <p class="text-red-400">{{ error }}</p>
+        <button @click="fetchAudit" class="btn btn-ghost text-xs">Retry</button>
       </div>
       <div v-else-if="entries.length === 0" class="loki-card">
         <p class="text-gray-400">No audit entries found matching your filters.</p>
       </div>
       <div v-else>
         <div class="text-xs text-gray-500 mb-2">Showing {{ entries.length }} entries</div>
+        <div class="table-responsive">
         <table class="loki-table">
           <thead>
             <tr>
@@ -96,6 +98,7 @@ export default {
             </tr>
           </tbody>
         </table>
+        </div>
 
         <!-- Expanded detail -->
         <div v-if="expandedIdx !== null && entries[expandedIdx]" class="mt-3 loki-card">

@@ -71,11 +71,12 @@ export default {
       </div>
 
       <!-- Sources list -->
-      <div v-if="loading && sources.length === 0" class="flex items-center gap-2 text-gray-400">
-        <div class="spinner"></div> Loading sources...
+      <div v-if="loading && sources.length === 0" class="space-y-2">
+        <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900">
+      <div v-else-if="error" class="loki-card border-red-900 error-state">
         <p class="text-red-400">{{ error }}</p>
+        <button @click="fetchSources" class="btn btn-ghost text-xs">Retry</button>
       </div>
       <div v-else-if="sources.length === 0 && !showIngest" class="loki-card">
         <p class="text-gray-400">No documents ingested. Click "Ingest Document" to add one.</p>
