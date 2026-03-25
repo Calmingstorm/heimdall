@@ -8,6 +8,9 @@ import SessionsPage from './pages/sessions.js';
 import ToolsPage from './pages/tools.js';
 import SkillsPage from './pages/skills.js';
 import KnowledgePage from './pages/knowledge.js';
+import SchedulesPage from './pages/schedules.js';
+import LoopsPage from './pages/loops.js';
+import ProcessesPage from './pages/processes.js';
 
 const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
 const { createRouter, createWebHashHistory } = VueRouter;
@@ -28,12 +31,9 @@ function makePage(name, icon) {
 }
 
 // ---------------------------------------------------------------------------
-// Page stubs (expanded in Rounds 25-28)
+// Page stubs (expanded in Rounds 27-28)
 // ---------------------------------------------------------------------------
-// ToolsPage, SkillsPage, KnowledgePage imported above
-const SchedulesPage   = makePage('Schedules', '');
-const LoopsPage       = makePage('Loops', '');
-const ProcessesPage   = makePage('Processes', '');
+// ToolsPage, SkillsPage, KnowledgePage, SchedulesPage, LoopsPage, ProcessesPage imported above
 const AuditPage       = makePage('Audit Log', '');
 const ConfigPage      = makePage('Config', '');
 const LogsPage        = makePage('Logs', '');
