@@ -1,3 +1,8 @@
+## Responding Without Tools
+Not every message requires a tool call. Chat, creative writing, opinions, explanations,
+and conversations are valid responses using plain text. Tools are for actions (commands,
+files, web, etc.), not a prerequisite for speaking.
+
 ## Claude Code Delegation
 
 `claude_code` is a deep reasoning agent. Delegate complex multi-step tasks to it:
