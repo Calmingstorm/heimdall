@@ -15,6 +15,16 @@ from ..logging import get_logger
 log = get_logger("browser")
 
 ALLOWED_SCHEMES = ("http://", "https://")
+_CONNECTION_ERROR_PATTERNS = (
+    "connection closed",
+    "target closed",
+    "browser has been closed",
+    "browser closed",
+    "websocket is closed",
+    "not connected",
+    "connection refused",
+    "target page, context or browser has been closed",
+)
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -46,6 +56,28 @@ class BrowserManager:
         self._browser = None
         self._lock = asyncio.Lock()
 
+    @staticmethod
+    def _is_connection_error(exc: Exception) -> bool:
+        """Check if an exception indicates a dead browser connection."""
+        msg = str(exc).lower()
+        return any(p in msg for p in _CONNECTION_ERROR_PATTERNS)
+
+    def _on_browser_disconnected(self) -> None:
+        """Callback when the browser fires a 'disconnected' event."""
+        log.warning("Browser disconnected (container may have restarted)")
+        self._browser = None
+
+    async def _force_reconnect(self) -> None:
+        """Force-drop the current connection and reconnect."""
+        async with self._lock:
+            try:
+                if self._browser:
+                    await self._browser.close()
+            except Exception:
+                pass
+            self._browser = None
+        await self._ensure_connected()
+
     async def _ensure_connected(self) -> None:
         """Lazy-connect to the browser, reconnecting if the connection dropped."""
         async with self._lock:
@@ -64,16 +96,15 @@ class BrowserManager:
                 self._browser = await self._playwright.chromium.connect_over_cdp(
                     self._cdp_url
                 )
+                self._browser.on("disconnected", self._on_browser_disconnected)
                 log.info("Connected to browser at %s", self._cdp_url.split("?")[0])
             except Exception as e:
                 raise RuntimeError(
                     f"Browser service unavailable. Is the loki-browser container running? ({e})"
                 )
 
-    @asynccontextmanager
-    async def new_page(self, timeout_ms: int | None = None) -> AsyncIterator:
-        """Yield a fresh page in an isolated context. Auto-cleans up."""
-        await self._ensure_connected()
+    async def _create_page(self, timeout_ms: int | None = None):
+        """Create a new browser context and page. Returns (context, page)."""
         context = await self._browser.new_context(
             viewport=self._viewport,
             user_agent=DEFAULT_USER_AGENT,
@@ -88,6 +119,26 @@ class BrowserManager:
             "deviceScaleFactor": 1,
             "mobile": False,
         })
+        return context, page
+
+    @asynccontextmanager
+    async def new_page(self, timeout_ms: int | None = None) -> AsyncIterator:
+        """Yield a fresh page in an isolated context. Auto-cleans up.
+
+        Self-heals stale CDP connections: if the browser container restarted,
+        the first page creation attempt will fail. We catch connection errors,
+        force a reconnect, and retry once.
+        """
+        await self._ensure_connected()
+        try:
+            context, page = await self._create_page(timeout_ms)
+        except Exception as e:
+            if self._is_connection_error(e):
+                log.warning("Stale CDP connection, reconnecting: %s", e)
+                await self._force_reconnect()
+                context, page = await self._create_page(timeout_ms)
+            else:
+                raise
         try:
             yield page
         finally:
