@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import time
+from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -22,6 +24,10 @@ TriggerCallback = Callable[[str, dict], Awaitable[int]]
 
 # Paths that skip API token authentication
 _AUTH_SKIP_PREFIXES = ("/health", "/webhook/", "/ui")
+
+# Rate-limit: max requests per window per IP on /api/ routes
+_RATE_LIMIT_MAX = 120
+_RATE_LIMIT_WINDOW = 60  # seconds
 
 
 def _make_auth_middleware(web_config: WebConfig) -> web.middleware:
@@ -49,6 +55,51 @@ def _make_auth_middleware(web_config: WebConfig) -> web.middleware:
     return auth_middleware
 
 
+def _make_rate_limit_middleware() -> web.middleware:
+    """Simple in-memory rate limiter for /api/ routes (per remote IP)."""
+    # {ip: [(timestamp, ...),]}
+    _buckets: dict[str, list[float]] = defaultdict(list)
+
+    @web.middleware
+    async def rate_limit_middleware(
+        request: web.Request,
+        handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
+    ) -> web.StreamResponse:
+        if not request.path.startswith("/api/"):
+            return await handler(request)
+        ip = request.remote or "unknown"
+        now = time.monotonic()
+        window_start = now - _RATE_LIMIT_WINDOW
+        # Prune old entries
+        bucket = _buckets[ip]
+        _buckets[ip] = bucket = [t for t in bucket if t > window_start]
+        if len(bucket) >= _RATE_LIMIT_MAX:
+            return web.json_response({"error": "rate limit exceeded"}, status=429)
+        bucket.append(now)
+        return await handler(request)
+
+    return rate_limit_middleware
+
+
+def _make_security_headers_middleware() -> web.middleware:
+    """Add security headers to all responses and catch malformed JSON."""
+
+    @web.middleware
+    async def security_headers_middleware(
+        request: web.Request,
+        handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
+    ) -> web.StreamResponse:
+        try:
+            response = await handler(request)
+        except json.JSONDecodeError:
+            return web.json_response({"error": "invalid JSON body"}, status=400)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        return response
+
+    return security_headers_middleware
+
+
 class HealthServer:
     def __init__(
         self,
@@ -64,6 +115,8 @@ class HealthServer:
         self._trigger_callback: TriggerCallback | None = None
         middlewares = []
         if self._web_config.enabled:
+            middlewares.append(_make_security_headers_middleware())
+            middlewares.append(_make_rate_limit_middleware())
             middlewares.append(_make_auth_middleware(self._web_config))
         self._app = web.Application(middlewares=middlewares)
         self._app.router.add_get("/health", self._health)

@@ -25,6 +25,20 @@ _SENSITIVE_FIELDS = frozenset({
     "api_key", "password",
 })
 
+# Input validation limits
+_MAX_NAME_LEN = 100
+_MAX_CODE_LEN = 50_000
+_MAX_CONTENT_LEN = 500_000
+_MAX_GOAL_LEN = 2000
+_MAX_DESCRIPTION_LEN = 500
+
+
+def _validate_string(value: str, field: str, max_len: int) -> str | None:
+    """Validate a string field. Returns error message or None."""
+    if len(value) > max_len:
+        return f"{field} exceeds maximum length ({max_len} chars)"
+    return None
+
 
 def _redact_config(obj: Any, *, _depth: int = 0) -> Any:
     """Recursively redact sensitive fields from config dicts."""
@@ -209,6 +223,12 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             return web.json_response(
                 {"error": "name and code are required"}, status=400
             )
+        for err in (
+            _validate_string(name, "name", _MAX_NAME_LEN),
+            _validate_string(code, "code", _MAX_CODE_LEN),
+        ):
+            if err:
+                return web.json_response({"error": err}, status=400)
         result = bot.skill_manager.create_skill(name, code)
         bot._cached_merged_tools = None
         bot._cached_skills_text = None
@@ -225,6 +245,9 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
         code = data.get("code", "").strip()
         if not code:
             return web.json_response({"error": "code is required"}, status=400)
+        err = _validate_string(code, "code", _MAX_CODE_LEN)
+        if err:
+            return web.json_response({"error": err}, status=400)
         result = bot.skill_manager.edit_skill(name, code)
         bot._cached_merged_tools = None
         bot._cached_skills_text = None
@@ -269,6 +292,12 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             return web.json_response(
                 {"error": "source and content are required"}, status=400
             )
+        for err in (
+            _validate_string(source, "source", _MAX_NAME_LEN),
+            _validate_string(content, "content", _MAX_CONTENT_LEN),
+        ):
+            if err:
+                return web.json_response({"error": err}, status=400)
         chunks = await store.ingest(content, source, embedder=bot._embedder, uploader="web-api")
         return web.json_response({"source": source, "chunks": chunks}, status=201)
 
@@ -291,7 +320,10 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
         query = request.query.get("q", "").strip()
         if not query:
             return web.json_response({"error": "q parameter required"}, status=400)
-        limit = min(int(request.query.get("limit", "10")), 50)
+        try:
+            limit = min(int(request.query.get("limit", "10")), 50)
+        except ValueError:
+            return web.json_response({"error": "limit must be an integer"}, status=400)
         results = await store.search_hybrid(query, embedder=bot._embedder, limit=limit)
         return web.json_response(results)
 
@@ -313,6 +345,9 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             return web.json_response(
                 {"error": "description and channel_id are required"}, status=400
             )
+        err = _validate_string(description, "description", _MAX_DESCRIPTION_LEN)
+        if err:
+            return web.json_response({"error": err}, status=400)
         try:
             schedule = bot.scheduler.add(
                 description=description,
@@ -368,6 +403,9 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
         goal = data.get("goal", "").strip()
         if not goal:
             return web.json_response({"error": "goal is required"}, status=400)
+        err = _validate_string(goal, "goal", _MAX_GOAL_LEN)
+        if err:
+            return web.json_response({"error": err}, status=400)
         channel_id = data.get("channel_id", "").strip()
         if not channel_id:
             return web.json_response(
@@ -464,7 +502,10 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
         host = request.query.get("host") or None
         keyword = request.query.get("q") or None
         date = request.query.get("date") or None
-        limit = min(int(request.query.get("limit", "50")), 200)
+        try:
+            limit = min(int(request.query.get("limit", "50")), 200)
+        except ValueError:
+            return web.json_response({"error": "limit must be an integer"}, status=400)
         results = await bot.audit.search(
             tool_name=tool_name,
             user=user,
