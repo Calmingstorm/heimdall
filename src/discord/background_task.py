@@ -147,23 +147,33 @@ async def run_background_task(
             if store_as:
                 variables[store_as] = output
 
+            # Detect error strings returned by executor (not raised as exceptions)
+            is_error = _is_error_output(output)
             task.results.append(StepResult(
                 index=i, tool_name=tool_name,
-                description=step_desc, status="ok",
+                description=step_desc, status="error" if is_error else "ok",
                 output=output[:500], elapsed_ms=elapsed_ms,
             ))
 
             if audit_logger:
                 try:
-                    await audit_logger.log_execution(
+                    log_kwargs: dict = dict(
                         user_id=task.requester_id, user_name=task.requester,
                         channel_id=str(getattr(task.channel, "id", "")),
                         tool_name=tool_name, tool_input=tool_input, approved=True,
                         result_summary=output[:500],
                         execution_time_ms=elapsed_ms,
                     )
+                    if is_error:
+                        log_kwargs["error"] = output[:500]
+                    await audit_logger.log_execution(**log_kwargs)
                 except Exception:
                     log.warning("Failed to audit log step %d of task %s", i, task.task_id)
+
+            # Abort on detected error if on_failure policy requires it
+            if is_error and on_failure == "abort":
+                task.status = "failed"
+                break
 
         except Exception as e:
             elapsed_ms = int((time.monotonic() - t0) * 1000)
@@ -218,6 +228,19 @@ def _get_default_host(executor: ToolExecutor) -> str:
     except (AttributeError, StopIteration):
         pass
     return "localhost"
+
+
+def _is_error_output(output: str) -> bool:
+    """Detect error strings returned as successful results by executor/handlers."""
+    if not output:
+        return False
+    # executor.execute() returns "Error executing <tool>: <msg>" on exception
+    if output.startswith("Error executing "):
+        return True
+    # executor.execute() returns "Unknown tool: <name>" for missing handlers
+    if output.startswith("Unknown tool: "):
+        return True
+    return False
 
 
 async def _execute_tool(
