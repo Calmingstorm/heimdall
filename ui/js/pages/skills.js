@@ -59,7 +59,6 @@ export default {
             <div class="flex items-center justify-between mb-2">
               <div class="flex items-center gap-2">
                 <span class="font-mono text-sm font-semibold">{{ s.name }}</span>
-                <span class="badge badge-info">{{ s.tool_count || 0 }} tools</span>
                 <span v-if="s.execution_count > 0" class="text-gray-500 text-xs font-mono">
                   {{ s.execution_count.toLocaleString() }} runs
                 </span>

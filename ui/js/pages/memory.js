@@ -71,6 +71,14 @@ export default {
         </button>
       </div>
 
+      <!-- Action error toast -->
+      <div v-if="actionError" class="loki-card border-red-900 mb-4">
+        <div class="flex items-center justify-between">
+          <p class="text-red-400 text-sm">{{ actionError }}</p>
+          <button @click="actionError = null" class="btn btn-ghost text-xs">Dismiss</button>
+        </div>
+      </div>
+
       <!-- Loading / error -->
       <div v-if="loading && scopes.length === 0" class="space-y-2">
         <div v-for="n in 3" :key="n" class="skeleton skeleton-row" style="height:3rem;"></div>
@@ -209,6 +217,7 @@ export default {
     const editingKey = ref(null);
     const editValue = ref('');
     const saving = ref(false);
+    const actionError = ref(null);
 
     // Copy
     const copied = ref(null);
@@ -300,6 +309,7 @@ export default {
 
     async function doEdit(scope, key) {
       saving.value = true;
+      actionError.value = null;
       try {
         await api.put(`/api/memory/${encodeURIComponent(scope)}/${encodeURIComponent(key)}`, {
           value: editValue.value,
@@ -310,7 +320,9 @@ export default {
           if (e) e.value = editValue.value;
         }
         editingKey.value = null;
-      } catch { /* ignore */ }
+      } catch (e) {
+        actionError.value = `Failed to save: ${e.message || 'unknown error'}`;
+      }
       saving.value = false;
     }
 
@@ -360,6 +372,7 @@ export default {
     async function doDelete() {
       if (!deleteTarget.value) return;
       deleting.value = true;
+      actionError.value = null;
       const { scope, key } = deleteTarget.value;
       try {
         await api.del(`/api/memory/${encodeURIComponent(scope)}/${encodeURIComponent(key)}`);
@@ -376,7 +389,9 @@ export default {
         const next = new Set(selected.value);
         next.delete(scope + '/' + key);
         selected.value = next;
-      } catch { /* ignore */ }
+      } catch (e) {
+        actionError.value = `Failed to delete: ${e.message || 'unknown error'}`;
+      }
       deleting.value = false;
       deleteTarget.value = null;
     }
@@ -387,6 +402,7 @@ export default {
 
     async function doBulkDelete() {
       deleting.value = true;
+      actionError.value = null;
       const entries = [];
       for (const id of selected.value) {
         const slash = id.indexOf('/');
@@ -394,11 +410,12 @@ export default {
       }
       try {
         await api.post('/api/memory/bulk-delete', { entries });
-        // Refresh state
         selected.value = new Set();
         scopeEntries.value = {};
         await fetchMemory();
-      } catch { /* ignore */ }
+      } catch (e) {
+        actionError.value = `Bulk delete failed: ${e.message || 'unknown error'}`;
+      }
       deleting.value = false;
       showBulkDelete.value = false;
     }
@@ -408,7 +425,7 @@ export default {
     return {
       scopes, scopeEntries, loading, error, expanded, loadingScope,
       showAdd, addForm, adding, addError, addSuccess,
-      editingKey, editValue, saving,
+      editingKey, editValue, saving, actionError,
       copied,
       selected, selectedCount, totalEntries,
       deleteTarget, deleting, showBulkDelete,

@@ -2550,3 +2550,57 @@ class TestScheduleValidateCron:
                 headers={"Content-Type": "application/json"},
             )
             assert resp.status == 400
+
+
+# ---------------------------------------------------------------------------
+# Round 14: Review fixes
+# ---------------------------------------------------------------------------
+
+
+class TestSkillCodeFieldConsistency:
+    """Verify code field is always present in skill list responses."""
+
+    @pytest.mark.asyncio
+    async def test_skills_code_present_when_file_exists(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/skills")
+            body = await resp.json()
+            assert body[0]["code"] == "print('hi')"
+
+    @pytest.mark.asyncio
+    async def test_skills_code_null_when_file_missing(self):
+        bot = _make_bot()
+        skill_mock = MagicMock()
+        skill_mock.file_path = MagicMock()
+        skill_mock.file_path.exists = MagicMock(return_value=False)
+        bot.skill_manager._skills = {"joke": skill_mock}
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/skills")
+            body = await resp.json()
+            assert body[0]["code"] is None
+
+    @pytest.mark.asyncio
+    async def test_skills_code_null_when_read_fails(self):
+        bot = _make_bot()
+        skill_mock = MagicMock()
+        skill_mock.file_path = MagicMock()
+        skill_mock.file_path.exists = MagicMock(return_value=True)
+        skill_mock.file_path.read_text = MagicMock(side_effect=OSError("perm denied"))
+        bot.skill_manager._skills = {"joke": skill_mock}
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/skills")
+            body = await resp.json()
+            assert body[0]["code"] is None
+
+    @pytest.mark.asyncio
+    async def test_skills_code_null_when_skill_not_loaded(self):
+        bot = _make_bot()
+        bot.skill_manager._skills = {}  # skill listed but not loaded
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/skills")
+            body = await resp.json()
+            assert body[0]["code"] is None

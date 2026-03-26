@@ -4,7 +4,7 @@
  */
 import { api, ws } from '../api.js';
 
-const { ref, computed, onMounted, onUnmounted } = Vue;
+const { ref, computed, onMounted, onUnmounted, watch } = Vue;
 
 export default {
   template: `
@@ -177,7 +177,7 @@ export default {
     }
 
     // Watch autoRefresh toggle
-    Vue.watch(autoRefresh, (val) => {
+    watch(autoRefresh, (val) => {
       if (val) startAutoRefresh();
       else stopAutoRefresh();
     });

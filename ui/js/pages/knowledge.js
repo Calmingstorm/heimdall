@@ -54,7 +54,10 @@ export default {
           Search Results <span class="badge badge-info">{{ searchResults.length }}</span>
           <span class="text-gray-500 text-xs ml-2">for "{{ lastQuery }}"</span>
         </div>
-        <div v-if="searchResults.length === 0" class="loki-card">
+        <div v-if="searchError" class="loki-card border-red-900">
+          <p class="text-red-400 text-sm">Search error: {{ searchError }}</p>
+        </div>
+        <div v-else-if="searchResults.length === 0" class="loki-card">
           <p class="text-gray-400 text-sm">No results for "{{ lastQuery }}"</p>
         </div>
         <div v-else class="space-y-2">
@@ -109,7 +112,7 @@ export default {
             <div class="flex items-center justify-between mb-1">
               <div class="flex items-center gap-2">
                 <span class="font-mono text-sm font-semibold">{{ s.source || s.name || s }}</span>
-                <span class="badge badge-info">{{ s.chunk_count || s.chunks || '—' }} chunks</span>
+                <span class="badge badge-info">{{ s.chunks || '—' }} chunks</span>
                 <span v-if="s.uploader" class="badge badge-warning text-xs">{{ s.uploader }}</span>
               </div>
               <div class="flex gap-1">
@@ -161,6 +164,7 @@ export default {
     const searchResults = ref(null);
     const searching = ref(false);
     const lastQuery = ref('');
+    const searchError = ref(null);
 
     // Ingest
     const showIngest = ref(false);
@@ -173,6 +177,7 @@ export default {
     // Re-ingest
     const reingesting = ref(null);
     const reingestResult = ref(null);
+    let reingestTimer = null;
 
     // Delete
     const deleteTarget = ref(null);
@@ -207,12 +212,14 @@ export default {
       const q = searchQuery.value.trim();
       if (!q) return;
       searching.value = true;
+      searchError.value = null;
       lastQuery.value = q;
       try {
         const results = await api.get(`/api/knowledge/search?q=${encodeURIComponent(q)}`);
         searchResults.value = Array.isArray(results) ? results : [];
       } catch (e) {
         searchResults.value = [];
+        searchError.value = e.message || 'Search failed';
       }
       searching.value = false;
     }
@@ -220,6 +227,7 @@ export default {
     function clearSearch() {
       searchResults.value = null;
       searchQuery.value = '';
+      searchError.value = null;
     }
 
     async function doIngest() {
@@ -247,6 +255,7 @@ export default {
     async function doReingest(source) {
       reingesting.value = source;
       reingestResult.value = null;
+      if (reingestTimer) { clearTimeout(reingestTimer); reingestTimer = null; }
       try {
         const result = await api.post(`/api/knowledge/${encodeURIComponent(source)}/reingest`);
         reingestResult.value = {
@@ -255,7 +264,7 @@ export default {
           message: `Re-ingested ${result.chunks || 0} chunks`,
         };
         await fetchSources();
-        setTimeout(() => { reingestResult.value = null; }, 3000);
+        reingestTimer = setTimeout(() => { reingestResult.value = null; reingestTimer = null; }, 3000);
       } catch (e) {
         reingestResult.value = {
           source,
@@ -285,7 +294,7 @@ export default {
 
     return {
       sources, loading, error,
-      searchQuery, searchResults, searching, lastQuery,
+      searchQuery, searchResults, searching, lastQuery, searchError,
       showIngest, ingestSource, ingestContent, ingestError, ingestSuccess, ingesting,
       reingesting, reingestResult,
       deleteTarget, deleting,

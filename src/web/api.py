@@ -415,12 +415,13 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
         # Add source code and execution stats for each skill
         for skill_info in skills:
             name = skill_info["name"]
+            skill_info["code"] = None
             loaded = bot.skill_manager._skills.get(name)
             if loaded and loaded.file_path.exists():
                 try:
                     skill_info["code"] = loaded.file_path.read_text()
                 except OSError:
-                    skill_info["code"] = None
+                    pass
             skill_info["execution_count"] = counts.get(name, 0)
         return web.json_response(skills)
 
