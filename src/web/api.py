@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
 from aiohttp import web
+from croniter import croniter
 
 from ..config.schema import Config
 from ..logging import get_logger
@@ -607,6 +609,44 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             return web.json_response({"status": "deleted"})
         return web.json_response({"error": "schedule not found"}, status=404)
 
+    @routes.post("/api/schedules/{schedule_id}/run")
+    async def run_schedule_now(request: web.Request) -> web.Response:
+        sid = request.match_info["schedule_id"]
+        schedule = None
+        for s in bot.scheduler._schedules:
+            if s["id"] == sid:
+                schedule = s
+                break
+        if not schedule:
+            return web.json_response({"error": "schedule not found"}, status=404)
+        if not bot.scheduler._callback:
+            return web.json_response(
+                {"error": "scheduler callback not configured"}, status=503
+            )
+        try:
+            schedule["last_run"] = datetime.now().isoformat()
+            await bot.scheduler._callback(schedule)
+            return web.json_response({"status": "triggered", "schedule_id": sid})
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=500)
+
+    @routes.post("/api/schedules/validate-cron")
+    async def validate_cron(request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid JSON"}, status=400)
+        expr = data.get("expression", "").strip()
+        if not expr:
+            return web.json_response({"error": "expression is required"}, status=400)
+        if not croniter.is_valid(expr):
+            return web.json_response({"valid": False, "error": "Invalid cron expression"})
+        # Return next 5 run times
+        now = datetime.now()
+        cr = croniter(expr, now)
+        next_runs = [cr.get_next(datetime).isoformat() for _ in range(5)]
+        return web.json_response({"valid": True, "next_runs": next_runs})
+
     # ------------------------------------------------------------------
     # Autonomous loops
     # ------------------------------------------------------------------
@@ -615,6 +655,8 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
     async def list_loops(_request: web.Request) -> web.Response:
         loops = []
         for lid, info in bot.loop_manager._loops.items():
+            # Include last 5 iteration history entries
+            history = list(info._iteration_history[-5:]) if info._iteration_history else []
             loops.append({
                 "id": lid,
                 "goal": info.goal,
@@ -629,6 +671,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
                 "last_trigger": info.last_trigger,
                 "created_at": info.created_at,
                 "status": info.status,
+                "iteration_history": history,
             })
         return web.json_response(loops)
 
@@ -688,6 +731,58 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             {"result": result}, status=404 if is_error else 200
         )
 
+    @routes.post("/api/loops/{loop_id}/restart")
+    async def restart_loop(request: web.Request) -> web.Response:
+        lid = request.match_info["loop_id"]
+        info = bot.loop_manager._loops.get(lid)
+        if not info:
+            return web.json_response({"error": "loop not found"}, status=404)
+
+        # Capture config before stopping
+        goal = info.goal
+        mode = info.mode
+        interval_seconds = info.interval_seconds
+        stop_condition = info.stop_condition
+        max_iterations = info.max_iterations
+        channel_id = info.channel_id
+        requester_id = info.requester_id
+        requester_name = info.requester_name
+
+        # Stop if running
+        if info.status == "running":
+            bot.loop_manager.stop_loop(lid)
+
+        # Find the channel
+        try:
+            channel = bot.get_channel(int(channel_id))
+        except (ValueError, TypeError):
+            channel = None
+        if not channel:
+            return web.json_response({"error": "channel not found"}, status=404)
+
+        # Build callback
+        async def _iteration_cb(
+            prompt: str, ch: object, prev_context: str | None,
+        ) -> str:
+            return await bot._run_loop_iteration(
+                prompt, ch, prev_context, requester_id,
+            )
+
+        new_id = bot.loop_manager.start_loop(
+            goal=goal,
+            channel=channel,
+            requester_id=requester_id,
+            requester_name=requester_name,
+            iteration_callback=_iteration_cb,
+            interval_seconds=interval_seconds,
+            mode=mode,
+            stop_condition=stop_condition,
+            max_iterations=max_iterations,
+        )
+        if new_id.startswith("Error"):
+            return web.json_response({"error": new_id}, status=400)
+        return web.json_response({"old_id": lid, "new_id": new_id}, status=201)
+
     # ------------------------------------------------------------------
     # Processes
     # ------------------------------------------------------------------
@@ -700,6 +795,9 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
         processes = []
         now = time.time()
         for pid, info in sorted(registry._processes.items()):
+            # Last 3 lines of output for inline preview
+            output_lines = list(info.output_buffer)
+            preview = [line.rstrip("\n") for line in output_lines[-3:]]
             processes.append({
                 "pid": pid,
                 "command": info.command,
@@ -708,6 +806,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
                 "exit_code": info.exit_code,
                 "uptime_seconds": round(now - info.start_time, 1),
                 "start_time": info.start_time,
+                "output_preview": preview,
             })
         return web.json_response(processes)
 

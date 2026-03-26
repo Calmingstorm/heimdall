@@ -51,8 +51,32 @@ export default {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
           <div>
             <label class="text-gray-400 text-xs block mb-1">Cron Expression</label>
-            <input v-model="form.cron" type="text" class="loki-input"
-                   placeholder="e.g. 0 */6 * * * (every 6h)" />
+            <div class="flex gap-2">
+              <input v-model="form.cron" type="text" class="loki-input"
+                     placeholder="e.g. 0 */6 * * *" @input="onCronInput" />
+              <button @click="validateCron" class="btn btn-ghost text-xs whitespace-nowrap"
+                      :disabled="!form.cron.trim() || validatingCron">
+                {{ validatingCron ? '...' : 'Validate' }}
+              </button>
+            </div>
+            <!-- Cron helper -->
+            <div v-if="cronResult" class="mt-2 text-xs">
+              <div v-if="cronResult.valid" class="text-green-400">
+                Valid. Next runs:
+                <div v-for="(run, i) in cronResult.next_runs" :key="i" class="text-gray-400 ml-2">
+                  {{ formatIso(run) }} ({{ formatFuture(run) }})
+                </div>
+              </div>
+              <div v-else class="text-red-400">{{ cronResult.error }}</div>
+            </div>
+            <!-- Quick cron presets -->
+            <div class="flex flex-wrap gap-1 mt-2">
+              <button v-for="p in cronPresets" :key="p.expr"
+                      @click="form.cron = p.expr; onCronInput()"
+                      class="cron-preset-btn">
+                {{ p.label }}
+              </button>
+            </div>
           </div>
           <div>
             <label class="text-gray-400 text-xs block mb-1">One-Time (ISO datetime)</label>
@@ -120,6 +144,7 @@ export default {
           </div>
         </div>
 
+        <div class="table-responsive">
         <table class="loki-table">
           <thead>
             <tr>
@@ -127,6 +152,7 @@ export default {
               <th>Type</th>
               <th>Action</th>
               <th>Schedule</th>
+              <th>Next Run</th>
               <th>Last Run</th>
               <th>Actions</th>
             </tr>
@@ -146,13 +172,32 @@ export default {
                 <span v-else-if="s.trigger">{{ s.trigger.type || 'webhook' }}</span>
                 <span v-else>-</span>
               </td>
-              <td class="text-sm text-gray-400">{{ s.last_run ? formatIso(s.last_run) : 'never' }}</td>
-              <td>
-                <button @click="confirmDelete(s.id)" class="btn btn-danger text-xs">Delete</button>
+              <td class="text-sm">
+                <span v-if="s.next_run" class="text-indigo-300" :title="formatIso(s.next_run)">
+                  {{ formatFuture(s.next_run) }}
+                </span>
+                <span v-else class="text-gray-600">-</span>
+              </td>
+              <td class="text-sm text-gray-400">{{ s.last_run ? formatAge(s.last_run) : 'never' }}</td>
+              <td class="whitespace-nowrap">
+                <div class="flex gap-1">
+                  <button @click="doRunNow(s.id)" class="btn btn-ghost text-xs"
+                          :disabled="runningId === s.id"
+                          title="Trigger this schedule immediately">
+                    {{ runningId === s.id ? 'Running...' : 'Run Now' }}
+                  </button>
+                  <button @click="confirmDelete(s.id)" class="btn btn-danger text-xs">Delete</button>
+                </div>
               </td>
             </tr>
           </tbody>
         </table>
+        </div>
+      </div>
+
+      <!-- Toast -->
+      <div v-if="toast" class="toast" :class="toast.type === 'success' ? 'toast-success' : 'toast-error'">
+        {{ toast.message }}
       </div>
 
       <!-- Delete confirmation -->
@@ -176,6 +221,7 @@ export default {
     const schedules = ref([]);
     const loading = ref(true);
     const error = ref(null);
+    const toast = ref(null);
 
     // Create form
     const showCreate = ref(false);
@@ -193,6 +239,20 @@ export default {
     const createError = ref(null);
     const createSuccess = ref(null);
 
+    // Cron validation
+    const cronResult = ref(null);
+    const validatingCron = ref(false);
+    const cronPresets = [
+      { label: 'Every hour', expr: '0 * * * *' },
+      { label: 'Every 6h', expr: '0 */6 * * *' },
+      { label: 'Daily 9am', expr: '0 9 * * *' },
+      { label: 'Weekly Mon', expr: '0 9 * * 1' },
+      { label: 'Every 30m', expr: '*/30 * * * *' },
+    ];
+
+    // Run now
+    const runningId = ref(null);
+
     // Delete
     const deleteTarget = ref(null);
     const deleting = ref(false);
@@ -201,12 +261,61 @@ export default {
     const oneTimeCount = computed(() => schedules.value.filter(s => s.one_time).length);
     const webhookCount = computed(() => schedules.value.filter(s => s.trigger).length);
 
+    function showToast(message, type = 'success') {
+      toast.value = { message, type };
+      setTimeout(() => { toast.value = null; }, 3000);
+    }
+
     function formatIso(iso) {
       if (!iso) return '';
       try {
         const d = new Date(iso);
         return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
       } catch { return iso; }
+    }
+
+    function formatAge(ts) {
+      if (!ts) return '-';
+      const now = Date.now();
+      const t = new Date(ts).getTime();
+      const diff = (now - t) / 1000;
+      if (diff < 60) return 'just now';
+      if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+      if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+      return `${Math.floor(diff / 86400)}d ago`;
+    }
+
+    function formatFuture(ts) {
+      if (!ts) return '-';
+      const now = Date.now();
+      const t = new Date(ts).getTime();
+      const diff = (t - now) / 1000;
+      if (diff < 0) return 'overdue';
+      if (diff < 60) return 'in < 1 min';
+      if (diff < 3600) return `in ${Math.floor(diff / 60)} min`;
+      if (diff < 86400) {
+        const h = Math.floor(diff / 3600);
+        const m = Math.floor((diff % 3600) / 60);
+        return m > 0 ? `in ${h}h ${m}m` : `in ${h}h`;
+      }
+      const d = Math.floor(diff / 86400);
+      return `in ${d} day${d !== 1 ? 's' : ''}`;
+    }
+
+    function onCronInput() {
+      cronResult.value = null;
+    }
+
+    async function validateCron() {
+      const expr = form.value.cron.trim();
+      if (!expr) return;
+      validatingCron.value = true;
+      try {
+        cronResult.value = await api.post('/api/schedules/validate-cron', { expression: expr });
+      } catch (e) {
+        cronResult.value = { valid: false, error: e.message };
+      }
+      validatingCron.value = false;
     }
 
     async function fetchSchedules() {
@@ -257,12 +366,25 @@ export default {
           description: '', action: 'reminder', channel_id: '',
           cron: '', run_at: '', message: '', tool_name: '', tool_input_str: '',
         };
+        cronResult.value = null;
         await fetchSchedules();
         setTimeout(() => { showCreate.value = false; createSuccess.value = null; }, 800);
       } catch (e) {
         createError.value = e.message;
       }
       creating.value = false;
+    }
+
+    async function doRunNow(scheduleId) {
+      runningId.value = scheduleId;
+      try {
+        await api.post(`/api/schedules/${encodeURIComponent(scheduleId)}/run`);
+        showToast('Schedule triggered');
+        await fetchSchedules();
+      } catch (e) {
+        showToast(e.message || 'Failed to trigger', 'error');
+      }
+      runningId.value = null;
     }
 
     function confirmDelete(id) {
@@ -283,11 +405,15 @@ export default {
     onMounted(() => { fetchSchedules(); });
 
     return {
-      schedules, loading, error,
+      schedules, loading, error, toast,
       showCreate, form, creating, createError, createSuccess,
+      cronResult, validatingCron, cronPresets,
+      runningId,
       deleteTarget, deleting,
       cronCount, oneTimeCount, webhookCount,
-      formatIso, fetchSchedules, doCreate, confirmDelete, doDelete,
+      showToast, formatIso, formatAge, formatFuture,
+      onCronInput, validateCron,
+      fetchSchedules, doCreate, doRunNow, confirmDelete, doDelete,
     };
   },
 };

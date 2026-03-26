@@ -89,15 +89,15 @@ export default {
         <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
           <div class="loki-card text-center">
             <div class="text-2xl font-bold">{{ loops.length }}</div>
-            <div class="text-gray-400 text-xs">Active Loops</div>
+            <div class="text-gray-400 text-xs">Total Loops</div>
+          </div>
+          <div class="loki-card text-center">
+            <div class="text-2xl font-bold text-green-400">{{ runningCount }}</div>
+            <div class="text-gray-400 text-xs">Running</div>
           </div>
           <div class="loki-card text-center">
             <div class="text-2xl font-bold">{{ totalIterations }}</div>
             <div class="text-gray-400 text-xs">Total Iterations</div>
-          </div>
-          <div class="loki-card text-center">
-            <div class="text-2xl font-bold">{{ modeBreakdown }}</div>
-            <div class="text-gray-400 text-xs">Modes</div>
           </div>
         </div>
 
@@ -106,11 +106,20 @@ export default {
           <div v-for="loop in loops" :key="loop.id" class="loki-card">
             <div class="flex items-start justify-between mb-2">
               <div class="flex items-center gap-2">
+                <span class="loop-status-dot" :class="statusDotClass(loop.status)"></span>
                 <span class="badge" :class="statusBadge(loop.status)">{{ loop.status || 'running' }}</span>
                 <span class="badge" :class="modeBadge(loop.mode)">{{ loop.mode }}</span>
                 <span class="font-mono text-xs text-gray-500">{{ loop.id }}</span>
               </div>
-              <button @click="confirmStop(loop.id)" class="btn btn-danger text-xs">Stop</button>
+              <div class="flex gap-2">
+                <button @click="doRestart(loop.id)" class="btn btn-ghost text-xs"
+                        :disabled="restartingId === loop.id"
+                        title="Restart loop with same config">
+                  {{ restartingId === loop.id ? 'Restarting...' : 'Restart' }}
+                </button>
+                <button v-if="loop.status === 'running'"
+                        @click="confirmStop(loop.id)" class="btn btn-danger text-xs">Stop</button>
+              </div>
             </div>
 
             <div class="text-sm text-gray-200 mb-2">{{ loop.goal }}</div>
@@ -144,6 +153,20 @@ export default {
 
             <div v-if="loop.requester_name" class="mt-1 text-xs text-gray-600">
               Started by {{ loop.requester_name }}
+            </div>
+
+            <!-- Iteration history -->
+            <div v-if="loop.iteration_history && loop.iteration_history.length > 0" class="mt-3">
+              <button @click="toggleHistory(loop.id)" class="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 mb-1">
+                <span class="tool-expand-icon" :style="{ transform: expandedHistory[loop.id] ? 'rotate(90deg)' : '' }">&#9654;</span>
+                Recent iterations ({{ loop.iteration_history.length }})
+              </button>
+              <div v-if="expandedHistory[loop.id]" class="loop-history">
+                <div v-for="(entry, i) in loop.iteration_history" :key="i"
+                     class="loop-history-entry">
+                  {{ entry }}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -190,22 +213,31 @@ export default {
     const stopTarget = ref(null);
     const stopping = ref(false);
 
+    // Restart
+    const restartingId = ref(null);
+
+    // History expansion
+    const expandedHistory = ref({});
+
     const totalIterations = computed(() =>
       loops.value.reduce((sum, l) => sum + (l.iteration_count || 0), 0)
     );
 
-    const modeBreakdown = computed(() => {
-      const modes = {};
-      for (const l of loops.value) {
-        modes[l.mode] = (modes[l.mode] || 0) + 1;
-      }
-      return Object.entries(modes).map(([m, c]) => `${c} ${m}`).join(', ') || '-';
-    });
+    const runningCount = computed(() =>
+      loops.value.filter(l => l.status === 'running').length
+    );
+
+    function statusDotClass(status) {
+      if (status === 'running') return 'loop-status-running';
+      if (status === 'error') return 'loop-status-error';
+      return 'loop-status-stopped';
+    }
 
     function statusBadge(status) {
       if (status === 'running') return 'badge-success';
-      if (status === 'stopped') return 'badge-danger';
-      return 'badge-info';
+      if (status === 'error') return 'badge-danger';
+      if (status === 'completed') return 'badge-info';
+      return 'badge-warning';
     }
 
     function modeBadge(mode) {
@@ -230,6 +262,13 @@ export default {
       if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
       if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
       return `${Math.floor(diff / 86400)}d ago`;
+    }
+
+    function toggleHistory(loopId) {
+      expandedHistory.value = {
+        ...expandedHistory.value,
+        [loopId]: !expandedHistory.value[loopId],
+      };
     }
 
     async function fetchLoops() {
@@ -290,6 +329,15 @@ export default {
       stopTarget.value = null;
     }
 
+    async function doRestart(loopId) {
+      restartingId.value = loopId;
+      try {
+        await api.post(`/api/loops/${encodeURIComponent(loopId)}/restart`);
+        await fetchLoops();
+      } catch { /* ignore */ }
+      restartingId.value = null;
+    }
+
     // WebSocket: refresh on loop events
     function onEvent(data) {
       if (data.payload && (data.payload.loop_id || data.payload.type === 'loop')) {
@@ -310,9 +358,11 @@ export default {
       loops, loading, error,
       showCreate, form, creating, createError, createSuccess,
       stopTarget, stopping,
-      totalIterations, modeBreakdown,
-      statusBadge, modeBadge, formatInterval, formatAge,
-      fetchLoops, doCreate, confirmStop, doStop,
+      restartingId, expandedHistory,
+      totalIterations, runningCount,
+      statusDotClass, statusBadge, modeBadge,
+      formatInterval, formatAge, toggleHistory,
+      fetchLoops, doCreate, confirmStop, doStop, doRestart,
     };
   },
 };

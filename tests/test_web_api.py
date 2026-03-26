@@ -122,6 +122,10 @@ def _make_bot():
 
     # Scheduler
     bot.scheduler = MagicMock()
+    bot.scheduler._schedules = [
+        {"id": "sch1", "description": "Daily backup", "channel_id": "c1",
+         "action": "reminder", "cron": "0 9 * * *", "last_run": None},
+    ]
     bot.scheduler.list_all = MagicMock(return_value=[
         {"id": "sch1", "description": "Daily backup", "channel_id": "c1"},
     ])
@@ -129,6 +133,7 @@ def _make_bot():
         "id": "sch2", "description": "New schedule",
     })
     bot.scheduler.delete = MagicMock(return_value=True)
+    bot.scheduler._callback = AsyncMock()
 
     # Loops
     loop_info = MagicMock()
@@ -137,13 +142,18 @@ def _make_bot():
     loop_info.interval_seconds = 60
     loop_info.stop_condition = None
     loop_info.max_iterations = 50
-    loop_info.channel_id = "chan1"
+    loop_info.channel_id = "123456"
     loop_info.requester_id = "u1"
     loop_info.requester_name = "Alice"
     loop_info.iteration_count = 5
     loop_info.last_trigger = "2024-01-02T10:00:00"
     loop_info.created_at = "2024-01-01T10:00:00"
     loop_info.status = "running"
+    loop_info._iteration_history = [
+        "Iteration 1: Disk at 45%",
+        "Iteration 2: Disk at 46%",
+        "Iteration 3: Disk at 47%",
+    ]
     bot.loop_manager = MagicMock()
     bot.loop_manager.active_count = 1
     bot.loop_manager._loops = {"loop1": loop_info}
@@ -158,6 +168,8 @@ def _make_bot():
     proc.status = "running"
     proc.exit_code = None
     proc.start_time = time.time() - 30
+    from collections import deque
+    proc.output_buffer = deque(["line1\n", "line2\n", "line3\n", "line4\n"], maxlen=500)
     registry = MagicMock()
     registry._processes = {1234: proc}
     registry.kill = AsyncMock(return_value="Process killed")
@@ -2327,3 +2339,214 @@ class TestKnowledgeStorePreview:
         store._fts = None
 
         assert store.get_source_content("nope") is None
+
+
+# ===================================================================
+# Round 13: Loops — iteration history in list + restart endpoint
+# ===================================================================
+
+
+class TestLoopIterationHistory:
+    @pytest.mark.asyncio
+    async def test_list_includes_iteration_history(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/loops")
+            body = await resp.json()
+            assert len(body) == 1
+            assert "iteration_history" in body[0]
+            assert len(body[0]["iteration_history"]) == 3
+            assert "Iteration 1" in body[0]["iteration_history"][0]
+
+    @pytest.mark.asyncio
+    async def test_list_empty_iteration_history(self):
+        bot = _make_bot()
+        bot.loop_manager._loops["loop1"]._iteration_history = []
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/loops")
+            body = await resp.json()
+            assert body[0]["iteration_history"] == []
+
+    @pytest.mark.asyncio
+    async def test_list_caps_iteration_history_at_5(self):
+        bot = _make_bot()
+        bot.loop_manager._loops["loop1"]._iteration_history = [
+            f"Iteration {i}: output" for i in range(10)
+        ]
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/loops")
+            body = await resp.json()
+            assert len(body[0]["iteration_history"]) == 5
+            # Should be the last 5
+            assert "Iteration 5" in body[0]["iteration_history"][0]
+
+
+class TestLoopRestart:
+    @pytest.mark.asyncio
+    async def test_restart_loop_success(self):
+        app, bot = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/loops/loop1/restart")
+            assert resp.status == 201
+            body = await resp.json()
+            assert body["old_id"] == "loop1"
+            assert body["new_id"] == "new-loop-id"
+            # Should have stopped the old loop
+            bot.loop_manager.stop_loop.assert_called_once_with("loop1")
+            # Should have started a new one with same config
+            bot.loop_manager.start_loop.assert_called_once()
+            call_kwargs = bot.loop_manager.start_loop.call_args[1]
+            assert call_kwargs["goal"] == "monitor disks"
+            assert call_kwargs["mode"] == "notify"
+            assert call_kwargs["interval_seconds"] == 60
+
+    @pytest.mark.asyncio
+    async def test_restart_loop_not_found(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/loops/nonexistent/restart")
+            assert resp.status == 404
+
+    @pytest.mark.asyncio
+    async def test_restart_loop_channel_not_found(self):
+        bot = _make_bot()
+        bot.get_channel = MagicMock(return_value=None)
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/loops/loop1/restart")
+            assert resp.status == 404
+
+    @pytest.mark.asyncio
+    async def test_restart_stopped_loop(self):
+        bot = _make_bot()
+        bot.loop_manager._loops["loop1"].status = "stopped"
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/loops/loop1/restart")
+            assert resp.status == 201
+            # Should NOT call stop_loop since already stopped
+            bot.loop_manager.stop_loop.assert_not_called()
+
+
+# ===================================================================
+# Round 13: Processes — output preview in list
+# ===================================================================
+
+
+class TestProcessOutputPreview:
+    @pytest.mark.asyncio
+    async def test_list_includes_output_preview(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/processes")
+            body = await resp.json()
+            assert len(body) == 1
+            assert "output_preview" in body[0]
+            # Last 3 lines of 4
+            assert len(body[0]["output_preview"]) == 3
+            assert body[0]["output_preview"][0] == "line2"
+            assert body[0]["output_preview"][2] == "line4"
+
+    @pytest.mark.asyncio
+    async def test_list_empty_output_preview(self):
+        bot = _make_bot()
+        from collections import deque
+        bot.tool_executor._process_registry._processes[1234].output_buffer = deque(maxlen=500)
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/processes")
+            body = await resp.json()
+            assert body[0]["output_preview"] == []
+
+
+# ===================================================================
+# Round 13: Schedules — run now + cron validation
+# ===================================================================
+
+
+class TestScheduleRunNow:
+    @pytest.mark.asyncio
+    async def test_run_now_success(self):
+        app, bot = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/schedules/sch1/run")
+            assert resp.status == 200
+            body = await resp.json()
+            assert body["status"] == "triggered"
+            assert body["schedule_id"] == "sch1"
+            bot.scheduler._callback.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_run_now_not_found(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/schedules/nonexistent/run")
+            assert resp.status == 404
+
+    @pytest.mark.asyncio
+    async def test_run_now_no_callback(self):
+        bot = _make_bot()
+        bot.scheduler._callback = None
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/schedules/sch1/run")
+            assert resp.status == 503
+
+    @pytest.mark.asyncio
+    async def test_run_now_updates_last_run(self):
+        app, bot = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            await client.post("/api/schedules/sch1/run")
+            # last_run should be updated
+            sch = bot.scheduler._schedules[0]
+            assert sch["last_run"] is not None
+
+
+class TestScheduleValidateCron:
+    @pytest.mark.asyncio
+    async def test_validate_cron_valid(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/schedules/validate-cron",
+                json={"expression": "0 */6 * * *"},
+            )
+            assert resp.status == 200
+            body = await resp.json()
+            assert body["valid"] is True
+            assert len(body["next_runs"]) == 5
+
+    @pytest.mark.asyncio
+    async def test_validate_cron_invalid(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/schedules/validate-cron",
+                json={"expression": "not a cron"},
+            )
+            body = await resp.json()
+            assert body["valid"] is False
+            assert "error" in body
+
+    @pytest.mark.asyncio
+    async def test_validate_cron_empty(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/schedules/validate-cron",
+                json={"expression": ""},
+            )
+            assert resp.status == 400
+
+    @pytest.mark.asyncio
+    async def test_validate_cron_invalid_json(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/schedules/validate-cron",
+                data="not json",
+                headers={"Content-Type": "application/json"},
+            )
+            assert resp.status == 400
