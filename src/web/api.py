@@ -173,7 +173,10 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
         # Write to disk
         config_path = Path("config.yml")
         if config_path.exists():
-            await asyncio.to_thread(_write_config, config_path, current)
+            try:
+                await asyncio.to_thread(_write_config, config_path, current)
+            except Exception:
+                log.warning("Config applied in memory but failed to persist to %s", config_path, exc_info=True)
 
         return web.json_response(_redact_config(new_config.model_dump()))
 
