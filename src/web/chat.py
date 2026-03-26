@@ -136,7 +136,10 @@ async def process_web_chat(
             if tools_used or handoff:
                 bot.sessions.add_message(channel_id, "assistant", response)
             bot.sessions.prune()
-            await asyncio.to_thread(bot.sessions.save)
+            try:
+                await asyncio.to_thread(bot.sessions.save)
+            except Exception:
+                log.warning("Failed to save session %s", channel_id, exc_info=True)
         else:
             if tools_used:
                 sanitized = (
@@ -147,7 +150,10 @@ async def process_web_chat(
                 sanitized = "[Previous request encountered an error before tool execution.]"
             bot.sessions.add_message(channel_id, "assistant", sanitized)
             bot.sessions.prune()
-            await asyncio.to_thread(bot.sessions.save)
+            try:
+                await asyncio.to_thread(bot.sessions.save)
+            except Exception:
+                log.warning("Failed to save session %s", channel_id, exc_info=True)
 
         return {
             "response": response,
