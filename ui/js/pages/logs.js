@@ -146,15 +146,35 @@ export default {
     });
 
     function parseLogEntry(data) {
-      // WebSocket log data may be a parsed audit entry or raw text
+      // WebSocket log line: {"type": "log", "line": "{...json...}"}
+      if (data.type === 'log' && data.line) {
+        try {
+          const entry = typeof data.line === 'string' ? JSON.parse(data.line) : data.line;
+          return {
+            ts: entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString(),
+            level: entry.error ? 'ERROR' : 'INFO',
+            text: entry.tool_name
+              ? `[${entry.tool_name}] ${entry.result_summary || ''}`.trim()
+              : (entry.message || JSON.stringify(entry)),
+            tool: entry.tool_name || '',
+            raw: null,
+          };
+        } catch {
+          // Unparseable line — show raw
+          return { ts: new Date().toLocaleTimeString(), level: 'INFO', text: String(data.line), tool: '', raw: String(data.line) };
+        }
+      }
+      // Broadcast event with payload (from dashboard events subscription)
       if (data.payload) {
         const p = data.payload;
         return {
           ts: p.timestamp ? new Date(p.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString(),
-          level: p.level || (p.error ? 'ERROR' : 'INFO'),
-          text: p.tool ? `[${p.tool}] ${p.summary || p.output || ''}`.trim() : (p.message || p.summary || JSON.stringify(p)),
-          tool: p.tool || '',
-          raw: typeof data.payload === 'string' ? data.payload : null,
+          level: p.error ? 'ERROR' : 'INFO',
+          text: p.tool_name
+            ? `[${p.tool_name}] ${p.result_summary || ''}`.trim()
+            : (p.message || JSON.stringify(p)),
+          tool: p.tool_name || '',
+          raw: null,
         };
       }
       // Raw string

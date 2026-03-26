@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -17,6 +18,11 @@ class AuditLogger:
     def __init__(self, path: str = "./data/audit.jsonl") -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._event_callback: Callable | None = None
+
+    def set_event_callback(self, callback: Callable) -> None:
+        """Set a callback to be invoked with each audit entry (for live WS events)."""
+        self._event_callback = callback
 
     async def log_execution(
         self,
@@ -49,6 +55,13 @@ class AuditLogger:
                 await f.write(line)
         except Exception as e:
             log.error("Failed to write audit log: %s", e)
+
+        # Notify WebSocket subscribers (fire-and-forget, don't block audit)
+        if self._event_callback:
+            try:
+                await self._event_callback(entry)
+            except Exception:
+                pass  # Never let callback errors affect audit logging
 
     async def search(
         self,

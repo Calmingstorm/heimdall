@@ -160,6 +160,9 @@ class HealthServer:
         self._ws_manager = setup_websocket(
             self._app, bot, api_token=self._web_config.api_token,
         )
+        # Wire audit events to WebSocket for live dashboard/log updates
+        ws_mgr = self._ws_manager
+        bot.audit.set_event_callback(ws_mgr.broadcast_event)
         log.info("Web management API enabled")
 
     async def _redirect_to_ui(self, _request: web.Request) -> web.Response:

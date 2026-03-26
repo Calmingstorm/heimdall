@@ -1270,9 +1270,9 @@ class TestWebSocketManager:
 
         await mgr.broadcast_event({"action": "tool_call"})
         mock_ws.send_json.assert_called_once()
-        payload = mock_ws.send_json.call_args[0][0]
-        assert payload["type"] == "event"
-        assert payload["action"] == "tool_call"
+        msg = mock_ws.send_json.call_args[0][0]
+        assert msg["type"] == "event"
+        assert msg["payload"]["action"] == "tool_call"
 
     @pytest.mark.asyncio
     async def test_broadcast_removes_dead_clients(self):
@@ -1771,3 +1771,115 @@ class TestQueryTokenAuth:
         async with TestClient(TestServer(app)) as client:
             resp = await client.get("/api/status", headers=_auth_headers("mytoken"))
             assert resp.status == 200
+
+
+# ===================================================================
+# Audit event callback + broadcast wiring (Round 10)
+# ===================================================================
+
+
+class TestAuditEventCallback:
+    @pytest.mark.asyncio
+    async def test_audit_logger_fires_event_callback(self):
+        """AuditLogger.log_execution calls the event callback with the entry."""
+        import tempfile, os
+        from src.audit.logger import AuditLogger
+
+        captured = []
+        async def on_event(entry):
+            captured.append(entry)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            logger = AuditLogger(os.path.join(tmp, "audit.jsonl"))
+            logger.set_event_callback(on_event)
+            await logger.log_execution(
+                user_id="u1", user_name="tester", channel_id="c1",
+                tool_name="run_command", tool_input={"command": "ls"},
+                approved=True, result_summary="ok", execution_time_ms=100,
+            )
+            assert len(captured) == 1
+            assert captured[0]["tool_name"] == "run_command"
+            assert captured[0]["user_name"] == "tester"
+
+    @pytest.mark.asyncio
+    async def test_audit_logger_no_callback_does_not_crash(self):
+        """Without a callback set, log_execution still works."""
+        import tempfile, os
+        from src.audit.logger import AuditLogger
+
+        with tempfile.TemporaryDirectory() as tmp:
+            logger = AuditLogger(os.path.join(tmp, "audit.jsonl"))
+            await logger.log_execution(
+                user_id="u1", user_name="tester", channel_id="c1",
+                tool_name="read_file", tool_input={},
+                approved=True, result_summary="ok", execution_time_ms=50,
+            )
+            # Just verify it didn't crash
+            assert logger.path.exists()
+
+    @pytest.mark.asyncio
+    async def test_audit_logger_callback_error_does_not_break_logging(self):
+        """Callback errors must not prevent the audit entry from being written."""
+        import tempfile, os
+        from src.audit.logger import AuditLogger
+
+        async def bad_callback(entry):
+            raise RuntimeError("boom")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            logger = AuditLogger(os.path.join(tmp, "audit.jsonl"))
+            logger.set_event_callback(bad_callback)
+            await logger.log_execution(
+                user_id="u1", user_name="tester", channel_id="c1",
+                tool_name="run_command", tool_input={},
+                approved=True, result_summary="ok", execution_time_ms=10,
+            )
+            # Entry still written despite callback error
+            assert logger.path.exists()
+            content = logger.path.read_text()
+            assert "run_command" in content
+
+    @pytest.mark.asyncio
+    async def test_audit_logger_error_entry_callback(self):
+        """Error entries include the error field in the callback."""
+        import tempfile, os
+        from src.audit.logger import AuditLogger
+
+        captured = []
+        async def on_event(entry):
+            captured.append(entry)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            logger = AuditLogger(os.path.join(tmp, "audit.jsonl"))
+            logger.set_event_callback(on_event)
+            await logger.log_execution(
+                user_id="u1", user_name="tester", channel_id="c1",
+                tool_name="run_command", tool_input={},
+                approved=True, result_summary="failed",
+                execution_time_ms=100, error="command not found",
+            )
+            assert len(captured) == 1
+            assert captured[0]["error"] == "command not found"
+
+
+class TestBroadcastEventPayloadFormat:
+    @pytest.mark.asyncio
+    async def test_broadcast_wraps_event_in_payload(self):
+        """broadcast_event wraps the event dict under a 'payload' key."""
+        bot = _make_bot()
+        mgr = WebSocketManager(bot)
+        mock_ws = AsyncMock()
+        mock_ws.send_json = AsyncMock()
+        mgr._clients.add(mock_ws)
+        mgr._event_subscribers.add(mock_ws)
+
+        await mgr.broadcast_event({
+            "tool_name": "run_command",
+            "error": None,
+            "timestamp": "2024-01-01T00:00:00",
+        })
+        msg = mock_ws.send_json.call_args[0][0]
+        assert msg["type"] == "event"
+        assert "payload" in msg
+        assert msg["payload"]["tool_name"] == "run_command"
+        assert msg["payload"]["timestamp"] == "2024-01-01T00:00:00"

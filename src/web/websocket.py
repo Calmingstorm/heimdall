@@ -152,7 +152,7 @@ class WebSocketManager:
         """Broadcast an event to all subscribed WebSocket clients."""
         if not self._event_subscribers:
             return
-        payload = {"type": "event", **event}
+        payload = {"type": "event", "payload": event}
         dead: list[web.WebSocketResponse] = []
         for ws in list(self._event_subscribers):
             try:
