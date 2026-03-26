@@ -160,6 +160,13 @@ _FABRICATION_PATTERNS: list[re.Pattern[str]] = [
         r"```(?:bash|shell|console|text|output)?\s*\n"
         r"(?:[\$#>].*\n|(?:total |drwx|Filesystem|CONTAINER|NAME |PID |USER ))",
     ),
+    # Claims of completed actions without tool calls (generated, posted, created, saved, etc.)
+    re.compile(
+        r"(?i)\b(?:generated|posted|created|saved|uploaded|deployed|installed|"
+        r"started|stopped|deleted|removed|wrote|written|sent|fetched|downloaded)"
+        r"(?:\s+(?:and\s+)?(?:posted|uploaded|saved|sent|attached|delivered))?"
+        r"\b.{0,40}\b(?:image|file|script|server|container|process|document|skill)"
+    ),
 ]
 
 
