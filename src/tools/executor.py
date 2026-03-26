@@ -654,14 +654,19 @@ class ToolExecutor:
         # writes into the temp dir, not to absolute paths it can't access.
         claude_user = self.config.claude_code_user
         tmpdir = ""
+        # Check if we're already running as the claude_code_user (skip su if so)
+        import os
+        _already_claude_user = (os.getenv("USER", "") == claude_user) if claude_user else False
         if allow_edits:
             if not claude_user:
                 return "claude_code_user not configured — required for allow_edits=true"
             safe_user = shlex.quote(claude_user)
+            if _already_claude_user:
+                mktemp_cmd = "mktemp -d /tmp/claude_code_XXXXXXXX"
+            else:
+                mktemp_cmd = f"su - {safe_user} -c 'mktemp -d /tmp/claude_code_XXXXXXXX'"
             _, tmpdir = await self._exec_command(
-                address,
-                f"su - {safe_user} -c 'mktemp -d /tmp/claude_code_XXXXXXXX'",
-                ssh_user, timeout=10,
+                address, mktemp_cmd, ssh_user, timeout=10,
             )
             tmpdir = tmpdir.strip()
             if not tmpdir or not tmpdir.startswith("/tmp/claude_code_"):
@@ -695,7 +700,10 @@ class ToolExecutor:
         if allow_edits:
             safe_tmpdir = shlex.quote(tmpdir)
             inner = f"cd {safe_tmpdir} && echo '{encoded_prompt}' | base64 -d | timeout 280 {claude_cmd}"
-            cmd = f"su - {safe_user} -c {shlex.quote(inner)}"
+            if _already_claude_user:
+                cmd = inner
+            else:
+                cmd = f"su - {safe_user} -c {shlex.quote(inner)}"
         else:
             safe_wd = shlex.quote(working_dir)
             cmd = f"cd {safe_wd} && echo '{encoded_prompt}' | base64 -d | timeout 280 {claude_cmd}"
