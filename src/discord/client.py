@@ -2118,7 +2118,7 @@ class LokiBot(discord.Client):
                     )
                 except asyncio.TimeoutError:
                     error_msg = (
-                        f"Tool '{block.name}' timed out after {tool_timeout}s"
+                        f"Tool '{block.name}' timed out after {t}s"
                     )
                     try:
                         await self.audit.log_execution(
@@ -2983,7 +2983,7 @@ class LokiBot(discord.Client):
                             channel=channel, user_id=user_id,
                         )
                 except asyncio.TimeoutError:
-                    error = f"Tool '{tool_name}' timed out after {tool_timeout}s"
+                    error = f"Tool '{tool_name}' timed out after {_t}s"
                     raw = error
                 except Exception as e:
                     error = str(e)
