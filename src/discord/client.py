@@ -2731,10 +2731,25 @@ class LokiBot(discord.Client):
         if len(steps) > MAX_STEPS:
             return f"Too many steps ({len(steps)}). Maximum is {MAX_STEPS}."
 
-        # Validate all steps have tool_name
+        # Validate all steps have tool_name and required tool_input fields
+        _REQUIRED_FIELDS = {
+            "run_command": "command",
+            "run_script": "script",
+        }
         for i, step in enumerate(steps):
             if not isinstance(step, dict) or "tool_name" not in step:
                 return f"Step {i}: must have 'tool_name'."
+            tn = step["tool_name"]
+            req = _REQUIRED_FIELDS.get(tn)
+            if req:
+                tool_input = step.get("tool_input", {})
+                if req not in tool_input:
+                    return (
+                        f"Step {i + 1} ({tn}): missing '{req}' in tool_input. "
+                        f"Each {tn} step MUST include tool_input with "
+                        f"'{req}': 'your_shell_command'. "
+                        f"Rebuild the steps with proper tool_input and retry."
+                    )
 
         task = BackgroundTask(
             task_id=create_task_id(),

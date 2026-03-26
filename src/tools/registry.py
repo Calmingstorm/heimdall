@@ -654,6 +654,9 @@ TOOLS: list[dict] = [
             "Runs a multi-step task in the background, posting progress to Discord. "
             "Steps run sequentially with conditions (substring match, ! to negate), "
             "on_failure (abort/continue), store_as ({var.name}), {prev_output} substitution. "
+            "IMPORTANT: each step using run_command MUST have tool_input with 'command' key. "
+            "Example step: {\"tool_name\": \"run_command\", \"description\": \"List files\", "
+            "\"tool_input\": {\"command\": \"ls -la /tmp\"}}. "
             "Track with list_tasks, stop with cancel_task."
         ),
         "input_schema": {
