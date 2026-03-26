@@ -1,8 +1,10 @@
-"""WebSocket handler for live log and event streaming.
+"""WebSocket handler for live log/event streaming and web chat.
 
 Endpoint: /api/ws
 - Client sends: {"subscribe": "logs"} or {"subscribe": "events"}
 - Server sends: {"type": "log", "line": "..."} or {"type": "event", ...}
+- Client sends: {"type": "chat", "content": "...", "channel_id": "web-default"}
+- Server sends: {"type": "chat_response", "content": "...", "tool_calls": [...]}
 """
 from __future__ import annotations
 
@@ -15,6 +17,7 @@ import aiohttp
 from aiohttp import web
 
 from ..logging import get_logger
+from .chat import MAX_CHAT_CONTENT_LEN, process_web_chat
 
 if TYPE_CHECKING:
     from ..discord.client import LokiBot
@@ -88,6 +91,8 @@ class WebSocketManager:
                     elif unsub == "events":
                         self._event_subscribers.discard(ws)
                         await ws.send_json({"type": "unsubscribed", "channel": "events"})
+                    elif data.get("type") == "chat":
+                        await self._handle_chat(ws, data)
                     else:
                         await ws.send_json({"error": "unknown command"})
 
@@ -106,6 +111,42 @@ class WebSocketManager:
             log.info("WebSocket client disconnected (%d remaining)", len(self._clients))
 
         return ws
+
+    async def _handle_chat(self, ws: web.WebSocketResponse, data: dict) -> None:
+        """Handle an incoming chat message from a WebSocket client."""
+        content = (data.get("content") or "").strip()
+        if not content:
+            await ws.send_json({"type": "chat_error", "error": "content is required"})
+            return
+        if len(content) > MAX_CHAT_CONTENT_LEN:
+            await ws.send_json({
+                "type": "chat_error",
+                "error": f"content exceeds {MAX_CHAT_CONTENT_LEN} chars",
+            })
+            return
+
+        channel_id = data.get("channel_id") or "web-default"
+        user_id = data.get("user_id") or "web-user"
+        username = data.get("username") or "WebUser"
+
+        log.info("WebSocket chat from %s: %s", username, content[:80])
+        try:
+            result = await process_web_chat(
+                self._bot, content, channel_id,
+                user_id=user_id, username=username,
+            )
+            await ws.send_json({
+                "type": "chat_response",
+                "content": result["response"],
+                "tools_used": result["tools_used"],
+                "is_error": result["is_error"],
+            })
+        except Exception as e:
+            log.error("WebSocket chat error: %s", e, exc_info=True)
+            await ws.send_json({
+                "type": "chat_error",
+                "error": str(e),
+            })
 
     async def broadcast_event(self, event: dict) -> None:
         """Broadcast an event to all subscribed WebSocket clients."""

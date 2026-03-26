@@ -16,6 +16,7 @@ from aiohttp import web
 from ..config.schema import Config
 from ..logging import get_logger
 from ..tools.registry import TOOL_PACKS, get_tool_definitions, get_pack_tool_names
+from .chat import MAX_CHAT_CONTENT_LEN, process_web_chat
 
 if TYPE_CHECKING:
     from ..discord.client import LokiBot
@@ -154,6 +155,40 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             await asyncio.to_thread(_write_config, config_path, current)
 
         return web.json_response(_redact_config(new_config.model_dump()))
+
+    # ------------------------------------------------------------------
+    # Chat
+    # ------------------------------------------------------------------
+
+    @routes.post("/api/chat")
+    async def chat(request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid JSON"}, status=400)
+
+        content = (data.get("content") or "").strip()
+        if not content:
+            return web.json_response({"error": "content is required"}, status=400)
+        if len(content) > MAX_CHAT_CONTENT_LEN:
+            return web.json_response(
+                {"error": f"content exceeds {MAX_CHAT_CONTENT_LEN} chars"}, status=400
+            )
+
+        channel_id = data.get("channel_id") or "web-default"
+        user_id = data.get("user_id") or "web-user"
+        username = data.get("username") or "WebUser"
+
+        result = await process_web_chat(
+            bot, content, channel_id,
+            user_id=user_id, username=username,
+        )
+        status = 200 if not result["is_error"] else 502
+        return web.json_response({
+            "response": result["response"],
+            "tools_used": result["tools_used"],
+            "is_error": result["is_error"],
+        }, status=status)
 
     # ------------------------------------------------------------------
     # Sessions
