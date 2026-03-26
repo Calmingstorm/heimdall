@@ -108,9 +108,9 @@ class TestAllToolsHaveHandlers:
             assert handler is not None, f"Tool '{name}' has no handler on ToolExecutor"
             assert callable(handler), f"Handler for '{name}' is not callable"
 
-    def test_tool_count_at_least_70(self):
-        """Registry must have 70+ tools."""
-        assert len(TOOLS) >= 70, f"Only {len(TOOLS)} tools found, expected 70+"
+    def test_tool_count_at_least_60(self):
+        """Registry must have 60+ tools."""
+        assert len(TOOLS) >= 60, f"Only {len(TOOLS)} tools found, expected 60+"
 
     def test_no_requires_approval_field(self):
         """No tool should have requires_approval."""
@@ -810,17 +810,6 @@ class TestHostBasedToolHandlers:
             })
             assert result == "active"
 
-    async def test_check_docker_with_container(self):
-        """check_docker with container filter."""
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "container info")
-            result = await executor.execute("check_docker", {
-                "host": "server", "container": "web"
-            })
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "web" in cmd
-
     async def test_check_logs_respects_line_limit(self):
         """check_logs caps at 50 lines."""
         executor = _make_executor()
@@ -870,129 +859,6 @@ class TestHostBasedToolHandlers:
             cmd = mock_ssh.call_args[1]["command"]
             assert "df -h" in cmd
             assert "--exclude" not in cmd
-
-
-class TestDockerToolHandlers:
-    """Docker tool handler tests."""
-
-    async def test_docker_logs_with_since(self):
-        """docker_logs supports --since parameter."""
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "log output")
-            await executor.execute("docker_logs", {
-                "host": "server", "container": "web", "since": "1h"
-            })
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "--since" in cmd
-
-    async def test_docker_compose_action_validates(self):
-        """docker_compose_action rejects invalid actions."""
-        executor = _make_executor()
-        result = await executor.execute("docker_compose_action", {
-            "host": "server", "project_dir": "/app", "action": "destroy"
-        })
-        assert "Invalid action" in result
-
-    async def test_docker_compose_up_adds_detach(self):
-        """docker compose up uses -d flag."""
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "ok")
-            await executor.execute("docker_compose_action", {
-                "host": "server", "project_dir": "/app", "action": "up"
-            })
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "up -d" in cmd
-
-    async def test_docker_stats_no_container(self):
-        """docker_stats without container shows all."""
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "stats")
-            await executor.execute("docker_stats", {"host": "server"})
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "--no-stream" in cmd
-
-
-class TestGitToolHandlers:
-    """Git tool handler tests."""
-
-    async def test_git_status(self):
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "clean")
-            result = await executor.execute("git_status", {
-                "host": "server", "repo_path": "/opt/repo"
-            })
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "git -C" in cmd
-            assert "status" in cmd
-
-    async def test_git_log_limits_count(self):
-        """git_log caps at 50 commits."""
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "log")
-            await executor.execute("git_log", {
-                "host": "server", "repo_path": "/opt/repo", "count": 100
-            })
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "-n 50" in cmd
-
-    async def test_git_commit_with_files(self):
-        """git_commit with file list adds specific files."""
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "committed")
-            await executor.execute("git_commit", {
-                "host": "server", "repo_path": "/opt/repo",
-                "message": "fix", "files": ["main.py", "utils.py"]
-            })
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "main.py" in cmd
-            assert "utils.py" in cmd
-            assert "git" in cmd
-
-    async def test_git_push_with_branch(self):
-        """git_push with branch pushes to specific branch."""
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "pushed")
-            await executor.execute("git_push", {
-                "host": "server", "repo_path": "/opt/repo", "branch": "feature"
-            })
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "feature" in cmd
-
-    async def test_git_branch_create(self):
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "created")
-            await executor.execute("git_branch", {
-                "host": "server", "repo_path": "/opt/repo",
-                "action": "create", "branch_name": "feature-x"
-            })
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "checkout -b" in cmd
-            assert "feature-x" in cmd
-
-    async def test_git_branch_list(self):
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "* main\n  dev")
-            await executor.execute("git_branch", {
-                "host": "server", "repo_path": "/opt/repo", "action": "list"
-            })
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "branch -a" in cmd
-
-    async def test_git_branch_requires_name_for_create(self):
-        executor = _make_executor()
-        result = await executor.execute("git_branch", {
-            "host": "server", "repo_path": "/opt/repo", "action": "create"
-        })
-        assert "branch_name is required" in result
 
 
 class TestPrometheusToolHandlers:

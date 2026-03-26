@@ -15,7 +15,6 @@ USER_TIER_TOOLS = frozenset({
     "check_disk",
     "check_memory",
     "check_service",
-    "check_docker",
     "check_logs",
     "query_prometheus",
     "search_history",

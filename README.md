@@ -1,6 +1,6 @@
 # Loki
 
-Autonomous executor Discord bot with infrastructure management, 81 tools, and an existential crisis.
+Autonomous executor Discord bot with infrastructure management, 67 tools, and an existential crisis.
 
 Loki manages servers, containers, services, and code through natural language in Discord.
 Every message goes to Codex (ChatGPT) with full tool access. Complex tasks are delegated
@@ -9,13 +9,13 @@ No classifier, no approval prompts, no hesitation.
 
 ## Features
 
-- **81 built-in tools** — SSH, Docker, Git, Ansible, Incus, Prometheus, browser automation, scheduling, knowledge base, autonomous loops, and more
+- **67 built-in tools** — SSH, Ansible, Incus, Prometheus, browser automation, scheduling, knowledge base, autonomous loops, and more
 - **Autonomous execution** — every message gets Codex with full tool access, no classification or approval needed
 - **Two-tier execution** — Codex handles direct tools, delegates complex multi-step tasks to Claude Code CLI
 - **Direct local execution** — localhost commands use subprocess directly (no SSH overhead)
 - **Extensible skill system** — create custom tools at runtime via Discord, with a Python API for SSH, HTTP, memory, and scheduling
 - **RAG knowledge base** — local embeddings (fastembed) + sqlite-vec + SQLite FTS5 hybrid search with reciprocal rank fusion (no external servers)
-- **Tool packs** — infrastructure tools (Docker, systemd, Incus, Ansible, Prometheus, Git, ComfyUI) are opt-in via config
+- **Tool packs** — infrastructure tools (systemd, Incus, Ansible, Prometheus, ComfyUI) are opt-in via config
 - **PDF analysis** — extract text from PDF files and Discord attachments via PyMuPDF
 - **Image analysis** — proactive image analysis via LLM vision
 - **Image generation** — text-to-image via ComfyUI API (optional)
@@ -106,7 +106,7 @@ python -m src
 
 ```
 Every Discord message
-  → Codex (with 81 tools + personality in system prompt)
+  → Codex (with 67 tools + personality in system prompt)
       ├── CHAT: Codex responds directly with personality
       ├── SIMPLE TASK: Codex calls tools directly (run_command, check_disk, web_search, etc.)
       ├── COMPLEX TASK: Codex delegates to claude -p via claude_code tool
@@ -116,8 +116,8 @@ Every Discord message
       └── LOOPS: start_loop, stop_loop, list_loops (autonomous recurring tasks)
 
 Tool packs (opt-in infrastructure tools):
-  docker(6), systemd(3), incus(11), ansible(1), prometheus(4), git(8), comfyui(1)
-  Empty config = all 81 tools loaded (backward compatible)
+  systemd(3), incus(11), ansible(1), prometheus(4), comfyui(1)
+  Empty config = all 67 tools loaded (backward compatible)
 ```
 
 No classifier. No routing. No approval buttons. Tools are capabilities, not suggestions.
@@ -181,8 +181,8 @@ src/
 │   ├── circuit_breaker.py  # Health tracking for LLM backends
 │   └── types.py            # Backend-agnostic LLMResponse and ToolCall types
 ├── tools/
-│   ├── registry.py         # 81 tool definitions + 7 tool packs
-│   ├── executor.py         # Tool execution (local subprocess, SSH, Prometheus, Docker, etc.)
+│   ├── registry.py         # 67 tool definitions + 5 tool packs
+│   ├── executor.py         # Tool execution (local subprocess, SSH, Prometheus, Incus, etc.)
 │   ├── ssh.py              # SSH + local subprocess dispatch (is_local_address, run_local_command, run_ssh_command)
 │   ├── tool_memory.py      # Per-tool learning from past executions
 │   ├── skill_manager.py    # Runtime skill loading from Python files
@@ -227,7 +227,7 @@ Loki includes a browser-based management interface at `http://host:3939/ui/`.
 
 - **Dashboard** — bot status, uptime, connected guilds, quick stats, recent activity
 - **Sessions** — view active conversations, message history, clear sessions
-- **Tools** — browse all 81 tools, toggle tool packs on/off
+- **Tools** — browse all 67 tools, toggle tool packs on/off
 - **Skills** — create, edit, delete runtime skills with a code editor
 - **Knowledge** — browse, search, ingest, and delete knowledge base documents
 - **Schedules** — manage cron jobs, one-time tasks, and webhook-triggered tasks
@@ -310,10 +310,8 @@ discord:
 
 | Category | Tools | Examples |
 |----------|-------|---------|
-| System Monitoring | 5 | check_service, check_docker, check_disk, check_memory, check_logs |
+| System Monitoring | 4 | check_service, check_disk, check_memory, check_logs |
 | Command Execution | 3 | run_command, run_command_multi, run_script |
-| Docker | 5 | docker_logs, docker_compose_action, docker_stats |
-| Git | 8 | git_status, git_log, git_diff, git_commit, git_push |
 | Ansible | 1 | run_ansible_playbook |
 | Prometheus | 2 | query_prometheus, query_prometheus_range |
 | Incus | 11 | incus_list, incus_exec, incus_snapshot, incus_launch |

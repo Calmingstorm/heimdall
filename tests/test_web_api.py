@@ -611,11 +611,11 @@ class TestToolsEndpoint:
         async with TestClient(TestServer(app)) as client:
             resp = await client.put(
                 "/api/tools/packs",
-                json={"packs": ["docker", "git"]},
+                json={"packs": ["systemd", "prometheus"]},
             )
             body = await resp.json()
             assert body["status"] == "updated"
-            assert bot.config.tools.tool_packs == ["docker", "git"]
+            assert bot.config.tools.tool_packs == ["systemd", "prometheus"]
 
     @pytest.mark.asyncio
     async def test_update_packs_invalid(self):

@@ -68,7 +68,7 @@ class TestReadmeAccuracy:
         from src.tools.registry import TOOLS
 
         actual_count = len(TOOLS)
-        assert actual_count >= 70
+        assert actual_count >= 60
         assert f"{actual_count}" in self.readme
 
     def test_personality_mentioned(self):

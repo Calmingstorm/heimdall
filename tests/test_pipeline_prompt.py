@@ -54,10 +54,9 @@ class TestSystemPromptPipelineGuidance:
         assert "code creation" in lower or "allow_edits" in lower
 
     def test_still_discourages_misuse(self):
-        """Should still warn against using claude_code for git ops, single file reads, commands."""
+        """Should still warn against using claude_code for single file reads, commands."""
         prompt = _full_prompt()
         lower = prompt.lower()
-        assert "git_log" in lower or "git ops" in lower
         assert "read_file" in lower or "file read" in lower
         assert "run_command" in lower or "command" in lower
 
@@ -109,10 +108,9 @@ class TestToolDescriptionPipelineGuidance:
         assert "deploy" in desc.lower()
 
     def test_still_warns_against_misuse(self):
-        """Tool description should still discourage misuse for git/file/command tasks."""
+        """Tool description should still discourage misuse for file/command tasks."""
         desc = self._get_claude_code_tool()["description"]
         lower = desc.lower()
-        assert "git" in lower
         assert "read_file" in lower or "reading" in lower
         assert "run_command" in lower or "running commands" in lower
 

@@ -107,30 +107,6 @@ class TestToolLifecycleDocs:
 class TestCrossReferenceBidirectionality:
     """Tool descriptions cross-reference in both directions."""
 
-    def test_check_docker_to_docker_logs(self):
-        assert "docker_logs" in _tool_desc("check_docker")
-
-    def test_docker_logs_to_check_docker(self):
-        assert "check_docker" in _tool_desc("docker_logs")
-
-    def test_check_docker_to_docker_stats(self):
-        assert "docker_stats" in _tool_desc("check_docker")
-
-    def test_docker_stats_to_docker_logs(self):
-        assert "docker_logs" in _tool_desc("docker_stats")
-
-    def test_git_log_to_git_status(self):
-        assert "git_status" in _tool_desc("git_log")
-
-    def test_git_diff_to_git_status(self):
-        assert "git_status" in _tool_desc("git_diff")
-
-    def test_git_push_to_git_commit(self):
-        assert "git_commit" in _tool_desc("git_push")
-
-    def test_git_commit_to_git_push(self):
-        assert "git_push" in _tool_desc("git_commit")
-
     def test_search_knowledge_to_list_knowledge(self):
         assert "list_knowledge" in _tool_desc("search_knowledge")
 

@@ -17,36 +17,6 @@ def executor(tools_config: ToolsConfig, tmp_dir: Path) -> ToolExecutor:
     return ToolExecutor(tools_config, memory_path=str(tmp_dir / "memory.json"))
 
 
-# ---------------------------------------------------------------------------
-# check_docker — container-specific branch (line 209-215)
-# ---------------------------------------------------------------------------
-
-class TestCheckDocker:
-    @pytest.mark.asyncio
-    async def test_check_docker_all(self, executor):
-        """check_docker without container shows all containers."""
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "NAME  STATUS  PORTS\nmyapp  Up 2 days")
-            result = await executor.execute("check_docker", {"host": "server"})
-        assert "myapp" in result
-        cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
-        # No --filter when no container specified
-        assert "--filter" not in cmd
-
-    @pytest.mark.asyncio
-    async def test_check_docker_specific_container(self, executor):
-        """check_docker with container uses --filter name=..."""
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "myapp  Up 2 days  8080->8080")
-            result = await executor.execute("check_docker", {
-                "host": "server",
-                "container": "myapp",
-            })
-        assert "myapp" in result
-        cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
-        assert "--filter name=" in cmd
-        # Uses -a for all (including stopped)
-        assert "-a" in cmd
 
 
 # ---------------------------------------------------------------------------
@@ -637,82 +607,6 @@ class TestIncusTools:
 
 
 # ---------------------------------------------------------------------------
-# docker_compose_action — remaining branches (lines 352-356)
-# ---------------------------------------------------------------------------
-
-class TestDockerComposeActionBranches:
-    @pytest.mark.asyncio
-    async def test_docker_compose_down(self, executor):
-        """docker_compose_action 'down' runs docker compose down."""
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "Stopped")
-            await executor.execute("docker_compose_action", {
-                "host": "server",
-                "project_dir": "/opt/project",
-                "action": "down",
-            })
-        cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
-        assert "down" in cmd
-
-    @pytest.mark.asyncio
-    async def test_docker_compose_pull(self, executor):
-        """docker_compose_action 'pull' runs docker compose pull."""
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "Pulling")
-            await executor.execute("docker_compose_action", {
-                "host": "server",
-                "project_dir": "/opt/project",
-                "action": "pull",
-            })
-        cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
-        assert "pull" in cmd
-
-    @pytest.mark.asyncio
-    async def test_docker_compose_restart(self, executor):
-        """docker_compose_action 'restart' runs docker compose restart."""
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "Restarted")
-            await executor.execute("docker_compose_action", {
-                "host": "server",
-                "project_dir": "/opt/project",
-                "action": "restart",
-            })
-        cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
-        assert "restart" in cmd
-
-    @pytest.mark.asyncio
-    async def test_docker_compose_build(self, executor):
-        """docker_compose_action 'build' runs docker compose build."""
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "Built")
-            await executor.execute("docker_compose_action", {
-                "host": "server",
-                "project_dir": "/opt/project",
-                "action": "build",
-            })
-        cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
-        assert "build" in cmd
-
-
-# ---------------------------------------------------------------------------
-# docker_stats with container (lines 382-383)
-# ---------------------------------------------------------------------------
-
-class TestDockerStatsContainer:
-    @pytest.mark.asyncio
-    async def test_docker_stats_specific_container(self, executor):
-        """docker_stats with container filters to that container."""
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "myapp  5%  100MiB / 1GiB")
-            result = await executor.execute("docker_stats", {
-                "host": "server",
-                "container": "myapp",
-            })
-        assert "myapp" in result
-        cmd = mock_ssh.call_args[1].get("command") or mock_ssh.call_args[0][1]
-        assert "myapp" in cmd
-
-
 # ---------------------------------------------------------------------------
 # run_command_multi — error branch (line 483)
 # ---------------------------------------------------------------------------

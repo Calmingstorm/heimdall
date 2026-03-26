@@ -166,7 +166,7 @@ class TestToolSystem:
 
     def test_tool_count(self):
         from src.tools.registry import TOOLS
-        assert len(TOOLS) == 81
+        assert len(TOOLS) == 67
 
     def test_all_tools_have_required_keys(self):
         from src.tools.registry import TOOLS
@@ -193,18 +193,10 @@ class TestToolSystem:
         names = {t["name"] for t in TOOLS}
         # SSH/infrastructure
         assert "check_service" in names
-        assert "check_docker" in names
         assert "check_disk" in names
         assert "check_memory" in names
         assert "run_command" in names
         assert "run_command_multi" in names
-        # Docker
-        assert "docker_logs" in names
-        assert "docker_compose_action" in names
-        # Git
-        assert "git_status" in names
-        assert "git_pull" in names
-        assert "git_push" in names
         # Incus
         assert "incus_list" in names
         assert "incus_exec" in names

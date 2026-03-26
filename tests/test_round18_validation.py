@@ -92,32 +92,32 @@ class TestToolPackFiltering:
 
     def test_single_pack_filters_correctly(self):
         """Enabling one pack returns core + that pack's tools."""
-        docker_tools = get_tool_definitions(enabled_packs=["docker"])
-        docker_names = {t["name"] for t in docker_tools}
+        systemd_tools = get_tool_definitions(enabled_packs=["systemd"])
+        systemd_names = {t["name"] for t in systemd_tools}
 
-        # All docker tools present
-        for name in TOOL_PACKS["docker"]:
-            assert name in docker_names, f"Docker tool {name} missing"
+        # All systemd tools present
+        for name in TOOL_PACKS["systemd"]:
+            assert name in systemd_names, f"Systemd tool {name} missing"
 
-        # No tools from OTHER packs (except those in docker)
+        # No tools from OTHER packs (except those in systemd)
         for pack, tools in TOOL_PACKS.items():
-            if pack == "docker":
+            if pack == "systemd":
                 continue
             for name in tools:
-                assert name not in docker_names, f"Non-docker tool {name} found"
+                assert name not in systemd_names, f"Non-systemd tool {name} found"
 
     def test_multiple_packs_combine(self):
         """Enabling multiple packs returns core + both packs' tools."""
-        combined = get_tool_definitions(enabled_packs=["docker", "git"])
+        combined = get_tool_definitions(enabled_packs=["systemd", "prometheus"])
         names = {t["name"] for t in combined}
 
-        for name in TOOL_PACKS["docker"]:
+        for name in TOOL_PACKS["systemd"]:
             assert name in names
-        for name in TOOL_PACKS["git"]:
+        for name in TOOL_PACKS["prometheus"]:
             assert name in names
 
-        # No systemd/incus/etc
-        for name in TOOL_PACKS["systemd"]:
+        # No incus/ansible/etc
+        for name in TOOL_PACKS["incus"]:
             assert name not in names
 
     def test_core_tools_always_present(self):
@@ -125,11 +125,11 @@ class TestToolPackFiltering:
         core_names = {t["name"] for t in TOOLS} - _ALL_PACK_TOOLS
 
         # With single pack
-        filtered = get_tool_definitions(enabled_packs=["docker"])
+        filtered = get_tool_definitions(enabled_packs=["systemd"])
         filtered_names = {t["name"] for t in filtered}
 
         for name in core_names:
-            assert name in filtered_names, f"Core tool {name} missing with docker pack"
+            assert name in filtered_names, f"Core tool {name} missing with systemd pack"
 
     def test_unknown_pack_silently_ignored(self):
         """Unknown pack names don't cause errors."""
@@ -149,9 +149,9 @@ class TestToolPackFiltering:
         assert len(with_all_packs) == len(without_packs)
 
     def test_get_pack_tool_names_returns_set(self):
-        result = get_pack_tool_names(["docker", "git"])
+        result = get_pack_tool_names(["systemd", "prometheus"])
         assert isinstance(result, set)
-        expected = set(TOOL_PACKS["docker"]) | set(TOOL_PACKS["git"])
+        expected = set(TOOL_PACKS["systemd"]) | set(TOOL_PACKS["prometheus"])
         assert result == expected
 
     def test_get_pack_tool_names_empty(self):
@@ -416,22 +416,22 @@ class TestSystemInvariants:
         for tool in new_tools:
             assert tool in names, f"New tool {tool} not found in registry"
 
-    def test_tool_count_is_81(self):
-        """Total tool count should be 81."""
-        assert len(TOOLS) == 81
+    def test_tool_count_is_67(self):
+        """Total tool count should be 67 (81 minus 14 removed docker/git tools)."""
+        assert len(TOOLS) == 67
 
-    def test_seven_tool_packs(self):
-        """There should be 7 tool packs."""
-        assert len(TOOL_PACKS) == 7
-        expected_packs = {"docker", "systemd", "incus", "ansible", "prometheus", "git", "comfyui"}
+    def test_five_tool_packs(self):
+        """There should be 5 tool packs (docker and git removed)."""
+        assert len(TOOL_PACKS) == 5
+        expected_packs = {"systemd", "incus", "ansible", "prometheus", "comfyui"}
         assert set(TOOL_PACKS.keys()) == expected_packs
 
-    def test_pack_tool_count_is_34(self):
-        """34 tools total across all packs."""
+    def test_pack_tool_count_is_20(self):
+        """20 tools total across all packs."""
         all_pack = set()
         for tools in TOOL_PACKS.values():
             all_pack.update(tools)
-        assert len(all_pack) == 34
+        assert len(all_pack) == 20
 
     def test_core_tool_count_is_47(self):
         """47 core tools always available."""

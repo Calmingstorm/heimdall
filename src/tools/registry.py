@@ -3,10 +3,6 @@ from __future__ import annotations
 # Tool packs: infrastructure tools that are opt-in via config.
 # Empty/absent tool_packs in config = ALL tools loaded (backward compatible).
 TOOL_PACKS: dict[str, list[str]] = {
-    "docker": [
-        "check_docker", "docker_logs", "docker_compose_action",
-        "docker_compose_status", "docker_compose_logs", "docker_stats",
-    ],
     "systemd": ["check_service", "restart_service", "check_logs"],
     "incus": [
         "incus_list", "incus_info", "incus_exec", "incus_start", "incus_stop",
@@ -17,10 +13,6 @@ TOOL_PACKS: dict[str, list[str]] = {
     "prometheus": [
         "query_prometheus", "query_prometheus_range",
         "check_disk", "check_memory",
-    ],
-    "git": [
-        "git_status", "git_log", "git_diff", "git_show",
-        "git_pull", "git_commit", "git_push", "git_branch",
     ],
     "comfyui": ["generate_image"],
 }
@@ -58,24 +50,6 @@ TOOLS: list[dict] = [
                 },
             },
             "required": ["host", "service"],
-        },
-    },
-    {
-        "name": "check_docker",
-        "description": "Lists running Docker containers on a managed host. With container name, returns detailed inspect output for that container. For container logs, use docker_logs. For resource stats, use docker_stats.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "container": {
-                    "type": "string",
-                    "description": "Container name to inspect. Omit to list all running containers.",
-                },
-            },
-            "required": ["host"],
         },
     },
     {
@@ -423,7 +397,7 @@ TOOLS: list[dict] = [
                 },
                 "tool_name": {
                     "type": "string",
-                    "description": "For checks: monitoring tool to run (check_service, check_docker, check_disk, check_memory, check_logs, query_prometheus)",
+                    "description": "For checks: monitoring tool to run (check_service, check_disk, check_memory, check_logs, query_prometheus)",
                 },
                 "tool_input": {
                     "type": "object",
@@ -676,305 +650,6 @@ TOOLS: list[dict] = [
         "input_schema": {
             "type": "object",
             "properties": {},
-        },
-    },
-    # --- Docker tools ---
-    {
-        "name": "docker_logs",
-        "description": "Returns recent logs from a Docker container. Supports --since for time-filtered output. For container status, use check_docker. For resource stats, use docker_stats.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "container": {
-                    "type": "string",
-                    "description": "Container name",
-                },
-                "lines": {
-                    "type": "integer",
-                    "description": "Log lines to fetch (default 50, max 200)",
-                },
-                "since": {
-                    "type": "string",
-                    "description": "Show logs since timestamp or relative (e.g. '1h', '30m', '2024-01-01T00:00:00')",
-                },
-            },
-            "required": ["host", "container"],
-        },
-    },
-    {
-        "name": "docker_compose_action",
-        "description": "Runs a Docker Compose action: up (-d), down, pull, restart, or build on a compose project directory.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "project_dir": {
-                    "type": "string",
-                    "description": "Absolute path to directory containing docker-compose.yml",
-                },
-                "action": {
-                    "type": "string",
-                    "enum": ["up", "down", "pull", "restart", "build"],
-                    "description": "Compose action to perform",
-                },
-            },
-            "required": ["host", "project_dir", "action"],
-        },
-    },
-    {
-        "name": "docker_compose_status",
-        "description": "Returns status of services in a Docker Compose project. Shows each service with state (running, exited, restarting).",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "project_dir": {
-                    "type": "string",
-                    "description": "Absolute path to directory containing docker-compose.yml",
-                },
-            },
-            "required": ["host", "project_dir"],
-        },
-    },
-    {
-        "name": "docker_compose_logs",
-        "description": "Returns logs from a Docker Compose project. Optionally filtered to a single service.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "project_dir": {
-                    "type": "string",
-                    "description": "Absolute path to directory containing docker-compose.yml",
-                },
-                "service": {
-                    "type": "string",
-                    "description": "Service name to filter. Omit for all services.",
-                },
-                "lines": {
-                    "type": "integer",
-                    "description": "Log lines to fetch (default 50, max 200)",
-                },
-                "since": {
-                    "type": "string",
-                    "description": "Show logs since timestamp or relative (e.g. '1h', '30m')",
-                },
-            },
-            "required": ["host", "project_dir"],
-        },
-    },
-    {
-        "name": "docker_stats",
-        "description": "Returns CPU, memory, and network I/O stats for Docker containers on a managed host. For container logs, use docker_logs.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "container": {
-                    "type": "string",
-                    "description": "Container name. Omit for all running containers.",
-                },
-            },
-            "required": ["host"],
-        },
-    },
-    # --- Git tools ---
-    {
-        "name": "git_status",
-        "description": "Returns git status for a repository. Shows modified, staged, and untracked files. For commit history, use git_log. For diffs, use git_diff.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "repo_path": {
-                    "type": "string",
-                    "description": "Absolute path to the git repository",
-                },
-            },
-            "required": ["host", "repo_path"],
-        },
-    },
-    {
-        "name": "git_log",
-        "description": "Returns recent commit history (git log --oneline --graph) from a repository. Max 50 commits. For commit details, use git_show. For diffs, use git_diff. For working tree status, use git_status.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "repo_path": {
-                    "type": "string",
-                    "description": "Absolute path to the git repository",
-                },
-                "count": {
-                    "type": "integer",
-                    "description": "Number of commits (default 10, max 50)",
-                },
-            },
-            "required": ["host", "repo_path"],
-        },
-    },
-    {
-        "name": "git_diff",
-        "description": "Returns unified diff output for a repository. Without commit: shows uncommitted changes. With commit: shows that commit's diff. For commit messages, use git_log or git_show. For working tree status, use git_status.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "repo_path": {
-                    "type": "string",
-                    "description": "Absolute path to the git repository",
-                },
-                "commit": {
-                    "type": "string",
-                    "description": "Commit hash (e.g. 'HEAD~1', 'abc1234'). Omit for working directory diff.",
-                },
-            },
-            "required": ["host", "repo_path"],
-        },
-    },
-    {
-        "name": "git_show",
-        "description": "Returns full details and diff of a specific git commit. Includes author, date, message, and changed files. For log overview, use git_log. For working directory changes, use git_diff without commit.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "repo_path": {
-                    "type": "string",
-                    "description": "Absolute path to the git repository",
-                },
-                "commit": {
-                    "type": "string",
-                    "description": "Commit hash or reference (e.g. 'HEAD', 'abc1234', 'HEAD~3')",
-                },
-            },
-            "required": ["host", "repo_path", "commit"],
-        },
-    },
-    {
-        "name": "git_pull",
-        "description": "Pulls latest changes from remote for a repository on a managed host.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "repo_path": {
-                    "type": "string",
-                    "description": "Absolute path to the git repository",
-                },
-            },
-            "required": ["host", "repo_path"],
-        },
-    },
-    {
-        "name": "git_commit",
-        "description": "Stages files and commits in a repository. Without files list, stages all changed files. To push after committing, use git_push.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "repo_path": {
-                    "type": "string",
-                    "description": "Absolute path to the git repository",
-                },
-                "message": {
-                    "type": "string",
-                    "description": "Commit message",
-                },
-                "files": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Files to stage (relative to repo root). Omit to stage all changes.",
-                },
-            },
-            "required": ["host", "repo_path", "message"],
-        },
-    },
-    {
-        "name": "git_push",
-        "description": "Pushes commits to the remote repository. To commit first, use git_commit.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "repo_path": {
-                    "type": "string",
-                    "description": "Absolute path to the git repository",
-                },
-                "remote": {
-                    "type": "string",
-                    "description": "Remote name (default: origin)",
-                },
-                "branch": {
-                    "type": "string",
-                    "description": "Branch to push (default: current branch)",
-                },
-            },
-            "required": ["host", "repo_path"],
-        },
-    },
-    {
-        "name": "git_branch",
-        "description": "Lists, creates, or switches branches in a repository.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "repo_path": {
-                    "type": "string",
-                    "description": "Absolute path to the git repository",
-                },
-                "action": {
-                    "type": "string",
-                    "enum": ["list", "create", "switch"],
-                    "description": "list, create, or switch branches",
-                },
-                "branch_name": {
-                    "type": "string",
-                    "description": "Branch name (required for create/switch)",
-                },
-            },
-            "required": ["host", "repo_path", "action"],
         },
     },
     # --- Prometheus range query ---
@@ -1509,7 +1184,7 @@ TOOLS: list[dict] = [
             "anything that would take 3+ direct tool calls step-by-step. Runs the entire chain in one session "
             "with no context loss. Results return as text + files on disk. "
             "With allow_edits=true, appends 'FILES ON DISK: ...' manifest listing written files.\n"
-            "NOT for: git history (use git_log/git_show/git_diff), reading single files (use read_file), "
+            "NOT for: reading single files (use read_file), "
             "running single commands (use run_command). For single-file writes, use write_file.\n"
             "For code+deploy: call this first to write code, then use infrastructure tools to deploy."
         ),

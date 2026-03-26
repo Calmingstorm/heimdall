@@ -70,26 +70,26 @@ class TestSinglePack:
     """Enabling a single pack returns core + that pack's tools."""
 
     def test_single_pack_returns_core_plus_pack(self):
-        """Docker pack returns core tools + docker tools only."""
-        result = get_tool_definitions(enabled_packs=["docker"])
+        """Systemd pack returns core tools + systemd tools only."""
+        result = get_tool_definitions(enabled_packs=["systemd"])
         names = {t["name"] for t in result}
 
-        docker_tools = set(TOOL_PACKS["docker"])
-        expected = CORE_TOOL_NAMES | docker_tools
+        systemd_tools = set(TOOL_PACKS["systemd"])
+        expected = CORE_TOOL_NAMES | systemd_tools
         assert names == expected
 
     def test_single_pack_excludes_other_packs(self):
-        """Enabling only 'docker' excludes systemd, incus, git, etc."""
-        result = get_tool_definitions(enabled_packs=["docker"])
+        """Enabling only 'systemd' excludes incus, prometheus, etc."""
+        result = get_tool_definitions(enabled_packs=["systemd"])
         names = {t["name"] for t in result}
 
         for pack_name, pack_tools in TOOL_PACKS.items():
-            if pack_name == "docker":
+            if pack_name == "systemd":
                 continue
             for tool_name in pack_tools:
                 if tool_name not in CORE_TOOL_NAMES:
                     assert tool_name not in names, (
-                        f"{tool_name} from pack '{pack_name}' should not be in docker-only results"
+                        f"{tool_name} from pack '{pack_name}' should not be in systemd-only results"
                     )
 
     def test_each_pack_works_alone(self):
@@ -113,11 +113,11 @@ class TestMultiplePacks:
     """Enabling multiple packs combines them."""
 
     def test_multiple_packs_combine(self):
-        """Docker + git returns core + docker tools + git tools."""
-        result = get_tool_definitions(enabled_packs=["docker", "git"])
+        """Systemd + prometheus returns core + systemd tools + prometheus tools."""
+        result = get_tool_definitions(enabled_packs=["systemd", "prometheus"])
         names = {t["name"] for t in result}
 
-        expected = CORE_TOOL_NAMES | set(TOOL_PACKS["docker"]) | set(TOOL_PACKS["git"])
+        expected = CORE_TOOL_NAMES | set(TOOL_PACKS["systemd"]) | set(TOOL_PACKS["prometheus"])
         assert names == expected
 
     def test_all_packs_equals_all_tools(self):
@@ -129,7 +129,7 @@ class TestMultiplePacks:
 
     def test_duplicate_packs_no_duplicates(self):
         """Passing the same pack twice doesn't duplicate tools."""
-        result = get_tool_definitions(enabled_packs=["docker", "docker"])
+        result = get_tool_definitions(enabled_packs=["systemd", "systemd"])
         names = [t["name"] for t in result]
         assert len(names) == len(set(names)), "Duplicate tool names found"
 
@@ -150,9 +150,9 @@ class TestUnknownPack:
 
     def test_mixed_known_unknown_packs(self):
         """Known packs work even when mixed with unknown ones."""
-        result = get_tool_definitions(enabled_packs=["docker", "fake_pack"])
+        result = get_tool_definitions(enabled_packs=["systemd", "fake_pack"])
         names = {t["name"] for t in result}
-        expected = CORE_TOOL_NAMES | set(TOOL_PACKS["docker"])
+        expected = CORE_TOOL_NAMES | set(TOOL_PACKS["systemd"])
         assert names == expected
 
 
@@ -226,12 +226,12 @@ class TestGetPackToolNames:
     """Test the get_pack_tool_names helper function."""
 
     def test_single_pack(self):
-        names = get_pack_tool_names(["docker"])
-        assert names == set(TOOL_PACKS["docker"])
+        names = get_pack_tool_names(["systemd"])
+        assert names == set(TOOL_PACKS["systemd"])
 
     def test_multiple_packs(self):
-        names = get_pack_tool_names(["docker", "git"])
-        assert names == set(TOOL_PACKS["docker"]) | set(TOOL_PACKS["git"])
+        names = get_pack_tool_names(["systemd", "prometheus"])
+        assert names == set(TOOL_PACKS["systemd"]) | set(TOOL_PACKS["prometheus"])
 
     def test_empty_list(self):
         names = get_pack_tool_names([])
@@ -242,8 +242,8 @@ class TestGetPackToolNames:
         assert names == set()
 
     def test_mixed_known_unknown(self):
-        names = get_pack_tool_names(["docker", "nonexistent"])
-        assert names == set(TOOL_PACKS["docker"])
+        names = get_pack_tool_names(["systemd", "nonexistent"])
+        assert names == set(TOOL_PACKS["systemd"])
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +267,7 @@ class TestToolDefinitionFormat:
 
     def test_filtered_tools_have_required_fields(self):
         """Filtered tool definitions retain all required fields."""
-        result = get_tool_definitions(enabled_packs=["docker"])
+        result = get_tool_definitions(enabled_packs=["systemd"])
         for tool in result:
             assert "name" in tool
             assert "description" in tool
