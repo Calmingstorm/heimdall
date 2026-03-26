@@ -354,7 +354,9 @@ class CodexChatClient:
                         if attempt < MAX_RETRIES - 1:
                             await asyncio.sleep(RETRY_BACKOFF[attempt])
                             continue
-                        return result  # exhausted retries, return empty
+                        # Exhausted retries on empty — record as degraded
+                        self.breaker.record_failure()
+                        return result
 
                     error_body = (await resp.read()).decode("utf-8", errors="replace")
 
@@ -563,7 +565,9 @@ class CodexChatClient:
                         if attempt < MAX_RETRIES - 1:
                             await asyncio.sleep(RETRY_BACKOFF[attempt])
                             continue
-                        return result  # exhausted retries, return empty
+                        # Exhausted retries on empty — record as degraded
+                        self.breaker.record_failure()
+                        return result
 
                     error_body = (await resp.read()).decode("utf-8", errors="replace")
 

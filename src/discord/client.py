@@ -1620,7 +1620,10 @@ class LokiBot(discord.Client):
                 self.sessions.add_message(channel_id, "assistant", response)
             self.sessions.prune()
             self._maybe_cleanup_caches()
-            await asyncio.to_thread(self.sessions.save)
+            try:
+                await asyncio.to_thread(self.sessions.save)
+            except Exception as save_err:
+                log.warning("Session save failed: %s", save_err)
 
             # Record tool use pattern for future hints
             if tools_used:
@@ -1643,7 +1646,10 @@ class LokiBot(discord.Client):
                 sanitized = "[Previous request encountered an error before tool execution.]"
             self.sessions.add_message(channel_id, "assistant", sanitized)
             self.sessions.prune()
-            await asyncio.to_thread(self.sessions.save)
+            try:
+                await asyncio.to_thread(self.sessions.save)
+            except Exception as save_err:
+                log.warning("Session save failed: %s", save_err)
 
         if voice_callback:
             await voice_callback(response)
@@ -2063,24 +2069,30 @@ class LokiBot(discord.Client):
                 # Scrub secrets from tool output
                 result = scrub_output_secrets(result)
 
-                # Audit log
-                await self.audit.log_execution(
-                    user_id=str(message.author.id),
-                    user_name=str(message.author),
-                    channel_id=str(message.channel.id),
-                    tool_name=tool_name,
-                    tool_input=tool_input,
-                    approved=True,
-                    result_summary=result,
-                    execution_time_ms=elapsed_ms,
-                    error=error,
-                )
+                # Audit log — never crash tool execution on audit failure
+                try:
+                    await self.audit.log_execution(
+                        user_id=str(message.author.id),
+                        user_name=str(message.author),
+                        channel_id=str(message.channel.id),
+                        tool_name=tool_name,
+                        tool_input=tool_input,
+                        approved=True,
+                        result_summary=result,
+                        execution_time_ms=elapsed_ms,
+                        error=error,
+                    )
+                except Exception as audit_err:
+                    log.warning("Audit log failed for %s: %s", tool_name, audit_err)
 
                 # Track for conversational context
-                self._track_recent_action(
-                    tool_name, tool_input, result[:200], elapsed_ms,
-                    channel_id=str(message.channel.id),
-                )
+                try:
+                    self._track_recent_action(
+                        tool_name, tool_input, result[:200], elapsed_ms,
+                        channel_id=str(message.channel.id),
+                    )
+                except Exception:
+                    pass  # Non-critical tracking
 
                 # Truncate large outputs before sending back to the LLM.
                 # Tool results stay in messages and are re-sent every iteration,
@@ -3400,7 +3412,10 @@ class LokiBot(discord.Client):
             msg = schedule.get("message", schedule["description"])
             # Resolve @username mentions to proper Discord <@ID> mentions
             msg = self._resolve_mentions(msg)
-            await channel.send(f"**Scheduled reminder:** {msg}")
+            try:
+                await channel.send(f"**Scheduled reminder:** {msg}")
+            except Exception as e:
+                log.warning("Failed to send scheduled reminder: %s", e)
 
         elif schedule["action"] == "check":
             tool_name = schedule.get("tool_name")
@@ -3440,7 +3455,7 @@ class LokiBot(discord.Client):
                     sent = await message.channel.send(text, **kwargs)
                 log.info("Message sent successfully: msg_id=%s", sent.id if sent else "None")
                 return sent
-            except discord.HTTPException as e:
+            except (discord.HTTPException, ConnectionError, OSError) as e:
                 if attempt < SEND_MAX_RETRIES - 1:
                     log.warning("Discord send failed (attempt %d): %s", attempt + 1, e)
                     await asyncio.sleep(1 + attempt)
