@@ -98,7 +98,10 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
 
     @routes.get("/api/status")
     async def get_status(_request: web.Request) -> web.Response:
-        guilds = [{"id": str(g.id), "name": g.name} for g in bot.guilds]
+        guilds = [
+            {"id": str(g.id), "name": g.name, "member_count": g.member_count or 0}
+            for g in bot.guilds
+        ]
         user_count = sum(g.member_count or 0 for g in bot.guilds)
         tools = bot._merged_tool_definitions()
         uptime = time.monotonic() - bot._start_time if hasattr(bot, "_start_time") else 0
@@ -155,6 +158,29 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             await asyncio.to_thread(_write_config, config_path, current)
 
         return web.json_response(_redact_config(new_config.model_dump()))
+
+    # ------------------------------------------------------------------
+    # Quick actions
+    # ------------------------------------------------------------------
+
+    @routes.post("/api/sessions/clear-all")
+    async def clear_all_sessions(_request: web.Request) -> web.Response:
+        channel_ids = list(bot.sessions._sessions.keys())
+        for cid in channel_ids:
+            bot.sessions.reset(cid)
+        return web.json_response({"status": "cleared", "count": len(channel_ids)})
+
+    @routes.post("/api/reload")
+    async def reload_config(_request: web.Request) -> web.Response:
+        bot.context_loader.reload()
+        bot._invalidate_prompt_caches()
+        bot._system_prompt = bot._build_system_prompt()
+        return web.json_response({"status": "reloaded"})
+
+    @routes.post("/api/loops/stop-all")
+    async def stop_all_loops(_request: web.Request) -> web.Response:
+        result = bot.loop_manager.stop_loop("all")
+        return web.json_response({"result": result})
 
     # ------------------------------------------------------------------
     # Chat
@@ -600,6 +626,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
         host = request.query.get("host") or None
         keyword = request.query.get("q") or None
         date = request.query.get("date") or None
+        error_only = request.query.get("error_only", "").lower() in ("1", "true", "yes")
         try:
             limit = min(int(request.query.get("limit", "50")), 200)
         except ValueError:
@@ -612,6 +639,8 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             date=date,
             limit=limit,
         )
+        if error_only:
+            results = [r for r in results if r.get("error")]
         return web.json_response(results)
 
     # ------------------------------------------------------------------

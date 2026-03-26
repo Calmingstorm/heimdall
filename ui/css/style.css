@@ -533,6 +533,14 @@ textarea.loki-input {
   padding-top: 0.25rem;
 }
 
+/* Stat card icon */
+.stat-card { position: relative; }
+.stat-icon {
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+  opacity: 0.7;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .loki-sidebar {

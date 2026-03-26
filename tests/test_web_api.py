@@ -158,6 +158,12 @@ def _make_bot():
     bot.tool_executor = MagicMock()
     bot.tool_executor._process_registry = registry
 
+    # Context / reload support
+    bot.context_loader = MagicMock()
+    bot._invalidate_prompt_caches = MagicMock()
+    bot._build_system_prompt = MagicMock(return_value="system prompt")
+    bot._system_prompt = "system prompt"
+
     # Audit
     bot.audit = MagicMock()
     bot.audit.search = AsyncMock(return_value=[
@@ -1457,3 +1463,99 @@ class TestSensitiveFieldProtection:
                 "loop_count", "schedule_count",
             }
             assert set(body.keys()) == expected_keys
+
+
+# ===================================================================
+# Quick actions endpoint tests (Round 7)
+# ===================================================================
+
+
+class TestQuickActions:
+    @pytest.mark.asyncio
+    async def test_clear_all_sessions(self):
+        app, bot = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/sessions/clear-all")
+            body = await resp.json()
+            assert body["status"] == "cleared"
+            assert body["count"] == 1
+            bot.sessions.reset.assert_called_once_with("chan1")
+
+    @pytest.mark.asyncio
+    async def test_clear_all_sessions_empty(self):
+        bot = _make_bot()
+        bot.sessions._sessions = {}
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/sessions/clear-all")
+            body = await resp.json()
+            assert body["count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_reload_config(self):
+        app, bot = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/reload")
+            body = await resp.json()
+            assert body["status"] == "reloaded"
+            bot.context_loader.reload.assert_called_once()
+            bot._invalidate_prompt_caches.assert_called_once()
+            bot._build_system_prompt.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_stop_all_loops(self):
+        app, bot = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/loops/stop-all")
+            body = await resp.json()
+            assert "result" in body
+            bot.loop_manager.stop_loop.assert_called_once_with("all")
+
+
+class TestStatusGuildMemberCount:
+    @pytest.mark.asyncio
+    async def test_guild_includes_member_count(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/status")
+            body = await resp.json()
+            assert body["guilds"][0]["member_count"] == 42
+
+    @pytest.mark.asyncio
+    async def test_guild_member_count_zero_when_none(self):
+        bot = _make_bot()
+        bot.guilds[0].member_count = None
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/status")
+            body = await resp.json()
+            assert body["guilds"][0]["member_count"] == 0
+
+
+class TestAuditErrorFilter:
+    @pytest.mark.asyncio
+    async def test_error_only_filter(self):
+        bot = _make_bot()
+        bot.audit.search = AsyncMock(return_value=[
+            {"timestamp": "2024-01-01", "tool_name": "run_command", "error": True, "error_message": "fail"},
+            {"timestamp": "2024-01-01", "tool_name": "read_file", "error": False},
+        ])
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/audit?error_only=1")
+            body = await resp.json()
+            assert len(body) == 1
+            assert body[0]["tool_name"] == "run_command"
+
+    @pytest.mark.asyncio
+    async def test_error_only_false_returns_all(self):
+        bot = _make_bot()
+        bot.audit.search = AsyncMock(return_value=[
+            {"timestamp": "2024-01-01", "tool_name": "run_command", "error": True},
+            {"timestamp": "2024-01-01", "tool_name": "read_file", "error": False},
+        ])
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/audit?error_only=0")
+            body = await resp.json()
+            assert len(body) == 2
