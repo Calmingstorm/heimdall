@@ -27,9 +27,10 @@ No classifier, no approval prompts, no hesitation.
 - **Webhook receiver** — Gitea push/PR events, Grafana alerts, generic JSON webhooks
 - **Anti-fabrication** — detects and retries when the LLM fabricates command output
 - **Anti-hedging** — detects and retries "shall I?" / "would you like?" hesitation (bot-to-bot)
+- **Anti-premature-failure** — detects and retries when the LLM gives up after first error without trying alternatives
 - **5-layer session defense** — context separators, selective history saving, abbreviated task history, compaction error omission, fabrication/hedging detection
 - **Autonomous loops** — LLM-driven recurring tasks with natural language goals, configurable intervals, and auto-stop conditions
-- **Web management UI** — browser-based dashboard for managing sessions, tools, skills, knowledge, schedules, loops, processes, audit logs, config, and live log tailing
+- **Web management UI** — browser-based dashboard with chat interface, sessions, tools, skills, knowledge, schedules, loops, processes, audit logs, config, and live log tailing
 - **Audit logging** — append-only JSONL log of all tool executions
 - **Secret scrubbing** — 10 patterns (API keys, passwords, tokens, AWS/GitHub/Stripe/Slack credentials) redacted from responses, errors, webhooks, and tool output
 - **Performance optimized** — system prompt caching, tool definition caching, connection pooling, TTL-based cache invalidation
@@ -143,7 +144,7 @@ Tool handler → _run_on_host(alias) → _exec_command(address, cmd, ...)
 2. **Selective saving** — only tool-bearing responses saved to history (tool-less responses discarded)
 3. **Abbreviated task history** — windowed subset keeps context focused on recent activity
 4. **Compaction error omission** — compacted summaries omit errors and failures, preserve outcomes
-5. **Fabrication + hedging detection** — retries when LLM fabricates output or hedges with "shall I?"
+5. **Fabrication + hedging + premature failure detection** — retries when LLM fabricates output, hedges with "shall I?", or gives up after first error
 
 ### Security
 
@@ -193,7 +194,7 @@ src/
 │   ├── comfyui.py          # ComfyUI image generation client
 │   └── autonomous_loop.py  # LLM-driven autonomous loop system
 ├── web/
-│   ├── api.py              # REST API (30 endpoints)
+│   ├── api.py              # REST API (43 endpoints)
 │   └── websocket.py        # WebSocket live updates
 ├── config/
 │   └── schema.py           # Pydantic config models, env var substitution
@@ -226,6 +227,7 @@ Loki includes a browser-based management interface at `http://host:3939/ui/`.
 ### Features
 
 - **Dashboard** — bot status, uptime, connected guilds, quick stats, recent activity
+- **Chat** — web-based chat interface with real-time WebSocket communication
 - **Sessions** — view active conversations, message history, clear sessions
 - **Tools** — browse all 67 tools, toggle tool packs on/off
 - **Skills** — create, edit, delete runtime skills with a code editor
@@ -252,7 +254,7 @@ Access at `http://localhost:3939/ui/` — the UI shares the health server port.
 
 ### Tech Stack
 
-- **Backend**: aiohttp REST API + WebSocket (extends existing health server)
+- **Backend**: aiohttp REST API (43 endpoints) + WebSocket (extends existing health server)
 - **Frontend**: Vue 3 + Tailwind CSS + Vue Router (all CDN, no build step)
 - **Auth**: Bearer token in `Authorization` header
 - **Security**: rate limiting (120 req/60s/IP), security headers, input validation
@@ -451,7 +453,7 @@ pip install -e ".[dev]"
 python -m pytest tests/ -q
 ```
 
-The test suite (4800+ tests) mocks all external I/O — no SSH connections, API calls, or Discord connections needed.
+The test suite (5600+ tests) mocks all external I/O — no SSH connections, API calls, or Discord connections needed.
 
 ### Project Conventions
 
