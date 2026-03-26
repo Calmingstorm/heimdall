@@ -1076,7 +1076,7 @@ class LokiBot(discord.Client):
                 log.info("Vector store up to date")
             # Backfill knowledge FTS from existing data
             if self._knowledge_store and self._fts_index:
-                kb_count = self._knowledge_store.backfill_fts()
+                kb_count = await asyncio.to_thread(self._knowledge_store.backfill_fts)
                 if kb_count:
                     log.info("Backfilled %d knowledge chunks into FTS index", kb_count)
         except Exception as e:

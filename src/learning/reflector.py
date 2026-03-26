@@ -151,7 +151,7 @@ class ConversationReflector:
         user_ids: list[str] | None = None,
     ) -> None:
         async with self._lock:
-            data = self._load()
+            data = await asyncio.to_thread(self._load)
             existing = data.get("entries", [])
 
             existing_text = "\n".join(
@@ -245,7 +245,7 @@ class ConversationReflector:
 
             data["entries"] = merged
             data["last_reflection"] = now
-            self._save(data)
+            await asyncio.to_thread(self._save, data)
             log.info(
                 "Reflection complete: %d new insights, %d total entries",
                 len(new_entries), len(merged),

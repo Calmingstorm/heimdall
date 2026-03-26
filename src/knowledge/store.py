@@ -5,6 +5,7 @@ Documents are chunked into ~500-token segments with overlap for better retrieval
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import re
 import sqlite3
@@ -105,42 +106,59 @@ class KnowledgeStore:
         doc_hash = hashlib.md5(source.encode()).hexdigest()[:8]
         now = datetime.now().isoformat()
 
-        # Remove any existing chunks for this source (re-ingest replaces)
-        self.delete_source(source)
+        # Remove any existing chunks for this source (blocking → offload)
+        await asyncio.to_thread(self.delete_source, source)
 
+        # Embed all chunks first (async, non-blocking)
+        vectors: list[list[float] | None] = []
+        for chunk in chunks:
+            if self._has_vec and embedder:
+                vec = await embedder.embed(chunk)
+                if vec is None:
+                    log.warning("Failed to embed chunk %d of '%s'", len(vectors), source)
+                vectors.append(vec)
+            else:
+                vectors.append(None)
+
+        # Batch write metadata + vectors to DB (blocking → offload)
+        indexed = await asyncio.to_thread(
+            self._write_chunks_sync, chunks, vectors, doc_hash, source, now, uploader,
+        )
+        log.info("Ingested '%s': %d/%d chunks indexed", source, indexed, len(chunks))
+        return indexed
+
+    def _write_chunks_sync(
+        self,
+        chunks: list[str],
+        vectors: list[list[float] | None],
+        doc_hash: str,
+        source: str,
+        now: str,
+        uploader: str,
+    ) -> int:
+        """Write chunk metadata, FTS entries, and vectors to database (sync)."""
         indexed = 0
         for i, chunk in enumerate(chunks):
             chunk_id = f"{doc_hash}_{i}"
             try:
-                # Always write chunk metadata
                 self._conn.execute(
                     "INSERT OR REPLACE INTO knowledge_chunks "
                     "(chunk_id, content, source, chunk_index, total_chunks, uploader, ingested_at) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (chunk_id, chunk, source, i, len(chunks), uploader, now),
                 )
-                # Always write to FTS5 (decoupled from embedding success)
                 if self._fts:
                     self._fts.index_knowledge_chunk(chunk_id, chunk, source, i)
-
-                # Try vector embedding (optional — FTS still works without it)
-                if self._has_vec and embedder:
-                    vector = await embedder.embed(chunk)
-                    if vector is not None:
-                        vec_bytes = serialize_vector(vector)
-                        self._conn.execute(
-                            "INSERT OR REPLACE INTO knowledge_vec (chunk_id, embedding) VALUES (?, ?)",
-                            (chunk_id, vec_bytes),
-                        )
-                    else:
-                        log.warning("Failed to embed chunk %d of '%s'", i, source)
-
+                if vectors[i] is not None:
+                    vec_bytes = serialize_vector(vectors[i])
+                    self._conn.execute(
+                        "INSERT OR REPLACE INTO knowledge_vec (chunk_id, embedding) VALUES (?, ?)",
+                        (chunk_id, vec_bytes),
+                    )
                 indexed += 1
             except Exception as e:
                 log.error("Failed to index chunk %d of '%s': %s", i, source, e)
-
         self._conn.commit()
-        log.info("Ingested '%s': %d/%d chunks indexed", source, indexed, len(chunks))
         return indexed
 
     async def search(
@@ -162,17 +180,7 @@ class KnowledgeStore:
 
         try:
             vec_bytes = serialize_vector(vector)
-            rows = self._conn.execute(
-                """
-                SELECT v.chunk_id, v.distance, c.content, c.source, c.chunk_index
-                FROM knowledge_vec v
-                JOIN knowledge_chunks c ON c.chunk_id = v.chunk_id
-                WHERE v.embedding MATCH ?
-                AND k = ?
-                ORDER BY v.distance
-                """,
-                (vec_bytes, limit),
-            ).fetchall()
+            rows = await asyncio.to_thread(self._search_vec_sync, vec_bytes, limit)
         except Exception as e:
             log.warning("Knowledge search failed: %s", e)
             return []
@@ -191,6 +199,20 @@ class KnowledgeStore:
             })
 
         return out
+
+    def _search_vec_sync(self, vec_bytes: bytes, limit: int) -> list:
+        """Execute vector similarity search (sync, for use with asyncio.to_thread)."""
+        return self._conn.execute(
+            """
+            SELECT v.chunk_id, v.distance, c.content, c.source, c.chunk_index
+            FROM knowledge_vec v
+            JOIN knowledge_chunks c ON c.chunk_id = v.chunk_id
+            WHERE v.embedding MATCH ?
+            AND k = ?
+            ORDER BY v.distance
+            """,
+            (vec_bytes, limit),
+        ).fetchall()
 
     def list_sources(self) -> list[dict]:
         """List all ingested document sources with metadata."""
@@ -296,7 +318,9 @@ class KnowledgeStore:
             semantic_results = await self.search(query, embedder, limit=limit * 2)
         fts_results = []
         if self._fts:
-            fts_results = self._fts.search_knowledge(query, limit=limit * 2)
+            fts_results = await asyncio.to_thread(
+                self._fts.search_knowledge, query, limit * 2,
+            )
 
         if not semantic_results and not fts_results:
             return []

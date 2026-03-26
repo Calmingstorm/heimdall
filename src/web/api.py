@@ -504,7 +504,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
         store = bot._knowledge_store
         if not store or not store.available:
             return web.json_response({"error": "knowledge store not available"}, status=503)
-        return web.json_response(store.list_sources())
+        return web.json_response(await asyncio.to_thread(store.list_sources))
 
     @routes.post("/api/knowledge")
     async def ingest_knowledge(request: web.Request) -> web.Response:
@@ -533,7 +533,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
         if not store or not store.available:
             return web.json_response({"error": "knowledge store not available"}, status=503)
         source = request.match_info["source"]
-        deleted = store.delete_source(source)
+        deleted = await asyncio.to_thread(store.delete_source, source)
         if deleted == 0:
             return web.json_response({"error": "source not found"}, status=404)
         return web.json_response({"status": "deleted", "chunks_removed": deleted})
@@ -544,7 +544,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
         if not store or not store.available:
             return web.json_response({"error": "knowledge store not available"}, status=503)
         source = request.match_info["source"]
-        content = store.get_source_content(source)
+        content = await asyncio.to_thread(store.get_source_content, source)
         if content is None:
             return web.json_response({"error": "source not found"}, status=404)
         chunks = await store.ingest(content, source, embedder=bot._embedder, uploader="web-reingest")

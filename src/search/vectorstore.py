@@ -5,6 +5,7 @@ Archives are indexed when sessions are compacted, enabling cross-session search.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import sqlite3
 from pathlib import Path
@@ -74,7 +75,7 @@ class SessionVectorStore:
         if not self.available:
             return False
         try:
-            data = json.loads(archive_path.read_text())
+            data = await asyncio.to_thread(self._read_archive_sync, archive_path)
         except Exception as e:
             log.error("Failed to read archive %s: %s", archive_path, e)
             return False
@@ -88,36 +89,55 @@ class SessionVectorStore:
         last_active = float(data.get("last_active", 0))
         message_count = len(data.get("messages", []))
 
+        # Embed (async, non-blocking)
+        vector = None
+        if self._has_vec and embedder:
+            vector = await embedder.embed(doc_text)
+            if vector is None:
+                log.warning("Failed to embed archive %s", archive_path.name)
+
+        # Write metadata + vector to DB (blocking → offload)
         try:
-            # Always write metadata
-            self._conn.execute(
-                "INSERT OR REPLACE INTO session_archives "
-                "(doc_id, content, channel_id, last_active, message_count) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (doc_id, doc_text, channel_id, last_active, message_count),
+            await asyncio.to_thread(
+                self._write_session_sync,
+                doc_id, doc_text, channel_id, last_active, message_count, vector,
             )
-            # Always write to FTS5 (decoupled from embedding success)
-            if self._fts:
-                self._fts.index_session(doc_id, doc_text, channel_id, last_active)
-
-            # Try vector embedding (optional — FTS still works without it)
-            if self._has_vec and embedder:
-                vector = await embedder.embed(doc_text)
-                if vector is not None:
-                    vec_bytes = serialize_vector(vector)
-                    self._conn.execute(
-                        "INSERT OR REPLACE INTO session_vec (doc_id, embedding) VALUES (?, ?)",
-                        (doc_id, vec_bytes),
-                    )
-                else:
-                    log.warning("Failed to embed archive %s", archive_path.name)
-
-            self._conn.commit()
             log.info("Indexed session %s for search", doc_id)
             return True
         except Exception as e:
             log.error("Session index failed for %s: %s", doc_id, e)
             return False
+
+    @staticmethod
+    def _read_archive_sync(archive_path: Path) -> dict:
+        """Read and parse archive JSON (sync, for use with asyncio.to_thread)."""
+        return json.loads(archive_path.read_text())
+
+    def _write_session_sync(
+        self,
+        doc_id: str,
+        doc_text: str,
+        channel_id: str,
+        last_active: float,
+        message_count: int,
+        vector: list[float] | None,
+    ) -> None:
+        """Write session metadata, FTS, and vector to database (sync)."""
+        self._conn.execute(
+            "INSERT OR REPLACE INTO session_archives "
+            "(doc_id, content, channel_id, last_active, message_count) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (doc_id, doc_text, channel_id, last_active, message_count),
+        )
+        if self._fts:
+            self._fts.index_session(doc_id, doc_text, channel_id, last_active)
+        if vector is not None:
+            vec_bytes = serialize_vector(vector)
+            self._conn.execute(
+                "INSERT OR REPLACE INTO session_vec (doc_id, embedding) VALUES (?, ?)",
+                (doc_id, vec_bytes),
+            )
+        self._conn.commit()
 
     async def search(self, query: str, embedder: LocalEmbedder, limit: int = 10) -> list[dict]:
         """Semantic search across archived sessions."""
@@ -130,17 +150,7 @@ class SessionVectorStore:
 
         try:
             vec_bytes = serialize_vector(vector)
-            rows = self._conn.execute(
-                """
-                SELECT v.doc_id, v.distance, a.content, a.channel_id, a.last_active
-                FROM session_vec v
-                JOIN session_archives a ON a.doc_id = v.doc_id
-                WHERE v.embedding MATCH ?
-                AND k = ?
-                ORDER BY v.distance
-                """,
-                (vec_bytes, limit),
-            ).fetchall()
+            rows = await asyncio.to_thread(self._search_vec_sync, vec_bytes, limit)
         except Exception as e:
             log.warning("Session vector search failed: %s", e)
             return []
@@ -160,6 +170,20 @@ class SessionVectorStore:
 
         return out
 
+    def _search_vec_sync(self, vec_bytes: bytes, limit: int) -> list:
+        """Execute vector similarity search (sync, for use with asyncio.to_thread)."""
+        return self._conn.execute(
+            """
+            SELECT v.doc_id, v.distance, a.content, a.channel_id, a.last_active
+            FROM session_vec v
+            JOIN session_archives a ON a.doc_id = v.doc_id
+            WHERE v.embedding MATCH ?
+            AND k = ?
+            ORDER BY v.distance
+            """,
+            (vec_bytes, limit),
+        ).fetchall()
+
     async def backfill(self, archive_dir: Path, embedder: LocalEmbedder) -> int:
         """Index all archive JSONs not yet indexed. Returns count of newly indexed."""
         if not self.available:
@@ -167,12 +191,9 @@ class SessionVectorStore:
         if not archive_dir.exists():
             return 0
 
-        # Get already-indexed IDs
+        # Get already-indexed IDs (blocking → offload)
         try:
-            existing = {
-                r[0] for r in
-                self._conn.execute("SELECT doc_id FROM session_archives").fetchall()
-            }
+            existing = await asyncio.to_thread(self._get_indexed_ids_sync)
         except Exception:
             existing = set()
 
@@ -184,25 +205,36 @@ class SessionVectorStore:
             if await self.index_session(path, embedder):
                 count += 1
 
-        # Backfill FTS5 for any sessions in SQLite but not in FTS
+        # Backfill FTS5 for any sessions in SQLite but not in FTS (blocking → offload)
         if self._fts:
-            for path in sorted(archive_dir.glob("*.json")):
-                doc_id = path.stem
-                if self._fts.has_session(doc_id):
-                    continue
-                try:
-                    data = json.loads(path.read_text())
-                    doc_text = self._build_document_text(data)
-                    if doc_text:
-                        self._fts.index_session(
-                            doc_id, doc_text,
-                            str(data.get("channel_id", "")),
-                            float(data.get("last_active", 0)),
-                        )
-                except Exception:
-                    continue
+            await asyncio.to_thread(self._backfill_fts_sync, archive_dir)
 
         return count
+
+    def _get_indexed_ids_sync(self) -> set[str]:
+        """Get set of already-indexed doc IDs (sync)."""
+        return {
+            r[0] for r in
+            self._conn.execute("SELECT doc_id FROM session_archives").fetchall()
+        }
+
+    def _backfill_fts_sync(self, archive_dir: Path) -> None:
+        """Backfill FTS5 index from archive JSON files (sync)."""
+        for path in sorted(archive_dir.glob("*.json")):
+            doc_id = path.stem
+            if self._fts.has_session(doc_id):
+                continue
+            try:
+                data = json.loads(path.read_text())
+                doc_text = self._build_document_text(data)
+                if doc_text:
+                    self._fts.index_session(
+                        doc_id, doc_text,
+                        str(data.get("channel_id", "")),
+                        float(data.get("last_active", 0)),
+                    )
+            except Exception:
+                continue
 
     async def search_hybrid(
         self, query: str, embedder: LocalEmbedder | None, limit: int = 10,
@@ -217,7 +249,9 @@ class SessionVectorStore:
 
         fts_results = []
         if self._fts:
-            fts_results = self._fts.search_sessions(query, limit=limit * 2)
+            fts_results = await asyncio.to_thread(
+                self._fts.search_sessions, query, limit * 2,
+            )
 
         if not semantic_results and not fts_results:
             return []
