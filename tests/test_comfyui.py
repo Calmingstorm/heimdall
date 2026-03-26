@@ -66,16 +66,36 @@ def _make_mock_view(data=PNG_BYTES, status=200):
     return mock_resp
 
 
+def _make_mock_checkpoint(ckpt_name="realisticVisionV60B1_v60B1VAE.safetensors"):
+    """Create a mock for the GET /object_info/CheckpointLoaderSimple response."""
+    mock_resp = AsyncMock()
+    mock_resp.status = 200
+    mock_resp.json = AsyncMock(return_value={
+        "CheckpointLoaderSimple": {
+            "input": {
+                "required": {
+                    "ckpt_name": [[ckpt_name]]
+                }
+            }
+        }
+    })
+    mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
+    mock_resp.__aexit__ = AsyncMock(return_value=False)
+    return mock_resp
+
+
 def _make_success_session(prompt_id="test-prompt-123"):
     """Create a mock aiohttp session that simulates successful generation."""
     session = AsyncMock()
 
     post_resp = _make_mock_post(prompt_id=prompt_id)
+    checkpoint_resp = _make_mock_checkpoint()
     history_resp = _make_mock_history(prompt_id=prompt_id)
     view_resp = _make_mock_view()
 
     session.post = MagicMock(return_value=post_resp)
-    session.get = MagicMock(side_effect=[history_resp, view_resp])
+    # Order: _resolve_checkpoint GET, _poll_history GET, /view GET
+    session.get = MagicMock(side_effect=[checkpoint_resp, history_resp, view_resp])
     session.__aenter__ = AsyncMock(return_value=session)
     session.__aexit__ = AsyncMock(return_value=False)
 
@@ -159,11 +179,12 @@ class TestComfyUIClient:
         session = AsyncMock()
 
         post_resp = _make_mock_post()
+        checkpoint_resp = _make_mock_checkpoint()
         history_resp = _make_mock_history()
         view_resp = _make_mock_view(status=404)
 
         session.post = MagicMock(return_value=post_resp)
-        session.get = MagicMock(side_effect=[history_resp, view_resp])
+        session.get = MagicMock(side_effect=[checkpoint_resp, history_resp, view_resp])
         session.__aenter__ = AsyncMock(return_value=session)
         session.__aexit__ = AsyncMock(return_value=False)
 

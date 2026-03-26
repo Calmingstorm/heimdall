@@ -301,6 +301,9 @@ class TestConfigSaveResilience:
                         "/api/config", json={"timezone": "UTC"}
                     )
             assert resp.status == 200
+            data = await resp.json()
+            # Config was applied in memory despite write failure
+            assert data.get("timezone") == "UTC"
 
     @pytest.mark.asyncio
     async def test_config_write_success(self):
@@ -615,12 +618,23 @@ class TestDeepMerge:
         assert base["b"] == 3
 
     def test_depth_limit(self):
-        """Deeply nested merges stop at depth limit."""
-        base = {"a": {"b": {"c": {"d": {"e": {"f": {"g": {"h": {"i": {"j": {"k": 1}}}}}}}}}}}
-        update = {"a": {"b": {"c": {"d": {"e": {"f": {"g": {"h": {"i": {"j": {"k": 99}}}}}}}}}}}
+        """Merges beyond depth 10 are silently skipped."""
+        # Build 12 levels of dict nesting (depth 0..11, leaf at depth 11)
+        base = {"k": "original"}
+        for _ in range(11):
+            base = {"k": base}
+        update = {"k": "replaced"}
+        for _ in range(11):
+            update = {"k": update}
+
         _deep_merge(base, update)
-        # At depth 10, should replace instead of recurse
-        # The test just verifies no infinite recursion
+
+        # Navigate to the leaf at depth 11
+        inner = base
+        for _ in range(11):
+            inner = inner["k"]
+        # Depth limit (>10) prevents merge at depth 11
+        assert inner["k"] == "original"
 
 
 # ===================================================================
