@@ -145,6 +145,7 @@ async def run_background_task(
             output = await _execute_tool(
                 tool_name, tool_input, executor, skill_manager,
                 knowledge_store, embedder, task.requester,
+                step_desc=step_desc,
             )
             elapsed_ms = int((time.monotonic() - t0) * 1000)
             output = scrub_output_secrets(output)
@@ -261,6 +262,7 @@ async def _execute_tool(
     knowledge_store: KnowledgeStore | None,
     embedder: LocalEmbedder | None,
     requester: str,
+    step_desc: str = "",
 ) -> str:
     """Execute a single tool, routing to the right handler."""
     # Knowledge base tools need special handling (not in executor)
@@ -294,9 +296,12 @@ async def _execute_tool(
     if skill_manager.has_skill(tool_name):
         return await skill_manager.execute(tool_name, tool_input)
 
-    # Built-in tools via executor — default 'host' if missing
+    # Built-in tools via executor — default missing required fields
     if "host" not in tool_input:
         tool_input = {**tool_input, "host": _get_default_host(executor)}
+    # run_command requires 'command' — use step description as fallback
+    if tool_name == "run_command" and "command" not in tool_input:
+        tool_input = {**tool_input, "command": step_desc}
     return await executor.execute(tool_name, tool_input)
 
 

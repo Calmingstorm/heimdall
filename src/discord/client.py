@@ -201,6 +201,13 @@ _TOOL_UNAVAIL_PATTERNS: list[re.Pattern[str]] = [
         r"is(?:n't| not) (?:enabled|available|configured|supported)|"
         r"is disabled|cannot be used)\b"
     ),
+    re.compile(
+        r"(?i)\bcan(?:'t|not)\b.{0,30}\b(?:generate|create|produce|render)\b.{0,20}"
+        r"\b(?:image|photo|picture|screenshot)"
+    ),
+    re.compile(
+        r"(?i)\b(?:image|photo) generation.{0,20}\b(?:not|isn't|unavailable|disabled)\b"
+    ),
 ]
 
 
