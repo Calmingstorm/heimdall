@@ -647,8 +647,8 @@ class TestClaudeCodeErrorHandling:
             # Output is truncated to last 2000 chars
             assert len(result) < 5500
 
-    async def test_timeout_300_seconds(self):
-        """claude_code uses 300-second timeout."""
+    async def test_timeout_1260_seconds(self):
+        """claude_code uses 1260-second timeout (20 min shell + 60s buffer)."""
         executor = _make_executor()
         with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
             mock_ssh.return_value = (0, "ok")
@@ -656,7 +656,7 @@ class TestClaudeCodeErrorHandling:
                 "working_directory": "/opt/project",
                 "prompt": "Analyze",
             })
-            assert mock_ssh.call_args[1]["timeout"] == 300
+            assert mock_ssh.call_args[1]["timeout"] == 1260
 
 
 # ===========================================================================
