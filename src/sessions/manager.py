@@ -228,11 +228,13 @@ class SessionManager:
             "If a previous summary is provided, merge it with the new messages.\n\n"
             "RULES:\n"
             "1. PRESERVE: User preferences, names, topics discussed, decisions made, "
-            "successful task outcomes (what tools accomplished), infrastructure changes.\n"
+            "successful task outcomes (what tools accomplished and on which hosts), "
+            "infrastructure state changes, and which tool names were used.\n"
             "2. OMIT: Error messages, API failures, 'I can\\'t' or 'unable to' statements, "
             "partial completion reports, and any response where the assistant said it could not do something.\n"
             "3. OMIT: Any data not confirmed by actual tool results.\n"
-            "4. Keep under 300 words."
+            "4. Keep under 300 words.\n"
+            "5. Start with a one-line topic summary, then bullet key facts."
         )
 
         try:
@@ -271,10 +273,10 @@ class SessionManager:
                 task.add_done_callback(self._reflection_tasks.discard)
         except Exception as e:
             log.error("Failed to compact session: %s", e)
-            # Fallback: just trim without summary; clear stale summary so
-            # it doesn't reference messages that no longer exist.
+            # Fallback: just trim without LLM summary.  Preserve the
+            # existing summary — it describes older context that is still
+            # relevant even though the detailed messages are gone.
             session.messages = session.messages[-self.max_history:]
-            session.summary = ""
             self._dirty.add(session.channel_id)
 
     def reset(self, channel_id: str) -> None:

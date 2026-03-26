@@ -477,6 +477,7 @@ class LokiBot(discord.Client):
         self._bot_msg_buffer: dict[tuple[str, str], list[str]] = {}
         self._bot_msg_tasks: dict[tuple[str, str], asyncio.Task] = {}
         self._bot_msg_buffer_delay: float = 2.0  # seconds to wait for more bot messages
+        self._bot_msg_buffer_max: int = 20  # max messages to buffer per bot+channel
         # Recent tool executions for conversational context (injected into system prompt)
         # Per-channel: {channel_id: [(timestamp, entry_text), ...]}
         self._recent_actions: dict[str, list[tuple[float, str]]] = {}
@@ -1151,7 +1152,11 @@ class LokiBot(discord.Client):
             buf_key = (str(message.channel.id), str(message.author.id))
             if buf_key not in self._bot_msg_buffer:
                 self._bot_msg_buffer[buf_key] = []
-            self._bot_msg_buffer[buf_key].append(message.content)
+            buf = self._bot_msg_buffer[buf_key]
+            if len(buf) >= self._bot_msg_buffer_max:
+                log.warning("Bot buffer full (%d msgs) for %s, dropping oldest", len(buf), buf_key)
+                buf.pop(0)
+            buf.append(message.content)
 
             # Cancel previous timer for this bot+channel
             if buf_key in self._bot_msg_tasks:

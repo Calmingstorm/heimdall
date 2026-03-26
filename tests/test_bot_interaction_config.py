@@ -163,6 +163,7 @@ class TestRespondToBots:
         stub._bot_msg_buffer = {}
         stub._bot_msg_tasks = {}
         stub._bot_msg_buffer_delay = 0
+        stub._bot_msg_buffer_max = 20
         stub.on_message = LokiBot.on_message.__get__(stub)
 
         msg = _make_message(content="hello from another bot")
@@ -327,6 +328,7 @@ class TestRequireMention:
         stub._bot_msg_buffer = {}
         stub._bot_msg_tasks = {}
         stub._bot_msg_buffer_delay = 0
+        stub._bot_msg_buffer_max = 20
         stub.on_message = LokiBot.on_message.__get__(stub)
 
         msg = _make_message(content=f"<@111> hello from bot")

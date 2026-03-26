@@ -189,14 +189,14 @@ class TestIncusNameValidation:
         assert "Invalid Incus name" in result
 
 
-# ── #13: Compaction fallback clears stale summary ────────────────────
+# ── #13: Compaction fallback preserves existing summary ──────────────
 
 
-class TestCompactionFallbackClearsSummary:
-    """When compaction fails, the fallback should clear the stale summary."""
+class TestCompactionFallbackPreservesSummary:
+    """When compaction fails, the fallback should preserve the existing summary."""
 
     @pytest.mark.asyncio
-    async def test_fallback_clears_summary(self, tmp_dir):
+    async def test_fallback_preserves_summary(self, tmp_dir):
         mgr = SessionManager(
             max_history=30,
             max_age_hours=1,
@@ -204,7 +204,7 @@ class TestCompactionFallbackClearsSummary:
         )
         channel = "test_ch"
         session = mgr.get_or_create(channel)
-        session.summary = "Stale summary from a previous compaction."
+        session.summary = "Summary from a previous compaction."
 
         # Add enough messages to trigger compaction
         for i in range(COMPACTION_THRESHOLD + 5):
@@ -215,8 +215,8 @@ class TestCompactionFallbackClearsSummary:
 
         await mgr.get_history_with_compaction(channel)
 
-        # Summary should be cleared, not stale
-        assert session.summary == ""
+        # Summary should be preserved, not cleared (Round 21 fix)
+        assert session.summary == "Summary from a previous compaction."
         # Messages should be trimmed to max_history
         assert len(session.messages) == 30
 

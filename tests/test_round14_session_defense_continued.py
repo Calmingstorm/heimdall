@@ -143,28 +143,31 @@ class TestSessionContinuityAcrossCompaction:
         assert "old msg 0" not in contents
 
     async def test_compaction_fallback_on_error(self, tmp_path):
-        """If compaction fails, fallback trims messages and clears summary."""
+        """If compaction fails, fallback trims messages but preserves summary."""
         mgr = _make_manager(tmp_path, max_history=20)
         mgr.set_compaction_fn(_fake_compaction_error)
         # Set an existing summary
         session = mgr.get_or_create("ch1")
-        session.summary = "old summary that should be cleared"
+        session.summary = "old summary that should be preserved"
         _fill_session(mgr, "ch1", COMPACTION_THRESHOLD // 2 + 5)
         await mgr.get_task_history("ch1")
         session = mgr._sessions["ch1"]
-        # Fallback clears stale summary
-        assert session.summary == ""
+        # Existing summary preserved on error (Round 21 fix)
+        assert session.summary == "old summary that should be preserved"
         # Trims to max_history
         assert len(session.messages) <= 20
 
     async def test_compaction_no_fn_configured(self, tmp_path):
-        """If no compaction function, fallback trims and clears summary."""
+        """If no compaction function, fallback trims but preserves summary."""
         mgr = _make_manager(tmp_path, max_history=20)
         # NO set_compaction_fn call
+        session = mgr.get_or_create("ch1")
+        session.summary = "existing context"
         _fill_session(mgr, "ch1", COMPACTION_THRESHOLD // 2 + 5)
         await mgr.get_task_history("ch1")
         session = mgr._sessions["ch1"]
-        assert session.summary == ""
+        # Summary preserved (Round 21: no longer cleared on fallback)
+        assert session.summary == "existing context"
         assert len(session.messages) <= 20
 
     async def test_continuity_carry_forward_from_archive(self, tmp_path):

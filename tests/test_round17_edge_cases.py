@@ -63,6 +63,7 @@ def _make_stub(**overrides):
     stub._bot_msg_buffer = {}
     stub._bot_msg_tasks = {}
     stub._bot_msg_buffer_delay = 0  # immediate flush for tests
+    stub._bot_msg_buffer_max = 20
     stub._pending_files = {}
     stub.config = MagicMock()
     stub.config.tools.enabled = True

@@ -628,7 +628,7 @@ class TestCompactionErrorOmission:
         assert session.summary == "Summary of old messages."
 
     async def test_compaction_fallback_on_failure(self):
-        """If compaction fails, trim without summary and clear stale summary."""
+        """If compaction fails, trim messages but preserve existing summary."""
         sm = SessionManager(max_history=50, max_age_hours=24, persist_dir="/tmp/test_sessions")
         async def failing_compact_fn(messages, system):
             raise RuntimeError("LLM failed")
@@ -641,8 +641,8 @@ class TestCompactionErrorOmission:
         await sm._compact(session)
         # Should trim to max_history
         assert len(session.messages) <= sm.max_history
-        # Stale summary should be cleared
-        assert session.summary == ""
+        # Existing summary should be preserved (not cleared)
+        assert session.summary == "Old stale summary."
 
     async def test_compaction_threshold(self):
         """Compaction should only trigger when threshold is exceeded."""
