@@ -57,7 +57,7 @@ export default {
             <div class="text-gray-400 text-sm font-medium">Tool Packs</div>
             <span v-if="packsAllLoaded" class="badge badge-success">All packs loaded</span>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 pack-grid-mobile">
             <div v-for="(info, name) in packs" :key="name"
                  class="tool-pack-card p-3 rounded border"
                  :class="info.enabled ? 'border-green-900/50 bg-green-950/20' : 'border-gray-800 bg-gray-900/30 opacity-60'">
@@ -99,13 +99,14 @@ export default {
             <span class="text-sm font-medium">{{ group.label }}</span>
             <span class="badge badge-info">{{ group.tools.length }}</span>
           </div>
+          <div class="table-responsive">
           <table class="loki-table">
             <thead>
               <tr>
                 <th style="width:30%">Name</th>
-                <th>Description</th>
+                <th class="mobile-hide">Description</th>
                 <th style="width:80px" class="text-right">Uses</th>
-                <th style="width:80px">Pack</th>
+                <th style="width:80px" class="mobile-hide">Pack</th>
               </tr>
             </thead>
             <tbody>
@@ -115,12 +116,12 @@ export default {
                     <span class="tool-expand-icon text-gray-600 mr-1">{{ expanded[t.name] ? '\u25BC' : '\u25B6' }}</span>
                     {{ t.name }}
                   </td>
-                  <td class="text-gray-400 text-sm">{{ truncate(t.description, 100) }}</td>
+                  <td class="text-gray-400 text-sm mobile-hide">{{ truncate(t.description, 100) }}</td>
                   <td class="text-right">
                     <span v-if="stats[t.name]" class="text-gray-300 text-sm font-mono">{{ stats[t.name].toLocaleString() }}</span>
                     <span v-else class="text-gray-600 text-sm">—</span>
                   </td>
-                  <td>
+                  <td class="mobile-hide">
                     <span v-if="t.pack" class="badge badge-warning">{{ t.pack }}</span>
                     <span v-else class="badge badge-info">core</span>
                   </td>
@@ -133,6 +134,7 @@ export default {
               </template>
             </tbody>
           </table>
+          </div>
         </div>
 
         <div v-if="filteredTools.length === 0 && search" class="loki-card empty-state">

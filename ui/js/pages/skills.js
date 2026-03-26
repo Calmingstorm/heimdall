@@ -32,7 +32,7 @@ function highlightPython(code) {
 export default {
   template: `
     <div class="p-6 page-fade-in">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h1 class="text-xl font-semibold">Skills</h1>
         <div class="flex gap-2">
           <button @click="showCreate" class="btn btn-primary text-xs">New Skill</button>

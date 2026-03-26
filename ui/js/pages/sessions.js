@@ -10,7 +10,7 @@ const { ref, computed, onMounted, onUnmounted, nextTick } = Vue;
 export default {
   template: `
     <div class="p-6 page-fade-in">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h1 class="text-xl font-semibold">Sessions</h1>
         <div class="flex items-center gap-2">
           <button v-if="selected.size > 0" @click="confirmBulkClear"

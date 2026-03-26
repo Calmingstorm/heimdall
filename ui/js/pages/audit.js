@@ -9,7 +9,7 @@ const { ref, computed, onMounted } = Vue;
 export default {
   template: `
     <div class="p-6 page-fade-in">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h1 class="text-xl font-semibold">Audit Log</h1>
         <button @click="fetchAudit" class="btn btn-ghost text-xs" :disabled="loading">
           {{ loading ? 'Loading...' : 'Refresh' }}
@@ -77,9 +77,9 @@ export default {
             <tr>
               <th>Timestamp</th>
               <th>Tool</th>
-              <th>User</th>
-              <th>Host</th>
-              <th>Duration</th>
+              <th class="mobile-hide">User</th>
+              <th class="mobile-hide">Host</th>
+              <th class="mobile-hide">Duration</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -89,9 +89,9 @@ export default {
                 :class="expandedIdx === i ? 'bg-gray-800/50' : ''">
               <td class="text-xs text-gray-400 font-mono whitespace-nowrap">{{ formatTs(e.timestamp) }}</td>
               <td class="font-mono text-xs">{{ e.tool || e.tool_name || '—' }}</td>
-              <td class="text-xs text-gray-400">{{ e.user || e.user_id || '—' }}</td>
-              <td class="text-xs text-gray-400 font-mono">{{ e.host || '—' }}</td>
-              <td class="text-xs text-gray-400">
+              <td class="text-xs text-gray-400 mobile-hide">{{ e.user || e.user_id || '—' }}</td>
+              <td class="text-xs text-gray-400 font-mono mobile-hide">{{ e.host || '—' }}</td>
+              <td class="text-xs text-gray-400 mobile-hide">
                 {{ e.duration ? (e.duration < 1 ? (e.duration * 1000).toFixed(0) + 'ms' : e.duration.toFixed(1) + 's') : '—' }}
               </td>
               <td>

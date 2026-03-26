@@ -9,7 +9,7 @@ const { ref, computed, onMounted } = Vue;
 export default {
   template: `
     <div class="p-6 page-fade-in">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h1 class="text-xl font-semibold">Schedules</h1>
         <div class="flex gap-2">
           <button @click="showCreate = !showCreate" class="btn btn-primary text-xs">
@@ -153,10 +153,10 @@ export default {
             <tr>
               <th>Description</th>
               <th>Type</th>
-              <th>Action</th>
-              <th>Schedule</th>
-              <th>Next Run</th>
-              <th>Last Run</th>
+              <th class="mobile-hide">Action</th>
+              <th class="mobile-hide">Schedule</th>
+              <th class="mobile-hide">Next Run</th>
+              <th class="mobile-hide">Last Run</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -168,20 +168,20 @@ export default {
                 <span v-else-if="s.one_time" class="badge badge-info">one-time</span>
                 <span v-else class="badge badge-success">cron</span>
               </td>
-              <td class="font-mono text-xs text-gray-400">{{ s.action }}</td>
-              <td class="text-sm text-gray-400 font-mono">
+              <td class="font-mono text-xs text-gray-400 mobile-hide">{{ s.action }}</td>
+              <td class="text-sm text-gray-400 font-mono mobile-hide">
                 <span v-if="s.cron">{{ s.cron }}</span>
                 <span v-else-if="s.run_at">{{ formatIso(s.run_at) }}</span>
                 <span v-else-if="s.trigger">{{ s.trigger.type || 'webhook' }}</span>
                 <span v-else>-</span>
               </td>
-              <td class="text-sm">
+              <td class="text-sm mobile-hide">
                 <span v-if="s.next_run" class="text-indigo-300" :title="formatIso(s.next_run)">
                   {{ formatFuture(s.next_run) }}
                 </span>
                 <span v-else class="text-gray-600">-</span>
               </td>
-              <td class="text-sm text-gray-400">{{ s.last_run ? formatAge(s.last_run) : 'never' }}</td>
+              <td class="text-sm text-gray-400 mobile-hide">{{ s.last_run ? formatAge(s.last_run) : 'never' }}</td>
               <td class="whitespace-nowrap">
                 <div class="flex gap-1">
                   <button @click="doRunNow(s.id)" class="btn btn-ghost text-xs"

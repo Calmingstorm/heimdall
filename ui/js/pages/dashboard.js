@@ -102,7 +102,7 @@ export default {
                    :class="{ 'flash-new': a._isNew }">
                 <span v-if="a.error" class="text-red-400">\u2022</span>
                 <span v-else class="text-green-400">\u2022</span>
-                <span class="font-mono text-gray-300 truncate" style="max-width:120px;">{{ a.tool_name }}</span>
+                <span class="font-mono text-gray-300 truncate" style="max-width:40%;">{{ a.tool_name }}</span>
                 <span class="text-gray-500 ml-auto whitespace-nowrap">{{ formatTime(a.timestamp) }}</span>
               </div>
             </div>
@@ -117,10 +117,10 @@ export default {
               <div v-for="(e, i) in errors" :key="i" class="text-xs py-1 border-b border-gray-800 last:border-0">
                 <div class="flex items-center gap-2">
                   <span class="text-red-400">\u26a0</span>
-                  <span class="font-mono text-red-300 truncate" style="max-width:140px;">{{ e.tool_name }}</span>
+                  <span class="font-mono text-red-300 truncate" style="max-width:40%;">{{ e.tool_name }}</span>
                   <span class="text-gray-500 ml-auto whitespace-nowrap">{{ formatTime(e.timestamp) }}</span>
                 </div>
-                <div v-if="e.error_message" class="text-gray-500 pl-5 truncate" style="max-width:280px;">{{ e.error_message }}</div>
+                <div v-if="e.error_message" class="text-gray-500 pl-5 truncate" style="max-width:90%;">{{ e.error_message }}</div>
               </div>
             </div>
           </div>

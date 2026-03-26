@@ -11,7 +11,7 @@ const LOG_LEVELS = ['INFO', 'WARNING', 'ERROR'];
 export default {
   template: `
     <div class="p-6 page-fade-in flex flex-col" style="height: calc(100vh - 56px);">
-      <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h1 class="text-xl font-semibold">Logs</h1>
         <div class="flex gap-2 items-center">
           <button @click="togglePause" class="btn text-xs" :class="paused ? 'btn-primary' : 'btn-ghost'">
@@ -55,7 +55,7 @@ export default {
       </div>
 
       <!-- Status bar -->
-      <div class="flex items-center gap-3 mb-2 text-xs text-gray-500">
+      <div class="flex items-center gap-3 mb-2 text-xs text-gray-500 flex-wrap">
         <div class="flex items-center gap-1.5">
           <span class="status-dot" :class="subscribed ? 'online' : 'offline'"></span>
           {{ subscribed ? 'Live' : 'Disconnected' }}

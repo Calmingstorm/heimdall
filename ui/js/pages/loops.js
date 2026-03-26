@@ -9,7 +9,7 @@ const { ref, computed, onMounted, onUnmounted } = Vue;
 export default {
   template: `
     <div class="p-6 page-fade-in">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h1 class="text-xl font-semibold">Autonomous Loops</h1>
         <div class="flex gap-2">
           <button @click="showCreate = !showCreate" class="btn btn-primary text-xs">

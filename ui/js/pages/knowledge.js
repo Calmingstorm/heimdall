@@ -25,7 +25,7 @@ function highlightTerms(text, query) {
 export default {
   template: `
     <div class="p-6 page-fade-in">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h1 class="text-xl font-semibold">Knowledge</h1>
         <div class="flex gap-2">
           <button @click="showIngest = !showIngest" class="btn btn-primary text-xs">

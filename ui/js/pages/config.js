@@ -66,7 +66,7 @@ function computeDiff(original, edited) {
 export default {
   template: `
     <div class="p-6 page-fade-in">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h1 class="text-xl font-semibold">Configuration</h1>
         <div class="flex gap-2">
           <template v-if="editing">
@@ -136,7 +136,7 @@ export default {
               <table class="loki-table">
                 <thead>
                   <tr>
-                    <th style="width:30%">Key</th>
+                    <th class="config-key-col" style="width:30%">Key</th>
                     <th>Value</th>
                   </tr>
                 </thead>

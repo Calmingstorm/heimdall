@@ -116,7 +116,7 @@ const App = {
       <!-- Sidebar -->
       <aside class="loki-sidebar" :class="{ collapsed: sidebarCollapsed, 'mobile-open': mobileOpen }">
         <div class="flex items-center gap-2 px-3 py-3 border-b border-gray-800">
-          <button @click="toggleSidebar" class="btn-ghost p-1 rounded" title="Toggle sidebar">
+          <button @click="toggleSidebar" class="btn-ghost p-1 rounded sidebar-toggle-btn" title="Toggle sidebar">
             <span style="font-size:1.1rem;">{{ sidebarCollapsed ? '\u{25B6}' : '\u{2630}' }}</span>
           </button>
           <span class="sidebar-header-text font-semibold text-sm tracking-wide">LOKI</span>
@@ -139,7 +139,7 @@ const App = {
             <span class="status-dot" :class="wsConnected ? 'online' : 'offline'"></span>
             {{ wsConnected ? 'Live' : 'Disconnected' }}
           </div>
-          <div class="text-gray-600" style="font-size:0.625rem;">
+          <div class="text-gray-600 mobile-hide" style="font-size:0.625rem;">
             <kbd class="px-1 py-0.5 bg-gray-800 rounded">/</kbd> search
             <kbd class="px-1 py-0.5 bg-gray-800 rounded ml-1">Esc</kbd> close
           </div>

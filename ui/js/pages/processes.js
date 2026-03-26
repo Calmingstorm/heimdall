@@ -9,7 +9,7 @@ const { ref, computed, onMounted, onUnmounted, watch } = Vue;
 export default {
   template: `
     <div class="p-6 page-fade-in">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h1 class="text-xl font-semibold">Processes</h1>
         <div class="flex items-center gap-3">
           <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">

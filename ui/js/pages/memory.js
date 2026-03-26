@@ -9,7 +9,7 @@ const { ref, computed, onMounted } = Vue;
 export default {
   template: `
     <div class="p-6 page-fade-in">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h1 class="text-xl font-semibold">Memory</h1>
         <div class="flex gap-2">
           <button @click="showAdd = !showAdd" class="btn btn-primary text-xs">
@@ -111,7 +111,7 @@ export default {
             <div v-if="loadingScope === scope.name" class="flex items-center gap-2 text-gray-400 text-sm pl-4">
               <div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> Loading...
             </div>
-            <div v-else-if="scopeEntries[scope.name]">
+            <div v-else-if="scopeEntries[scope.name]" class="table-responsive">
               <table class="loki-table">
                 <thead>
                   <tr>
