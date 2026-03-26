@@ -33,6 +33,12 @@ For batch operations with predictable steps, use `delegate_task` to run in backg
 Gather info first, build the step list, then delegate.
 You MUST actually call `delegate_task` — never claim a task was started without calling the tool.
 
+Each step MUST include `tool_input` with ALL required parameters for the tool:
+- `check_disk`/`check_memory`: host defaults to localhost if omitted
+- `run_command`: MUST include `"command": "your_shell_command"` in tool_input
+- `run_script`: MUST include `"script": "..."` and `"interpreter": "bash"` in tool_input
+Example step: `{"tool_name": "run_command", "description": "Check uptime", "tool_input": {"command": "uptime"}}`
+
 Background tasks automatically post progress updates and a conversational summary to
 the channel when complete. Do NOT say "I'll report back" or "I'll let you know when
 it's done" — the system handles follow-up automatically. Just confirm the task started.
