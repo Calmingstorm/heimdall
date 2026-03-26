@@ -299,9 +299,8 @@ async def _execute_tool(
     # Built-in tools via executor — default missing required fields
     if "host" not in tool_input:
         tool_input = {**tool_input, "host": _get_default_host(executor)}
-    # run_command requires 'command' — use step description as fallback
-    if tool_name == "run_command" and "command" not in tool_input:
-        tool_input = {**tool_input, "command": step_desc}
+    # run_command/run_script: if 'command'/'script' missing, let executor handle it
+    # (it will return an error that _is_error_output catches)
     return await executor.execute(tool_name, tool_input)
 
 
