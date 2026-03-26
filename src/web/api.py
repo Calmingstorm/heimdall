@@ -535,6 +535,18 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             return web.json_response({"error": "source not found"}, status=404)
         return web.json_response({"status": "deleted", "chunks_removed": deleted})
 
+    @routes.post("/api/knowledge/{source}/reingest")
+    async def reingest_knowledge(request: web.Request) -> web.Response:
+        store = bot._knowledge_store
+        if not store or not store.available:
+            return web.json_response({"error": "knowledge store not available"}, status=503)
+        source = request.match_info["source"]
+        content = store.get_source_content(source)
+        if content is None:
+            return web.json_response({"error": "source not found"}, status=404)
+        chunks = await store.ingest(content, source, embedder=bot._embedder, uploader="web-reingest")
+        return web.json_response({"source": source, "chunks": chunks})
+
     @routes.get("/api/knowledge/search")
     async def search_knowledge(request: web.Request) -> web.Response:
         store = bot._knowledge_store
@@ -801,6 +813,31 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
         del all_mem[scope][key]
         await asyncio.to_thread(bot.tool_executor._save_all_memory, all_mem)
         return web.json_response({"status": "deleted", "scope": scope, "key": key})
+
+    @routes.post("/api/memory/bulk-delete")
+    async def bulk_delete_memory(request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid JSON"}, status=400)
+        entries = data.get("entries", [])
+        if not isinstance(entries, list) or not entries:
+            return web.json_response(
+                {"error": "entries must be a non-empty list of {scope, key}"}, status=400
+            )
+        all_mem = await asyncio.to_thread(
+            bot.tool_executor._load_all_memory
+        )
+        deleted = 0
+        for entry in entries:
+            scope = entry.get("scope")
+            key = entry.get("key")
+            if scope and key and scope in all_mem and key in all_mem[scope]:
+                del all_mem[scope][key]
+                deleted += 1
+        if deleted:
+            await asyncio.to_thread(bot.tool_executor._save_all_memory, all_mem)
+        return web.json_response({"status": "deleted", "count": deleted})
 
     return routes
 

@@ -1,6 +1,6 @@
 /**
  * Loki Management UI — Memory Page
- * Tree view of persistent memory (global + per-user scopes)
+ * Table view of persistent memory with copy, scope badges, and bulk delete
  */
 import { api } from '../api.js';
 
@@ -18,6 +18,29 @@ export default {
           <button @click="fetchMemory" class="btn btn-ghost text-xs" :disabled="loading">
             {{ loading ? 'Loading...' : 'Refresh' }}
           </button>
+        </div>
+      </div>
+
+      <!-- Summary stats -->
+      <div v-if="!loading && scopes.length > 0" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div class="loki-card text-center">
+          <div class="text-2xl font-bold">{{ totalEntries }}</div>
+          <div class="text-gray-400 text-xs">Total Entries</div>
+        </div>
+        <div class="loki-card text-center">
+          <div class="text-2xl font-bold">{{ scopes.length }}</div>
+          <div class="text-gray-400 text-xs">Scopes</div>
+        </div>
+        <div class="loki-card text-center">
+          <div class="text-2xl font-bold">{{ selectedCount }}</div>
+          <div class="text-gray-400 text-xs">Selected</div>
+        </div>
+        <div class="loki-card text-center">
+          <button v-if="selectedCount > 0" @click="confirmBulkDelete"
+                  class="btn btn-danger text-xs">
+            Delete Selected ({{ selectedCount }})
+          </button>
+          <span v-else class="text-gray-600 text-xs">Select entries to delete</span>
         </div>
       </div>
 
@@ -60,13 +83,16 @@ export default {
         <p class="text-gray-400">No memory entries. Click "Add Entry" to create one.</p>
       </div>
 
-      <!-- Scope tree -->
-      <div v-else class="space-y-3">
+      <!-- Memory table per scope -->
+      <div v-else class="space-y-4">
         <div v-for="scope in scopes" :key="scope.name" class="loki-card">
-          <div class="flex items-center gap-2 mb-2 cursor-pointer select-none"
+          <div class="flex items-center gap-2 mb-3 cursor-pointer select-none"
                @click="toggleScope(scope.name)">
             <span class="text-xs text-gray-500 font-mono">{{ expanded[scope.name] ? '\u25BC' : '\u25B6' }}</span>
-            <span class="text-sm font-medium">{{ scope.name }}</span>
+            <span class="memory-scope-badge"
+                  :class="scope.name === 'global' ? 'memory-scope-global' : 'memory-scope-user'">
+              {{ scope.name }}
+            </span>
             <span class="badge badge-info text-xs">{{ scope.count }} keys</span>
           </div>
 
@@ -78,13 +104,25 @@ export default {
               <table class="loki-table">
                 <thead>
                   <tr>
-                    <th style="width:30%">Key</th>
+                    <th style="width:30px">
+                      <input type="checkbox"
+                             :checked="isScopeAllSelected(scope.name)"
+                             @change="toggleSelectAll(scope.name, $event.target.checked)"
+                             class="memory-checkbox" />
+                    </th>
+                    <th style="width:25%">Key</th>
                     <th>Value</th>
-                    <th style="width:120px">Actions</th>
+                    <th style="width:140px">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="entry in scopeEntries[scope.name]" :key="entry.key">
+                    <td>
+                      <input type="checkbox"
+                             :checked="isSelected(scope.name, entry.key)"
+                             @change="toggleSelect(scope.name, entry.key)"
+                             class="memory-checkbox" />
+                    </td>
                     <td class="font-mono text-xs text-gray-400">{{ entry.key }}</td>
                     <td>
                       <div v-if="editingKey === scope.name + '/' + entry.key">
@@ -103,6 +141,10 @@ export default {
                     </td>
                     <td>
                       <div class="flex gap-1">
+                        <button @click="copyValue(entry.value)" class="btn btn-ghost text-xs"
+                                :title="'Copy value'">
+                          {{ copied === scope.name + '/' + entry.key ? 'Copied!' : 'Copy' }}
+                        </button>
                         <button @click="startEdit(scope.name, entry.key, entry.value)" class="btn btn-ghost text-xs">Edit</button>
                         <button @click="confirmDelete(scope.name, entry.key)" class="btn btn-danger text-xs">Del</button>
                       </div>
@@ -115,7 +157,7 @@ export default {
         </div>
       </div>
 
-      <!-- Delete confirmation -->
+      <!-- Delete confirmation (single) -->
       <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null">
         <div class="modal-content">
           <h3 class="text-lg font-semibold mb-2">Delete Memory Entry</h3>
@@ -126,6 +168,22 @@ export default {
             <button @click="deleteTarget = null" class="btn btn-ghost">Cancel</button>
             <button @click="doDelete" class="btn btn-danger" :disabled="deleting">
               {{ deleting ? 'Deleting...' : 'Delete' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bulk delete confirmation -->
+      <div v-if="showBulkDelete" class="modal-overlay" @click.self="showBulkDelete = false">
+        <div class="modal-content">
+          <h3 class="text-lg font-semibold mb-2">Bulk Delete</h3>
+          <p class="text-gray-400 text-sm mb-4">
+            Delete <span class="font-semibold text-gray-200">{{ selectedCount }}</span> selected entries? This cannot be undone.
+          </p>
+          <div class="flex gap-2 justify-end">
+            <button @click="showBulkDelete = false" class="btn btn-ghost">Cancel</button>
+            <button @click="doBulkDelete" class="btn btn-danger" :disabled="deleting">
+              {{ deleting ? 'Deleting...' : 'Delete All Selected' }}
             </button>
           </div>
         </div>
@@ -152,9 +210,49 @@ export default {
     const editValue = ref('');
     const saving = ref(false);
 
+    // Copy
+    const copied = ref(null);
+
+    // Selection
+    const selected = ref(new Set());
+
     // Delete
     const deleteTarget = ref(null);
     const deleting = ref(false);
+    const showBulkDelete = ref(false);
+
+    const totalEntries = computed(() => scopes.value.reduce((sum, s) => sum + s.count, 0));
+    const selectedCount = computed(() => selected.value.size);
+
+    function isSelected(scope, key) {
+      return selected.value.has(scope + '/' + key);
+    }
+
+    function toggleSelect(scope, key) {
+      const id = scope + '/' + key;
+      const next = new Set(selected.value);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      selected.value = next;
+    }
+
+    function isScopeAllSelected(scopeName) {
+      const entries = scopeEntries.value[scopeName];
+      if (!entries || entries.length === 0) return false;
+      return entries.every(e => selected.value.has(scopeName + '/' + e.key));
+    }
+
+    function toggleSelectAll(scopeName, checked) {
+      const entries = scopeEntries.value[scopeName];
+      if (!entries) return;
+      const next = new Set(selected.value);
+      for (const e of entries) {
+        const id = scopeName + '/' + e.key;
+        if (checked) next.add(id);
+        else next.delete(id);
+      }
+      selected.value = next;
+    }
 
     async function fetchMemory() {
       loading.value = true;
@@ -178,7 +276,6 @@ export default {
         return;
       }
       expanded.value[scopeName] = true;
-      // Load entries for this scope
       const scope = scopes.value.find(s => s.name === scopeName);
       if (!scope || scopeEntries.value[scopeName]) return;
 
@@ -207,7 +304,6 @@ export default {
         await api.put(`/api/memory/${encodeURIComponent(scope)}/${encodeURIComponent(key)}`, {
           value: editValue.value,
         });
-        // Update local state
         const entries = scopeEntries.value[scope];
         if (entries) {
           const e = entries.find(e => e.key === key);
@@ -216,6 +312,21 @@ export default {
         editingKey.value = null;
       } catch { /* ignore */ }
       saving.value = false;
+    }
+
+    async function copyValue(value) {
+      try {
+        await navigator.clipboard.writeText(value);
+        // Find which entry was copied for feedback
+        for (const [scopeName, entries] of Object.entries(scopeEntries.value)) {
+          const entry = entries.find(e => e.value === value);
+          if (entry) {
+            copied.value = scopeName + '/' + entry.key;
+            setTimeout(() => { copied.value = null; }, 1500);
+            return;
+          }
+        }
+      } catch { /* clipboard not available */ }
     }
 
     async function doAdd() {
@@ -233,7 +344,6 @@ export default {
         await api.put(`/api/memory/${encodeURIComponent(s)}/${encodeURIComponent(k)}`, { value: v });
         addSuccess.value = 'Entry saved';
         addForm.value = { scope: 'global', key: '', value: '' };
-        // Invalidate scope cache and re-fetch
         scopeEntries.value = {};
         await fetchMemory();
         setTimeout(() => { showAdd.value = false; addSuccess.value = null; }, 800);
@@ -253,20 +363,44 @@ export default {
       const { scope, key } = deleteTarget.value;
       try {
         await api.del(`/api/memory/${encodeURIComponent(scope)}/${encodeURIComponent(key)}`);
-        // Remove from local state
         const entries = scopeEntries.value[scope];
         if (entries) {
           scopeEntries.value[scope] = entries.filter(e => e.key !== key);
         }
-        // Update scope count
         const s = scopes.value.find(s => s.name === scope);
         if (s) {
           s.count--;
           s.keys = s.keys.filter(k => k !== key);
         }
+        // Remove from selection
+        const next = new Set(selected.value);
+        next.delete(scope + '/' + key);
+        selected.value = next;
       } catch { /* ignore */ }
       deleting.value = false;
       deleteTarget.value = null;
+    }
+
+    function confirmBulkDelete() {
+      showBulkDelete.value = true;
+    }
+
+    async function doBulkDelete() {
+      deleting.value = true;
+      const entries = [];
+      for (const id of selected.value) {
+        const slash = id.indexOf('/');
+        entries.push({ scope: id.slice(0, slash), key: id.slice(slash + 1) });
+      }
+      try {
+        await api.post('/api/memory/bulk-delete', { entries });
+        // Refresh state
+        selected.value = new Set();
+        scopeEntries.value = {};
+        await fetchMemory();
+      } catch { /* ignore */ }
+      deleting.value = false;
+      showBulkDelete.value = false;
     }
 
     onMounted(() => { fetchMemory(); });
@@ -275,8 +409,12 @@ export default {
       scopes, scopeEntries, loading, error, expanded, loadingScope,
       showAdd, addForm, adding, addError, addSuccess,
       editingKey, editValue, saving,
-      deleteTarget, deleting,
-      fetchMemory, toggleScope, startEdit, doEdit, doAdd, confirmDelete, doDelete,
+      copied,
+      selected, selectedCount, totalEntries,
+      deleteTarget, deleting, showBulkDelete,
+      fetchMemory, toggleScope, startEdit, doEdit, copyValue, doAdd,
+      confirmDelete, doDelete, confirmBulkDelete, doBulkDelete,
+      isSelected, toggleSelect, isScopeAllSelected, toggleSelectAll,
     };
   },
 };

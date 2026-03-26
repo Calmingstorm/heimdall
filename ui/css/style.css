@@ -683,3 +683,44 @@ textarea.loki-input {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 }
+
+/* Knowledge page */
+.knowledge-highlight {
+  background: rgba(99, 102, 241, 0.3);
+  color: #c7d2fe;
+  padding: 0 2px;
+  border-radius: 2px;
+}
+.knowledge-preview {
+  border-left: 2px solid var(--loki-border);
+  padding-left: 0.75rem;
+  max-height: 4rem;
+  overflow: hidden;
+  font-style: italic;
+}
+
+/* Memory page */
+.memory-scope-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: ui-monospace, monospace;
+}
+.memory-scope-global {
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+.memory-scope-user {
+  background: rgba(234, 179, 8, 0.15);
+  color: #fde047;
+  border: 1px solid rgba(234, 179, 8, 0.25);
+}
+.memory-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--loki-accent);
+  cursor: pointer;
+}

@@ -108,12 +108,15 @@ def _make_bot():
     # Knowledge
     store = MagicMock()
     store.available = True
-    store.list_sources = MagicMock(return_value=[{"source": "doc1", "chunks": 3}])
+    store.list_sources = MagicMock(return_value=[
+        {"source": "doc1", "chunks": 3, "preview": "Hello world document...", "ingested_at": "2024-01-01T10:00:00"},
+    ])
     store.ingest = AsyncMock(return_value=5)
     store.search_hybrid = AsyncMock(return_value=[
         {"source": "doc1", "content": "hello", "score": 0.9},
     ])
     store.delete_source = MagicMock(return_value=3)
+    store.get_source_content = MagicMock(return_value="Hello world full content")
     bot._knowledge_store = store
     bot._embedder = None
 
@@ -2060,3 +2063,267 @@ class TestSkillTestEndpoint:
         async with TestClient(TestServer(app)) as client:
             await client.post("/api/skills/joke/test")
             bot.skill_manager.execute.assert_called_once_with("joke", {})
+
+
+# ===================================================================
+# Knowledge preview + re-ingest tests (Round 12)
+# ===================================================================
+
+
+class TestKnowledgePreview:
+    @pytest.mark.asyncio
+    async def test_list_includes_preview(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/knowledge")
+            body = await resp.json()
+            assert body[0]["preview"] == "Hello world document..."
+
+    @pytest.mark.asyncio
+    async def test_list_includes_ingested_at(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/knowledge")
+            body = await resp.json()
+            assert body[0]["ingested_at"] == "2024-01-01T10:00:00"
+
+
+class TestKnowledgeReingest:
+    @pytest.mark.asyncio
+    async def test_reingest_success(self):
+        app, bot = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/knowledge/doc1/reingest")
+            assert resp.status == 200
+            body = await resp.json()
+            assert body["source"] == "doc1"
+            assert body["chunks"] == 5
+            bot._knowledge_store.get_source_content.assert_called_once_with("doc1")
+            bot._knowledge_store.ingest.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_reingest_not_found(self):
+        bot = _make_bot()
+        bot._knowledge_store.get_source_content = MagicMock(return_value=None)
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/knowledge/nope/reingest")
+            assert resp.status == 404
+
+    @pytest.mark.asyncio
+    async def test_reingest_unavailable(self):
+        bot = _make_bot()
+        bot._knowledge_store = None
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/knowledge/doc1/reingest")
+            assert resp.status == 503
+
+    @pytest.mark.asyncio
+    async def test_reingest_uses_web_reingest_uploader(self):
+        app, bot = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            await client.post("/api/knowledge/doc1/reingest")
+            call_kwargs = bot._knowledge_store.ingest.call_args
+            assert call_kwargs.kwargs.get("uploader") == "web-reingest"
+
+
+# ===================================================================
+# Memory bulk delete tests (Round 12)
+# ===================================================================
+
+
+class TestMemoryBulkDelete:
+    @pytest.mark.asyncio
+    async def test_bulk_delete_success(self):
+        app, bot = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/memory/bulk-delete",
+                json={"entries": [{"scope": "global", "key": "key1"}]},
+            )
+            assert resp.status == 200
+            body = await resp.json()
+            assert body["count"] == 1
+            bot.tool_executor._save_all_memory.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_bulk_delete_partial(self):
+        """Entries that don't exist are silently skipped."""
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/memory/bulk-delete",
+                json={"entries": [
+                    {"scope": "global", "key": "key1"},
+                    {"scope": "global", "key": "nonexistent"},
+                ]},
+            )
+            body = await resp.json()
+            assert body["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_bulk_delete_empty_list(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/memory/bulk-delete",
+                json={"entries": []},
+            )
+            assert resp.status == 400
+
+    @pytest.mark.asyncio
+    async def test_bulk_delete_invalid_json(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/memory/bulk-delete",
+                data="not json",
+                headers={"Content-Type": "application/json"},
+            )
+            assert resp.status == 400
+
+    @pytest.mark.asyncio
+    async def test_bulk_delete_missing_entries(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/memory/bulk-delete", json={})
+            assert resp.status == 400
+
+
+# ===================================================================
+# Knowledge store unit tests (Round 12)
+# ===================================================================
+
+
+class TestKnowledgeStorePreview:
+    def test_list_sources_includes_preview(self):
+        """list_sources returns preview from first chunk."""
+        import sqlite3
+        conn = sqlite3.connect(":memory:")
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("""
+            CREATE TABLE knowledge_chunks (
+                chunk_id TEXT PRIMARY KEY,
+                content TEXT NOT NULL,
+                source TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                total_chunks INTEGER NOT NULL,
+                uploader TEXT NOT NULL DEFAULT 'system',
+                ingested_at TEXT NOT NULL
+            )
+        """)
+        conn.execute(
+            "INSERT INTO knowledge_chunks VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ("id0", "First chunk content here", "test-doc", 0, 2, "system", "2024-01-01T00:00:00"),
+        )
+        conn.execute(
+            "INSERT INTO knowledge_chunks VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ("id1", "Second chunk content", "test-doc", 1, 2, "system", "2024-01-01T00:00:00"),
+        )
+        conn.commit()
+
+        from src.knowledge.store import KnowledgeStore
+        store = KnowledgeStore.__new__(KnowledgeStore)
+        store._conn = conn
+        store._has_vec = False
+        store._fts = None
+
+        sources = store.list_sources()
+        assert len(sources) == 1
+        assert sources[0]["preview"] == "First chunk content here"
+        assert sources[0]["chunks"] == 2
+
+    def test_list_sources_preview_truncated(self):
+        """Preview truncated to 200 chars with ellipsis."""
+        import sqlite3
+        conn = sqlite3.connect(":memory:")
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("""
+            CREATE TABLE knowledge_chunks (
+                chunk_id TEXT PRIMARY KEY,
+                content TEXT NOT NULL,
+                source TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                total_chunks INTEGER NOT NULL,
+                uploader TEXT NOT NULL DEFAULT 'system',
+                ingested_at TEXT NOT NULL
+            )
+        """)
+        long_content = "x" * 300
+        conn.execute(
+            "INSERT INTO knowledge_chunks VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ("id0", long_content, "long-doc", 0, 1, "system", "2024-01-01T00:00:00"),
+        )
+        conn.commit()
+
+        from src.knowledge.store import KnowledgeStore
+        store = KnowledgeStore.__new__(KnowledgeStore)
+        store._conn = conn
+        store._has_vec = False
+        store._fts = None
+
+        sources = store.list_sources()
+        assert sources[0]["preview"].endswith("...")
+        assert len(sources[0]["preview"]) == 203  # 200 + "..."
+
+    def test_get_source_content(self):
+        """get_source_content returns concatenated chunks."""
+        import sqlite3
+        conn = sqlite3.connect(":memory:")
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("""
+            CREATE TABLE knowledge_chunks (
+                chunk_id TEXT PRIMARY KEY,
+                content TEXT NOT NULL,
+                source TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                total_chunks INTEGER NOT NULL,
+                uploader TEXT NOT NULL DEFAULT 'system',
+                ingested_at TEXT NOT NULL
+            )
+        """)
+        conn.execute(
+            "INSERT INTO knowledge_chunks VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ("id0", "chunk one", "doc", 0, 2, "system", "2024-01-01"),
+        )
+        conn.execute(
+            "INSERT INTO knowledge_chunks VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ("id1", "chunk two", "doc", 1, 2, "system", "2024-01-01"),
+        )
+        conn.commit()
+
+        from src.knowledge.store import KnowledgeStore
+        store = KnowledgeStore.__new__(KnowledgeStore)
+        store._conn = conn
+        store._has_vec = False
+        store._fts = None
+
+        content = store.get_source_content("doc")
+        assert content == "chunk one\n\nchunk two"
+
+    def test_get_source_content_not_found(self):
+        """get_source_content returns None for missing source."""
+        import sqlite3
+        conn = sqlite3.connect(":memory:")
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("""
+            CREATE TABLE knowledge_chunks (
+                chunk_id TEXT PRIMARY KEY,
+                content TEXT NOT NULL,
+                source TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                total_chunks INTEGER NOT NULL,
+                uploader TEXT NOT NULL DEFAULT 'system',
+                ingested_at TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+
+        from src.knowledge.store import KnowledgeStore
+        store = KnowledgeStore.__new__(KnowledgeStore)
+        store._conn = conn
+        store._has_vec = False
+        store._fts = None
+
+        assert store.get_source_content("nope") is None

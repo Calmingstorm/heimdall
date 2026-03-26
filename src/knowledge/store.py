@@ -209,15 +209,44 @@ class KnowledgeStore:
         except Exception:
             return []
 
-        return [
-            {
+        results = []
+        for r in rows:
+            entry: dict = {
                 "source": r[0],
                 "chunks": r[1],
                 "uploader": r[2],
                 "ingested_at": r[3],
             }
-            for r in rows
-        ]
+            # Add preview from first chunk
+            try:
+                first = self._conn.execute(
+                    "SELECT content FROM knowledge_chunks WHERE source = ? ORDER BY chunk_index LIMIT 1",
+                    (r[0],),
+                ).fetchone()
+                if first and first[0]:
+                    text = first[0][:200]
+                    if len(first[0]) > 200:
+                        text += "..."
+                    entry["preview"] = text
+            except Exception:
+                pass
+            results.append(entry)
+        return results
+
+    def get_source_content(self, source: str) -> str | None:
+        """Get the full concatenated content of a source (for re-ingest)."""
+        if not self.available:
+            return None
+        try:
+            rows = self._conn.execute(
+                "SELECT content FROM knowledge_chunks WHERE source = ? ORDER BY chunk_index",
+                (source,),
+            ).fetchall()
+            if not rows:
+                return None
+            return "\n\n".join(r[0] for r in rows)
+        except Exception:
+            return None
 
     def delete_source(self, source: str) -> int:
         """Delete all chunks for a document source. Returns count deleted."""

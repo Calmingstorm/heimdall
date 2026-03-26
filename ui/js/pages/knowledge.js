@@ -1,10 +1,26 @@
 /**
  * Loki Management UI — Knowledge Page
- * Browse/search/ingest/delete knowledge documents
+ * Browse/search/ingest/delete knowledge documents with previews and search highlighting
  */
 import { api } from '../api.js';
 
 const { ref, onMounted } = Vue;
+
+function escapeHtml(text) {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function highlightTerms(text, query) {
+  if (!text || !query) return escapeHtml(text);
+  const escaped = escapeHtml(text);
+  const terms = query.trim().split(/\s+/).filter(Boolean);
+  if (!terms.length) return escaped;
+  const pattern = terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  try {
+    return escaped.replace(new RegExp(`(${pattern})`, 'gi'),
+      '<mark class="knowledge-highlight">$1</mark>');
+  } catch { return escaped; }
+}
 
 export default {
   template: `
@@ -36,6 +52,7 @@ export default {
       <div v-if="searchResults" class="mb-6">
         <div class="text-sm font-medium text-gray-400 mb-2">
           Search Results <span class="badge badge-info">{{ searchResults.length }}</span>
+          <span class="text-gray-500 text-xs ml-2">for "{{ lastQuery }}"</span>
         </div>
         <div v-if="searchResults.length === 0" class="loki-card">
           <p class="text-gray-400 text-sm">No results for "{{ lastQuery }}"</p>
@@ -45,8 +62,10 @@ export default {
             <div class="flex items-center gap-2 mb-1">
               <span class="badge badge-info">{{ r.source || 'unknown' }}</span>
               <span v-if="r.score" class="text-gray-500 text-xs font-mono">score: {{ r.score.toFixed(3) }}</span>
+              <span v-if="r.chunk_index !== undefined" class="text-gray-600 text-xs">chunk #{{ r.chunk_index }}</span>
             </div>
-            <div class="text-sm text-gray-300 whitespace-pre-wrap break-words">{{ truncate(r.content || r.text || '', 500) }}</div>
+            <div class="text-sm text-gray-300 whitespace-pre-wrap break-words"
+                 v-html="highlightTerms(truncate(r.content || r.text || '', 500), lastQuery)"></div>
           </div>
         </div>
       </div>
@@ -85,26 +104,34 @@ export default {
         <div class="text-sm font-medium text-gray-400 mb-2">
           Ingested Sources <span class="badge badge-info">{{ sources.length }}</span>
         </div>
-        <table class="loki-table">
-          <thead>
-            <tr>
-              <th>Source</th>
-              <th>Chunks</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="s in sources" :key="s.source || s.name || s">
-              <td class="font-mono text-sm">{{ s.source || s.name || s }}</td>
-              <td>
-                <span class="badge badge-info">{{ s.chunk_count || s.chunks || '—' }}</span>
-              </td>
-              <td>
+        <div class="space-y-2">
+          <div v-for="s in sources" :key="s.source || s.name || s" class="loki-card">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-2">
+                <span class="font-mono text-sm font-semibold">{{ s.source || s.name || s }}</span>
+                <span class="badge badge-info">{{ s.chunk_count || s.chunks || '—' }} chunks</span>
+                <span v-if="s.uploader" class="badge badge-warning text-xs">{{ s.uploader }}</span>
+              </div>
+              <div class="flex gap-1">
+                <button @click="doReingest(s.source || s.name || s)"
+                        class="btn btn-ghost text-xs"
+                        :disabled="reingesting === (s.source || s.name || s)">
+                  {{ reingesting === (s.source || s.name || s) ? 'Re-ingesting...' : 'Re-ingest' }}
+                </button>
                 <button @click="confirmDelete(s.source || s.name || s)" class="btn btn-danger text-xs">Delete</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+              </div>
+            </div>
+            <div v-if="s.ingested_at" class="text-gray-600 text-xs mb-1">
+              Ingested: {{ formatDate(s.ingested_at) }}
+            </div>
+            <div v-if="s.preview" class="text-gray-400 text-sm mt-1 whitespace-pre-wrap break-words knowledge-preview">{{ s.preview }}</div>
+            <div v-if="reingestResult && reingestResult.source === (s.source || s.name || s)"
+                 class="mt-2 text-xs"
+                 :class="reingestResult.error ? 'text-red-400' : 'text-green-400'">
+              {{ reingestResult.message }}
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Delete confirmation -->
@@ -143,6 +170,10 @@ export default {
     const ingestSuccess = ref(null);
     const ingesting = ref(false);
 
+    // Re-ingest
+    const reingesting = ref(null);
+    const reingestResult = ref(null);
+
     // Delete
     const deleteTarget = ref(null);
     const deleting = ref(false);
@@ -152,12 +183,19 @@ export default {
       return text.length > max ? text.slice(0, max) + '...' : text;
     }
 
+    function formatDate(iso) {
+      if (!iso) return '';
+      try {
+        const d = new Date(iso);
+        return d.toLocaleString();
+      } catch { return iso; }
+    }
+
     async function fetchSources() {
       loading.value = true;
       error.value = null;
       try {
         const data = await api.get('/api/knowledge');
-        // API may return array of objects or strings
         sources.value = Array.isArray(data) ? data : [];
       } catch (e) {
         error.value = e.message;
@@ -206,6 +244,28 @@ export default {
       ingesting.value = false;
     }
 
+    async function doReingest(source) {
+      reingesting.value = source;
+      reingestResult.value = null;
+      try {
+        const result = await api.post(`/api/knowledge/${encodeURIComponent(source)}/reingest`);
+        reingestResult.value = {
+          source,
+          error: false,
+          message: `Re-ingested ${result.chunks || 0} chunks`,
+        };
+        await fetchSources();
+        setTimeout(() => { reingestResult.value = null; }, 3000);
+      } catch (e) {
+        reingestResult.value = {
+          source,
+          error: true,
+          message: e.message,
+        };
+      }
+      reingesting.value = null;
+    }
+
     function confirmDelete(source) {
       deleteTarget.value = source;
     }
@@ -227,8 +287,10 @@ export default {
       sources, loading, error,
       searchQuery, searchResults, searching, lastQuery,
       showIngest, ingestSource, ingestContent, ingestError, ingestSuccess, ingesting,
+      reingesting, reingestResult,
       deleteTarget, deleting,
-      truncate, fetchSources, doSearch, clearSearch, doIngest, confirmDelete, doDelete,
+      truncate, formatDate, highlightTerms, fetchSources, doSearch, clearSearch,
+      doIngest, doReingest, confirmDelete, doDelete,
     };
   },
 };
