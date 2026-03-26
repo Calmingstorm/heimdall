@@ -315,7 +315,7 @@ class ToolExecutor:
             return f"Ansible host '{ansible_host}' not found in configured hosts"
         address, ssh_user, _os = resolved
         code, output = await self._exec_command(
-            address, cmd, ssh_user, timeout=120,  # Ansible can take longer
+            address, cmd, ssh_user, timeout=600,  # Ansible playbooks can take a while
         )
         if code != 0:
             return f"Ansible playbook failed (exit {code}):\n{output}"
@@ -912,7 +912,7 @@ class ToolExecutor:
         if not resolved:
             return f"Unknown or disallowed host: {self._incus_host()}"
         address, ssh_user, _os = resolved
-        code, output = await self._exec_command(address, cmd, ssh_user, timeout=60)
+        code, output = await self._exec_command(address, cmd, ssh_user, timeout=300)
         if code != 0:
             return f"Launch failed (exit {code}):\n{output}"
         return output if output.strip() else f"Instance '{inp['name']}' launched from {inp['image']}."

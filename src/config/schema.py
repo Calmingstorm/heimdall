@@ -41,7 +41,7 @@ class ToolsConfig(BaseModel):
     allowed_services: list[str] = Field(default_factory=list)
     allowed_playbooks: list[str] = Field(default_factory=list)
     ansible_directory: str = "/ansible"
-    command_timeout_seconds: int = 30
+    command_timeout_seconds: int = 300
     tool_timeout_seconds: int = 300
     prometheus_host: str = ""
     ansible_host: str = ""

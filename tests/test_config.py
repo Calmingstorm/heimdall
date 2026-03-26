@@ -48,7 +48,7 @@ class TestLoadConfig:
         assert cfg.discord.token == "test-token"
         # Defaults
         assert cfg.sessions.max_history == 50
-        assert cfg.tools.command_timeout_seconds == 30
+        assert cfg.tools.command_timeout_seconds == 300
 
     def test_loads_actual_config_yml(self, monkeypatch):
         """Verify the real config.yml parses correctly after Round 1-4 changes."""
@@ -195,7 +195,7 @@ class TestToolsConfig:
     def test_defaults(self):
         tc = ToolsConfig()
         assert tc.enabled is True
-        assert tc.command_timeout_seconds == 30
+        assert tc.command_timeout_seconds == 300
         assert tc.allowed_services == []
 
     def test_new_config_fields_defaults(self):
