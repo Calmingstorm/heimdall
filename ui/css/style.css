@@ -552,6 +552,62 @@ textarea.loki-input {
 }
 .session-msg-content { font-size: 0.8125rem; }
 
+/* Log line color coding */
+.log-line { border-left: 2px solid transparent; padding-left: 0.5rem; }
+.log-line-error { color: #f87171; border-left-color: #ef4444; background: rgba(239, 68, 68, 0.05); }
+.log-line-warning { color: #fbbf24; border-left-color: #eab308; background: rgba(234, 179, 8, 0.04); }
+.log-ts { transition: color 0.15s; }
+
+/* Log level filter chips */
+.log-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  font-family: 'Fira Code', monospace;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--loki-text-muted);
+}
+.log-chip:hover { background: rgba(255, 255, 255, 0.1); }
+.log-chip-info.log-chip-active { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; border-color: rgba(99, 102, 241, 0.4); }
+.log-chip-warning.log-chip-active { background: rgba(234, 179, 8, 0.2); color: #facc15; border-color: rgba(234, 179, 8, 0.4); }
+.log-chip-error.log-chip-active { background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4); }
+.log-chip-clear {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--loki-text-muted);
+}
+.log-chip-clear:hover { background: rgba(255, 255, 255, 0.1); color: var(--loki-text); }
+
+/* Jump to bottom button */
+.log-jump-btn {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--loki-accent);
+  color: white;
+  border: none;
+  border-radius: 9999px;
+  padding: 0.375rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: background 0.15s, transform 0.15s;
+  animation: jump-btn-in 0.2s ease-out;
+}
+.log-jump-btn:hover { background: var(--loki-accent-hover); }
+@keyframes jump-btn-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(0.5rem); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
 /* Stat card icon */
 .stat-card { position: relative; }
 .stat-icon {
