@@ -2111,7 +2111,7 @@ class LokiBot(discord.Client):
             _LONG_TIMEOUT_TOOLS = {"claude_code"}
 
             async def _run_tool_with_timeout(block):
-                t = 1260 if block.name in _LONG_TIMEOUT_TOOLS else tool_timeout
+                t = 3660 if block.name in _LONG_TIMEOUT_TOOLS else tool_timeout
                 try:
                     return await asyncio.wait_for(
                         _run_tool(block), timeout=t,
@@ -2983,7 +2983,7 @@ class LokiBot(discord.Client):
                 t0 = time.monotonic()
                 error = None
                 try:
-                    _t = 1260 if tool_name in _LONG_TIMEOUT_TOOLS else tool_timeout
+                    _t = 3660 if tool_name in _LONG_TIMEOUT_TOOLS else tool_timeout
                     raw = await asyncio.wait_for(
                         self._dispatch_loop_tool(
                             tool_name, tool_input, msg_proxy, user_id,

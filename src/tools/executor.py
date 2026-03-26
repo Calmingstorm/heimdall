@@ -699,17 +699,17 @@ class ToolExecutor:
 
         if allow_edits:
             safe_tmpdir = shlex.quote(tmpdir)
-            inner = f"cd {safe_tmpdir} && echo '{encoded_prompt}' | base64 -d | timeout 1200 {claude_cmd}"
+            inner = f"cd {safe_tmpdir} && echo '{encoded_prompt}' | base64 -d | timeout 3600 {claude_cmd}"
             if _already_claude_user:
                 cmd = inner
             else:
                 cmd = f"su - {safe_user} -c {shlex.quote(inner)}"
         else:
             safe_wd = shlex.quote(working_dir)
-            cmd = f"cd {safe_wd} && echo '{encoded_prompt}' | base64 -d | timeout 1200 {claude_cmd}"
+            cmd = f"cd {safe_wd} && echo '{encoded_prompt}' | base64 -d | timeout 3600 {claude_cmd}"
 
         code, output = await self._exec_command(
-            address, cmd, ssh_user, timeout=1260,
+            address, cmd, ssh_user, timeout=3660,
         )
 
         file_manifest = ""

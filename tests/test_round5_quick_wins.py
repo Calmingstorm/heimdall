@@ -5,7 +5,7 @@ Covers:
 2. requester_id field on BackgroundTask + audit logging integration
 3. _send_summary activation in run_background_task
 4. cp -a return code check in _handle_claude_code
-5. timeout 1200 wrapper for remote claude command
+5. timeout 3600 wrapper for remote claude command
 """
 from __future__ import annotations
 
@@ -374,7 +374,7 @@ class TestClaudeCodeCpReturnCode:
 
 
 # ---------------------------------------------------------------------------
-# Fix 5: timeout 1200 wrapper for remote claude command
+# Fix 5: timeout 3600 wrapper for remote claude command
 # ---------------------------------------------------------------------------
 
 class TestClaudeCodeTimeoutWrapper:
@@ -393,7 +393,7 @@ class TestClaudeCodeTimeoutWrapper:
         return ToolExecutor(config)
 
     async def test_allow_edits_command_has_timeout(self, executor):
-        """allow_edits=True path should include 'timeout 1200' in the SSH command."""
+        """allow_edits=True path should include 'timeout 3600' in the SSH command."""
         call_count = [0]
         tmpdir = "/tmp/claude_code_abcd1234"
 
@@ -416,10 +416,10 @@ class TestClaudeCodeTimeoutWrapper:
         # Second call is the main claude execution (first is mktemp)
         second_call = mock_ssh_ref.call_args_list[1]
         cmd_arg = second_call[1].get("command", second_call[0][1] if len(second_call[0]) > 1 else "")
-        assert "timeout 1200" in cmd_arg
+        assert "timeout 3600" in cmd_arg
 
     async def test_readonly_command_has_timeout(self, executor):
-        """allow_edits=False (read-only) path should include 'timeout 1200' in the SSH command."""
+        """allow_edits=False (read-only) path should include 'timeout 3600' in the SSH command."""
         with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
             mock_ssh.return_value = (0, "analysis result")
             await executor._handle_claude_code({
@@ -431,4 +431,4 @@ class TestClaudeCodeTimeoutWrapper:
         first_call_cmd = mock_ssh.call_args_list[0][1].get("command") or mock_ssh.call_args_list[0][0][1]
         if not isinstance(first_call_cmd, str):
             first_call_cmd = str(mock_ssh.call_args_list[0])
-        assert "timeout 1200" in first_call_cmd
+        assert "timeout 3600" in first_call_cmd
