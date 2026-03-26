@@ -6,6 +6,7 @@ All endpoints are prefixed with /api/ and require Bearer token auth
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +17,7 @@ from aiohttp import web
 from croniter import croniter
 
 from ..config.schema import Config
+from ..llm.secret_scrubber import scrub_output_secrets
 from ..logging import get_logger
 from ..tools.registry import TOOL_PACKS, get_tool_definitions, get_pack_tool_names
 from .chat import MAX_CHAT_CONTENT_LEN, process_web_chat
@@ -44,6 +46,20 @@ def _validate_string(value: str, field: str, max_len: int) -> str | None:
     if len(value) > max_len:
         return f"{field} exceeds maximum length ({max_len} chars)"
     return None
+
+
+# Regex: keep only ASCII alphanumeric, hyphen, underscore, period
+_SAFE_FILENAME_RE = re.compile(r"[^a-zA-Z0-9_.\-]")
+
+
+def _safe_filename(name: str, max_len: int = 80) -> str:
+    """Sanitize a string for use in Content-Disposition filename."""
+    return _SAFE_FILENAME_RE.sub("_", name)[:max_len] or "export"
+
+
+def _sanitize_error(msg: str) -> str:
+    """Scrub secrets from error messages before returning to clients."""
+    return scrub_output_secrets(str(msg))
 
 
 def _contains_blocked_fields(d: dict, blocked: frozenset[str], *, _depth: int = 0) -> bool:
@@ -287,6 +303,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             }
             for m in session.messages
         ]
+        safe_cid = _safe_filename(cid)
         if fmt == "text":
             lines = []
             if session.summary:
@@ -301,7 +318,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             return web.Response(
                 text=body,
                 content_type="text/plain",
-                headers={"Content-Disposition": f'attachment; filename="session-{cid}.txt"'},
+                headers={"Content-Disposition": f'attachment; filename="session-{safe_cid}.txt"'},
             )
         # Default: JSON
         export = {
@@ -314,7 +331,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
         }
         return web.json_response(
             export,
-            headers={"Content-Disposition": f'attachment; filename="session-{cid}.json"'},
+            headers={"Content-Disposition": f'attachment; filename="session-{safe_cid}.json"'},
         )
 
     @routes.delete("/api/sessions/{channel_id}")
@@ -481,7 +498,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
                 "is_error": is_error,
             })
         except Exception as e:
-            return web.json_response({"result": str(e), "is_error": True}, status=500)
+            return web.json_response({"result": _sanitize_error(e), "is_error": True}, status=500)
 
     @routes.delete("/api/skills/{name}")
     async def delete_skill(request: web.Request) -> web.Response:
@@ -601,7 +618,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             )
             return web.json_response(schedule, status=201)
         except (ValueError, TypeError) as e:
-            return web.json_response({"error": str(e)}, status=400)
+            return web.json_response({"error": _sanitize_error(e)}, status=400)
 
     @routes.delete("/api/schedules/{schedule_id}")
     async def delete_schedule(request: web.Request) -> web.Response:
@@ -629,7 +646,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             await bot.scheduler._callback(schedule)
             return web.json_response({"status": "triggered", "schedule_id": sid})
         except Exception as e:
-            return web.json_response({"error": str(e)}, status=500)
+            return web.json_response({"error": _sanitize_error(e)}, status=500)
 
     @routes.post("/api/schedules/validate-cron")
     async def validate_cron(request: web.Request) -> web.Response:

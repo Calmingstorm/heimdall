@@ -158,7 +158,7 @@ async def process_web_chat(
         log.error("Web chat error: %s", e, exc_info=True)
         bot.sessions.remove_last_message(channel_id, "user")
         return {
-            "response": f"Error processing message: {e}",
+            "response": f"Error processing message: {_scrub(str(e))}",
             "tools_used": [],
             "is_error": True,
         }

@@ -9,6 +9,7 @@ Endpoint: /api/ws
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -16,6 +17,7 @@ from typing import TYPE_CHECKING
 import aiohttp
 from aiohttp import web
 
+from ..llm.secret_scrubber import scrub_output_secrets
 from ..logging import get_logger
 from .chat import MAX_CHAT_CONTENT_LEN, process_web_chat
 
@@ -49,7 +51,7 @@ class WebSocketManager:
         # Authenticate via query param token (if configured)
         if self._api_token:
             token = request.query.get("token", "")
-            if token != self._api_token:
+            if not hmac.compare_digest(token, self._api_token):
                 ws = web.WebSocketResponse()
                 await ws.prepare(request)
                 await ws.close(code=4001, message=b"unauthorized")
@@ -145,7 +147,7 @@ class WebSocketManager:
             log.error("WebSocket chat error: %s", e, exc_info=True)
             await ws.send_json({
                 "type": "chat_error",
-                "error": str(e),
+                "error": scrub_output_secrets(str(e)),
             })
 
     async def broadcast_event(self, event: dict) -> None:

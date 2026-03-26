@@ -48,7 +48,8 @@ def _make_auth_middleware(web_config: WebConfig) -> web.middleware:
             return await handler(request)
         # Check Bearer token (header) or token query param (for downloads)
         auth_header = request.headers.get("Authorization", "")
-        if auth_header == f"Bearer {token}":
+        expected_bearer = f"Bearer {token}"
+        if hmac.compare_digest(auth_header, expected_bearer):
             return await handler(request)
         query_token = request.query.get("token", "")
         if query_token and hmac.compare_digest(query_token, token):
