@@ -78,7 +78,7 @@ class LokiWebSocket {
   constructor(api) {
     this._api = api;
     this._ws = null;
-    this._handlers = { logs: [], events: [] };
+    this._handlers = { logs: [], events: [], chat: [] };
     this._reconnectDelay = 1000;
     this._maxReconnectDelay = 30000;
     this._shouldConnect = false;
@@ -124,6 +124,19 @@ class LokiWebSocket {
     }
   }
 
+  /** Send a chat message via WebSocket. Returns true if sent. */
+  sendChat(content, { channelId, userId, username } = {}) {
+    if (!this.connected) return false;
+    this._ws.send(JSON.stringify({
+      type: 'chat',
+      content,
+      channel_id: channelId || 'web-default',
+      user_id: userId || undefined,
+      username: username || undefined,
+    }));
+    return true;
+  }
+
   _open() {
     if (this._ws) return;
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -148,6 +161,8 @@ class LokiWebSocket {
         for (const h of this._handlers.logs || []) h(data);
       } else if (type === 'event') {
         for (const h of this._handlers.events || []) h(data);
+      } else if (type === 'chat_response' || type === 'chat_error') {
+        for (const h of this._handlers.chat || []) h(data);
       }
       // subscribed/unsubscribed confirmations are silently consumed
     };

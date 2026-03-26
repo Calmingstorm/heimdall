@@ -15,6 +15,7 @@ import ConfigPage from './pages/config.js';
 import LogsPage from './pages/logs.js';
 import AuditPage from './pages/audit.js';
 import MemoryPage from './pages/memory.js';
+import ChatPage from './pages/chat.js';
 
 const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
 const { createRouter, createWebHashHistory } = VueRouter;
@@ -27,6 +28,7 @@ const { createRouter, createWebHashHistory } = VueRouter;
 const routes = [
   { path: '/',           redirect: '/dashboard' },
   { path: '/dashboard',  component: DashboardPage,  meta: { label: 'Dashboard',  icon: '\u{1F4CA}' } },
+  { path: '/chat',       component: ChatPage,       meta: { label: 'Chat',       icon: '\u{1F4AD}' } },
   { path: '/sessions',   component: SessionsPage,   meta: { label: 'Sessions',   icon: '\u{1F4AC}' } },
   { path: '/tools',      component: ToolsPage,      meta: { label: 'Tools',      icon: '\u{1F527}' } },
   { path: '/skills',     component: SkillsPage,     meta: { label: 'Skills',     icon: '\u{1F9E9}' } },
