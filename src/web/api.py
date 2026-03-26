@@ -224,12 +224,24 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
     async def list_sessions(_request: web.Request) -> web.Response:
         sessions = []
         for cid, session in bot.sessions._sessions.items():
+            # Build preview from last 2 messages
+            preview = []
+            for m in session.messages[-2:]:
+                text = m.content or ""
+                if len(text) > 120:
+                    text = text[:120] + "..."
+                preview.append({"role": m.role, "content": text})
+            # Determine source type
+            source = "web" if cid.startswith("web-") else "discord"
             sessions.append({
                 "channel_id": cid,
                 "message_count": len(session.messages),
                 "last_active": session.last_active,
                 "created_at": session.created_at,
                 "has_summary": bool(session.summary),
+                "preview": preview,
+                "source": source,
+                "last_user_id": session.last_user_id,
             })
         sessions.sort(key=lambda s: s["last_active"], reverse=True)
         return web.json_response(sessions)
@@ -257,6 +269,52 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             "last_active": session.last_active,
         })
 
+    @routes.get("/api/sessions/{channel_id}/export")
+    async def export_session(request: web.Request) -> web.Response:
+        cid = request.match_info["channel_id"]
+        session = bot.sessions._sessions.get(cid)
+        if not session:
+            return web.json_response({"error": "session not found"}, status=404)
+        fmt = request.query.get("format", "json")
+        messages = [
+            {
+                "role": m.role,
+                "content": m.content,
+                "timestamp": m.timestamp,
+                "user_id": m.user_id,
+            }
+            for m in session.messages
+        ]
+        if fmt == "text":
+            lines = []
+            if session.summary:
+                lines.append(f"=== Summary ===\n{session.summary}\n")
+            lines.append(f"=== Messages ({len(messages)}) ===")
+            for m in messages:
+                ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(m["timestamp"])) if m["timestamp"] else "?"
+                role = m["role"].upper()
+                uid = f" ({m['user_id']})" if m.get("user_id") else ""
+                lines.append(f"\n[{ts}] {role}{uid}:\n{m['content']}")
+            body = "\n".join(lines)
+            return web.Response(
+                text=body,
+                content_type="text/plain",
+                headers={"Content-Disposition": f'attachment; filename="session-{cid}.txt"'},
+            )
+        # Default: JSON
+        export = {
+            "channel_id": cid,
+            "messages": messages,
+            "summary": session.summary,
+            "created_at": session.created_at,
+            "last_active": session.last_active,
+            "exported_at": time.time(),
+        }
+        return web.json_response(
+            export,
+            headers={"Content-Disposition": f'attachment; filename="session-{cid}.json"'},
+        )
+
     @routes.delete("/api/sessions/{channel_id}")
     async def delete_session(request: web.Request) -> web.Response:
         cid = request.match_info["channel_id"]
@@ -264,6 +322,24 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             return web.json_response({"error": "session not found"}, status=404)
         bot.sessions.reset(cid)
         return web.json_response({"status": "cleared"})
+
+    @routes.post("/api/sessions/clear-bulk")
+    async def clear_bulk_sessions(request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid JSON"}, status=400)
+        channel_ids = data.get("channel_ids", [])
+        if not isinstance(channel_ids, list) or not channel_ids:
+            return web.json_response(
+                {"error": "channel_ids must be a non-empty list"}, status=400
+            )
+        cleared = 0
+        for cid in channel_ids:
+            if cid in bot.sessions._sessions:
+                bot.sessions.reset(cid)
+                cleared += 1
+        return web.json_response({"status": "cleared", "count": cleared})
 
     # ------------------------------------------------------------------
     # Tools

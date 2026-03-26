@@ -533,6 +533,25 @@ textarea.loki-input {
   padding-top: 0.25rem;
 }
 
+/* Session cards */
+.session-card { transition: border-color 0.15s ease; }
+.session-card:hover { border-color: var(--loki-accent); }
+.session-selected { border-color: var(--loki-accent) !important; background: rgba(99, 102, 241, 0.05); }
+.session-checkbox {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--loki-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.session-preview-role {
+  font-weight: 600;
+  font-family: 'Fira Code', 'Cascadia Code', monospace;
+  flex-shrink: 0;
+  width: 36px;
+}
+.session-msg-content { font-size: 0.8125rem; }
+
 /* Stat card icon */
 .stat-card { position: relative; }
 .stat-icon {

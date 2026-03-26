@@ -79,11 +79,12 @@ def _make_bot():
     # Sessions
     session = MagicMock()
     session.messages = [
-        MagicMock(role="user", content="hi", timestamp="2024-01-01", user_id="u1"),
+        MagicMock(role="user", content="hi", timestamp=1704067200.0, user_id="u1"),
     ]
     session.summary = ""
-    session.created_at = "2024-01-01"
-    session.last_active = "2024-01-02"
+    session.created_at = 1704067200.0
+    session.last_active = 1704153600.0
+    session.last_user_id = "u1"
     bot.sessions = MagicMock()
     bot.sessions._sessions = {"chan1": session}
     bot.sessions.reset = MagicMock()
@@ -1559,3 +1560,214 @@ class TestAuditErrorFilter:
             resp = await client.get("/api/audit?error_only=0")
             body = await resp.json()
             assert len(body) == 2
+
+
+# ===================================================================
+# Sessions — preview, export, bulk clear (Round 8)
+# ===================================================================
+
+
+class TestSessionPreview:
+    @pytest.mark.asyncio
+    async def test_list_includes_preview(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/sessions")
+            body = await resp.json()
+            assert len(body) == 1
+            s = body[0]
+            assert "preview" in s
+            assert len(s["preview"]) == 1
+            assert s["preview"][0]["role"] == "user"
+            assert s["preview"][0]["content"] == "hi"
+
+    @pytest.mark.asyncio
+    async def test_list_includes_source_discord(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/sessions")
+            body = await resp.json()
+            assert body[0]["source"] == "discord"
+
+    @pytest.mark.asyncio
+    async def test_list_includes_source_web(self):
+        bot = _make_bot()
+        session = MagicMock()
+        session.messages = [MagicMock(role="user", content="test", timestamp=1704067200.0, user_id="web-user")]
+        session.summary = ""
+        session.created_at = 1704067200.0
+        session.last_active = 1704067200.0
+        session.last_user_id = "web-user"
+        bot.sessions._sessions = {"web-chat": session}
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/sessions")
+            body = await resp.json()
+            assert body[0]["source"] == "web"
+
+    @pytest.mark.asyncio
+    async def test_list_includes_last_user_id(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/sessions")
+            body = await resp.json()
+            assert body[0]["last_user_id"] == "u1"
+
+    @pytest.mark.asyncio
+    async def test_preview_truncates_long_content(self):
+        bot = _make_bot()
+        session = MagicMock()
+        long_content = "x" * 200
+        session.messages = [MagicMock(role="assistant", content=long_content, timestamp=1704067200.0, user_id=None)]
+        session.summary = ""
+        session.created_at = 1704067200.0
+        session.last_active = 1704067200.0
+        session.last_user_id = None
+        bot.sessions._sessions = {"chan1": session}
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/sessions")
+            body = await resp.json()
+            preview_content = body[0]["preview"][0]["content"]
+            assert len(preview_content) <= 124  # 120 + "..."
+
+
+class TestSessionExport:
+    @pytest.mark.asyncio
+    async def test_export_json(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/sessions/chan1/export?format=json")
+            assert resp.status == 200
+            body = await resp.json()
+            assert body["channel_id"] == "chan1"
+            assert len(body["messages"]) == 1
+            assert "exported_at" in body
+            assert "attachment" in resp.headers.get("Content-Disposition", "")
+
+    @pytest.mark.asyncio
+    async def test_export_text(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/sessions/chan1/export?format=text")
+            assert resp.status == 200
+            text = await resp.text()
+            assert "Messages" in text
+            assert "USER" in text
+            assert resp.content_type == "text/plain"
+            assert "attachment" in resp.headers.get("Content-Disposition", "")
+
+    @pytest.mark.asyncio
+    async def test_export_not_found(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/sessions/nope/export?format=json")
+            assert resp.status == 404
+
+    @pytest.mark.asyncio
+    async def test_export_default_format_is_json(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/sessions/chan1/export")
+            assert resp.status == 200
+            body = await resp.json()
+            assert "messages" in body
+
+    @pytest.mark.asyncio
+    async def test_export_with_query_token_auth(self):
+        app, _ = _make_app(api_token="secret123")
+        async with TestClient(TestServer(app)) as client:
+            # Without auth should fail
+            resp = await client.get("/api/sessions/chan1/export")
+            assert resp.status == 401
+            # With query token should succeed
+            resp = await client.get("/api/sessions/chan1/export?token=secret123")
+            assert resp.status == 200
+
+
+class TestSessionBulkClear:
+    @pytest.mark.asyncio
+    async def test_bulk_clear(self):
+        bot = _make_bot()
+        session2 = MagicMock()
+        session2.messages = [MagicMock(role="user", content="bye", timestamp=1704067200.0, user_id="u2")]
+        session2.summary = ""
+        session2.created_at = 1704067200.0
+        session2.last_active = 1704067200.0
+        session2.last_user_id = "u2"
+        bot.sessions._sessions["chan2"] = session2
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/sessions/clear-bulk",
+                json={"channel_ids": ["chan1", "chan2"]},
+            )
+            assert resp.status == 200
+            body = await resp.json()
+            assert body["status"] == "cleared"
+            assert body["count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_bulk_clear_partial(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/sessions/clear-bulk",
+                json={"channel_ids": ["chan1", "nonexistent"]},
+            )
+            body = await resp.json()
+            assert body["count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_bulk_clear_empty_list(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/sessions/clear-bulk",
+                json={"channel_ids": []},
+            )
+            assert resp.status == 400
+
+    @pytest.mark.asyncio
+    async def test_bulk_clear_invalid_json(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/sessions/clear-bulk",
+                data="not json",
+                headers={"Content-Type": "application/json"},
+            )
+            assert resp.status == 400
+
+    @pytest.mark.asyncio
+    async def test_bulk_clear_missing_field(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post(
+                "/api/sessions/clear-bulk",
+                json={"wrong_field": ["chan1"]},
+            )
+            assert resp.status == 400
+
+
+class TestQueryTokenAuth:
+    @pytest.mark.asyncio
+    async def test_query_token_accepted(self):
+        app, _ = _make_app(api_token="mytoken")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/status?token=mytoken")
+            assert resp.status == 200
+
+    @pytest.mark.asyncio
+    async def test_query_token_rejected(self):
+        app, _ = _make_app(api_token="mytoken")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/status?token=wrongtoken")
+            assert resp.status == 401
+
+    @pytest.mark.asyncio
+    async def test_bearer_still_works(self):
+        app, _ = _make_app(api_token="mytoken")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/status", headers=_auth_headers("mytoken"))
+            assert resp.status == 200

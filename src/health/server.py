@@ -46,9 +46,12 @@ def _make_auth_middleware(web_config: WebConfig) -> web.middleware:
         token = web_config.api_token
         if not token:
             return await handler(request)
-        # Check Bearer token
+        # Check Bearer token (header) or token query param (for downloads)
         auth_header = request.headers.get("Authorization", "")
         if auth_header == f"Bearer {token}":
+            return await handler(request)
+        query_token = request.query.get("token", "")
+        if query_token and hmac.compare_digest(query_token, token):
             return await handler(request)
         return web.json_response({"error": "unauthorized"}, status=401)
 
