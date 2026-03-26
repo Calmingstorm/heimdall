@@ -148,9 +148,11 @@ def scrub_response_secrets(text: str) -> str:
 # Patterns that suggest fabricated tool output when no tools were actually called.
 # Each is (compiled_regex, description) for testability.
 _FABRICATION_PATTERNS: list[re.Pattern[str]] = [
-    # Claims of running/executing commands
+    # Claims of running/executing/investigating commands
     re.compile(
-        r"(?i)\b(?:I\s+(?:ran|executed|checked|performed|ran\s+a)|"
+        r"(?i)\b(?:I\s+(?:ran|executed|checked|performed|ran\s+a|"
+        r"looked\s+at|reviewed|inspected|examined|verified|confirmed|"
+        r"tested|scanned|monitored|queried)|"
         r"running|executing|here(?:'s| is) the (?:output|result)|"
         r"the (?:command|output|result) (?:returned|shows?|is)|"
         r"I (?:can see|found) (?:that )?(?:the |your )?)"
@@ -166,6 +168,11 @@ _FABRICATION_PATTERNS: list[re.Pattern[str]] = [
         r"started|stopped|deleted|removed|wrote|written|sent|fetched|downloaded)"
         r"(?:\s+(?:and\s+)?(?:posted|uploaded|saved|sent|attached|delivered))?"
         r"\b.{0,40}\b(?:image|file|script|server|container|process|document|skill)"
+    ),
+    # Claims referencing data sources without having checked them
+    re.compile(
+        r"(?i)\b(?:according to (?:the )?(?:logs?|output|results?|data|metrics|dashboard)|"
+        r"based on (?:the )?(?:output|logs?|results?|metrics))\b"
     ),
 ]
 
@@ -215,6 +222,12 @@ _TOOL_UNAVAIL_PATTERNS: list[re.Pattern[str]] = [
     re.compile(
         r"(?i)\b(?:image|photo) generation.{0,20}\b(?:not|isn't|unavailable|disabled)\b"
     ),
+    # Claims of lacking access or capability
+    re.compile(
+        r"(?i)\b(?:(?:don't|do not) have (?:access|the ability) to|"
+        r"no (?:tool|way) (?:to |for )(?:do )?(?:that|this)|"
+        r"that(?:'s| is) not something I can)\b"
+    ),
 ]
 
 
@@ -259,7 +272,10 @@ _HEDGING_PATTERNS: list[re.Pattern[str]] = [
         r"(?i)\b(?:here(?:'s| is) (?:a |the )?plan|"
         r"I(?:'d| would) (?:suggest|recommend)|"
         r"before (?:I |we )(?:proceed|go ahead|start)|"
-        r"I'll wait for (?:your|the) (?:go[- ]ahead|confirmation|approval))\b"
+        r"I'll wait for (?:your|the) (?:go[- ]ahead|confirmation|approval)|"
+        r"awaiting (?:your|the) (?:confirmation|input|response|approval|go[- ]ahead)|"
+        r"once you (?:confirm|approve|give the go[- ]ahead)|"
+        r"(?:your call|up to you|your decision))\b"
     ),
     re.compile(
         r"(?i)^Plan:|"
@@ -301,7 +317,7 @@ _HEDGING_RETRY_MSG = {
 # ---------------------------------------------------------------------------
 
 _CODE_BLOCK_HEDGING_PATTERN: re.Pattern[str] = re.compile(
-    r"```(?:bash|sh)\s*\n",
+    r"```(?:bash|sh|shell|zsh)\s*\n",
 )
 
 
@@ -334,8 +350,9 @@ _CODE_HEDGING_RETRY_MSG = {
 
 _FAILURE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(
-        r"(?i)(?:couldn'?t (?:get|resolve|find|fetch|retrieve|determine)|"
-        r"(?:failed|unable) to (?:get|resolve|find|fetch|retrieve)|"
+        r"(?i)(?:couldn'?t (?:get|resolve|find|fetch|retrieve|determine|complete|"
+        r"access|connect)|"
+        r"(?:failed|unable) to (?:get|resolve|find|fetch|retrieve|connect|access)|"
         r"(?:no|zero) (?:results?|matches?|data) (?:found|returned|available)|"
         r"(?:is|was|currently) (?:blocked|unavailable|down|broken|failing)|"
         r"(?:error|Error):)"
@@ -343,6 +360,11 @@ _FAILURE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(
         r"(?i)(?:workaround|fallback|alternative|try (?:this|these|instead)|"
         r"use this .{0,20} instead|if you want .{0,30} workaround)"
+    ),
+    # Connection/execution failure patterns
+    re.compile(
+        r"(?i)(?:timed?\s*out|connection (?:refused|failed|reset|closed)|"
+        r"(?:doesn't|does not|isn't|is not) (?:seem to be )?(?:work(?:ing)?|respond(?:ing)?))"
     ),
 ]
 
