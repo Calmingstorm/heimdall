@@ -104,9 +104,12 @@ class LokiWebSocket {
   subscribe(channel, handler) {
     if (!this._handlers[channel]) this._handlers[channel] = [];
     this._handlers[channel].push(handler);
-    this._subscriptions.add(channel);
-    if (this.connected) {
-      this._ws.send(JSON.stringify({ subscribe: channel }));
+    // Only pub/sub channels need server-side subscription (not chat — it's request/response)
+    if (channel !== 'chat') {
+      this._subscriptions.add(channel);
+      if (this.connected) {
+        this._ws.send(JSON.stringify({ subscribe: channel }));
+      }
     }
   }
 
@@ -116,9 +119,11 @@ class LokiWebSocket {
       const idx = arr.indexOf(handler);
       if (idx >= 0) arr.splice(idx, 1);
       if (arr.length === 0) {
-        this._subscriptions.delete(channel);
-        if (this.connected) {
-          this._ws.send(JSON.stringify({ unsubscribe: channel }));
+        if (channel !== 'chat') {
+          this._subscriptions.delete(channel);
+          if (this.connected) {
+            this._ws.send(JSON.stringify({ unsubscribe: channel }));
+          }
         }
       }
     }

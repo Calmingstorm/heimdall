@@ -245,7 +245,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
 
     @routes.get("/api/tools")
     async def list_tools(_request: web.Request) -> web.Response:
-        all_tools = get_tool_definitions()  # All 81
+        all_tools = get_tool_definitions()
         pack_names = get_pack_tool_names(list(TOOL_PACKS.keys()))
         result = []
         for tool in all_tools:

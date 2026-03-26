@@ -19,6 +19,10 @@ const ENUM_FIELDS = {
 
 const REDACTED = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
 
+function isSensitiveKey(key) {
+  return SENSITIVE_KEYS.has(key);
+}
+
 function isRedacted(value) {
   return value === REDACTED;
 }
@@ -141,7 +145,7 @@ export default {
                     <td class="font-mono text-xs text-gray-400">{{ k }}</td>
                     <td>
                       <!-- Sensitive field: always masked, never editable -->
-                      <template v-if="isRedacted(v)">
+                      <template v-if="isSensitiveKey(k) || isRedacted(v)">
                         <span class="text-gray-500 font-mono text-xs flex items-center gap-2">
                           {{ REDACTED }}
                           <span class="badge badge-warning text-xs">sensitive</span>
@@ -418,7 +422,7 @@ export default {
       config, displayConfig, editValues, loading, error,
       expanded, expandedNested, editing, saving, toast,
       hasChanges, REDACTED,
-      isRedacted, sectionChanged, fieldChanged,
+      isSensitiveKey, isRedacted, sectionChanged, fieldChanged,
       getEdited, getEditedField, getDisplayBool, setEdited, setEditedJson,
       getEnumOptions, removeArrayItem, addArrayItem,
       toggleSection, toggleNested, formatJson, showToast,

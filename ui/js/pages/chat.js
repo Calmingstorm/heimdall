@@ -93,10 +93,10 @@ export default {
     const sending = ref(false);
     const messagesEl = ref(null);
     const inputEl = ref(null);
-    const useWebSocket = ref(true);
+    let sentViaWs = false; // Track if current send used WebSocket (for timeout)
 
     const canSend = computed(() => input.value.trim().length > 0 && !sending.value);
-    const wsStatus = computed(() => useWebSocket.value && ws.connected ? 'WebSocket' : 'REST');
+    const wsStatus = computed(() => ws.connected ? 'WebSocket' : 'REST');
 
     function scrollToBottom() {
       nextTick(() => {
@@ -131,6 +131,7 @@ export default {
     function onChatMessage(data) {
       if (!sending.value) return; // Ignore stale responses
       sending.value = false;
+      sentViaWs = false;
       if (data.type === 'chat_response') {
         addMessage('bot', data.content, {
           tools_used: data.tools_used || [],
@@ -164,20 +165,22 @@ export default {
       addMessage('user', content);
       input.value = '';
       sending.value = true;
+      sentViaWs = false;
 
       // Reset textarea height
       if (inputEl.value) inputEl.value.style.height = 'auto';
 
       // Try WebSocket first, fall back to REST
-      if (useWebSocket.value && ws.connected) {
+      if (ws.connected) {
         const sent = ws.sendChat(content, { channelId: 'web-default' });
-        if (!sent) {
-          // WS send failed, fall back to REST
+        if (sent) {
+          sentViaWs = true;
+          startWsTimeout();
+          // Response will come via onChatMessage callback
+        } else {
           await sendViaRest(content);
           sending.value = false;
-          useWebSocket.value = false;
         }
-        // Response will come via onChatMessage callback
       } else {
         await sendViaRest(content);
         sending.value = false;
@@ -186,20 +189,24 @@ export default {
       nextTick(() => inputEl.value?.focus());
     }
 
-    // Timeout for WS responses — fall back to REST after 120s
+    // Timeout for WS responses — fall back after 120s
     let wsTimeout = null;
     watch(sending, (val) => {
-      if (val && useWebSocket.value) {
-        wsTimeout = setTimeout(() => {
-          if (sending.value) {
-            sending.value = false;
-            addMessage('bot', 'Response timed out. Try again.', { is_error: true });
-          }
-        }, 120000);
-      } else {
+      if (!val) {
+        // Clear timeout when sending completes (REST or WS response arrived)
         if (wsTimeout) { clearTimeout(wsTimeout); wsTimeout = null; }
       }
     });
+    // Set timeout after WS send (called from send() after sentViaWs is set)
+    function startWsTimeout() {
+      wsTimeout = setTimeout(() => {
+        if (sending.value) {
+          sending.value = false;
+          sentViaWs = false;
+          addMessage('bot', 'Response timed out. Try again.', { is_error: true });
+        }
+      }, 120000);
+    }
 
     onMounted(() => {
       ws.subscribe('chat', onChatMessage);
@@ -213,7 +220,7 @@ export default {
 
     return {
       messages, input, sending, messagesEl, inputEl,
-      canSend, wsStatus, useWebSocket,
+      canSend, wsStatus,
       send, autoResize,
     };
   },
