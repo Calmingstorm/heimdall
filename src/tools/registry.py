@@ -36,13 +36,13 @@ TOOLS: list[dict] = [
     # --- Host monitoring ---
     {
         "name": "check_service",
-        "description": "Returns systemd service status on a managed host. Output includes active state, PID, memory, and recent journal lines. For logs only, use check_logs. To restart, use restart_service.",
+        "description": "Returns systemd service status on a managed host (active state, PID, memory, recent journal). For logs only, use check_logs. To restart, use restart_service.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "host": {
                     "type": "string",
-                    "description": "Host alias from config (e.g. 'myserver', 'webhost')",
+                    "description": "Host alias from config",
                 },
                 "service": {
                     "type": "string",
@@ -54,7 +54,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "check_disk",
-        "description": "Returns disk usage (df -h) on a managed host. Shows all mounted filesystems with size, used, available, and mount point.",
+        "description": "Returns disk usage (df -h) on a managed host.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -68,7 +68,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "check_memory",
-        "description": "Returns memory usage (free -h) on a managed host. Shows total, used, free, shared, buffers/cache, and swap.",
+        "description": "Returns memory usage (free -h) on a managed host.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -105,7 +105,7 @@ TOOLS: list[dict] = [
     # --- Prometheus ---
     {
         "name": "query_prometheus",
-        "description": "Runs a PromQL instant query against Prometheus. Returns current metric values as 'N result(s): metric{labels}: value'. Read-only. For historical trends, use query_prometheus_range.",
+        "description": "Runs a PromQL instant query. Returns formatted 'N result(s): metric{labels}: value'. For trends, use query_prometheus_range.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -120,7 +120,7 @@ TOOLS: list[dict] = [
     # --- Service management ---
     {
         "name": "restart_service",
-        "description": "Restarts a systemd service on a managed host. Runs systemctl restart then returns the new status. To check without restarting, use check_service.",
+        "description": "Restarts a systemd service on a managed host and returns new status. To check without restarting, use check_service.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -165,7 +165,7 @@ TOOLS: list[dict] = [
     # --- Shell execution ---
     {
         "name": "run_command",
-        "description": "Runs a single shell command on a managed host. Returns stdout/stderr (truncated at 200 lines). On failure: 'Command failed (exit N): output'. For multi-line scripts or code blocks, use run_script. For the same command on multiple hosts, use run_command_multi.",
+        "description": "Runs a shell command on a managed host. Returns stdout/stderr (max 200 lines). On failure: 'Command failed (exit N): output'. For multi-line scripts, use run_script. For multiple hosts, use run_command_multi.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -184,18 +184,17 @@ TOOLS: list[dict] = [
     {
         "name": "run_script",
         "description": (
-            "Writes a script to a temp file on a managed host and executes it. Handles multi-line scripts, "
-            "heredocs, code blocks, and complex commands without quoting issues. Temp file is cleaned up after "
-            "execution. Returns stdout/stderr (truncated at 200 lines). On failure: 'Script failed (exit N): output'. "
+            "Runs a multi-line script on a managed host via temp file. Handles heredocs, code blocks, "
+            "and complex quoting. Returns stdout/stderr (max 200 lines). On failure: 'Script failed (exit N): output'. "
             "Interpreters: bash (default), python3, python, sh, node, ruby, perl. "
-            "For single commands, use run_command instead."
+            "For single commands, use run_command."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "host": {
                     "type": "string",
-                    "description": "Host alias from config (e.g. 'myserver', 'webhost')",
+                    "description": "Host alias from config",
                 },
                 "script": {
                     "type": "string",
@@ -203,11 +202,11 @@ TOOLS: list[dict] = [
                 },
                 "interpreter": {
                     "type": "string",
-                    "description": "Script interpreter: 'bash' (default), 'python3', 'python', 'sh', 'node', 'ruby', 'perl'",
+                    "description": "Interpreter (default: bash)",
                 },
                 "filename": {
                     "type": "string",
-                    "description": "Optional filename for the temp file (default: auto-generated based on interpreter)",
+                    "description": "Temp filename (default: auto-generated)",
                 },
             },
             "required": ["host", "script"],
@@ -215,7 +214,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "run_command_multi",
-        "description": "Runs the same shell command on multiple managed hosts in parallel. Returns per-host results as markdown blocks: '### hostname\\n```\\noutput\\n```'. Pass ['all'] for every configured host. For a single host, use run_command.",
+        "description": "Runs a command on multiple hosts in parallel. Returns per-host '### hostname\\n```\\noutput\\n```'. Pass ['all'] for all configured hosts. For one host, use run_command.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -257,7 +256,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "write_file",
-        "description": "Writes content to a file on a managed host. Creates the file if missing, overwrites if it exists. To read first, use read_file. For multi-file edits, use claude_code with allow_edits=true.",
+        "description": "Writes content to a file on a managed host (creates or overwrites). To read first, use read_file. For multi-file edits, use claude_code.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -293,13 +292,13 @@ TOOLS: list[dict] = [
     },
     {
         "name": "post_file",
-        "description": "Fetches a file from a managed host and posts it as a Discord attachment. Supports images (png, jpg, gif, webp) and text files. Max 25MB. For generated content, use generate_file instead.",
+        "description": "Fetches a file from a managed host and posts it as a Discord attachment. Max 25MB. For generated content, use generate_file.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "host": {
                     "type": "string",
-                    "description": "Host alias from config (e.g. 'myserver', 'webhost')",
+                    "description": "Host alias from config",
                 },
                 "path": {
                     "type": "string",
@@ -315,7 +314,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "generate_file",
-        "description": "Creates a file and posts it as a Discord attachment. For script, code, CSV, report, config, or any downloadable content. Returns the file as a Discord attachment. For files already on a host, use post_file instead.",
+        "description": "Creates a file (script, code, CSV, report, etc.) and posts it as a Discord attachment. For files on a host, use post_file.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -339,11 +338,10 @@ TOOLS: list[dict] = [
     {
         "name": "schedule_task",
         "description": (
-            "Schedules a recurring, one-time, or webhook-triggered task. "
-            "Recurring: provide cron expression. One-time: provide run_at (ISO datetime, use parse_time to convert natural language). "
-            "Webhook-triggered: provide trigger object matching incoming webhooks (Gitea push, Grafana alert, etc.). "
-            "Actions: 'reminder' posts a message, 'check' runs a monitoring tool, 'digest' runs infrastructure digest, "
-            "'workflow' runs a multi-step tool chain with conditions and variable substitution."
+            "Schedules a recurring (cron), one-time (run_at), or webhook-triggered task. "
+            "Use parse_time to convert natural language to run_at. "
+            "Actions: 'reminder' = post message, 'check' = monitoring tool, 'digest' = infrastructure digest, "
+            "'workflow' = multi-step tool chain."
         ),
         "input_schema": {
             "type": "object",
@@ -362,10 +360,7 @@ TOOLS: list[dict] = [
                 },
                 "trigger": {
                     "type": "object",
-                    "description": (
-                        "Webhook trigger conditions (AND logic). "
-                        "Example: {\"source\": \"gitea\", \"event\": \"push\", \"repo\": \"myproject\"}. Omit for time-based tasks."
-                    ),
+                    "description": "Webhook trigger (AND logic). E.g. {\"source\": \"gitea\", \"event\": \"push\", \"repo\": \"myproject\"}.",
                     "properties": {
                         "source": {
                             "type": "string",
@@ -397,39 +392,23 @@ TOOLS: list[dict] = [
                 },
                 "tool_name": {
                     "type": "string",
-                    "description": "For checks: monitoring tool to run (check_service, check_disk, check_memory, check_logs, query_prometheus)",
+                    "description": "Tool to run for 'check' action",
                 },
                 "tool_input": {
                     "type": "object",
-                    "description": "For checks: tool input parameters (e.g. {\"host\": \"myserver\"})",
+                    "description": "Input parameters for the tool",
                 },
                 "steps": {
                     "type": "array",
-                    "description": "For workflows: ordered steps to execute sequentially",
+                    "description": "Workflow steps (sequential)",
                     "items": {
                         "type": "object",
                         "properties": {
-                            "tool_name": {
-                                "type": "string",
-                                "description": "Tool to run",
-                            },
-                            "tool_input": {
-                                "type": "object",
-                                "description": "Input parameters",
-                            },
-                            "description": {
-                                "type": "string",
-                                "description": "Step description",
-                            },
-                            "condition": {
-                                "type": "string",
-                                "description": "Run only if previous output contains this substring. Prefix ! to negate.",
-                            },
-                            "on_failure": {
-                                "type": "string",
-                                "enum": ["abort", "continue"],
-                                "description": "What to do on failure (default: abort)",
-                            },
+                            "tool_name": {"type": "string", "description": "Tool to run"},
+                            "tool_input": {"type": "object", "description": "Input parameters"},
+                            "description": {"type": "string", "description": "Step description"},
+                            "condition": {"type": "string", "description": "Run if previous output contains this (! to negate)"},
+                            "on_failure": {"type": "string", "enum": ["abort", "continue"], "description": "Default: abort"},
                         },
                         "required": ["tool_name"],
                     },
@@ -440,7 +419,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "list_schedules",
-        "description": "Returns all scheduled tasks (recurring, one-time, and webhook-triggered) with their IDs, descriptions, and next run times. To delete, use delete_schedule.",
+        "description": "Lists all scheduled tasks with IDs, descriptions, and next run times. To delete, use delete_schedule.",
         "input_schema": {
             "type": "object",
             "properties": {},
@@ -463,10 +442,9 @@ TOOLS: list[dict] = [
     {
         "name": "parse_time",
         "description": (
-            "Converts a natural language time expression to ISO datetime string. "
-            "Handles: 'in 30 minutes', 'in 2 hours', 'tomorrow at 9am', 'next Monday at 3pm', "
-            "'at 5pm', 'friday at noon'. Uses the bot's configured timezone. "
-            "Use this to get the run_at value for schedule_task."
+            "Converts natural language time to ISO datetime "
+            "(e.g. 'in 2 hours', 'tomorrow at 9am', 'next Friday at 3pm'). "
+            "Uses bot timezone. For schedule_task's run_at parameter."
         ),
         "input_schema": {
             "type": "object",
@@ -482,7 +460,7 @@ TOOLS: list[dict] = [
     # --- History and memory ---
     {
         "name": "search_history",
-        "description": "Searches past conversation history (current and archived sessions) using keyword and semantic matching. Returns timestamped entries: '[date] (role): content'. For ingested docs, use search_knowledge instead.",
+        "description": "Searches past conversation history using keyword and semantic matching. Returns '[date] (role): content'. For ingested docs, use search_knowledge.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -500,7 +478,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "memory_manage",
-        "description": "Persistent memory notes that survive across conversations. 'save' stores facts/preferences, 'list' shows all notes, 'delete' removes a note. Personal notes are per-user; global notes are shared infrastructure knowledge visible to everyone.",
+        "description": "Persistent memory that survives across conversations. 'save'/'list'/'delete' notes. 'personal' = per-user, 'global' = shared with everyone.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -529,7 +507,7 @@ TOOLS: list[dict] = [
     # --- Audit ---
     {
         "name": "search_audit",
-        "description": "Searches the audit log of past tool executions. Returns entries: '[date] tool_name by user (status, Nms)' with result summary. Filterable by tool name, user, host, keyword, and date.",
+        "description": "Searches audit log of tool executions. Returns '[date] tool_name by user (status, Nms)'. Filterable by tool, user, host, keyword, date.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -562,7 +540,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "create_digest",
-        "description": "Creates a scheduled daily infrastructure digest. Checks disk, memory, services, and Prometheus alerts across all hosts, posts a summary.",
+        "description": "Creates a scheduled daily infrastructure digest across all hosts (disk, memory, services, alerts).",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -581,21 +559,15 @@ TOOLS: list[dict] = [
     {
         "name": "create_skill",
         "description": (
-            "Creates a new skill (custom tool) from Python code. Immediately available after creation.\n"
-            "Code must define: async def execute(inp: dict, context: SkillContext) -> str\n\n"
-            "SkillContext API:\n"
-            "- await context.run_on_host(alias, command) — run command on managed host\n"
-            "- await context.query_prometheus(query) — PromQL query\n"
-            "- await context.read_file(host, path, lines=200) — read remote file\n"
-            "- await context.execute_tool(name, input) — call any safe built-in tool\n"
-            "- await context.http_get(url) / context.http_post(url, json=) — HTTP requests\n"
-            "- await context.post_message(text) / context.post_file(data, filename, caption)\n"
-            "- await context.search_knowledge(query) / context.ingest_document(content, source)\n"
-            "- await context.search_history(query, limit=10)\n"
-            "- context.remember(key, value) / context.recall(key) — persistent memory\n"
-            "- context.schedule_task(...) / context.list_schedules() / context.delete_schedule(id)\n"
-            "- context.get_hosts() / context.get_services() / context.log(msg)\n"
-            "See data/skills/*.template for examples."
+            "Creates a skill (custom tool) from Python code. Available immediately.\n"
+            "Define: async def execute(inp: dict, context: SkillContext) -> str\n\n"
+            "SkillContext methods (all async):\n"
+            "- run_on_host(alias, cmd), query_prometheus(query), read_file(host, path)\n"
+            "- execute_tool(name, input), http_get(url), http_post(url, json=)\n"
+            "- post_message(text), post_file(data, filename, caption)\n"
+            "- search_knowledge(query), ingest_document(content, source), search_history(query)\n"
+            "- remember(key, value), recall(key), schedule_task(...), get_hosts(), log(msg)\n"
+            "See data/skills/*.template."
         ),
         "input_schema": {
             "type": "object",
@@ -646,7 +618,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "list_skills",
-        "description": "Returns all user-created skills with their descriptions, status, and input schemas.",
+        "description": "Lists all user-created skills with descriptions, status, and input schemas.",
         "input_schema": {
             "type": "object",
             "properties": {},
@@ -655,7 +627,7 @@ TOOLS: list[dict] = [
     # --- Prometheus range query ---
     {
         "name": "query_prometheus_range",
-        "description": "Runs a PromQL range query over a time window. Returns series as 'metric{labels}: N points [first → last]'. For trend analysis (e.g. CPU over 6 hours). For current values only, use query_prometheus.",
+        "description": "Runs a PromQL range query over a time window. Returns 'metric{labels}: N points [first → last]'. For current values, use query_prometheus.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -679,10 +651,10 @@ TOOLS: list[dict] = [
     {
         "name": "delegate_task",
         "description": (
-            "Runs a multi-step task in the background. Returns immediately with task ID; progress updates post to Discord. "
-            "Steps execute sequentially. Support: conditions (substring match on previous output, prefix ! to negate), "
-            "on_failure (abort/continue), store_as (save output to named variable, reference via {var.name}), "
-            "{prev_output} substitution. Track with list_tasks, stop with cancel_task."
+            "Runs a multi-step task in the background, posting progress to Discord. "
+            "Steps run sequentially with conditions (substring match, ! to negate), "
+            "on_failure (abort/continue), store_as ({var.name}), {prev_output} substitution. "
+            "Track with list_tasks, stop with cancel_task."
         ),
         "input_schema": {
             "type": "object",
@@ -713,7 +685,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "list_tasks",
-        "description": "Returns background tasks. Without task_id: overview of all (running/completed/failed). With task_id: detailed step-by-step results. See delegate_task to create, cancel_task to stop.",
+        "description": "Lists background tasks. Without task_id: overview. With task_id: step-by-step details. See delegate_task, cancel_task.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -742,10 +714,9 @@ TOOLS: list[dict] = [
     {
         "name": "search_knowledge",
         "description": (
-            "Searches the knowledge base of ingested documentation, runbooks, configs, and notes. "
-            "Returns ranked chunks: '[source] (score: N) content'. "
-            "Search here FIRST for environment-specific questions before falling back to web_search. "
-            "To add documents, use ingest_document. To list sources, use list_knowledge."
+            "Searches ingested knowledge base (docs, runbooks, configs). "
+            "Returns ranked '[source] (score: N) content'. "
+            "Search here FIRST before web_search. To add, use ingest_document. To list, use list_knowledge."
         ),
         "input_schema": {
             "type": "object",
@@ -765,9 +736,8 @@ TOOLS: list[dict] = [
     {
         "name": "ingest_document",
         "description": (
-            "Ingests a document into the knowledge base. Content is chunked and embedded for semantic search. "
-            "Re-ingesting the same source name replaces the previous version. "
-            "For files on a host, read_file first then pass the content here. Search with search_knowledge."
+            "Ingests a document into the knowledge base (chunked + embedded for search). "
+            "Re-ingesting same source replaces previous. For host files, read_file first. Search with search_knowledge."
         ),
         "input_schema": {
             "type": "object",
@@ -786,7 +756,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "list_knowledge",
-        "description": "Returns all documents in the knowledge base with source names and chunk counts. To search, use search_knowledge. To remove, use delete_knowledge.",
+        "description": "Lists all knowledge base documents with source names and chunk counts. To search, use search_knowledge. To remove, use delete_knowledge.",
         "input_schema": {
             "type": "object",
             "properties": {},
@@ -809,7 +779,7 @@ TOOLS: list[dict] = [
     # --- Browser automation ---
     {
         "name": "browser_screenshot",
-        "description": "Navigates to a URL in a headless browser, takes a screenshot, and posts it to Discord. Renders JavaScript — works on dashboards (Grafana, Semaphore, Pi-hole), SPAs, and dynamic pages that fetch_url cannot handle. For text extraction, use browser_read_page.",
+        "description": "Takes a screenshot of a URL (renders JavaScript) and posts to Discord. Works on dashboards, SPAs, and dynamic pages unlike fetch_url. For text, use browser_read_page.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -831,7 +801,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "browser_read_page",
-        "description": "Navigates to a URL in a headless browser and returns 'Title (url)\\n\\ntext'. Renders JavaScript first — works on SPAs and dynamic pages unlike fetch_url. Optionally scoped to a CSS selector. For tables, use browser_read_table. For screenshots, use browser_screenshot.",
+        "description": "Reads a URL's text content (renders JavaScript). Returns 'Title (url)\\n\\ntext'. Works on SPAs/dynamic pages unlike fetch_url. Scope via CSS selector. For tables, use browser_read_table. For screenshots, use browser_screenshot.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -857,7 +827,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "browser_read_table",
-        "description": "Navigates to a URL in a headless browser and extracts an HTML table as markdown (| col | col |). Returns structured tabular data. For general text, use browser_read_page.",
+        "description": "Extracts an HTML table from a URL as markdown (| col | col |). Renders JavaScript. For text, use browser_read_page.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -927,7 +897,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "browser_evaluate",
-        "description": "Navigates to a URL and evaluates a JavaScript expression. Returns the expression result. Escape hatch for custom scraping or interaction.",
+        "description": "Evaluates JavaScript on a URL and returns the result. For custom scraping or interaction.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -950,7 +920,7 @@ TOOLS: list[dict] = [
     # --- Web tools ---
     {
         "name": "web_search",
-        "description": "Searches the web via DuckDuckGo. Returns numbered results: 'N. title\\nurl\\nsnippet'. Max 10 results. For full page content, follow up with fetch_url or browser_read_page.",
+        "description": "Searches the web via DuckDuckGo. Returns 'N. title\\nurl\\nsnippet' (max 10). For full content, use fetch_url or browser_read_page.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -968,7 +938,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "fetch_url",
-        "description": "Fetches a URL and returns content as text (HTML converted to readable text, JSON passed through). Static only — for JavaScript-rendered pages use browser_read_page. To find URLs first, use web_search.",
+        "description": "Fetches a URL and returns text (HTML→readable text, JSON passed through). Static only — for JS-rendered pages use browser_read_page.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -983,7 +953,7 @@ TOOLS: list[dict] = [
     # --- Incus tools ---
     {
         "name": "incus_list",
-        "description": "Returns all Incus instances (containers/VMs) as a formatted table: name, status, type, IPv4. For details on one instance, use incus_info.",
+        "description": "Lists all Incus instances as a table (name, status, type, IPv4). For details, use incus_info.",
         "input_schema": {
             "type": "object",
             "properties": {},
@@ -991,7 +961,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "incus_info",
-        "description": "Returns detailed info for an Incus instance: config, devices, snapshots, and resource usage. For a list of all instances, use incus_list.",
+        "description": "Returns detailed Incus instance info (config, devices, snapshots, resources). For all instances, use incus_list.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1005,7 +975,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "incus_exec",
-        "description": "Executes a command inside an Incus instance. Returns exit code and output. For host-level commands, use run_command instead. For console logs, use incus_logs.",
+        "description": "Runs a command inside an Incus instance. For host-level commands, use run_command. For logs, use incus_logs.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1159,7 +1129,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "incus_logs",
-        "description": "Returns console log output from an Incus instance. Max 200 lines. To run commands inside, use incus_exec.",
+        "description": "Returns console log from an Incus instance (max 200 lines). To run commands inside, use incus_exec.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1179,14 +1149,10 @@ TOOLS: list[dict] = [
     {
         "name": "claude_code",
         "description": (
-            "Deep reasoning agent for complex multi-step tasks: code generation, repo analysis, debugging, "
-            "building/deploying projects, reading docs and following instructions, architecture review — "
-            "anything that would take 3+ direct tool calls step-by-step. Runs the entire chain in one session "
-            "with no context loss. Results return as text + files on disk. "
-            "With allow_edits=true, appends 'FILES ON DISK: ...' manifest listing written files.\n"
-            "NOT for: reading single files (use read_file), "
-            "running single commands (use run_command). For single-file writes, use write_file.\n"
-            "For code+deploy: call this first to write code, then use infrastructure tools to deploy."
+            "Deep reasoning agent for complex multi-step tasks (3+ tool calls): code generation, "
+            "repo analysis, debugging, building/deploying. Runs an entire chain in one session. "
+            "Results as text + files on disk. With allow_edits=true, appends 'FILES ON DISK: ...' manifest.\n"
+            "NOT for: single files (read_file/write_file) or single commands (run_command)."
         ),
         "input_schema": {
             "type": "object",
@@ -1218,11 +1184,7 @@ TOOLS: list[dict] = [
     # --- Permissions ---
     {
         "name": "set_permission",
-        "description": (
-            "Sets a Discord user's permission tier. Admin-only. "
-            "Tiers: 'admin' (full tool access), 'user' (read-only monitoring), "
-            "'guest' (chat only, no tools)."
-        ),
+        "description": "Sets a Discord user's permission tier. Admin-only. Tiers: admin (full access), user (read-only), guest (chat only).",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1242,10 +1204,7 @@ TOOLS: list[dict] = [
     # --- PDF analysis ---
     {
         "name": "analyze_pdf",
-        "description": "Extracts text from a PDF file. Accepts a URL or host:path. "
-                       "Returns markdown-formatted text content. "
-                       "For host files, fetches via read_file. For URLs, downloads directly. "
-                       "Truncated to 12000 chars. For image-heavy PDFs, use browser_screenshot.",
+        "description": "Extracts text from a PDF (URL or host:path). Returns markdown text (max 12000 chars). For image-heavy PDFs, use browser_screenshot.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1259,8 +1218,7 @@ TOOLS: list[dict] = [
     # --- Rich Discord messaging ---
     {
         "name": "add_reaction",
-        "description": "Adds an emoji reaction to a message. Requires message_id and emoji. "
-                       "Use Unicode emoji (\U0001f44d) or custom emoji format (<:name:id>).",
+        "description": "Adds an emoji reaction to a message. Unicode emoji or custom format (<:name:id>).",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1291,9 +1249,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "broadcast",
-        "description": "Sends a message to the current channel with optional rich embed. "
-                       "Use for announcements, formatted info, or styled messages. "
-                       "Supports embed with title, description, color (hex), and fields.",
+        "description": "Sends a message to the current channel with optional rich embed (title, description, color, fields).",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -1327,10 +1283,9 @@ TOOLS: list[dict] = [
     {
         "name": "manage_process",
         "description": (
-            "Manages background processes: start, poll output, send stdin, kill, or list. "
-            "Start spawns a long-running command and returns its PID. Poll returns recent output lines. "
-            "Write sends text to stdin. Kill terminates the process. List shows all tracked processes. "
-            "Max 20 concurrent, auto-killed after 1 hour."
+            "Manages background processes (start/poll/write/kill/list). "
+            "Start spawns a command, returns PID. Poll gets output. Write sends stdin. "
+            "Max 20 concurrent, auto-killed after 1hr."
         ),
         "input_schema": {
             "type": "object",
@@ -1368,9 +1323,9 @@ TOOLS: list[dict] = [
     {
         "name": "manage_list",
         "description": (
-            "Manages named lists (grocery, todo, shopping, hardware, gifts, etc.). "
-            "Lists are created on first add. Per-user lists are private; shared lists are visible to everyone. "
-            "Todo/task lists support mark_done/mark_undone."
+            "Manages named lists (grocery, todo, shopping, etc.). "
+            "Created on first add. 'personal' = private, 'shared' = visible to all. "
+            "Supports mark_done/mark_undone."
         ),
         "input_schema": {
             "type": "object",
@@ -1414,9 +1369,8 @@ TOOLS: list[dict] = [
     {
         "name": "analyze_image",
         "description": (
-            "Fetches an image from a URL or host file path and analyzes it. "
-            "Returns a text description of the image content. "
-            "For screenshots of web pages, use browser_screenshot instead."
+            "Analyzes an image from URL or host path. Returns text description. "
+            "For web page screenshots, use browser_screenshot."
         ),
         "input_schema": {
             "type": "object",
@@ -1435,12 +1389,9 @@ TOOLS: list[dict] = [
     {
         "name": "start_loop",
         "description": (
-            "Starts an intelligent autonomous loop. Each iteration triggers a full "
-            "LLM reasoning cycle — you decide what to check, how to interpret results, "
-            "and what to report. Use for: monitoring, game playing, event watching, "
-            "periodic status updates. The 'goal' describes what you're trying to "
-            "accomplish — you will be called repeatedly with this goal and can use "
-            "any tools. Returns a loop ID. Check status with list_loops, stop with stop_loop."
+            "Starts an autonomous loop. Each iteration triggers a full LLM reasoning cycle "
+            "with all tools. Use for monitoring, game playing, event watching, periodic updates. "
+            "Returns loop ID. Check with list_loops, stop with stop_loop."
         ),
         "input_schema": {
             "type": "object",
@@ -1448,11 +1399,9 @@ TOOLS: list[dict] = [
                 "goal": {
                     "type": "string",
                     "description": (
-                        "What this loop should accomplish. This is passed to you "
-                        "each iteration as your instruction. Be specific: "
-                        "'Check game state at http://X, take the next move, report score' or "
-                        "'Monitor disk usage, warn if above 80%' or "
-                        "'Watch /tmp/events.log for new lines, summarize any new entries'"
+                        "Goal for each iteration (be specific). "
+                        "E.g. 'Monitor disk usage, warn if above 80%' or "
+                        "'Watch /tmp/events.log, summarize new entries'"
                     ),
                 },
                 "interval_seconds": {
@@ -1462,19 +1411,11 @@ TOOLS: list[dict] = [
                 "mode": {
                     "type": "string",
                     "enum": ["notify", "act", "silent"],
-                    "description": (
-                        "notify: check + report to channel. "
-                        "act: check + take actions + report. "
-                        "silent: check + take actions, only report if notable."
-                    ),
+                    "description": "notify = report always, act = act + report, silent = act, report only if notable",
                 },
                 "stop_condition": {
                     "type": "string",
-                    "description": (
-                        "Natural language condition to auto-stop: "
-                        "'when the game ends' or 'when disk is below 50%' or "
-                        "'after 5 iterations'. Evaluated by LLM each cycle."
-                    ),
+                    "description": "Auto-stop condition, e.g. 'when disk below 50%' or 'after 5 iterations'. Evaluated each cycle.",
                 },
                 "max_iterations": {
                     "type": "integer",
@@ -1500,10 +1441,7 @@ TOOLS: list[dict] = [
     },
     {
         "name": "list_loops",
-        "description": (
-            "Lists all active autonomous loops with their status, iteration count, "
-            "and last activity time. To create a loop, use start_loop. To stop, use stop_loop."
-        ),
+        "description": "Lists all autonomous loops with status, iterations, and last activity. To create, use start_loop. To stop, use stop_loop.",
         "input_schema": {
             "type": "object",
             "properties": {},
@@ -1512,12 +1450,7 @@ TOOLS: list[dict] = [
     # --- Image generation (ComfyUI) ---
     {
         "name": "generate_image",
-        "description": (
-            "Generates an image from a text prompt using ComfyUI (Stable Diffusion). "
-            "Posts the result as a Discord attachment. "
-            "Supports positive prompt, negative prompt, and custom dimensions. "
-            "Requires ComfyUI to be enabled in config."
-        ),
+        "description": "Generates an image from a text prompt via ComfyUI and posts to Discord. Requires ComfyUI enabled in config.",
         "input_schema": {
             "type": "object",
             "properties": {
