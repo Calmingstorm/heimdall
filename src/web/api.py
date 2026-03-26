@@ -381,6 +381,11 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             "all_packs_loaded": not enabled,
         })
 
+    @routes.get("/api/tools/stats")
+    async def tool_stats(_request: web.Request) -> web.Response:
+        counts = await bot.audit.count_by_tool()
+        return web.json_response(counts)
+
     @routes.put("/api/tools/packs")
     async def update_packs(request: web.Request) -> web.Response:
         data = await request.json()
@@ -403,7 +408,9 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
     @routes.get("/api/skills")
     async def list_skills(_request: web.Request) -> web.Response:
         skills = bot.skill_manager.list_skills()
-        # Add source code for each skill
+        # Get usage counts from audit log
+        counts = await bot.audit.count_by_tool()
+        # Add source code and execution stats for each skill
         for skill_info in skills:
             name = skill_info["name"]
             loaded = bot.skill_manager._skills.get(name)
@@ -412,6 +419,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
                     skill_info["code"] = loaded.file_path.read_text()
                 except OSError:
                     skill_info["code"] = None
+            skill_info["execution_count"] = counts.get(name, 0)
         return web.json_response(skills)
 
     @routes.post("/api/skills")
@@ -456,6 +464,21 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
             {"result": result},
             status=400 if is_error else 200,
         )
+
+    @routes.post("/api/skills/{name}/test")
+    async def test_skill(request: web.Request) -> web.Response:
+        name = request.match_info["name"]
+        if not bot.skill_manager.has_skill(name):
+            return web.json_response({"error": "skill not found"}, status=404)
+        try:
+            result = await bot.skill_manager.execute(name, {})
+            is_error = result.startswith("Skill error:") or result.startswith("Skill '")
+            return web.json_response({
+                "result": result,
+                "is_error": is_error,
+            })
+        except Exception as e:
+            return web.json_response({"result": str(e), "is_error": True}, status=500)
 
     @routes.delete("/api/skills/{name}")
     async def delete_skill(request: web.Request) -> web.Response:

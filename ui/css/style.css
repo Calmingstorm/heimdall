@@ -616,6 +616,51 @@ textarea.loki-input {
   opacity: 0.7;
 }
 
+/* Tool detail expandable row */
+.tool-expand-icon {
+  font-size: 0.625rem;
+  display: inline-block;
+  transition: transform 0.15s;
+}
+.tool-detail-row td { padding: 0 !important; }
+.tool-detail-cell {
+  padding: 0.75rem 1rem 0.75rem 2rem !important;
+  background: rgba(17, 24, 39, 0.5);
+  border-left: 2px solid var(--loki-accent);
+}
+.tool-pack-card { transition: opacity 0.15s, border-color 0.15s; }
+
+/* Skill code block with syntax highlighting */
+.skill-code-block {
+  background: var(--loki-bg);
+  border: 1px solid var(--loki-border);
+  border-radius: 0.375rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+  overflow-x: auto;
+  line-height: 1.6;
+  max-height: 400px;
+  overflow-y: auto;
+  margin: 0;
+  color: var(--loki-text);
+}
+.skill-code-block code { background: none; padding: 0; font-size: inherit; }
+.sk-kw { color: #c084fc; font-weight: 600; }
+.sk-str { color: #86efac; }
+.sk-cmt { color: #6b7280; font-style: italic; }
+.sk-dec { color: #fbbf24; }
+.sk-num { color: #67e8f9; }
+.skill-card { transition: border-color 0.15s; }
+.skill-card:hover { border-color: rgba(99, 102, 241, 0.3); }
+.skill-editor {
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  tab-size: 4;
+  min-height: 300px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .loki-sidebar {

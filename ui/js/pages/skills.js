@@ -1,10 +1,33 @@
 /**
  * Loki Management UI — Skills Page
- * List, create, edit, delete skills with code editor
+ * List, create, edit, delete, test skills with syntax highlighting
  */
 import { api } from '../api.js';
 
-const { ref, onMounted } = Vue;
+const { ref, computed, onMounted, nextTick, watch } = Vue;
+
+// Basic Python keyword highlighting (no external dependency)
+function highlightPython(code) {
+  if (!code) return '';
+  // Escape HTML first
+  let html = code
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  // Strings (triple-quoted first, then single/double)
+  html = html.replace(/("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g,
+    '<span class="sk-str">$1</span>');
+  // Comments
+  html = html.replace(/(#[^\n]*)/g, '<span class="sk-cmt">$1</span>');
+  // Keywords
+  const kw = '\\b(def|class|return|if|elif|else|for|while|import|from|as|try|except|finally|raise|with|async|await|yield|pass|break|continue|and|or|not|in|is|None|True|False|self|lambda)\\b';
+  html = html.replace(new RegExp(kw, 'g'), '<span class="sk-kw">$1</span>');
+  // Decorators
+  html = html.replace(/(@\w+)/g, '<span class="sk-dec">$1</span>');
+  // Numbers
+  html = html.replace(/\b(\d+\.?\d*)\b/g, '<span class="sk-num">$1</span>');
+  return html;
+}
 
 export default {
   template: `
@@ -30,29 +53,48 @@ export default {
         <p class="text-gray-400">No skills loaded. Create one to get started.</p>
       </div>
       <div v-else-if="!editing">
-        <table class="loki-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Description</th>
-              <th>Tools</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="s in skills" :key="s.name">
-              <td class="font-mono text-sm whitespace-nowrap">{{ s.name }}</td>
-              <td class="text-gray-400 text-sm">{{ s.description || '—' }}</td>
-              <td>
-                <span class="badge badge-info">{{ s.tool_count || 0 }}</span>
-              </td>
-              <td class="whitespace-nowrap">
+        <!-- Skill cards -->
+        <div class="space-y-3">
+          <div v-for="s in skills" :key="s.name" class="loki-card skill-card">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="font-mono text-sm font-semibold">{{ s.name }}</span>
+                <span class="badge badge-info">{{ s.tool_count || 0 }} tools</span>
+                <span v-if="s.execution_count > 0" class="text-gray-500 text-xs font-mono">
+                  {{ s.execution_count.toLocaleString() }} runs
+                </span>
+              </div>
+              <div class="flex gap-1">
+                <button @click="testSkill(s.name)"
+                        class="btn btn-ghost text-xs"
+                        :disabled="testing === s.name">
+                  {{ testing === s.name ? 'Testing...' : 'Test' }}
+                </button>
+                <button @click="toggleCode(s.name)" class="btn btn-ghost text-xs">
+                  {{ showCode[s.name] ? 'Hide Code' : 'View Code' }}
+                </button>
                 <button @click="editSkill(s)" class="btn btn-ghost text-xs">Edit</button>
-                <button @click="confirmDelete(s.name)" class="btn btn-danger text-xs ml-1">Delete</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                <button @click="confirmDelete(s.name)" class="btn btn-danger text-xs">Delete</button>
+              </div>
+            </div>
+            <div class="text-gray-400 text-sm mb-1">{{ s.description || 'No description' }}</div>
+            <div class="text-gray-600 text-xs">Loaded: {{ formatDate(s.loaded_at) }}</div>
+
+            <!-- Test result -->
+            <div v-if="testResults[s.name]" class="mt-2 p-2 rounded text-sm font-mono"
+                 :class="testResults[s.name].is_error ? 'bg-red-950/30 border border-red-900/50 text-red-400' : 'bg-green-950/30 border border-green-900/50 text-green-400'">
+              <div class="text-xs font-sans mb-1" :class="testResults[s.name].is_error ? 'text-red-500' : 'text-green-500'">
+                {{ testResults[s.name].is_error ? 'Test Failed' : 'Test Passed' }}
+              </div>
+              <div class="whitespace-pre-wrap text-xs">{{ truncate(testResults[s.name].result, 500) }}</div>
+            </div>
+
+            <!-- Code preview with syntax highlighting -->
+            <div v-if="showCode[s.name] && s.code" class="mt-2">
+              <pre class="skill-code-block"><code v-html="highlight(s.code)"></code></pre>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Create/Edit form -->
@@ -66,16 +108,21 @@ export default {
 
         <div v-if="editMode === 'create'" class="mb-3">
           <label class="text-gray-400 text-xs block mb-1">Name</label>
-          <input v-model="editName" type="text" class="loki-input" placeholder="my_skill" />
+          <input v-model="editName" type="text" class="loki-input" placeholder="my_skill"
+                 style="max-width:300px" />
+          <div class="text-gray-600 text-xs mt-1">Lowercase, alphanumeric + underscores, starts with letter</div>
         </div>
 
         <div class="mb-3">
           <label class="text-gray-400 text-xs block mb-1">Code</label>
-          <textarea v-model="editCode" class="loki-input" rows="16"
-                    placeholder="# Skill code here..."></textarea>
+          <textarea v-model="editCode" class="loki-input skill-editor" rows="20"
+                    placeholder="# Skill code here...&#10;&#10;SKILL_DEFINITION = {&#10;    'name': 'my_skill',&#10;    'description': 'What this skill does',&#10;    'input_schema': {&#10;        'type': 'object',&#10;        'properties': {},&#10;    },&#10;}&#10;&#10;async def execute(tool_input, context):&#10;    return 'result'"></textarea>
         </div>
 
-        <div v-if="editError" class="mb-3 text-red-400 text-sm">{{ editError }}</div>
+        <div v-if="editError" class="mb-3 p-2 rounded bg-red-950/30 border border-red-900/50">
+          <div class="text-red-400 text-sm font-semibold mb-1">Error</div>
+          <div class="text-red-300 text-sm whitespace-pre-wrap">{{ editError }}</div>
+        </div>
         <div v-if="editSuccess" class="mb-3 text-green-400 text-sm">{{ editSuccess }}</div>
 
         <div class="flex gap-2">
@@ -107,10 +154,13 @@ export default {
     const skills = ref([]);
     const loading = ref(true);
     const error = ref(null);
+    const showCode = ref({});
+    const testResults = ref({});
+    const testing = ref(null);
 
     // Editor state
     const editing = ref(false);
-    const editMode = ref('create'); // 'create' | 'edit'
+    const editMode = ref('create');
     const editName = ref('');
     const editCode = ref('');
     const editError = ref(null);
@@ -121,6 +171,27 @@ export default {
     const deleteTarget = ref(null);
     const deleting = ref(false);
 
+    function highlight(code) {
+      return highlightPython(code);
+    }
+
+    function truncate(text, max) {
+      if (!text) return '';
+      return text.length > max ? text.slice(0, max) + '...' : text;
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '—';
+      try {
+        const d = new Date(iso);
+        return d.toLocaleString();
+      } catch { return iso; }
+    }
+
+    function toggleCode(name) {
+      showCode.value = { ...showCode.value, [name]: !showCode.value[name] };
+    }
+
     async function fetchSkills() {
       loading.value = true;
       error.value = null;
@@ -130,6 +201,19 @@ export default {
         error.value = e.message;
       }
       loading.value = false;
+    }
+
+    async function testSkill(name) {
+      testing.value = name;
+      delete testResults.value[name];
+      testResults.value = { ...testResults.value };
+      try {
+        const result = await api.post(`/api/skills/${encodeURIComponent(name)}/test`);
+        testResults.value = { ...testResults.value, [name]: result };
+      } catch (e) {
+        testResults.value = { ...testResults.value, [name]: { result: e.message, is_error: true } };
+      }
+      testing.value = null;
     }
 
     function showCreate() {
@@ -174,7 +258,6 @@ export default {
           editSuccess.value = 'Skill updated successfully';
         }
         await fetchSkills();
-        // Auto-close after brief delay
         setTimeout(() => { editing.value = false; }, 800);
       } catch (e) {
         editError.value = e.message;
@@ -200,10 +283,11 @@ export default {
     onMounted(() => { fetchSkills(); });
 
     return {
-      skills, loading, error,
+      skills, loading, error, showCode, testResults, testing,
       editing, editMode, editName, editCode, editError, editSuccess, saving,
       deleteTarget, deleting,
-      fetchSkills, showCreate, editSkill, cancelEdit, saveSkill,
+      highlight, truncate, formatDate, toggleCode,
+      fetchSkills, testSkill, showCreate, editSkill, cancelEdit, saveSkill,
       confirmDelete, doDelete,
     };
   },

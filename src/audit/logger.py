@@ -63,6 +63,28 @@ class AuditLogger:
             except Exception:
                 pass  # Never let callback errors affect audit logging
 
+    async def count_by_tool(self) -> dict[str, int]:
+        """Return execution counts per tool name (most used first)."""
+        if not self.path.exists():
+            return {}
+        counts: dict[str, int] = {}
+        try:
+            async with aiofiles.open(self.path, "r") as f:
+                async for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        entry = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    name = entry.get("tool_name")
+                    if name:
+                        counts[name] = counts.get(name, 0) + 1
+        except Exception as e:
+            log.error("Failed to read audit log for counts: %s", e)
+        return dict(sorted(counts.items(), key=lambda x: x[1], reverse=True))
+
     async def search(
         self,
         *,

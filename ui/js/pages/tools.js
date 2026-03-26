@@ -1,6 +1,6 @@
 /**
  * Loki Management UI — Tools Page
- * Tool list grouped by pack, toggle packs, search/filter
+ * Tool list grouped by pack, toggle packs, search/filter, usage stats
  */
 import { api } from '../api.js';
 
@@ -45,8 +45,8 @@ export default {
             <div class="text-gray-400 text-xs">Pack Tools</div>
           </div>
           <div class="loki-card text-center">
-            <div class="text-2xl font-bold">{{ Object.keys(packs).length }}</div>
-            <div class="text-gray-400 text-xs">Tool Packs</div>
+            <div class="text-2xl font-bold">{{ totalUsage.toLocaleString() }}</div>
+            <div class="text-gray-400 text-xs">Total Executions</div>
           </div>
         </div>
 
@@ -54,26 +54,33 @@ export default {
         <div class="loki-card mb-4">
           <div class="flex items-center justify-between mb-3">
             <div class="text-gray-400 text-sm font-medium">Tool Packs</div>
-            <span v-if="packsAllLoaded" class="badge badge-info">All packs loaded</span>
+            <span v-if="packsAllLoaded" class="badge badge-success">All packs loaded</span>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
             <div v-for="(info, name) in packs" :key="name"
-                 class="flex items-center justify-between p-2 rounded border"
-                 :class="info.enabled ? 'border-green-900/50 bg-green-950/20' : 'border-gray-800 bg-gray-900/30'">
-              <div>
+                 class="tool-pack-card p-3 rounded border"
+                 :class="info.enabled ? 'border-green-900/50 bg-green-950/20' : 'border-gray-800 bg-gray-900/30 opacity-60'">
+              <div class="flex items-center justify-between mb-1">
                 <span class="text-sm font-medium">{{ name }}</span>
-                <span class="text-gray-500 text-xs ml-1">({{ info.tool_count }})</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox"
+                         :checked="info.enabled"
+                         @change="togglePack(name, $event.target.checked)"
+                         class="sr-only peer">
+                  <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-indigo-600
+                              after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                              after:bg-white after:rounded-full after:h-4 after:w-4
+                              after:transition-all peer-checked:after:translate-x-full"></div>
+                </label>
               </div>
-              <label class="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox"
-                       :checked="info.enabled"
-                       @change="togglePack(name, $event.target.checked)"
-                       class="sr-only peer">
-                <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-indigo-600
-                            after:content-[''] after:absolute after:top-[2px] after:left-[2px]
-                            after:bg-white after:rounded-full after:h-4 after:w-4
-                            after:transition-all peer-checked:after:translate-x-full"></div>
-              </label>
+              <div class="text-gray-500 text-xs">{{ info.tool_count }} tools</div>
+              <div v-if="info.enabled" class="flex flex-wrap gap-1 mt-2">
+                <span v-for="t in (info.tools || []).slice(0, 3)" :key="t"
+                      class="text-xs font-mono text-gray-500">{{ t }}</span>
+                <span v-if="(info.tools || []).length > 3" class="text-xs text-gray-600">
+                  +{{ info.tools.length - 3 }}
+                </span>
+              </div>
             </div>
           </div>
           <div v-if="packSaving" class="mt-2 text-xs text-gray-500">Saving...</div>
@@ -94,20 +101,35 @@ export default {
           <table class="loki-table">
             <thead>
               <tr>
-                <th>Name</th>
+                <th style="width:30%">Name</th>
                 <th>Description</th>
-                <th>Pack</th>
+                <th style="width:80px" class="text-right">Uses</th>
+                <th style="width:80px">Pack</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="t in group.tools" :key="t.name">
-                <td class="font-mono text-sm whitespace-nowrap">{{ t.name }}</td>
-                <td class="text-gray-400 text-sm">{{ truncate(t.description, 120) }}</td>
-                <td>
-                  <span v-if="t.pack" class="badge badge-warning">{{ t.pack }}</span>
-                  <span v-else class="badge badge-info">core</span>
-                </td>
-              </tr>
+              <template v-for="t in group.tools" :key="t.name">
+                <tr class="cursor-pointer" @click="toggleExpand(t.name)">
+                  <td class="font-mono text-sm whitespace-nowrap">
+                    <span class="tool-expand-icon text-gray-600 mr-1">{{ expanded[t.name] ? '\u25BC' : '\u25B6' }}</span>
+                    {{ t.name }}
+                  </td>
+                  <td class="text-gray-400 text-sm">{{ truncate(t.description, 100) }}</td>
+                  <td class="text-right">
+                    <span v-if="stats[t.name]" class="text-gray-300 text-sm font-mono">{{ stats[t.name].toLocaleString() }}</span>
+                    <span v-else class="text-gray-600 text-sm">—</span>
+                  </td>
+                  <td>
+                    <span v-if="t.pack" class="badge badge-warning">{{ t.pack }}</span>
+                    <span v-else class="badge badge-info">core</span>
+                  </td>
+                </tr>
+                <tr v-if="expanded[t.name]" class="tool-detail-row">
+                  <td colspan="4" class="tool-detail-cell">
+                    <div class="text-gray-300 text-sm whitespace-pre-wrap">{{ t.description }}</div>
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
         </div>
@@ -128,9 +150,12 @@ export default {
     const search = ref('');
     const packSaving = ref(false);
     const packError = ref(null);
+    const stats = ref({});
+    const expanded = ref({});
 
     const coreCount = computed(() => tools.value.filter(t => t.is_core).length);
     const packCount = computed(() => tools.value.filter(t => !t.is_core).length);
+    const totalUsage = computed(() => Object.values(stats.value).reduce((a, b) => a + b, 0));
 
     const filteredTools = computed(() => {
       if (!search.value) return tools.value;
@@ -163,18 +188,24 @@ export default {
       return text.length > max ? text.slice(0, max) + '...' : text;
     }
 
+    function toggleExpand(name) {
+      expanded.value = { ...expanded.value, [name]: !expanded.value[name] };
+    }
+
     async function fetchTools() {
       loading.value = true;
       error.value = null;
       try {
-        const [toolsData, packsData] = await Promise.all([
+        const [toolsData, packsData, statsData] = await Promise.all([
           api.get('/api/tools'),
           api.get('/api/tools/packs'),
+          api.get('/api/tools/stats').catch(() => ({})),
         ]);
         tools.value = toolsData;
         packs.value = packsData.packs || {};
         packsAllLoaded.value = packsData.all_packs_loaded || false;
         enabledPacks.value = packsData.enabled_packs || [];
+        stats.value = statsData || {};
       } catch (e) {
         error.value = e.message;
       }
@@ -184,17 +215,13 @@ export default {
     async function togglePack(name, enabled) {
       packSaving.value = true;
       packError.value = null;
-      // Compute new pack list
       let newPacks;
       if (packsAllLoaded.value && !enabled) {
-        // Going from "all loaded" to disabling one: enable all except this one
         newPacks = Object.keys(packs.value).filter(p => p !== name);
       } else if (packsAllLoaded.value && enabled) {
-        // Already all loaded, toggling on is a no-op
         packSaving.value = false;
         return;
       } else {
-        // Normal: add or remove from enabled list
         const current = new Set(enabledPacks.value);
         if (enabled) {
           current.add(name);
@@ -220,9 +247,9 @@ export default {
 
     return {
       tools, packs, packsAllLoaded, loading, error, search,
-      packSaving, packError,
-      coreCount, packCount, filteredTools, groupedTools,
-      truncate, togglePack, refresh,
+      packSaving, packError, stats, expanded,
+      coreCount, packCount, totalUsage, filteredTools, groupedTools,
+      truncate, toggleExpand, togglePack, refresh,
     };
   },
 };

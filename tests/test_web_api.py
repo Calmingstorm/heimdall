@@ -102,6 +102,8 @@ def _make_bot():
     bot.skill_manager.create_skill = MagicMock(return_value="Skill created")
     bot.skill_manager.edit_skill = MagicMock(return_value="Skill updated")
     bot.skill_manager.delete_skill = MagicMock(return_value="Skill deleted")
+    bot.skill_manager.has_skill = MagicMock(side_effect=lambda n: n in bot.skill_manager._skills)
+    bot.skill_manager.execute = AsyncMock(return_value="test output")
 
     # Knowledge
     store = MagicMock()
@@ -170,6 +172,9 @@ def _make_bot():
     bot.audit.search = AsyncMock(return_value=[
         {"timestamp": "2024-01-01", "tool_name": "run_command", "user": "u1"},
     ])
+    bot.audit.count_by_tool = AsyncMock(return_value={
+        "run_command": 42, "read_file": 10, "joke": 3,
+    })
 
     # Memory
     bot.tool_executor._load_all_memory = MagicMock(return_value={
@@ -1862,6 +1867,56 @@ class TestAuditEventCallback:
             assert captured[0]["error"] == "command not found"
 
 
+class TestAuditCountByTool:
+    @pytest.mark.asyncio
+    async def test_count_by_tool_returns_counts(self):
+        import tempfile, os
+        from src.audit.logger import AuditLogger
+
+        with tempfile.TemporaryDirectory() as tmp:
+            logger = AuditLogger(os.path.join(tmp, "audit.jsonl"))
+            for _ in range(3):
+                await logger.log_execution(
+                    user_id="u1", user_name="tester", channel_id="c1",
+                    tool_name="run_command", tool_input={},
+                    approved=True, result_summary="ok", execution_time_ms=10,
+                )
+            await logger.log_execution(
+                user_id="u1", user_name="tester", channel_id="c1",
+                tool_name="read_file", tool_input={},
+                approved=True, result_summary="ok", execution_time_ms=5,
+            )
+            counts = await logger.count_by_tool()
+            assert counts["run_command"] == 3
+            assert counts["read_file"] == 1
+            # Sorted by count descending
+            keys = list(counts.keys())
+            assert keys[0] == "run_command"
+
+    @pytest.mark.asyncio
+    async def test_count_by_tool_empty_log(self):
+        import tempfile, os
+        from src.audit.logger import AuditLogger
+
+        with tempfile.TemporaryDirectory() as tmp:
+            logger = AuditLogger(os.path.join(tmp, "audit.jsonl"))
+            counts = await logger.count_by_tool()
+            assert counts == {}
+
+    @pytest.mark.asyncio
+    async def test_count_by_tool_no_file(self):
+        import tempfile, os
+        from src.audit.logger import AuditLogger
+
+        with tempfile.TemporaryDirectory() as tmp:
+            # Logger created but no entries written — file doesn't exist
+            path = os.path.join(tmp, "empty_audit.jsonl")
+            logger = AuditLogger(path)
+            os.remove(path) if os.path.exists(path) else None
+            counts = await logger.count_by_tool()
+            assert counts == {}
+
+
 class TestBroadcastEventPayloadFormat:
     @pytest.mark.asyncio
     async def test_broadcast_wraps_event_in_payload(self):
@@ -1883,3 +1938,125 @@ class TestBroadcastEventPayloadFormat:
         assert "payload" in msg
         assert msg["payload"]["tool_name"] == "run_command"
         assert msg["payload"]["timestamp"] == "2024-01-01T00:00:00"
+
+
+# ---------------------------------------------------------------------------
+# Round 11: Tool stats endpoint
+# ---------------------------------------------------------------------------
+
+
+class TestToolStats:
+    @pytest.mark.asyncio
+    async def test_tool_stats_returns_counts(self):
+        app, bot = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/tools/stats")
+            assert resp.status == 200
+            body = await resp.json()
+            assert body["run_command"] == 42
+            assert body["read_file"] == 10
+            bot.audit.count_by_tool.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_tool_stats_empty(self):
+        bot = _make_bot()
+        bot.audit.count_by_tool = AsyncMock(return_value={})
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/tools/stats")
+            assert resp.status == 200
+            body = await resp.json()
+            assert body == {}
+
+    @pytest.mark.asyncio
+    async def test_tool_stats_requires_auth(self):
+        app, _ = _make_app(api_token="secret")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/tools/stats")
+            assert resp.status == 401
+            resp2 = await client.get("/api/tools/stats", headers=_auth_headers("secret"))
+            assert resp2.status == 200
+
+
+# ---------------------------------------------------------------------------
+# Round 11: Skill execution stats in list
+# ---------------------------------------------------------------------------
+
+
+class TestSkillExecutionStats:
+    @pytest.mark.asyncio
+    async def test_skills_list_includes_execution_count(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/skills")
+            assert resp.status == 200
+            body = await resp.json()
+            assert len(body) == 1
+            assert body[0]["name"] == "joke"
+            assert body[0]["execution_count"] == 3  # from count_by_tool mock
+
+    @pytest.mark.asyncio
+    async def test_skills_list_zero_executions(self):
+        bot = _make_bot()
+        bot.audit.count_by_tool = AsyncMock(return_value={})
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.get("/api/skills")
+            body = await resp.json()
+            assert body[0]["execution_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Round 11: Skill test endpoint
+# ---------------------------------------------------------------------------
+
+
+class TestSkillTestEndpoint:
+    @pytest.mark.asyncio
+    async def test_test_skill_success(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/skills/joke/test")
+            assert resp.status == 200
+            body = await resp.json()
+            assert body["result"] == "test output"
+            assert body["is_error"] is False
+
+    @pytest.mark.asyncio
+    async def test_test_skill_not_found(self):
+        app, _ = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/skills/nonexistent/test")
+            assert resp.status == 404
+            body = await resp.json()
+            assert "not found" in body["error"]
+
+    @pytest.mark.asyncio
+    async def test_test_skill_error_result(self):
+        bot = _make_bot()
+        bot.skill_manager.execute = AsyncMock(return_value="Skill error: syntax error")
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/skills/joke/test")
+            assert resp.status == 200
+            body = await resp.json()
+            assert body["is_error"] is True
+
+    @pytest.mark.asyncio
+    async def test_test_skill_exception(self):
+        bot = _make_bot()
+        bot.skill_manager.execute = AsyncMock(side_effect=RuntimeError("boom"))
+        app, _ = _make_app(bot, api_token="")
+        async with TestClient(TestServer(app)) as client:
+            resp = await client.post("/api/skills/joke/test")
+            assert resp.status == 500
+            body = await resp.json()
+            assert body["is_error"] is True
+            assert "boom" in body["result"]
+
+    @pytest.mark.asyncio
+    async def test_test_skill_passes_empty_input(self):
+        app, bot = _make_app(api_token="")
+        async with TestClient(TestServer(app)) as client:
+            await client.post("/api/skills/joke/test")
+            bot.skill_manager.execute.assert_called_once_with("joke", {})
