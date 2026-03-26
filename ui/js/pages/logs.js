@@ -10,7 +10,7 @@ const LOG_LEVELS = ['INFO', 'WARNING', 'ERROR'];
 
 export default {
   template: `
-    <div class="p-6 flex flex-col" style="height: calc(100vh - 56px);">
+    <div class="p-6 page-fade-in flex flex-col" style="height: calc(100vh - 56px);">
       <div class="flex items-center justify-between mb-3">
         <h1 class="text-xl font-semibold">Logs</h1>
         <div class="flex gap-2 items-center">
@@ -69,8 +69,9 @@ export default {
       <div class="relative flex-1" style="min-height:200px;">
         <div ref="logContainer" @scroll="onScroll"
              class="absolute inset-0 overflow-y-auto bg-gray-950 border border-gray-800 rounded p-3 font-mono text-xs">
-          <div v-if="filteredLogs.length === 0" class="text-gray-500 text-center py-8">
-            {{ logs.length === 0 ? 'Waiting for log entries...' : 'No entries match the current filter' }}
+          <div v-if="filteredLogs.length === 0" class="empty-state" style="padding:2rem 0;">
+            <span class="empty-state-icon">{{ logs.length === 0 ? '\u{1F4C4}' : '\u{1F50D}' }}</span>
+            <span class="empty-state-text">{{ logs.length === 0 ? 'Waiting for log entries...' : 'No entries match the current filter' }}</span>
           </div>
           <div v-for="(entry, i) in filteredLogs" :key="i"
                class="log-line py-0.5 leading-relaxed whitespace-pre-wrap break-all"

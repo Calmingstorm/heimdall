@@ -22,11 +22,15 @@ function renderMarkdown(text) {
 
 export default {
   template: `
-    <div class="chat-container">
+    <div class="chat-container page-fade-in">
       <!-- Message list -->
       <div class="chat-messages" ref="messagesEl">
         <div v-if="messages.length === 0" class="chat-empty">
-          <div class="text-gray-500 text-sm">No messages yet. Say something to Loki.</div>
+          <div class="empty-state">
+            <span class="empty-state-icon">\u{1F4AD}</span>
+            <span class="empty-state-text">No messages yet</span>
+            <span class="empty-state-hint">Say something to Loki to start a conversation</span>
+          </div>
         </div>
         <div v-for="(msg, i) in messages" :key="i" class="chat-message" :class="'chat-' + msg.role">
           <!-- User message -->

@@ -9,7 +9,7 @@ const { ref, computed, onMounted, onUnmounted, nextTick } = Vue;
 
 export default {
   template: `
-    <div class="p-6">
+    <div class="p-6 page-fade-in">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-xl font-semibold">Sessions</h1>
         <div class="flex items-center gap-2">
@@ -28,11 +28,14 @@ export default {
         <div v-for="n in 4" :key="n" class="skeleton skeleton-row"></div>
       </div>
       <div v-else-if="error" class="loki-card border-red-900 error-state">
+        <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="retry" class="btn btn-ghost text-xs">Retry</button>
       </div>
-      <div v-else-if="sessions.length === 0" class="loki-card">
-        <p class="text-gray-400">No active sessions</p>
+      <div v-else-if="sessions.length === 0" class="loki-card empty-state">
+        <span class="empty-state-icon">\u{1F4AC}</span>
+        <span class="empty-state-text">No active sessions</span>
+        <span class="empty-state-hint">Sessions appear when users interact with Loki via Discord or the chat interface</span>
       </div>
       <div v-else>
         <!-- Select all -->

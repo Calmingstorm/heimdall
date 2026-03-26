@@ -786,6 +786,53 @@ textarea.loki-input {
   margin: 0;
 }
 
+/* Focus states for keyboard navigation */
+.btn:focus-visible,
+.loki-input:focus-visible,
+.loki-select:focus-visible,
+.chat-input:focus-visible,
+.toggle-switch input:focus-visible + .toggle-slider,
+.session-checkbox:focus-visible,
+.memory-checkbox:focus-visible {
+  outline: 2px solid var(--loki-accent);
+  outline-offset: 2px;
+}
+.nav-item:focus-visible {
+  outline: 2px solid var(--loki-accent);
+  outline-offset: -2px;
+}
+
+/* Page fade-in animation */
+.page-fade-in {
+  animation: page-fade 0.2s ease-out;
+}
+@keyframes page-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Consistent empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  text-align: center;
+}
+.empty-state-icon {
+  font-size: 1.75rem;
+  opacity: 0.4;
+}
+.empty-state-text {
+  color: var(--loki-text-muted);
+  font-size: 0.875rem;
+}
+.empty-state-hint {
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
 /* Cron preset buttons */
 .cron-preset-btn {
   display: inline-block;

@@ -8,7 +8,7 @@ const { ref, computed, onMounted } = Vue;
 
 export default {
   template: `
-    <div class="p-6">
+    <div class="p-6 page-fade-in">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-xl font-semibold">Tools</h1>
         <button @click="refresh" class="btn btn-ghost text-xs" :disabled="loading">
@@ -26,6 +26,7 @@ export default {
         <div v-for="n in 5" :key="n + 4" class="skeleton skeleton-row"></div>
       </div>
       <div v-else-if="error" class="loki-card border-red-900 error-state">
+        <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="refresh" class="btn btn-ghost text-xs">Retry</button>
       </div>
@@ -134,8 +135,10 @@ export default {
           </table>
         </div>
 
-        <div v-if="filteredTools.length === 0 && search" class="loki-card">
-          <p class="text-gray-400 text-sm">No tools match "{{ search }}"</p>
+        <div v-if="filteredTools.length === 0 && search" class="loki-card empty-state">
+          <span class="empty-state-icon">\u{1F50D}</span>
+          <span class="empty-state-text">No tools match "{{ search }}"</span>
+          <span class="empty-state-hint">Try a different search term</span>
         </div>
       </div>
     </div>`,

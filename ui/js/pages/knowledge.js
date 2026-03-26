@@ -24,7 +24,7 @@ function highlightTerms(text, query) {
 
 export default {
   template: `
-    <div class="p-6">
+    <div class="p-6 page-fade-in">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-xl font-semibold">Knowledge</h1>
         <div class="flex gap-2">
@@ -57,8 +57,10 @@ export default {
         <div v-if="searchError" class="loki-card border-red-900">
           <p class="text-red-400 text-sm">Search error: {{ searchError }}</p>
         </div>
-        <div v-else-if="searchResults.length === 0" class="loki-card">
-          <p class="text-gray-400 text-sm">No results for "{{ lastQuery }}"</p>
+        <div v-else-if="searchResults.length === 0" class="loki-card empty-state">
+          <span class="empty-state-icon">\u{1F50D}</span>
+          <span class="empty-state-text">No results for "{{ lastQuery }}"</span>
+          <span class="empty-state-hint">Try different search terms or ingest more documents</span>
         </div>
         <div v-else class="space-y-2">
           <div v-for="(r, i) in searchResults" :key="i" class="loki-card">
@@ -97,11 +99,14 @@ export default {
         <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
       </div>
       <div v-else-if="error" class="loki-card border-red-900 error-state">
+        <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchSources" class="btn btn-ghost text-xs">Retry</button>
       </div>
-      <div v-else-if="sources.length === 0 && !showIngest" class="loki-card">
-        <p class="text-gray-400">No documents ingested. Click "Ingest Document" to add one.</p>
+      <div v-else-if="sources.length === 0 && !showIngest" class="loki-card empty-state">
+        <span class="empty-state-icon">\u{1F4DA}</span>
+        <span class="empty-state-text">No documents ingested</span>
+        <span class="empty-state-hint">Click "Ingest Document" to add knowledge for Loki to reference</span>
       </div>
       <div v-else-if="sources.length > 0">
         <div class="text-sm font-medium text-gray-400 mb-2">

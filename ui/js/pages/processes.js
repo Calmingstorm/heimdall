@@ -8,7 +8,7 @@ const { ref, computed, onMounted, onUnmounted, watch } = Vue;
 
 export default {
   template: `
-    <div class="p-6">
+    <div class="p-6 page-fade-in">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-xl font-semibold">Processes</h1>
         <div class="flex items-center gap-3">
@@ -32,11 +32,14 @@ export default {
         <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
       </div>
       <div v-else-if="error" class="loki-card border-red-900 error-state">
+        <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchProcesses" class="btn btn-ghost text-xs">Retry</button>
       </div>
-      <div v-else-if="processes.length === 0" class="loki-card">
-        <p class="text-gray-400">No background processes running.</p>
+      <div v-else-if="processes.length === 0" class="loki-card empty-state">
+        <span class="empty-state-icon">\u{2699}\u{FE0F}</span>
+        <span class="empty-state-text">No background processes</span>
+        <span class="empty-state-hint">Processes appear when Loki runs long-running commands</span>
       </div>
       <div v-else>
         <!-- Summary -->

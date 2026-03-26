@@ -8,7 +8,7 @@ const { ref, computed, onMounted, onUnmounted, nextTick } = Vue;
 
 export default {
   template: `
-    <div class="p-6">
+    <div class="p-6 page-fade-in">
       <h1 class="text-xl font-semibold mb-4">Dashboard</h1>
 
       <!-- Skeleton loading -->
@@ -27,6 +27,7 @@ export default {
 
       <!-- Error state with retry -->
       <div v-else-if="error" class="loki-card border-red-900 error-state">
+        <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="retry" class="btn btn-ghost text-xs">Retry</button>
       </div>
@@ -72,7 +73,7 @@ export default {
           <!-- Guilds -->
           <div class="loki-card">
             <div class="text-gray-400 text-sm font-medium mb-2">Connected Guilds</div>
-            <div v-if="!status.guilds || status.guilds.length === 0" class="text-gray-500 text-sm">No guilds connected</div>
+            <div v-if="!status.guilds || status.guilds.length === 0" class="text-gray-500 text-sm text-center py-2">No guilds connected</div>
             <div v-else class="space-y-1.5">
               <div v-for="g in status.guilds" :key="g.id" class="flex items-center gap-2 text-sm">
                 <span class="status-dot online" style="width:6px;height:6px;"></span>

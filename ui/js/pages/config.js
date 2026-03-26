@@ -65,7 +65,7 @@ function computeDiff(original, edited) {
 
 export default {
   template: `
-    <div class="p-6">
+    <div class="p-6 page-fade-in">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-xl font-semibold">Configuration</h1>
         <div class="flex gap-2">
@@ -99,6 +99,7 @@ export default {
 
       <!-- Error state -->
       <div v-else-if="error" class="loki-card border-red-900 error-state">
+        <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchConfig" class="btn btn-ghost text-xs">Retry</button>
       </div>

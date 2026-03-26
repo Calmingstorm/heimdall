@@ -8,7 +8,7 @@ const { ref, computed, onMounted } = Vue;
 
 export default {
   template: `
-    <div class="p-6">
+    <div class="p-6 page-fade-in">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-xl font-semibold">Schedules</h1>
         <div class="flex gap-2">
@@ -117,11 +117,14 @@ export default {
         <div v-for="n in 4" :key="n" class="skeleton skeleton-row"></div>
       </div>
       <div v-else-if="error" class="loki-card border-red-900 error-state">
+        <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchSchedules" class="btn btn-ghost text-xs">Retry</button>
       </div>
-      <div v-else-if="schedules.length === 0 && !showCreate" class="loki-card">
-        <p class="text-gray-400">No scheduled tasks. Click "New Schedule" to create one.</p>
+      <div v-else-if="schedules.length === 0 && !showCreate" class="loki-card empty-state">
+        <span class="empty-state-icon">\u{23F0}</span>
+        <span class="empty-state-text">No scheduled tasks</span>
+        <span class="empty-state-hint">Click "New Schedule" to set up automated checks or reminders</span>
       </div>
       <div v-else-if="schedules.length > 0">
         <!-- Summary cards -->

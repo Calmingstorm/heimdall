@@ -8,7 +8,7 @@ const { ref, computed, onMounted } = Vue;
 
 export default {
   template: `
-    <div class="p-6">
+    <div class="p-6 page-fade-in">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-xl font-semibold">Audit Log</h1>
         <button @click="fetchAudit" class="btn btn-ghost text-xs" :disabled="loading">
@@ -60,11 +60,14 @@ export default {
         <div v-for="n in 5" :key="n" class="skeleton skeleton-row"></div>
       </div>
       <div v-else-if="error" class="loki-card border-red-900 error-state">
+        <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchAudit" class="btn btn-ghost text-xs">Retry</button>
       </div>
-      <div v-else-if="entries.length === 0" class="loki-card">
-        <p class="text-gray-400">No audit entries found matching your filters.</p>
+      <div v-else-if="entries.length === 0" class="loki-card empty-state">
+        <span class="empty-state-icon">\u{1F4DD}</span>
+        <span class="empty-state-text">No audit entries found</span>
+        <span class="empty-state-hint">Try adjusting your filters or wait for tool executions to appear</span>
       </div>
       <div v-else>
         <div class="text-xs text-gray-500 mb-2">Showing {{ entries.length }} entries</div>

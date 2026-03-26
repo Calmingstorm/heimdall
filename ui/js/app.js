@@ -47,6 +47,12 @@ const router = createRouter({
   routes,
 });
 
+// Update browser tab title on navigation
+router.afterEach((to) => {
+  const label = to.meta?.label;
+  document.title = label ? `Loki \u2014 ${label}` : 'Loki \u2014 Management';
+});
+
 // ---------------------------------------------------------------------------
 // Login component
 // ---------------------------------------------------------------------------

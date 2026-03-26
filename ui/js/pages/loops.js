@@ -8,7 +8,7 @@ const { ref, computed, onMounted, onUnmounted } = Vue;
 
 export default {
   template: `
-    <div class="p-6">
+    <div class="p-6 page-fade-in">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-xl font-semibold">Autonomous Loops</h1>
         <div class="flex gap-2">
@@ -75,14 +75,17 @@ export default {
 
       <!-- Loop list -->
       <div v-if="loading && loops.length === 0" class="space-y-2">
-        <div v-for="n in 3" :key="n" class="skeleton skeleton-row" style="height:5rem;"></div>
+        <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
       </div>
       <div v-else-if="error" class="loki-card border-red-900 error-state">
+        <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchLoops" class="btn btn-ghost text-xs">Retry</button>
       </div>
-      <div v-else-if="loops.length === 0 && !showCreate" class="loki-card">
-        <p class="text-gray-400">No active loops. Click "Start Loop" to create one.</p>
+      <div v-else-if="loops.length === 0 && !showCreate" class="loki-card empty-state">
+        <span class="empty-state-icon">\u{1F504}</span>
+        <span class="empty-state-text">No active loops</span>
+        <span class="empty-state-hint">Click "Start Loop" to create an autonomous recurring task</span>
       </div>
       <div v-else-if="loops.length > 0">
         <!-- Summary -->
