@@ -555,7 +555,7 @@ class TestHedgingNegatives:
         assert detect_hedging("All services are running normally.", []) is False
 
     def test_simple_answer(self):
-        assert detect_hedging("The IP address is 192.168.1.100.", []) is False
+        assert detect_hedging("The IP address is 10.0.0.100.", []) is False
 
 
 # ===========================================================================
