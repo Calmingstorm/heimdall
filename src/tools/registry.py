@@ -1470,6 +1470,12 @@ TOOLS: list[dict] = [
                     "type": "integer",
                     "description": "Image height in pixels (default 1024)",
                 },
+                "model": {
+                    "type": "string",
+                    "description": "Checkpoint/model name to use (e.g. 'realisticVisionV60B1_v60B1VAE.safetensors'). "
+                                   "If omitted, uses the default. Query available models via run_command: "
+                                   "curl -s http://localhost:8188/object_info/CheckpointLoaderSimple",
+                },
             },
             "required": ["prompt"],
         },

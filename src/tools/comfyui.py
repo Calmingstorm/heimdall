@@ -69,6 +69,7 @@ class ComfyUIClient:
         negative: str = "",
         width: int = 1024,
         height: int = 1024,
+        model: str = "",
     ) -> bytes | None:
         """Generate an image from a text prompt.
 
@@ -79,8 +80,8 @@ class ComfyUIClient:
 
         workflow = copy.deepcopy(_DEFAULT_WORKFLOW)
 
-        # Auto-detect checkpoint if the default isn't available
-        ckpt = workflow["4"]["inputs"]["ckpt_name"]
+        # Use specified model or auto-detect from available checkpoints
+        ckpt = model if model else workflow["4"]["inputs"]["ckpt_name"]
         resolved = await self._resolve_checkpoint(ckpt)
         if not resolved:
             log.warning("No checkpoints available on ComfyUI")

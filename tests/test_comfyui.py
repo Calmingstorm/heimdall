@@ -400,6 +400,7 @@ class TestHandleGenerateImage:
             negative="blurry",
             width=512,
             height=512,
+            model="",
         )
         msg.channel.send.assert_awaited_once()
         send_kwargs = msg.channel.send.call_args[1]

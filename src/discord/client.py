@@ -3314,6 +3314,7 @@ class LokiBot(discord.Client):
         negative = inp.get("negative", "")
         width = inp.get("width", 1024)
         height = inp.get("height", 1024)
+        model = inp.get("model", "")
 
         # Clamp dimensions to reasonable range
         width = max(64, min(2048, width))
@@ -3327,6 +3328,7 @@ class LokiBot(discord.Client):
             negative=negative,
             width=width,
             height=height,
+            model=model,
         )
 
         if not image_bytes:
