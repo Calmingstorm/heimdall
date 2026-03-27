@@ -64,9 +64,9 @@ class TestTokenize:
         assert _tokenize("") == set()
 
     def test_preserves_paths_and_ips(self):
-        tokens = _tokenize("check /var/log/syslog on 192.168.1.1")
+        tokens = _tokenize("check /var/log/syslog on 10.0.0.1")
         assert "/var/log/syslog" in tokens
-        assert "192.168.1.1" in tokens
+        assert "10.0.0.1" in tokens
 
 
 # ---------------------------------------------------------------------------
@@ -364,8 +364,8 @@ class TestRelevanceEdgeCases:
     def test_score_with_numbers_and_paths(self):
         """Numbers and paths should be valid tokens."""
         score = score_relevance(
-            "check /var/log/nginx on 192.168.1.1",
-            "/var/log/nginx shows errors on 192.168.1.1",
+            "check /var/log/nginx on 10.0.0.1",
+            "/var/log/nginx shows errors on 10.0.0.1",
         )
         assert score > 0.5
 

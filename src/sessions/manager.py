@@ -149,6 +149,15 @@ def estimate_tokens(text: str) -> int:
     return max(1, len(text) // CHARS_PER_TOKEN)
 
 
+_SUMMARY_PREFIX = "[Previous conversation summary:"
+
+
+def _content_text(m: dict) -> str:
+    """Extract text from a message dict, handling non-string content."""
+    c = m["content"]
+    return c if isinstance(c, str) else str(c)
+
+
 def apply_token_budget(
     messages: list[dict[str, str]],
     budget: int = CONTEXT_TOKEN_BUDGET,
@@ -159,14 +168,14 @@ def apply_token_budget(
     ``BUDGET_KEEP_RECENT`` messages.  Returns the trimmed list and the
     number of messages dropped.
 
-    The summary pair (if present at the start) is counted toward the
-    budget but is dropped last — after all non-recent messages are gone.
+    The summary pair (if present at the start) is protected — dropped
+    last, only after all other non-recent messages are gone.
     """
     if not messages:
         return messages, 0
 
     # Calculate total tokens
-    total = sum(estimate_tokens(m["content"] if isinstance(m["content"], str) else str(m["content"])) for m in messages)
+    total = sum(estimate_tokens(_content_text(m)) for m in messages)
     if total <= budget:
         return messages, 0
 
@@ -175,16 +184,29 @@ def apply_token_budget(
     recent = messages[-keep_n:]
     older = messages[:-keep_n] if keep_n < len(messages) else []
 
-    # Token cost of protected recent messages
-    recent_tokens = sum(estimate_tokens(m["content"] if isinstance(m["content"], str) else str(m["content"])) for m in recent)
+    # Detect summary pair at the start of older messages
+    has_summary = (
+        len(older) >= 2
+        and _content_text(older[0]).startswith(_SUMMARY_PREFIX)
+    )
+    summary_pair = older[:2] if has_summary else []
+    droppable = older[2:] if has_summary else list(older)
 
-    # Drop oldest non-recent messages until under budget
+    def _older_tokens() -> int:
+        return sum(estimate_tokens(_content_text(m)) for m in summary_pair + droppable)
+
+    recent_tokens = sum(estimate_tokens(_content_text(m)) for m in recent)
+
+    # Drop oldest droppable (non-summary, non-recent) first
     dropped = 0
-    while older and recent_tokens + sum(
-        estimate_tokens(m["content"] if isinstance(m["content"], str) else str(m["content"])) for m in older
-    ) > budget:
-        older.pop(0)
+    while droppable and recent_tokens + _older_tokens() > budget:
+        droppable.pop(0)
         dropped += 1
+
+    # If still over budget, drop summary pair
+    if summary_pair and recent_tokens + _older_tokens() > budget:
+        summary_pair.clear()
+        dropped += 2
 
     if dropped > 0:
         log.info(
@@ -192,7 +214,7 @@ def apply_token_budget(
             dropped, budget,
         )
 
-    return older + recent, dropped
+    return summary_pair + droppable + recent, dropped
 
 
 @dataclass
@@ -546,6 +568,11 @@ class SessionManager:
                 last_newline = truncated.rfind("\n")
                 if last_newline > 0:
                     truncated = truncated[:last_newline]
+                else:
+                    # No newline — fall back to last space to avoid mid-word cut
+                    last_space = truncated.rfind(" ")
+                    if last_space > 0:
+                        truncated = truncated[:last_space]
                 summary_text = truncated.rstrip()
                 log.info(
                     "Compaction summary truncated to %d chars for channel %s",

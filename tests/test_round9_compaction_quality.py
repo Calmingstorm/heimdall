@@ -39,8 +39,8 @@ def _fill_session(mgr: SessionManager, channel: str, count: int) -> None:
 def _fill_realistic_session(mgr: SessionManager, channel: str) -> None:
     """Add realistic infrastructure conversation messages."""
     messages = [
-        ("user", "Check disk usage on server-a at 192.168.1.50"),
-        ("assistant", "Ran df -h on server-a (192.168.1.50). /dev/sda1 is at 78% usage, /var/log at 92%."),
+        ("user", "Check disk usage on server-a at 10.0.0.50"),
+        ("assistant", "Ran df -h on server-a (10.0.0.50). /dev/sda1 is at 78% usage, /var/log at 92%."),
         ("user", "Clean up old logs on server-a"),
         ("assistant", "Deleted 3.2GB of rotated logs from /var/log on server-a. Usage now 45%."),
         ("user", "Deploy nginx to container web-prod-01"),
@@ -392,7 +392,7 @@ class TestRealisticCompaction:
             # Simulate what a good LLM summary should look like
             return (
                 "[Topics: nginx, ssl, dns, payment-api, server-a, server-b]\n"
-                "- Cleaned /var/log on server-a (192.168.1.50) → 45% usage\n"
+                "- Cleaned /var/log on server-a (10.0.0.50) → 45% usage\n"
                 "- Deployed nginx 1.24.0 on web-prod-01, port 443\n"
                 "- SSL cert for api.example.com via Let's Encrypt\n"
                 "- api.example.com → 203.0.113.42 (CNAME lb-east)\n"
@@ -412,7 +412,7 @@ class TestRealisticCompaction:
         assert len(session.summary) <= COMPACTION_MAX_CHARS
         # Key identifiers preserved
         assert "server-a" in session.summary
-        assert "192.168.1.50" in session.summary or "server-a" in session.summary
+        assert "10.0.0.50" in session.summary or "server-a" in session.summary
 
     async def test_merged_summary_includes_previous(self, tmp_dir):
         """When session has existing summary, it's included for merging."""
