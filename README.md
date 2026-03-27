@@ -9,7 +9,7 @@ No classifier, no approval prompts, no hesitation.
 
 ## Features
 
-- **67 built-in tools** — SSH, Ansible, Incus, Prometheus, browser automation, scheduling, knowledge base, autonomous loops, and more
+- **80 built-in tools** — SSH, Ansible, Incus, Prometheus, browser automation, scheduling, knowledge base, autonomous loops, and more
 - **Autonomous execution** — every message gets Codex with full tool access, no classification or approval needed
 - **Two-tier execution** — Codex handles direct tools, delegates complex multi-step tasks to Claude Code CLI
 - **Direct local execution** — localhost commands use subprocess directly (no SSH overhead)
@@ -33,7 +33,9 @@ No classifier, no approval prompts, no hesitation.
 - **Web management UI** — browser-based dashboard with chat interface, sessions, tools, skills, knowledge, schedules, loops, processes, audit logs, config, and live log tailing
 - **Audit logging** — append-only JSONL log of all tool executions
 - **Secret scrubbing** — 10 patterns (API keys, passwords, tokens, AWS/GitHub/Stripe/Slack credentials) redacted from responses, errors, webhooks, and tool output
-- **Performance optimized** — system prompt caching, tool definition caching, connection pooling, TTL-based cache invalidation
+- **Multi-agent orchestration** — autonomous agents with parallel execution, loop integration, and lifecycle management
+- **Performance optimized** — O(n) algorithms, pre-compiled regex, system prompt caching, tool definition caching, connection pooling, ZoneInfo cache, dataclass slots
+- **Comprehensive test suite** — 9000+ tests covering all components
 - **Multi-deployment** — Docker, Incus system containers, or bare metal
 
 ## Personality
@@ -183,7 +185,7 @@ src/
 │   ├── circuit_breaker.py  # Health tracking for LLM backends
 │   └── types.py            # Backend-agnostic LLMResponse and ToolCall types
 ├── tools/
-│   ├── registry.py         # 67 tool definitions + 5 tool packs
+│   ├── registry.py         # 80 tool definitions + 5 tool packs
 │   ├── executor.py         # Tool execution (local subprocess, SSH, Prometheus, Incus, etc.)
 │   ├── ssh.py              # SSH + local subprocess dispatch (is_local_address, run_local_command, run_ssh_command)
 │   ├── tool_memory.py      # Per-tool learning from past executions
@@ -194,9 +196,13 @@ src/
 │   ├── process_manager.py  # Background process registry (start/poll/write/kill)
 │   ├── comfyui.py          # ComfyUI image generation client
 │   └── autonomous_loop.py  # LLM-driven autonomous loop system
+├── agents/
+│   ├── manager.py           # Multi-agent orchestration (spawn, manage, kill)
+│   └── loop_bridge.py       # Agent integration with autonomous loops
 ├── web/
-│   ├── api.py              # REST API (43 endpoints)
-│   └── websocket.py        # WebSocket live updates
+│   ├── api.py              # REST API (55 endpoints)
+│   ├── websocket.py        # WebSocket live updates
+│   └── chat.py             # Chat backend for web UI
 ├── config/
 │   └── schema.py           # Pydantic config models, env var substitution
 ├── sessions/
@@ -255,7 +261,7 @@ Access at `http://localhost:3939/ui/` — the UI shares the health server port.
 
 ### Tech Stack
 
-- **Backend**: aiohttp REST API (43 endpoints) + WebSocket (extends existing health server)
+- **Backend**: aiohttp REST API (55 endpoints) + WebSocket (extends existing health server)
 - **Frontend**: Vue 3 + Tailwind CSS + Vue Router (all CDN, no build step)
 - **Auth**: Bearer token in `Authorization` header
 - **Security**: rate limiting (120 req/60s/IP), security headers, input validation
@@ -389,7 +395,29 @@ Skills receive a `SkillContext` object with these methods:
 | `delete_schedule(id)` | Delete a scheduled task |
 | `log(msg)` | Log a message |
 
-See `data/skills/*.template` for complete examples.
+See `data/skills/*.template` for complete examples and `docs/SKILLS.md` for the full development guide.
+
+## Agents
+
+Heimdall supports multi-agent orchestration for parallel autonomous work.
+
+### Agent System
+
+- **AgentManager** spawns and manages autonomous agents per channel
+- Agents execute goals with full tool access (except spawning sub-agents)
+- Autonomous loops can spawn agents via `LoopAgentBridge` for parallel subtasks
+- Max 5 concurrent agents per channel, 30 iterations each, 1-hour lifetime
+- Monitor and kill agents via the web UI or API (`/api/agents`)
+
+### Agent Limits
+
+| Limit | Value |
+|-------|-------|
+| Concurrent agents per channel | 5 |
+| Max iterations per agent | 30 |
+| Max lifetime | 1 hour |
+| Agents per loop iteration | 3 |
+| Agents per loop (lifetime) | 10 |
 
 ## Deployment
 
@@ -454,7 +482,7 @@ pip install -e ".[dev]"
 python -m pytest tests/ -q
 ```
 
-The test suite (5600+ tests) mocks all external I/O — no SSH connections, API calls, or Discord connections needed.
+The test suite (9000+ tests) mocks all external I/O — no SSH connections, API calls, or Discord connections needed.
 
 ### Project Conventions
 
@@ -464,6 +492,17 @@ The test suite (5600+ tests) mocks all external I/O — no SSH connections, API 
 - Tool handlers are methods named `_handle_{tool_name}` on `ToolExecutor`.
 - Config uses Pydantic models in `src/config/schema.py`.
 - Secrets use `${VAR}` (required) or `${VAR:-default}` (optional) syntax in config.yml.
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| `README.md` | This file — overview, quick start, architecture |
+| `CLAUDE.md` | Build loop instructions and detailed technical reference |
+| `docs/API.md` | REST API reference (55 endpoints + WebSocket protocol) |
+| `docs/SKILLS.md` | Skill development guide with examples |
+| `docs/ARCHITECTURE.md` | Internal architecture and data flow reference |
+| `data/context/architecture.md` | Operational context (loaded into system prompt) |
 
 ## License
 
