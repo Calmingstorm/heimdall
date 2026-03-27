@@ -25,6 +25,11 @@ COMPACTION_THRESHOLD = 40  # compact when history exceeds this
 CONTINUITY_MAX_AGE = 48 * 3600  # carry forward summaries from archives < 48 hours old
 COMPACTION_MAX_CHARS = 500  # target max chars per compacted summary block
 
+# Topic change detection constants
+TOPIC_CHANGE_SCORE_THRESHOLD = 0.05  # below this overlap = topic change
+TOPIC_CHANGE_TIME_GAP = 300  # 5 minutes in seconds
+TOPIC_CHANGE_RECENT_WINDOW = 5  # check overlap against this many recent messages
+
 # Relevance scoring constants
 RELEVANCE_KEEP_RECENT = 3  # always include the most recent N messages
 RELEVANCE_MIN_SCORE = 0.15  # minimum overlap score to include an older message
@@ -207,9 +212,66 @@ class SessionManager:
 
         return self.get_history(channel_id)
 
+    def detect_topic_change(
+        self, channel_id: str, current_query: str,
+    ) -> dict:
+        """Detect whether the current query represents a topic change.
+
+        Returns a dict with:
+        - ``is_topic_change``: whether a topic change was detected
+        - ``time_gap``: seconds since last message (0 if no history)
+        - ``has_time_gap``: whether the time gap exceeds TOPIC_CHANGE_TIME_GAP
+        - ``max_overlap``: highest relevance score against recent messages
+
+        A topic change is detected when the keyword overlap between the current
+        query and recent history messages is below TOPIC_CHANGE_SCORE_THRESHOLD.
+        A time gap >5 min combined with low overlap strengthens the signal.
+        """
+        session = self._sessions.get(channel_id)
+        if not session or not session.messages:
+            return {
+                "is_topic_change": False,
+                "time_gap": 0.0,
+                "has_time_gap": False,
+                "max_overlap": 0.0,
+            }
+
+        # Time gap from last message
+        last_msg = session.messages[-1]
+        time_gap = time.time() - last_msg.timestamp
+
+        # Score overlap against recent messages
+        recent = session.messages[-TOPIC_CHANGE_RECENT_WINDOW:]
+        scores = []
+        for msg in recent:
+            content = msg.content if isinstance(msg.content, str) else str(msg.content)
+            s = score_relevance(current_query, content)
+            scores.append(s)
+
+        max_overlap = max(scores) if scores else 0.0
+        has_time_gap = time_gap > TOPIC_CHANGE_TIME_GAP
+
+        # Topic change: low overlap with all recent messages
+        # Time gap alone doesn't trigger — user might continue same topic after a break
+        is_topic_change = max_overlap < TOPIC_CHANGE_SCORE_THRESHOLD and len(recent) >= 2
+
+        if is_topic_change:
+            log.info(
+                "Topic change detected for channel %s (max_overlap=%.3f, time_gap=%.0fs)",
+                channel_id, max_overlap, time_gap,
+            )
+
+        return {
+            "is_topic_change": is_topic_change,
+            "time_gap": time_gap,
+            "has_time_gap": has_time_gap,
+            "max_overlap": max_overlap,
+        }
+
     async def get_task_history(
         self, channel_id: str, max_messages: int = 10,
         current_query: str | None = None,
+        topic_change: bool = False,
     ) -> list[dict[str, str]]:
         """Get abbreviated history for the tool-calling path.
 
@@ -221,6 +283,11 @@ class SessionManager:
         recent ``RELEVANCE_KEEP_RECENT``) are scored for keyword relevance
         and only the most relevant ones are included.  This prevents stale
         context from unrelated earlier conversations from bleeding in.
+
+        When *topic_change* is True, the history window is reduced to only
+        the most recent message (the current one) — previous context is
+        mostly irrelevant for a new topic.  The summary is still included
+        for broad continuity.
         """
         session = self.get_or_create(channel_id)
 
@@ -228,10 +295,18 @@ class SessionManager:
         if len(session.messages) > COMPACTION_THRESHOLD:
             await self._compact(session)
 
-        # Take only the most recent messages as the candidate pool
-        candidate_msgs = session.messages[-max_messages:]
+        # On topic change, shrink to just the most recent message
+        if topic_change:
+            candidate_msgs = session.messages[-1:] if session.messages else []
+            log.info(
+                "Topic change: reduced history to %d message(s) for channel %s",
+                len(candidate_msgs), channel_id,
+            )
+        else:
+            # Take only the most recent messages as the candidate pool
+            candidate_msgs = session.messages[-max_messages:]
 
-        if current_query and len(candidate_msgs) > RELEVANCE_KEEP_RECENT:
+        if current_query and not topic_change and len(candidate_msgs) > RELEVANCE_KEEP_RECENT:
             # Always include the most recent messages unconditionally
             recent = candidate_msgs[-RELEVANCE_KEEP_RECENT:]
             older = candidate_msgs[:-RELEVANCE_KEEP_RECENT]

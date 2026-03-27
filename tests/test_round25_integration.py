@@ -67,6 +67,10 @@ def _make_bot_stub(*, respond_to_bots=False):
     stub.sessions.prune = MagicMock()
     stub.sessions.save = MagicMock()
     stub.sessions.get_or_create = MagicMock()
+    stub.sessions.detect_topic_change = MagicMock(return_value={
+        "is_topic_change": False, "time_gap": 0.0,
+        "has_time_gap": False, "max_overlap": 1.0,
+    })
     stub.codex_client = MagicMock()
     stub.codex_client.chat = AsyncMock(return_value="Chat response")
     stub.codex_client.chat_with_tools = AsyncMock(
@@ -1144,7 +1148,7 @@ class TestSessionPoisoningDefense:
             await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         # get_task_history was called (not get_history_with_compaction)
-        stub.sessions.get_task_history.assert_called_once_with("chan-1", max_messages=20, current_query="check disk")
+        stub.sessions.get_task_history.assert_called_once_with("chan-1", max_messages=20, current_query="check disk", topic_change=False)
 
     async def test_guest_uses_full_history(self):
         """Guest users use full history with compaction (not abbreviated)."""
@@ -1367,7 +1371,7 @@ class TestSessionPoisoningDefense:
         assert "42%" in assistant_saves[0][0][2]
 
         # Layer 3: Abbreviated history was used
-        stub.sessions.get_task_history.assert_called_once_with("chan-1", max_messages=20, current_query="check disk")
+        stub.sessions.get_task_history.assert_called_once_with("chan-1", max_messages=20, current_query="check disk", topic_change=False)
 
         # Response was sent to Discord
         stub._send_chunked.assert_called_once()

@@ -1556,12 +1556,15 @@ class HeimdallBot(discord.Client):
                 _sp = self._build_system_prompt(channel=message.channel, user_id=user_id, query=content)
                 _sp = await self._inject_tool_hints(_sp, content, user_id)
                 log.info("Routing to Codex with tools")
+                # Detect topic change before fetching history
+                topic_info = self.sessions.detect_topic_change(channel_id, content)
                 # Use abbreviated history to reduce poisoning from stale responses
                 # (get_task_history handles compaction internally)
                 # Pass current message content for relevance scoring —
                 # older messages unrelated to the current query are dropped
                 task_history = await self.sessions.get_task_history(
                     channel_id, max_messages=20, current_query=content,
+                    topic_change=topic_info["is_topic_change"],
                 )
                 if image_blocks and task_history and task_history[-1]["role"] == "user":
                     last = task_history[-1]
@@ -1574,6 +1577,7 @@ class HeimdallBot(discord.Client):
                 try:
                     response, already_sent, is_error, tools_used, handoff = await self._process_with_tools(
                         message, task_history, system_prompt_override=_sp,
+                        topic_change=topic_info["is_topic_change"],
                     )
                 except Exception as codex_err:
                     log.warning("Codex tool loop failed: %s", codex_err)
@@ -1682,6 +1686,7 @@ class HeimdallBot(discord.Client):
         message: discord.Message,
         history: list[dict],
         system_prompt_override: str | None = None,
+        topic_change: bool = False,
     ) -> tuple[str, bool, bool, list[str], bool]:
         """Process a message with Codex tool loop.
 
@@ -1722,6 +1727,13 @@ class HeimdallBot(discord.Client):
                 "Do not repeat prior refusals or text-only responses. "
                 "If a tool exists for the requested action, call it."
             )
+            if topic_change:
+                sep_text += (
+                    "\n\nTOPIC CHANGE DETECTED. The user has switched to a new subject. "
+                    "History above is from a DIFFERENT topic — do NOT carry over "
+                    "assumptions, hosts, files, or context from the previous topic. "
+                    "Treat this as a fresh request."
+                )
             if is_bot_message:
                 sep_text += (
                     "\n\nIMPORTANT: This message is from ANOTHER BOT. "
