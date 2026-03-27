@@ -8,6 +8,7 @@ import re
 import subprocess
 import sys
 import time
+import urllib.parse
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -43,6 +44,11 @@ _PIP_INSTALL_TIMEOUT = 120  # seconds
 
 # PEP 508 simplified: package names start with letter/digit, may contain .-_
 _PACKAGE_NAME_RE = re.compile(r"^([A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?)")
+
+# URL install limits.
+MAX_SKILL_DOWNLOAD_BYTES = 256 * 1024  # 256 KB max skill file size
+_URL_DOWNLOAD_TIMEOUT = 30  # seconds
+_ALLOWED_URL_SCHEMES = frozenset({"http", "https"})
 
 
 def _parse_package_name(spec: str) -> str:
@@ -940,3 +946,120 @@ class SkillManager:
             )
             skill.last_execution = stats
             skill.total_executions += 1
+
+    # -- URL install --
+
+    async def install_from_url(self, url: str) -> str:
+        """Download a skill Python file from a URL and install it.
+
+        Validates URL scheme, downloads with size limit, validates skill code,
+        then creates the skill.
+        """
+        # Validate URL
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in _ALLOWED_URL_SCHEMES:
+            return f"Invalid URL scheme '{parsed.scheme}'. Only http/https allowed."
+        if not parsed.netloc:
+            return "Invalid URL: no host specified."
+
+        # Download
+        try:
+            import aiohttp
+            timeout = aiohttp.ClientTimeout(total=_URL_DOWNLOAD_TIMEOUT)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url) as resp:
+                    if resp.status != 200:
+                        return f"Download failed: HTTP {resp.status}"
+                    # Check content length header if available
+                    cl = resp.content_length
+                    if cl and cl > MAX_SKILL_DOWNLOAD_BYTES:
+                        return f"File too large ({cl} bytes). Maximum is {MAX_SKILL_DOWNLOAD_BYTES}."
+                    data = await resp.content.read(MAX_SKILL_DOWNLOAD_BYTES + 1)
+                    if len(data) > MAX_SKILL_DOWNLOAD_BYTES:
+                        return f"File too large (>{MAX_SKILL_DOWNLOAD_BYTES} bytes). Maximum is {MAX_SKILL_DOWNLOAD_BYTES}."
+                    code = data.decode("utf-8")
+        except UnicodeDecodeError:
+            return "Downloaded file is not valid UTF-8 text."
+        except asyncio.TimeoutError:
+            return f"Download timed out after {_URL_DOWNLOAD_TIMEOUT}s."
+        except Exception as e:
+            return f"Download error: {e}"
+
+        # Validate the code
+        report = self.validate_skill_code(code, url)
+        if not report["valid"]:
+            errors = "; ".join(report["errors"])
+            return f"Invalid skill code: {errors}"
+
+        # Extract skill name from the code
+        ns: dict[str, Any] = {}
+        try:
+            exec(code, ns)  # noqa: S102
+        except Exception as e:
+            return f"Skill code execution error: {e}"
+        definition = ns.get("SKILL_DEFINITION", {})
+        name = definition.get("name", "")
+        if not name or not isinstance(name, str):
+            return "Skill code missing SKILL_DEFINITION['name']."
+
+        # Create the skill (handles name validation, duplicate checks, loading)
+        return self.create_skill(name, code)
+
+    # -- Export --
+
+    def export_skill(self, name: str) -> tuple[bytes, str] | str:
+        """Export a skill as a Python file.
+
+        Returns ``(file_bytes, filename)`` on success, or an error string.
+        """
+        skill = self._skills.get(name)
+        if not skill:
+            return f"Skill '{name}' not found."
+        try:
+            code = skill.file_path.read_text()
+            return code.encode("utf-8"), f"{name}.py"
+        except Exception as e:
+            return f"Failed to read skill file: {e}"
+
+    # -- Status display --
+
+    def skill_status(self, name: str) -> str:
+        """Return a formatted status report for a skill."""
+        skill = self._skills.get(name)
+        if not skill:
+            return f"Skill '{name}' not found."
+
+        lines = [f"**Skill: {name}**"]
+        lines.append(f"Description: {skill.definition.get('description', 'N/A')}")
+        lines.append(f"Status: {skill.status.value}")
+        lines.append(f"Version: {skill.metadata.version}")
+        if skill.metadata.author:
+            lines.append(f"Author: {skill.metadata.author}")
+        if skill.metadata.homepage:
+            lines.append(f"Homepage: {skill.metadata.homepage}")
+        if skill.metadata.tags:
+            lines.append(f"Tags: {', '.join(skill.metadata.tags)}")
+        lines.append(f"Loaded at: {skill.loaded_at}")
+        lines.append(f"Total executions: {skill.total_executions}")
+
+        if skill.last_execution:
+            ex = skill.last_execution
+            lines.append(f"Last execution: {ex.timestamp} ({ex.wall_time_ms:.0f}ms, {ex.output_chars} chars)")
+
+        if skill.metadata.dependencies:
+            dep_status = self.check_dependencies(name)
+            dep_lines = []
+            for d in dep_status.get("dependencies", []):
+                status = "installed" if d["installed"] else "MISSING"
+                dep_lines.append(f"  {d['spec']} [{status}]")
+            lines.append(f"Dependencies:\n" + "\n".join(dep_lines))
+
+        if skill.metadata.config_schema:
+            config = self.get_skill_config(name)
+            lines.append(f"Config: {json.dumps(config)}")
+
+        if skill.diagnostics:
+            diag_lines = [f"  [{d.level}] {d.message}" for d in skill.diagnostics]
+            lines.append(f"Diagnostics:\n" + "\n".join(diag_lines))
+
+        return "\n".join(lines)

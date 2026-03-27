@@ -652,6 +652,48 @@ TOOLS: list[dict] = [
             "required": ["name"],
         },
     },
+    {
+        "name": "install_skill",
+        "description": "Installs a skill from a URL. Downloads the Python file, validates it, and loads it as a new tool.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "URL to a Python skill file (http/https)",
+                },
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "export_skill",
+        "description": "Exports a skill as a Python file attachment for sharing.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Name of the skill to export",
+                },
+            },
+            "required": ["name"],
+        },
+    },
+    {
+        "name": "skill_status",
+        "description": "Shows detailed status for a skill: version, author, dependencies, config, execution stats, diagnostics.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Name of the skill to inspect",
+                },
+            },
+            "required": ["name"],
+        },
+    },
     # --- Prometheus range query ---
     {
         "name": "query_prometheus_range",

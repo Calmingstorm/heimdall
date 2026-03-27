@@ -18,7 +18,7 @@ class TestDescriptionOptimization:
         assert total < 11000, f"Description chars {total} should be < 11000"
 
     def test_total_json_chars_reduced(self):
-        """Total JSON payload should be under 39000 (base 36000 + agent + skill toggle tools)."""
+        """Total JSON payload should be under 41000 (base 36000 + agent + skill toggle + skill management tools)."""
         total = sum(
             len(json.dumps({
                 "name": t["name"],
@@ -27,7 +27,7 @@ class TestDescriptionOptimization:
             }))
             for t in TOOLS
         )
-        assert total < 39000, f"JSON chars {total} should be < 39000"
+        assert total < 41000, f"JSON chars {total} should be < 41000"
 
     def test_no_empty_descriptions(self):
         """Every tool must have a non-empty description."""
@@ -43,8 +43,8 @@ class TestDescriptionOptimization:
             )
 
     def test_tool_count_unchanged(self):
-        """Still 77 tools (67 base + 6 agent + 2 loop-agent bridge + 2 skill toggle tools)."""
-        assert len(TOOLS) == 77
+        """Still 80 tools (67 base + 6 agent + 2 loop-agent bridge + 2 skill toggle + 3 skill management tools)."""
+        assert len(TOOLS) == 80
 
 
 class TestCrossReferences:

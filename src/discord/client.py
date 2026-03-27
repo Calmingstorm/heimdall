@@ -2100,6 +2100,22 @@ class HeimdallBot(discord.Client):
                         self._cached_merged_tools = None
                         self._cached_skills_text = None
                         system_prompt = self._build_system_prompt(channel=message.channel, user_id=user_id)
+                    elif tool_name == "install_skill":
+                        result = await self.skill_manager.install_from_url(tool_input["url"])
+                        self._cached_merged_tools = None
+                        self._cached_skills_text = None
+                        system_prompt = self._build_system_prompt(channel=message.channel, user_id=user_id)
+                    elif tool_name == "export_skill":
+                        export_result = self.skill_manager.export_skill(tool_input["name"])
+                        if isinstance(export_result, str):
+                            result = export_result
+                        else:
+                            file_bytes, filename = export_result
+                            channel_id_key = str(message.channel.id)
+                            self._pending_files.setdefault(channel_id_key, []).append((file_bytes, filename))
+                            result = f"Skill '{tool_input['name']}' exported as {filename}."
+                    elif tool_name == "skill_status":
+                        result = self.skill_manager.skill_status(tool_input["name"])
                     elif tool_name == "add_reaction":
                         result = await self._handle_add_reaction(message, tool_input)
                     elif tool_name == "create_poll":
