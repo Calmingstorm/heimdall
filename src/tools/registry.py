@@ -1540,6 +1540,47 @@ TOOLS: list[dict] = [
             "required": ["agent_ids"],
         },
     },
+    # --- Loop-Agent integration ---
+    {
+        "name": "spawn_loop_agents",
+        "description": "Spawns agents from a loop iteration with context. Max 3/iter, 10/loop.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "loop_id": {"type": "string", "description": "Loop ID"},
+                "tasks": {
+                    "type": "array",
+                    "description": "Agent tasks to spawn",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "label": {"type": "string", "description": "Agent name"},
+                            "goal": {"type": "string", "description": "Agent task"},
+                        },
+                        "required": ["label", "goal"],
+                    },
+                },
+            },
+            "required": ["loop_id", "tasks"],
+        },
+    },
+    {
+        "name": "collect_loop_agents",
+        "description": "Collects results from loop-spawned agents. Omit agent_ids for all.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "loop_id": {"type": "string", "description": "Loop ID"},
+                "agent_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Agent IDs (omit for all)",
+                },
+                "timeout": {"type": "number", "description": "Seconds (default 300)"},
+            },
+            "required": ["loop_id"],
+        },
+    },
     # --- Image generation (ComfyUI) ---
     {
         "name": "generate_image",

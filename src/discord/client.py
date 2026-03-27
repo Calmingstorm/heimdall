@@ -21,7 +21,7 @@ from ..monitoring import InfraWatcher
 from .background_task import (
     BackgroundTask, run_background_task, create_task_id, MAX_STEPS,
 )
-from ..agents import AgentManager
+from ..agents import AgentManager, LoopAgentBridge
 from ..agents.manager import AGENT_BLOCKED_TOOLS, filter_agent_tools
 from ..tools.autonomous_loop import LoopManager
 from ..learning import ConversationReflector
@@ -492,10 +492,12 @@ class HeimdallBot(discord.Client):
         # Background task tracking
         self._background_tasks: dict[str, BackgroundTask] = {}
         self._background_tasks_max = 20
-        # Autonomous loop manager
-        self.loop_manager = LoopManager()
         # Multi-agent orchestration
         self.agent_manager = AgentManager()
+        # Autonomous loop manager (agent-aware)
+        self.loop_manager = LoopManager(agents_enabled=True)
+        # Loop-agent bridge for spawning agents from loop iterations
+        self.loop_agent_bridge = LoopAgentBridge(self.agent_manager)
         # Cached merged tool definitions — invalidated on skill create/edit/delete
         self._cached_merged_tools: list[dict] | None = None
         # Cached host string dict — invalidated on context reload
@@ -933,6 +935,13 @@ class HeimdallBot(discord.Client):
         # Agent lifecycle: kill stuck agents, log stale ones
         if hasattr(self, "agent_manager"):
             self.agent_manager.check_health()
+
+        # Clean up loop-agent bridge records for finished loops
+        if hasattr(self, "loop_agent_bridge"):
+            for loop_id in list(self.loop_agent_bridge._loop_agents):
+                loop_info = self.loop_manager._loops.get(loop_id)
+                if not loop_info or loop_info.status != "running":
+                    self.loop_agent_bridge.cleanup_loop(loop_id)
 
     def _maybe_cleanup_caches(self) -> None:
         """Run cache cleanup if enough time has passed since the last run."""
@@ -2103,6 +2112,10 @@ class HeimdallBot(discord.Client):
                         result = self._handle_get_agent_results(tool_input)
                     elif tool_name == "wait_for_agents":
                         result = await self._handle_wait_for_agents(tool_input)
+                    elif tool_name == "spawn_loop_agents":
+                        result = await self._handle_spawn_loop_agents(message, tool_input)
+                    elif tool_name == "collect_loop_agents":
+                        result = await self._handle_collect_loop_agents(tool_input)
                     elif tool_name == "list_skills":
                         skills = self.skill_manager.list_skills()
                         if not skills:
@@ -3139,6 +3152,112 @@ class HeimdallBot(discord.Client):
 
         return "\n\n".join(lines) if lines else "No results."
 
+    # --- Loop-Agent bridge tool handlers ---
+
+    async def _handle_spawn_loop_agents(self, message: object, inp: dict) -> str:
+        """Spawn agents from within a loop iteration via the loop-agent bridge."""
+        loop_id = inp.get("loop_id", "")
+        tasks = inp.get("tasks", [])
+        if not loop_id:
+            return "A 'loop_id' is required."
+        if not tasks:
+            return "A 'tasks' list is required."
+
+        # Validate the loop exists
+        loop_info = self.loop_manager._loops.get(loop_id)
+        if not loop_info:
+            return f"Error: Loop '{loop_id}' not found."
+        if loop_info.status != "running":
+            return f"Error: Loop '{loop_id}' is not running (status: {loop_info.status})."
+
+        if not self.codex_client:
+            return "Error: Codex client not available."
+
+        channel = getattr(message, "channel", message)
+        channel_id = str(getattr(channel, "id", "0"))
+
+        # Build system prompt and tools for the agents (no agent tools — prevents nesting)
+        system_prompt = self._build_system_prompt(
+            channel=channel, user_id=loop_info.requester_id,
+        )
+        all_tools = self._merged_tool_definitions() if self.config.tools.enabled else []
+        tools = filter_agent_tools(all_tools)
+
+        # Build iteration/tool callbacks (same pattern as _handle_spawn_agent)
+        async def _iteration_cb(messages, sys, tool_defs):
+            resp = await self.codex_client.chat_with_tools(
+                messages=messages, system=sys, tools=tool_defs,
+            )
+            return {
+                "text": resp.text or "",
+                "tool_calls": [
+                    {"name": tc.name, "input": tc.input}
+                    for tc in (resp.tool_calls or [])
+                ],
+                "stop_reason": resp.stop_reason or "end_turn",
+            }
+
+        async def _tool_cb(tool_name, tool_input):
+            return await self._dispatch_loop_tool(
+                tool_name, tool_input,
+                _LoopMessageProxy(channel, loop_info.requester_id, loop_info.requester_name),
+                loop_info.requester_id,
+            )
+
+        async def _announce_cb(ch_id, text):
+            ch = self.bot.get_channel(int(ch_id)) if hasattr(self, "bot") else channel
+            if ch:
+                await ch.send(text[:2000])
+
+        agent_ids = self.loop_agent_bridge.spawn_agents_for_loop(
+            loop_id=loop_id,
+            iteration=loop_info.iteration_count,
+            loop_goal=loop_info.goal,
+            tasks=tasks,
+            channel_id=channel_id,
+            requester_id=loop_info.requester_id,
+            requester_name=loop_info.requester_name,
+            iteration_callback=_iteration_cb,
+            tool_executor_callback=_tool_cb,
+            announce_callback=_announce_cb,
+            tools=tools,
+            system_prompt=system_prompt,
+        )
+
+        # Format response
+        errors = [a for a in agent_ids if a.startswith("Error")]
+        successes = [a for a in agent_ids if not a.startswith("Error")]
+
+        parts = []
+        if successes:
+            parts.append(f"Spawned {len(successes)} agent(s): {', '.join(successes)}")
+        if errors:
+            parts.append(f"Errors: {'; '.join(errors)}")
+        return "\n".join(parts) or "No agents spawned."
+
+    async def _handle_collect_loop_agents(self, inp: dict) -> str:
+        """Collect results from agents spawned by a loop."""
+        loop_id = inp.get("loop_id", "")
+        agent_ids = inp.get("agent_ids", None)
+        timeout = inp.get("timeout", 300)
+        if not loop_id:
+            return "A 'loop_id' is required."
+
+        # Validate the loop exists
+        if loop_id not in self.loop_manager._loops:
+            return f"Error: Loop '{loop_id}' not found."
+
+        results = await self.loop_agent_bridge.wait_and_collect(
+            loop_id=loop_id,
+            agent_ids=agent_ids if isinstance(agent_ids, list) else None,
+            timeout=float(timeout),
+        )
+
+        if not results:
+            return "No agents to collect for this loop."
+
+        return self.loop_agent_bridge.format_agent_results_for_context(results)
+
     async def _run_loop_iteration(
         self,
         prompt: str,
@@ -3367,6 +3486,12 @@ class HeimdallBot(discord.Client):
             return self._handle_get_agent_results(tool_input)
         if tool_name == "wait_for_agents":
             return await self._handle_wait_for_agents(tool_input)
+
+        # --- Loop-Agent bridge ---
+        if tool_name == "spawn_loop_agents":
+            return await self._handle_spawn_loop_agents(msg_proxy, tool_input)
+        if tool_name == "collect_loop_agents":
+            return await self._handle_collect_loop_agents(tool_input)
 
         # --- Skill CRUD ---
         if tool_name == "create_skill":

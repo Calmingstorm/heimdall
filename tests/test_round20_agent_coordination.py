@@ -588,8 +588,8 @@ class TestWaitForAgentsToolDef:
         assert "fan-out" in desc or "pipeline" in desc
 
     def test_total_tool_count(self):
-        """73 tools: 67 base + 6 agent tools."""
-        assert len(TOOLS) == 73
+        """75 tools: 67 base + 6 agent + 2 loop-agent bridge tools."""
+        assert len(TOOLS) == 75
 
     def test_agent_tool_names(self):
         agent_tools = {"spawn_agent", "send_to_agent", "list_agents",

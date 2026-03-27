@@ -63,8 +63,9 @@ class LoopInfo:
 class LoopManager:
     """Manages autonomous loops — LLM-driven recurring tasks."""
 
-    def __init__(self) -> None:
+    def __init__(self, agents_enabled: bool = False) -> None:
         self._loops: dict[str, LoopInfo] = {}
+        self._agents_enabled = agents_enabled
 
     @property
     def active_count(self) -> int:
@@ -357,6 +358,15 @@ class LoopManager:
             parts.append(
                 f'- If the stop condition is met ("{info.stop_condition}"), '
                 f'include the exact text "LOOP_STOP" in your response.'
+            )
+
+        # Agent awareness: tell the LLM it can spawn agents for parallel sub-tasks
+        if self._agents_enabled:
+            parts.append("")
+            parts.append(
+                "AGENTS: You can spawn agents (spawn_agent) for parallel sub-tasks. "
+                "Use wait_for_agents to collect results. Good for: investigating "
+                "multiple hosts, running parallel checks, delegating fixes."
             )
 
         return "\n".join(parts)

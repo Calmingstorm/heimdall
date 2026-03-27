@@ -100,6 +100,7 @@ class TestAllToolsHaveHandlers:
             "start_loop", "stop_loop", "list_loops",
             "spawn_agent", "send_to_agent", "list_agents", "kill_agent", "get_agent_results",
             "wait_for_agents",
+            "spawn_loop_agents", "collect_loop_agents",
         }
         executor = _make_executor()
         for tool in TOOLS:

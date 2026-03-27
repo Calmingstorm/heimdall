@@ -889,7 +889,7 @@ class TestToolDefinitions:
 
     def test_tool_count_updated(self):
         from src.tools.registry import TOOLS
-        assert len(TOOLS) == 73  # 67 + 6 agent tools
+        assert len(TOOLS) == 75  # 67 + 6 agent + 2 loop-agent bridge tools
 
     def test_spawn_agent_schema(self):
         from src.tools.registry import TOOLS

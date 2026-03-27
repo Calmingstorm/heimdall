@@ -226,7 +226,7 @@ class TestCrossLayerConsistency:
             "Saves", "Schedules", "Replaces", "Cancels", "Ingests",
             "Launches", "Extracts", "Adds", "Generates", "Analyzes",
             "Sends", "Takes", "Reads", "Evaluates",
-            "Spawns", "Terminates", "Waits",
+            "Spawns", "Terminates", "Waits", "Collects",
         )
         for tool in TOOLS:
             desc = tool["description"]
