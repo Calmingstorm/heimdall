@@ -7,6 +7,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -18,13 +19,14 @@ from typing import Any
 from ..logging import get_logger
 from .executor import ToolExecutor
 from .registry import TOOLS
-from .skill_context import SkillContext
+from .skill_context import ResourceTracker, SkillContext
 
 log = get_logger("skills")
 
 SKILL_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,49}$")
 BUILTIN_TOOL_NAMES = {t["name"] for t in TOOLS}
 SKILL_EXECUTE_TIMEOUT = 120  # seconds
+MAX_SKILL_OUTPUT_CHARS = 50000  # truncate skill output beyond this
 
 # Supported metadata keys in SKILL_DEFINITION (beyond the required ones).
 _METADATA_KEYS = ("version", "author", "homepage", "tags", "dependencies", "config_schema")
@@ -329,6 +331,31 @@ class SkillMetadata:
 
 
 @dataclass
+class SkillExecutionStats:
+    """Resource usage from a single skill execution."""
+    wall_time_ms: float = 0.0
+    output_chars: int = 0
+    truncated: bool = False
+    tool_calls: int = 0
+    http_requests: int = 0
+    messages_sent: int = 0
+    files_sent: int = 0
+    timestamp: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "wall_time_ms": round(self.wall_time_ms, 1),
+            "output_chars": self.output_chars,
+            "truncated": self.truncated,
+            "tool_calls": self.tool_calls,
+            "http_requests": self.http_requests,
+            "messages_sent": self.messages_sent,
+            "files_sent": self.files_sent,
+            "timestamp": self.timestamp,
+        }
+
+
+@dataclass
 class LoadedSkill:
     name: str
     definition: dict
@@ -339,6 +366,8 @@ class LoadedSkill:
     status: SkillStatus = SkillStatus.LOADED
     metadata: SkillMetadata = field(default_factory=SkillMetadata)
     diagnostics: list[SkillDiagnostic] = field(default_factory=list)
+    last_execution: SkillExecutionStats | None = None
+    total_executions: int = 0
 
 
 class SkillManager:
@@ -679,6 +708,8 @@ class SkillManager:
                     {"level": d.level, "message": d.message}
                     for d in s.diagnostics
                 ],
+                "total_executions": s.total_executions,
+                "last_execution": s.last_execution.to_dict() if s.last_execution else None,
             }
             for s in self._skills.values()
         ]
@@ -841,6 +872,8 @@ class SkillManager:
             ],
             "handoff_to_codex": skill.definition.get("handoff_to_codex", False),
             "code": code,
+            "total_executions": skill.total_executions,
+            "last_execution": skill.last_execution.to_dict() if skill.last_execution else None,
         }
 
     async def execute(
@@ -848,7 +881,7 @@ class SkillManager:
         message_callback: Callable | None = None,
         file_callback: Callable | None = None,
     ) -> str:
-        """Execute a user-created skill with timeout."""
+        """Execute a user-created skill with timeout and sandboxing."""
         skill = self._skills.get(tool_name)
         if not skill:
             return f"Skill '{tool_name}' not found."
@@ -858,6 +891,7 @@ class SkillManager:
         # Load config with defaults applied
         skill_config = self.get_skill_config(tool_name)
 
+        tracker = ResourceTracker()
         context = SkillContext(
             self._executor, tool_name,
             memory_path=self._memory_path,
@@ -868,7 +902,12 @@ class SkillManager:
             session_manager=self._session_manager,
             scheduler=self._scheduler,
             skill_config=skill_config,
+            resource_tracker=tracker,
         )
+
+        start = time.monotonic()
+        truncated = False
+        output_chars = 0
         try:
             result = await asyncio.wait_for(
                 skill.execute_fn(tool_input, context),
@@ -876,9 +915,28 @@ class SkillManager:
             )
             if not isinstance(result, str):
                 result = str(result)
+            # Enforce output limit
+            if len(result) > MAX_SKILL_OUTPUT_CHARS:
+                result = result[:MAX_SKILL_OUTPUT_CHARS] + f"\n... [truncated at {MAX_SKILL_OUTPUT_CHARS} chars]"
+                truncated = True
+            output_chars = len(result)
             return result
         except asyncio.TimeoutError:
             return f"Skill '{tool_name}' timed out after {SKILL_EXECUTE_TIMEOUT}s."
         except Exception as e:
             log.error("Skill %s execution error: %s", tool_name, e, exc_info=True)
             return f"Skill error: {e}"
+        finally:
+            elapsed_ms = (time.monotonic() - start) * 1000
+            stats = SkillExecutionStats(
+                wall_time_ms=elapsed_ms,
+                output_chars=output_chars,
+                truncated=truncated,
+                tool_calls=tracker.tool_calls,
+                http_requests=tracker.http_requests,
+                messages_sent=tracker.messages_sent,
+                files_sent=tracker.files_sent,
+                timestamp=datetime.now().isoformat(),
+            )
+            skill.last_execution = stats
+            skill.total_executions += 1

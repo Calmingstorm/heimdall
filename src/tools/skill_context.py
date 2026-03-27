@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import ipaddress
 import json
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 import aiohttp
 
@@ -15,6 +19,92 @@ if TYPE_CHECKING:
     from ..search.embedder import LocalEmbedder
     from ..sessions.manager import SessionManager
     from .executor import ToolExecutor
+
+
+# ---------------------------------------------------------------------------
+# Resource tracking
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ResourceTracker:
+    """Tracks resource usage during a single skill execution."""
+    tool_calls: int = 0
+    http_requests: int = 0
+    messages_sent: int = 0
+    files_sent: int = 0
+    bytes_downloaded: int = 0
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "tool_calls": self.tool_calls,
+            "http_requests": self.http_requests,
+            "messages_sent": self.messages_sent,
+            "files_sent": self.files_sent,
+            "bytes_downloaded": self.bytes_downloaded,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Sandbox limits
+# ---------------------------------------------------------------------------
+
+# Maximum number of tool calls per skill execution.
+MAX_SKILL_TOOL_CALLS = 50
+# Maximum number of HTTP requests per skill execution.
+MAX_SKILL_HTTP_REQUESTS = 20
+# Maximum number of messages per skill execution.
+MAX_SKILL_MESSAGES = 10
+
+# File path patterns that skills are NOT allowed to read.
+_DENIED_PATH_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"(^|/)\.env($|\.)"),       # .env, .env.local, etc.
+    re.compile(r"(^|/)config\.ya?ml$"),     # config.yml / config.yaml
+    re.compile(r"/etc/shadow$"),            # system shadow passwords
+    re.compile(r"(^|/)id_(rsa|ed25519|ecdsa|dsa)$"),  # SSH private keys
+    re.compile(r"(^|/)\.ssh/"),             # entire .ssh directory
+    re.compile(r"(^|/)credentials\.json$"), # service credentials
+    re.compile(r"(^|/)\.kube/config$"),     # kubernetes config
+]
+
+
+def is_path_denied(path: str) -> bool:
+    """Return True if a file path matches a denied pattern."""
+    for pat in _DENIED_PATH_PATTERNS:
+        if pat.search(path):
+            return True
+    return False
+
+
+def is_url_blocked(url: str) -> bool:
+    """Return True if a URL targets localhost, private IPs, or metadata endpoints."""
+    try:
+        parsed = urlparse(url)
+        host = parsed.hostname or ""
+    except Exception:
+        return True  # malformed → block
+
+    # Block empty/missing hostname
+    if not host:
+        return True
+
+    # Block common localhost names
+    if host in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
+        return True
+
+    # Block cloud metadata endpoints
+    if host in ("169.254.169.254", "metadata.google.internal"):
+        return True
+
+    # Block private IP ranges
+    try:
+        addr = ipaddress.ip_address(host)
+        if addr.is_private or addr.is_loopback or addr.is_link_local:
+            return True
+    except ValueError:
+        pass  # hostname, not IP — allow
+
+    return False
+
 
 # Tools that skills are allowed to call via execute_tool().
 # Only read-only / non-destructive tools are included.
@@ -76,6 +166,7 @@ class SkillContext:
         session_manager: SessionManager | None = None,
         scheduler: Scheduler | None = None,
         skill_config: dict[str, Any] | None = None,
+        resource_tracker: ResourceTracker | None = None,
     ) -> None:
         self._executor = tool_executor
         self._log = get_logger(f"skills.{skill_name}")
@@ -87,6 +178,7 @@ class SkillContext:
         self._session_manager = session_manager
         self._scheduler = scheduler
         self._config: dict[str, Any] = skill_config or {}
+        self._tracker: ResourceTracker = resource_tracker or ResourceTracker()
 
     async def run_on_host(self, alias: str, command: str) -> str:
         """Run a shell command on a managed host via SSH. Returns output string."""
@@ -98,21 +190,32 @@ class SkillContext:
 
     async def read_file(self, host: str, path: str, lines: int = 200) -> str:
         """Read a file from a managed host. Returns file content."""
+        if is_path_denied(path):
+            self._log.warning("Skill attempted to read denied path: %s", path)
+            return f"Access denied: '{path}' is a restricted path."
         return await self._executor.execute("read_file", {
             "host": host, "path": path, "lines": lines,
         })
 
     async def post_message(self, text: str) -> None:
         """Send a message to the channel that invoked this skill."""
+        if self._tracker.messages_sent >= MAX_SKILL_MESSAGES:
+            self._log.warning("Skill exceeded message limit (%d)", MAX_SKILL_MESSAGES)
+            return
         if self._message_callback:
             await self._message_callback(text)
+            self._tracker.messages_sent += 1
         else:
             self._log.warning("post_message called but no channel callback available")
 
     async def post_file(self, data: bytes, filename: str, caption: str = "") -> None:
         """Send a binary file to the channel that invoked this skill."""
+        if self._tracker.files_sent >= MAX_SKILL_MESSAGES:
+            self._log.warning("Skill exceeded file send limit (%d)", MAX_SKILL_MESSAGES)
+            return
         if self._file_callback:
             await self._file_callback(data, filename, caption)
+            self._tracker.files_sent += 1
         else:
             self._log.warning("post_file called but no channel callback available")
 
@@ -157,6 +260,12 @@ class SkillContext:
         Custom headers can be passed via *headers*. By default ``Accept: application/json``
         is included unless overridden.
         """
+        if is_url_blocked(url):
+            self._log.warning("Skill attempted blocked URL: %s", url)
+            return "Access denied: internal/private URLs are not allowed from skills."
+        if self._tracker.http_requests >= MAX_SKILL_HTTP_REQUESTS:
+            return f"HTTP request limit ({MAX_SKILL_HTTP_REQUESTS}) exceeded."
+        self._tracker.http_requests += 1
         merged = {"Accept": "application/json"}
         if headers:
             merged.update(headers)
@@ -169,6 +278,7 @@ class SkillContext:
                 if "json" in ct:
                     return await resp.json()
                 text = await resp.text()
+                self._tracker.bytes_downloaded += len(text.encode())
                 try:
                     return json.loads(text)
                 except (ValueError, TypeError):
@@ -186,6 +296,12 @@ class SkillContext:
 
         Custom headers can be passed via *headers*.
         """
+        if is_url_blocked(url):
+            self._log.warning("Skill attempted blocked URL: %s", url)
+            return "Access denied: internal/private URLs are not allowed from skills."
+        if self._tracker.http_requests >= MAX_SKILL_HTTP_REQUESTS:
+            return f"HTTP request limit ({MAX_SKILL_HTTP_REQUESTS}) exceeded."
+        self._tracker.http_requests += 1
         merged: dict[str, str] = {}
         if headers:
             merged.update(headers)
@@ -198,6 +314,7 @@ class SkillContext:
                 if "json" in ct:
                     return await resp.json()
                 text = await resp.text()
+                self._tracker.bytes_downloaded += len(text.encode())
                 try:
                     return json.loads(text)
                 except (ValueError, TypeError):
@@ -258,6 +375,15 @@ class SkillContext:
         if tool_name not in SKILL_SAFE_TOOLS:
             self._log.warning("Skill attempted blocked tool: %s", tool_name)
             return f"Tool '{tool_name}' is not allowed from skills. Only read-only tools are permitted."
+        if self._tracker.tool_calls >= MAX_SKILL_TOOL_CALLS:
+            return f"Tool call limit ({MAX_SKILL_TOOL_CALLS}) exceeded."
+        self._tracker.tool_calls += 1
+        # Apply file path restriction for read_file
+        if tool_name == "read_file":
+            path = (tool_input or {}).get("path", "")
+            if is_path_denied(path):
+                self._log.warning("Skill attempted to read denied path via tool: %s", path)
+                return f"Access denied: '{path}' is a restricted path."
         return await self._executor.execute(tool_name, tool_input or {})
 
     def log(self, msg: str) -> None:
