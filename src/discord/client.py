@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import collections
+import hashlib
 import io
 import os
 import re
@@ -1698,13 +1699,23 @@ class HeimdallBot(discord.Client):
         is_bot_message = getattr(message.author, "bot", False) and self.config.discord.respond_to_bots
         # Always inject message ID so the LLM can reference it (e.g. add_reaction)
         msg_id_note = f"Current message ID: {message.id}"
+        # Generate request hash + metadata for disambiguation
+        _content_str = message.content if isinstance(message.content, str) else str(message.id)
+        req_hash = hashlib.sha256(_content_str.encode()).hexdigest()[:8]
+        req_time = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
+        user_display = getattr(message.author, "display_name", str(message.author))
         if len(messages) > 1:
             sep_text = (
-                "=== CURRENT REQUEST ===\n"
+                f"=== CURRENT REQUEST [req-{req_hash}] ===\n"
+                f"Time: {req_time}\n"
+                f"From: {user_display} (ID: {message.author.id})\n"
                 f"{msg_id_note}\n"
-                "The messages above are conversation history for context only. "
-                "For the user's new request below, evaluate your CURRENTLY AVAILABLE "
-                "tools and use them. Do not repeat prior refusals or text-only responses. "
+                "--- HISTORY ABOVE | REQUEST BELOW ---\n"
+                "Messages above are HISTORY — context only. "
+                "Do NOT re-execute completed tasks from history. "
+                "Do NOT confuse old context with the current request. "
+                "Evaluate your CURRENTLY AVAILABLE tools fresh and use them. "
+                "Do not repeat prior refusals or text-only responses. "
                 "If a tool exists for the requested action, call it."
             )
             if is_bot_message:

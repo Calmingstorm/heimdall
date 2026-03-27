@@ -440,11 +440,12 @@ class TestContextSeparator:
         assert '"role": "developer"' in source or "'role': 'developer'" in source
 
     def test_separator_has_current_request_header(self):
-        """The separator should have the '=== CURRENT REQUEST ===' header."""
+        """The separator should have the '=== CURRENT REQUEST' header with request hash."""
         from src.discord import client
         import inspect
         source = inspect.getsource(client.HeimdallBot._process_with_tools)
-        assert "=== CURRENT REQUEST ===" in source
+        assert "=== CURRENT REQUEST" in source
+        assert "req_hash" in source
 
     def test_separator_mentions_bot_execution(self):
         """The bot preamble should tell the LLM to execute immediately."""
