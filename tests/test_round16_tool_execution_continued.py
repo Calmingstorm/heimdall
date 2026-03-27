@@ -351,11 +351,11 @@ class TestScheduleHandlers:
         msg = _make_message()
         stub.scheduler.add = MagicMock(return_value={
             "id": "sched-3", "description": "On push",
-            "trigger": {"event": "push", "repo": "loki"},
+            "trigger": {"event": "push", "repo": "myapp"},
         })
 
         result = stub._handle_schedule_task(msg, {
-            "description": "On push", "trigger": {"event": "push", "repo": "loki"},
+            "description": "On push", "trigger": {"event": "push", "repo": "myapp"},
         })
 
         assert "webhook-triggered" in result.lower() or "trigger" in result.lower()

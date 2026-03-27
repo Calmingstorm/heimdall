@@ -661,9 +661,9 @@ class TestBackgroundTaskVariableSubstitution:
         from src.discord.background_task import _substitute_vars
         result = _substitute_vars(
             {"command": "deploy {var.app} to {var.host}"},
-            {"app": "loki", "host": "prod"}, "",
+            {"app": "myapp", "host": "prod"}, "",
         )
-        assert result["command"] == "deploy loki to prod"
+        assert result["command"] == "deploy myapp to prod"
 
 
 class TestBackgroundTaskConditions:
