@@ -21,6 +21,7 @@ from ..monitoring import InfraWatcher
 from .background_task import (
     BackgroundTask, run_background_task, create_task_id, MAX_STEPS,
 )
+from ..agents import AgentManager
 from ..tools.autonomous_loop import LoopManager
 from ..learning import ConversationReflector
 from ..llm import CircuitOpenError, CodexAuth, CodexChatClient
@@ -492,6 +493,8 @@ class HeimdallBot(discord.Client):
         self._background_tasks_max = 20
         # Autonomous loop manager
         self.loop_manager = LoopManager()
+        # Multi-agent orchestration
+        self.agent_manager = AgentManager()
         # Cached merged tool definitions — invalidated on skill create/edit/delete
         self._cached_merged_tools: list[dict] | None = None
         # Cached host string dict — invalidated on context reload
@@ -2083,6 +2086,16 @@ class HeimdallBot(discord.Client):
                         result = await self._handle_analyze_image(message, tool_input)
                     elif tool_name == "generate_image":
                         result = await self._handle_generate_image(message, tool_input)
+                    elif tool_name == "spawn_agent":
+                        result = await self._handle_spawn_agent(message, tool_input)
+                    elif tool_name == "send_to_agent":
+                        result = self._handle_send_to_agent(tool_input)
+                    elif tool_name == "list_agents":
+                        result = self._handle_list_agents(message)
+                    elif tool_name == "kill_agent":
+                        result = self._handle_kill_agent(tool_input)
+                    elif tool_name == "get_agent_results":
+                        result = self._handle_get_agent_results(tool_input)
                     elif tool_name == "list_skills":
                         skills = self.skill_manager.list_skills()
                         if not skills:
@@ -2952,6 +2965,141 @@ class HeimdallBot(discord.Client):
         """List all autonomous loops."""
         return self.loop_manager.list_loops()
 
+    # --- Agent tool handlers ---
+
+    async def _handle_spawn_agent(self, message: object, inp: dict) -> str:
+        """Spawn an autonomous agent for a sub-task."""
+        label = inp.get("label", "")
+        goal = inp.get("goal", "")
+        if not label or not goal:
+            return "Both 'label' and 'goal' are required."
+
+        if not self.codex_client:
+            return "Error: Codex client not available."
+
+        channel = getattr(message, "channel", message)
+        channel_id = str(getattr(channel, "id", "0"))
+        author = getattr(message, "author", None)
+        user_id = str(getattr(author, "id", "0"))
+        user_name = str(author) if author else "agent"
+
+        # Build system prompt and tools for the agent
+        system_prompt = self._build_system_prompt(channel=channel, user_id=user_id)
+        tools = self._merged_tool_definitions() if self.config.tools.enabled else []
+
+        # Iteration callback — wraps Codex chat_with_tools, returns dict
+        async def _iteration_cb(
+            messages: list[dict], sys_prompt: str, tool_defs: list[dict],
+        ) -> dict:
+            resp = await self.codex_client.chat_with_tools(
+                messages=messages, system=sys_prompt, tools=tool_defs,
+            )
+            return {
+                "text": resp.text,
+                "tool_calls": [
+                    {"name": tc.name, "input": tc.input}
+                    for tc in resp.tool_calls
+                ],
+                "stop_reason": resp.stop_reason,
+            }
+
+        # Tool executor callback — dispatches through the same tool routing
+        msg_proxy = _LoopMessageProxy(channel, user_id, user_name)
+
+        async def _tool_exec_cb(tool_name: str, tool_input: dict) -> str:
+            result = await self._dispatch_loop_tool(
+                tool_name, tool_input, msg_proxy, user_id,
+            )
+            return str(result) if result is not None else ""
+
+        # Announce callback — posts results to the parent channel
+        async def _announce_cb(ch_id: str, text: str) -> None:
+            target = self.get_channel(int(ch_id)) if ch_id.isdigit() else channel
+            if target:
+                await target.send(scrub_response_secrets(text))
+
+        agent_id = self.agent_manager.spawn(
+            label=label,
+            goal=goal,
+            channel_id=str(getattr(channel, "id", "0")),
+            requester_id=user_id,
+            requester_name=user_name,
+            iteration_callback=_iteration_cb,
+            tool_executor_callback=_tool_exec_cb,
+            announce_callback=_announce_cb,
+            tools=tools,
+            system_prompt=system_prompt,
+        )
+
+        if agent_id.startswith("Error"):
+            return agent_id
+        return (
+            f"Agent '{label}' spawned (ID: `{agent_id}`). "
+            f"Working on: {goal[:100]}"
+        )
+
+    def _handle_send_to_agent(self, inp: dict) -> str:
+        """Send a message to a running agent."""
+        agent_id = inp.get("agent_id", "")
+        message = inp.get("message", "")
+        if not agent_id:
+            return "'agent_id' is required."
+        if not message:
+            return "'message' is required."
+        return self.agent_manager.send(agent_id, message)
+
+    def _handle_list_agents(self, message: object) -> str:
+        """List all agents, optionally filtered by channel."""
+        channel = getattr(message, "channel", message)
+        channel_id = str(getattr(channel, "id", "0"))
+        agents = self.agent_manager.list(channel_id)
+        if not agents:
+            return "No agents running."
+        lines = []
+        for a in agents:
+            lines.append(
+                f"`{a['id']}` | **{a['label']}** | {a['status']} | "
+                f"{a['iteration_count']} iters | {a['runtime_seconds']}s"
+            )
+        return f"**Agents ({len(agents)}):**\n" + "\n".join(lines)
+
+    def _handle_kill_agent(self, inp: dict) -> str:
+        """Kill a running agent."""
+        agent_id = inp.get("agent_id", "")
+        if not agent_id:
+            return "'agent_id' is required."
+        return self.agent_manager.kill(agent_id)
+
+    def _handle_get_agent_results(self, inp: dict) -> str:
+        """Get results of a completed agent."""
+        agent_id = inp.get("agent_id", "")
+        if not agent_id:
+            return "'agent_id' is required."
+        results = self.agent_manager.get_results(agent_id)
+        if results is None:
+            return f"Agent '{agent_id}' not found."
+        if results["status"] == "running":
+            return (
+                f"Agent '{results['label']}' is still running "
+                f"({results['iteration_count']} iterations, "
+                f"{results['runtime_seconds']}s elapsed)."
+            )
+        parts = [
+            f"**Agent: {results['label']}** ({results['status']})",
+            f"Runtime: {results['runtime_seconds']}s, "
+            f"Iterations: {results['iteration_count']}",
+        ]
+        if results["tools_used"]:
+            parts.append(f"Tools: {', '.join(results['tools_used'])}")
+        if results["result"]:
+            result_text = results["result"]
+            if len(result_text) > 1500:
+                result_text = result_text[:1500] + "..."
+            parts.append(f"Result:\n{result_text}")
+        if results["error"]:
+            parts.append(f"Error: {results['error']}")
+        return "\n".join(parts)
+
     async def _run_loop_iteration(
         self,
         prompt: str,
@@ -3166,6 +3314,18 @@ class HeimdallBot(discord.Client):
             return self._handle_set_permission(user_id, tool_input)
         if tool_name == "search_audit":
             return await self._handle_search_audit(tool_input)
+
+        # --- Agent tools ---
+        if tool_name == "spawn_agent":
+            return await self._handle_spawn_agent(msg_proxy, tool_input)
+        if tool_name == "send_to_agent":
+            return self._handle_send_to_agent(tool_input)
+        if tool_name == "list_agents":
+            return self._handle_list_agents(msg_proxy)
+        if tool_name == "kill_agent":
+            return self._handle_kill_agent(tool_input)
+        if tool_name == "get_agent_results":
+            return self._handle_get_agent_results(tool_input)
 
         # --- Skill CRUD ---
         if tool_name == "create_skill":
