@@ -30,6 +30,7 @@ from ..llm.system_prompt import build_system_prompt, build_chat_system_prompt
 from ..logging import get_logger
 from ..scheduler import Scheduler
 from ..sessions import SessionManager
+from ..sessions.manager import summarize_tool_response
 from ..tools import ToolExecutor, SkillManager, get_tool_definitions
 from ..tools.tool_memory import ToolMemory
 from ..search import LocalEmbedder, SessionVectorStore
@@ -1636,7 +1637,10 @@ class HeimdallBot(discord.Client):
             if not is_guest and not tools_used and not handoff:
                 pass
             else:
-                self.sessions.add_message(channel_id, "assistant", response)
+                # Summarize verbose tool-loop responses before persisting
+                # to prevent long multi-tool outputs from dominating history
+                history_response = summarize_tool_response(response, tools_used)
+                self.sessions.add_message(channel_id, "assistant", history_response)
             self.sessions.prune()
             self._maybe_cleanup_caches()
             try:
