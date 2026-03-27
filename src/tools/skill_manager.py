@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import json
 import re
 import sys
 from dataclasses import dataclass, field
@@ -27,6 +28,105 @@ _METADATA_KEYS = ("version", "author", "homepage", "tags", "dependencies", "conf
 
 # Valid semantic version pattern (loose — major.minor.patch with optional pre-release).
 _SEMVER_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:[-+].+)?$")
+
+# Supported types for config_schema fields.
+_CONFIG_FIELD_TYPES = frozenset({"string", "integer", "number", "boolean"})
+
+
+def validate_config_value(field_name: str, field_schema: dict, value: Any) -> str | None:
+    """Validate a single config value against its field schema.
+
+    Returns an error string or None if valid.
+    """
+    ftype = field_schema.get("type", "string")
+
+    # Type check
+    if ftype == "string":
+        if not isinstance(value, str):
+            return f"'{field_name}': expected string, got {type(value).__name__}"
+    elif ftype == "integer":
+        if not isinstance(value, int) or isinstance(value, bool):
+            return f"'{field_name}': expected integer, got {type(value).__name__}"
+    elif ftype == "number":
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            return f"'{field_name}': expected number, got {type(value).__name__}"
+    elif ftype == "boolean":
+        if not isinstance(value, bool):
+            return f"'{field_name}': expected boolean, got {type(value).__name__}"
+
+    # Enum constraint
+    enum = field_schema.get("enum")
+    if enum is not None and isinstance(enum, list) and value not in enum:
+        return f"'{field_name}': value {value!r} not in allowed values {enum}"
+
+    # Numeric constraints
+    if ftype in ("integer", "number") and isinstance(value, (int, float)) and not isinstance(value, bool):
+        minimum = field_schema.get("minimum")
+        if minimum is not None and value < minimum:
+            return f"'{field_name}': value {value} is below minimum {minimum}"
+        maximum = field_schema.get("maximum")
+        if maximum is not None and value > maximum:
+            return f"'{field_name}': value {value} exceeds maximum {maximum}"
+
+    # String constraints
+    if ftype == "string" and isinstance(value, str):
+        min_len = field_schema.get("minLength")
+        if min_len is not None and len(value) < min_len:
+            return f"'{field_name}': length {len(value)} is below minLength {min_len}"
+        max_len = field_schema.get("maxLength")
+        if max_len is not None and len(value) > max_len:
+            return f"'{field_name}': length {len(value)} exceeds maxLength {max_len}"
+
+    return None
+
+
+def validate_config(schema: dict, values: dict) -> list[str]:
+    """Validate a full config dict against a config_schema.
+
+    The schema follows JSON Schema 'object' format:
+    {
+      "type": "object",
+      "properties": {
+        "field_name": {"type": "string", "default": "...", "description": "..."},
+        ...
+      },
+      "required": ["field_name"]
+    }
+
+    Returns a list of error strings (empty = valid).
+    """
+    errors: list[str] = []
+    properties = schema.get("properties", {})
+    required = set(schema.get("required", []))
+
+    # Check required fields
+    for req in required:
+        if req not in values:
+            # Only error if there's no default in the schema
+            prop = properties.get(req, {})
+            if "default" not in prop:
+                errors.append(f"Missing required field '{req}'")
+
+    # Validate each provided value
+    for key, value in values.items():
+        if key not in properties:
+            errors.append(f"Unknown field '{key}'")
+            continue
+        err = validate_config_value(key, properties[key], value)
+        if err:
+            errors.append(err)
+
+    return errors
+
+
+def apply_defaults(schema: dict, values: dict) -> dict:
+    """Return config values with defaults filled in from schema."""
+    result = dict(values)
+    properties = schema.get("properties", {})
+    for key, prop in properties.items():
+        if key not in result and "default" in prop:
+            result[key] = prop["default"]
+    return result
 
 
 class SkillStatus(str, Enum):
@@ -133,6 +233,8 @@ class SkillManager:
     ) -> None:
         self.skills_dir = Path(skills_dir)
         self.skills_dir.mkdir(parents=True, exist_ok=True)
+        self._config_dir = self.skills_dir / "config"
+        self._config_dir.mkdir(parents=True, exist_ok=True)
         self._executor = tool_executor
         # Derive a separate skill memory file to avoid corrupting the
         # executor's scoped memory structure (global/user_* namespaces).
@@ -322,7 +424,52 @@ class SkillManager:
         path = self.skills_dir / f"{name}.py"
         self._unload_skill(name)
         path.unlink(missing_ok=True)
+        # Clean up config file
+        config_path = self._config_dir / f"{name}.json"
+        config_path.unlink(missing_ok=True)
         return f"Skill '{name}' deleted."
+
+    # -- Config management --
+
+    def _config_path(self, name: str) -> Path:
+        return self._config_dir / f"{name}.json"
+
+    def get_skill_config(self, name: str) -> dict:
+        """Get runtime config for a skill, with defaults applied from schema."""
+        skill = self._skills.get(name)
+        if not skill:
+            return {}
+        raw = self._load_config_file(name)
+        schema = skill.metadata.config_schema
+        if schema:
+            return apply_defaults(schema, raw)
+        return raw
+
+    def set_skill_config(self, name: str, values: dict) -> list[str]:
+        """Set runtime config for a skill. Returns list of validation errors (empty = success)."""
+        skill = self._skills.get(name)
+        if not skill:
+            return [f"Skill '{name}' not found."]
+        schema = skill.metadata.config_schema
+        if schema:
+            errors = validate_config(schema, values)
+            if errors:
+                return errors
+        self._save_config_file(name, values)
+        return []
+
+    def _load_config_file(self, name: str) -> dict:
+        path = self._config_path(name)
+        if not path.exists():
+            return {}
+        try:
+            return json.loads(path.read_text())
+        except Exception:
+            return {}
+
+    def _save_config_file(self, name: str, values: dict) -> None:
+        path = self._config_path(name)
+        path.write_text(json.dumps(values, indent=2))
 
     def list_skills(self) -> list[dict]:
         """Return metadata for all loaded skills."""
@@ -470,6 +617,7 @@ class SkillManager:
                 "has_config": bool(skill.metadata.config_schema),
                 "config_schema": skill.metadata.config_schema,
             },
+            "config": self.get_skill_config(name),
             "diagnostics": [
                 {"level": d.level, "message": d.message}
                 for d in skill.diagnostics
@@ -488,6 +636,9 @@ class SkillManager:
         if not skill:
             return f"Skill '{tool_name}' not found."
 
+        # Load config with defaults applied
+        skill_config = self.get_skill_config(tool_name)
+
         context = SkillContext(
             self._executor, tool_name,
             memory_path=self._memory_path,
@@ -497,6 +648,7 @@ class SkillManager:
             embedder=self._embedder,
             session_manager=self._session_manager,
             scheduler=self._scheduler,
+            skill_config=skill_config,
         )
         try:
             result = await asyncio.wait_for(

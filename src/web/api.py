@@ -535,6 +535,31 @@ def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
         report = bot.skill_manager.validate_skill_code(code)
         return web.json_response(report)
 
+    @routes.get("/api/skills/{name}/config")
+    async def get_skill_config(request: web.Request) -> web.Response:
+        name = request.match_info["name"]
+        if not bot.skill_manager.has_skill(name):
+            return web.json_response({"error": "skill not found"}, status=404)
+        info = bot.skill_manager.get_skill_info(name)
+        return web.json_response({
+            "config": bot.skill_manager.get_skill_config(name),
+            "schema": info["metadata"]["config_schema"] if info else {},
+        })
+
+    @routes.put("/api/skills/{name}/config")
+    async def set_skill_config(request: web.Request) -> web.Response:
+        name = request.match_info["name"]
+        if not bot.skill_manager.has_skill(name):
+            return web.json_response({"error": "skill not found"}, status=404)
+        data = await request.json()
+        values = data.get("config", {})
+        if not isinstance(values, dict):
+            return web.json_response({"error": "config must be a dict"}, status=400)
+        errors = bot.skill_manager.set_skill_config(name, values)
+        if errors:
+            return web.json_response({"errors": errors}, status=400)
+        return web.json_response({"config": bot.skill_manager.get_skill_config(name)})
+
     # ------------------------------------------------------------------
     # Knowledge
     # ------------------------------------------------------------------

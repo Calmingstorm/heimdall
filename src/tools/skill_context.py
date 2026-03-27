@@ -75,6 +75,7 @@ class SkillContext:
         embedder: LocalEmbedder | None = None,
         session_manager: SessionManager | None = None,
         scheduler: Scheduler | None = None,
+        skill_config: dict[str, Any] | None = None,
     ) -> None:
         self._executor = tool_executor
         self._log = get_logger(f"skills.{skill_name}")
@@ -85,6 +86,7 @@ class SkillContext:
         self._embedder = embedder
         self._session_manager = session_manager
         self._scheduler = scheduler
+        self._config: dict[str, Any] = skill_config or {}
 
     async def run_on_host(self, alias: str, command: str) -> str:
         """Run a shell command on a managed host via SSH. Returns output string."""
@@ -134,6 +136,14 @@ class SkillContext:
     def get_services(self) -> list[str]:
         """List allowed systemd service names."""
         return list(self._executor.config.allowed_services)
+
+    def get_config(self, key: str, default: Any = None) -> Any:
+        """Get a single skill config value. Returns default if not set."""
+        return self._config.get(key, default)
+
+    def get_all_config(self) -> dict[str, Any]:
+        """Get all skill config values (with defaults applied)."""
+        return dict(self._config)
 
     async def http_get(
         self,
