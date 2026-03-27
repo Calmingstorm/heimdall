@@ -210,7 +210,9 @@ export default {
                 <div v-if="threadView === 'threaded'" class="max-h-96 overflow-y-auto pr-1" style="scrollbar-gutter: stable;">
                   <div v-for="(thread, ti) in threads" :key="ti" class="mb-4">
                     <div class="flex items-center gap-2 mb-2 px-2 py-1 bg-gray-800 rounded cursor-pointer select-none"
-                         @click="toggleThread(ti)">
+                         @click="toggleThread(ti)" role="button" tabindex="0"
+                         @keydown.enter="toggleThread(ti)" @keydown.space.prevent="toggleThread(ti)"
+                         :aria-expanded="!collapsedThreads.has(ti)">
                       <span class="text-xs font-bold text-amber-400">#{{ ti + 1 }}</span>
                       <span class="text-xs text-gray-300">{{ threadSummary(thread) }}</span>
                       <span class="text-xs bg-gray-700 px-1.5 py-0.5 rounded text-gray-300">{{ thread.length }} msg</span>

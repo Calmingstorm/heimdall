@@ -53,7 +53,7 @@ CLIENT_TOOLS = {
     "create_skill", "edit_skill", "delete_skill", "list_skills",
     "enable_skill", "disable_skill",
     "install_skill", "export_skill", "skill_status",
-    "add_reaction", "create_poll", "broadcast", "analyze_image", "generate_image",
+    "add_reaction", "create_poll", "analyze_image", "generate_image",
     "start_loop", "stop_loop", "list_loops",
     "spawn_agent", "send_to_agent", "list_agents", "kill_agent", "get_agent_results",
     "wait_for_agents",

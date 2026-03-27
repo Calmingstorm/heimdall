@@ -1320,38 +1320,6 @@ TOOLS: list[dict] = [
             "required": ["question", "options"],
         },
     },
-    {
-        "name": "broadcast",
-        "description": "Sends a message to the current channel with optional rich embed (title, description, color, fields).",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "text": {"type": "string", "description": "Plain text message content"},
-                "embed": {
-                    "type": "object",
-                    "description": "Optional rich embed object",
-                    "properties": {
-                        "title": {"type": "string", "description": "Embed title"},
-                        "description": {"type": "string", "description": "Embed body text"},
-                        "color": {"type": "string", "description": "Hex color, e.g. '#ff0000'"},
-                        "fields": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {"type": "string"},
-                                    "value": {"type": "string"},
-                                    "inline": {"type": "boolean"},
-                                },
-                                "required": ["name", "value"],
-                            },
-                            "description": "List of embed fields",
-                        },
-                    },
-                },
-            },
-        },
-    },
     # --- Process management ---
     {
         "name": "manage_process",

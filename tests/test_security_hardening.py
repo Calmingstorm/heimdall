@@ -4,7 +4,7 @@ Tests verify:
 - URL scheme validation on PDF and image tools (SSRF prevention)
 - Process manager host validation
 - ComfyUI prompt_id sanitization
-- Secret scrubbing on Discord-facing outputs (broadcast, poll, image gen)
+- Secret scrubbing on Discord-facing outputs (poll, image gen)
 - SQL injection resistance in knowledge store
 - Path traversal prevention in host+path tools
 """
@@ -248,54 +248,6 @@ class TestComfyUIPromptIdValidation:
 
 class TestDiscordOutputScrubbing:
     """Verify tools that send directly to Discord scrub secrets first."""
-
-    async def test_broadcast_scrubs_password(self):
-        """Broadcast handler must scrub secrets from text before Discord send."""
-        from src.discord.client import HeimdallBot
-
-        bot = MagicMock(spec=HeimdallBot)
-        message = MagicMock()
-        message.channel.send = AsyncMock()
-
-        await HeimdallBot._handle_broadcast(bot, message, {
-            "text": "Here is the password=hunter2 for the server",
-        })
-
-        # Verify channel.send was called
-        message.channel.send.assert_called_once()
-        sent_content = message.channel.send.call_args[1].get("content", "")
-        # The password should have been scrubbed
-        assert "hunter2" not in sent_content
-        assert "[REDACTED]" in sent_content
-
-    async def test_broadcast_scrubs_api_key(self):
-        from src.discord.client import HeimdallBot
-
-        bot = MagicMock(spec=HeimdallBot)
-        message = MagicMock()
-        message.channel.send = AsyncMock()
-
-        await HeimdallBot._handle_broadcast(bot, message, {
-            "text": "Use api_key=sk-abcdefghijklmnopqrstuvwxyz1234567890",
-        })
-
-        sent_content = message.channel.send.call_args[1].get("content", "")
-        assert "sk-abcdefghijklmnopqrstuvwxyz1234567890" not in sent_content
-        assert "[REDACTED]" in sent_content
-
-    async def test_broadcast_preserves_safe_text(self):
-        from src.discord.client import HeimdallBot
-
-        bot = MagicMock(spec=HeimdallBot)
-        message = MagicMock()
-        message.channel.send = AsyncMock()
-
-        await HeimdallBot._handle_broadcast(bot, message, {
-            "text": "Server is running fine with 99.9% uptime.",
-        })
-
-        sent_content = message.channel.send.call_args[1].get("content", "")
-        assert sent_content == "Server is running fine with 99.9% uptime."
 
     async def test_poll_scrubs_question_secrets(self):
         """Poll questions must be scrubbed for secrets."""

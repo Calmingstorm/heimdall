@@ -121,8 +121,6 @@ Discord attachment.
 
 `add_reaction` — add emoji reactions to messages (Unicode or custom format).
 `create_poll` — create native Discord polls (max 10 options, up to 7 days).
-`broadcast` — send messages with optional rich embeds (title, description,
-color, fields).
 
 ## Common Patterns
 

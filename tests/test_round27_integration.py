@@ -485,7 +485,7 @@ class TestToolPackIntegrity:
     """Tool registry must be consistent and complete."""
 
     def test_total_tool_count(self):
-        assert len(TOOLS) == 80
+        assert len(TOOLS) == 79
 
     def test_five_packs(self):
         assert len(TOOL_PACKS) == 5
@@ -510,7 +510,7 @@ class TestToolPackIntegrity:
     def test_empty_packs_returns_all_tools(self):
         """Empty pack config = all tools loaded."""
         defs = get_tool_definitions(enabled_packs=[])
-        assert len(defs) == 80
+        assert len(defs) == 79
 
     def test_single_pack_filters(self):
         """Selecting a single pack returns core + pack tools."""

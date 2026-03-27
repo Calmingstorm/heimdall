@@ -2130,8 +2130,6 @@ class HeimdallBot(discord.Client):
                         result = await self._handle_add_reaction(message, tool_input)
                     elif tool_name == "create_poll":
                         result = await self._handle_create_poll(message, tool_input)
-                    elif tool_name == "broadcast":
-                        result = await self._handle_broadcast(message, tool_input)
                     elif tool_name == "analyze_image":
                         result = await self._handle_analyze_image(message, tool_input)
                     elif tool_name == "generate_image":
@@ -3470,8 +3468,6 @@ class HeimdallBot(discord.Client):
             return await self._handle_add_reaction(msg_proxy, tool_input)
         if tool_name == "create_poll":
             return await self._handle_create_poll(msg_proxy, tool_input)
-        if tool_name == "broadcast":
-            return await self._handle_broadcast(msg_proxy, tool_input)
         if tool_name == "analyze_image":
             return await self._handle_analyze_image(msg_proxy, tool_input)
         if tool_name == "generate_image":
@@ -3620,39 +3616,6 @@ class HeimdallBot(discord.Client):
             return "Poll created."
         except Exception as e:
             return f"Failed to create poll: {e}"
-
-    async def _handle_broadcast(self, message: discord.Message, inp: dict) -> str:
-        """Send a message with optional rich embed to the current channel."""
-        text = inp.get("text")
-        embed_data = inp.get("embed")
-        embed_obj = None
-
-        if embed_data and isinstance(embed_data, dict):
-            color_str = embed_data.get("color", "#000000")
-            try:
-                color_val = int(color_str.lstrip("#"), 16)
-            except (ValueError, AttributeError):
-                color_val = 0
-            embed_obj = discord.Embed(
-                title=embed_data.get("title"),
-                description=embed_data.get("description"),
-                color=color_val,
-            )
-            for field in embed_data.get("fields", []):
-                embed_obj.add_field(
-                    name=field.get("name", "\u200b"),
-                    value=field.get("value", "\u200b"),
-                    inline=field.get("inline", False),
-                )
-
-        if not text and not embed_obj:
-            return "Provide 'text' and/or 'embed' content."
-
-        # Scrub secrets before sending to Discord (broadcast bypasses LLM response scrubbing)
-        if text:
-            text = scrub_response_secrets(text)
-        await message.channel.send(content=text, embed=embed_obj)
-        return "Message sent."
 
     async def _handle_analyze_image(self, message: discord.Message, inp: dict) -> str | dict:
         """Fetch an image and return a vision block for the LLM to analyze.
