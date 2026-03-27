@@ -145,14 +145,21 @@ const App = {
         </nav>
         <div class="px-3 py-2 border-t border-gray-800 text-xs text-gray-500 sidebar-header-text">
           <div class="flex items-center gap-1.5 mb-1" aria-live="polite">
-            <span class="status-dot" :class="wsConnected ? 'online' : 'offline'" aria-hidden="true"></span>
-            <span>{{ wsConnected ? 'Live' : 'Disconnected' }}</span>
+            <span class="ws-indicator" :class="'ws-' + wsState" aria-hidden="true"></span>
+            <span>{{ wsLabel }}</span>
+            <span v-if="wsLatency >= 0" class="text-gray-600" style="font-size:0.5625rem;">{{ wsLatency }}ms</span>
           </div>
           <div class="text-gray-600 mobile-hide" style="font-size:0.625rem;" aria-label="Keyboard shortcuts">
             <kbd class="px-1 py-0.5 bg-gray-800 rounded">/</kbd> search
             <kbd class="px-1 py-0.5 bg-gray-800 rounded ml-1">Esc</kbd> close
           </div>
         </div>
+        <!-- Connection toast -->
+        <transition name="ws-toast">
+          <div v-if="wsToast" class="ws-toast" :class="'ws-toast-' + wsToast.level" role="status" aria-live="assertive">
+            {{ wsToast.text }}
+          </div>
+        </transition>
       </aside>
 
       <!-- Mobile overlay -->
@@ -181,6 +188,10 @@ const App = {
     const sidebarCollapsed = ref(false);
     const mobileOpen = ref(false);
     const wsConnected = ref(false);
+    const wsState = ref('disconnected'); // disconnected | connecting | connected | reconnecting
+    const wsLatency = ref(-1);
+    const wsToast = ref(null);
+    let wsToastTimer = null;
     const botStatus = ref('starting');
     const botUptime = ref('');
 
@@ -231,11 +242,39 @@ const App = {
       sidebarCollapsed.value = !sidebarCollapsed.value;
     }
 
+    const wsLabel = computed(() => {
+      switch (wsState.value) {
+        case 'connected': return 'Live';
+        case 'connecting': return 'Connecting\u2026';
+        case 'reconnecting': return 'Reconnecting\u2026';
+        default: return 'Disconnected';
+      }
+    });
+
+    function showWsToast(text, level = 'info', duration = 3000) {
+      wsToast.value = { text, level };
+      clearTimeout(wsToastTimer);
+      wsToastTimer = setTimeout(() => { wsToast.value = null; }, duration);
+    }
+
     // Live updates
     let statusInterval = null;
+    let wasConnected = false;
 
     function startLive() {
       ws.onStatusChange = (connected) => { wsConnected.value = connected; };
+      ws.onStateChange = (state, detail) => {
+        wsState.value = state;
+        wsLatency.value = detail.latency ?? -1;
+        if (state === 'connected') {
+          if (wasConnected) {
+            showWsToast('Connection restored', 'success');
+          }
+          wasConnected = true;
+        } else if (state === 'reconnecting' && detail.attempt === 1) {
+          showWsToast('Connection lost \u2014 reconnecting\u2026', 'warn');
+        }
+      };
       ws.connect();
       fetchStatus();
       statusInterval = setInterval(fetchStatus, 15000);
@@ -263,6 +302,7 @@ const App = {
 
     return {
       authState, sidebarCollapsed, mobileOpen, wsConnected,
+      wsState, wsLatency, wsLabel, wsToast,
       botStatus, botUptime, navRoutes,
       onLogin, logout, toggleSidebar,
     };

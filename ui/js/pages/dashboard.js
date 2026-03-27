@@ -146,7 +146,7 @@ export default {
             <div v-else class="dash-activity-list">
               <div v-for="(a, i) in activity" :key="a._key || i"
                    class="dash-activity-item"
-                   :class="{ 'flash-new': a._isNew }">
+                   :class="{ 'flash-new': a._isNew, 'item-enter': a._isNew }">
                 <span class="dash-activity-dot" :class="a.error ? 'dot-error' : 'dot-ok'"></span>
                 <span class="dash-activity-tool">{{ a.tool_name }}</span>
                 <span class="dash-activity-time">{{ formatTime(a.timestamp) }}</span>
@@ -405,11 +405,16 @@ export default {
 
     async function clearSessions() {
       actionLoading.value = { ...actionLoading.value, clearSessions: true };
+      // Optimistic: immediately set sessions to 0
+      const prevSessions = status.value.session_count;
+      status.value = { ...status.value, session_count: 0 };
       try {
         const res = await api.post('/api/sessions/clear-all');
         showAction(`Cleared ${res.count} session${res.count !== 1 ? 's' : ''}`);
         await fetchStatus();
       } catch (e) {
+        // Rollback on failure
+        status.value = { ...status.value, session_count: prevSessions };
         showAction(e.message, false);
       }
       actionLoading.value = { ...actionLoading.value, clearSessions: false };
@@ -417,11 +422,16 @@ export default {
 
     async function stopAllLoops() {
       actionLoading.value = { ...actionLoading.value, stopLoops: true };
+      // Optimistic: immediately set loops to 0
+      const prevLoops = status.value.loop_count;
+      status.value = { ...status.value, loop_count: 0 };
       try {
         const res = await api.post('/api/loops/stop-all');
         showAction(res.result);
         await fetchStatus();
       } catch (e) {
+        // Rollback on failure
+        status.value = { ...status.value, loop_count: prevLoops };
         showAction(e.message, false);
       }
       actionLoading.value = { ...actionLoading.value, stopLoops: false };

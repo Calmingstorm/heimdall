@@ -83,21 +83,67 @@ class HeimdallWebSocket {
     this._maxReconnectDelay = 30000;
     this._shouldConnect = false;
     this._subscriptions = new Set();
+    this._reconnectAttempt = 0;
+    this._lastPongTime = 0;
+    this._pingInterval = null;
+    this._latency = -1;
+    // state: 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
+    this._state = 'disconnected';
     this.onStatusChange = null; // callback(connected: boolean)
+    this.onStateChange = null;  // callback(state: string, detail: object)
   }
 
   get connected() { return this._ws?.readyState === WebSocket.OPEN; }
 
+  /** Current connection state with detail. */
+  get state() { return this._state; }
+  get reconnectAttempt() { return this._reconnectAttempt; }
+  get latency() { return this._latency; }
+
   connect() {
     this._shouldConnect = true;
+    this._setState('connecting');
     this._open();
   }
 
   disconnect() {
     this._shouldConnect = false;
+    this._reconnectAttempt = 0;
+    this._latency = -1;
+    this._stopPing();
     if (this._ws) {
       this._ws.close();
       this._ws = null;
+    }
+    this._setState('disconnected');
+  }
+
+  _setState(state) {
+    if (this._state === state) return;
+    this._state = state;
+    if (this.onStateChange) {
+      this.onStateChange(state, {
+        attempt: this._reconnectAttempt,
+        latency: this._latency,
+      });
+    }
+  }
+
+  _startPing() {
+    this._stopPing();
+    this._pingInterval = setInterval(() => {
+      if (this.connected) {
+        try {
+          this._ws.send(JSON.stringify({ type: 'ping', ts: Date.now() }));
+        } catch { /* ignore */ }
+      }
+    }, 15000);
+  }
+
+  _stopPing() {
+    if (this._pingInterval) {
+      clearInterval(this._pingInterval);
+      this._pingInterval = null;
     }
   }
 
@@ -151,10 +197,13 @@ class HeimdallWebSocket {
 
     this._ws.onopen = () => {
       this._reconnectDelay = 1000;
+      this._reconnectAttempt = 0;
       // Re-subscribe to channels
       for (const ch of this._subscriptions) {
         this._ws.send(JSON.stringify({ subscribe: ch }));
       }
+      this._startPing();
+      this._setState('connected');
       if (this.onStatusChange) this.onStatusChange(true);
     };
 
@@ -162,6 +211,13 @@ class HeimdallWebSocket {
       let data;
       try { data = JSON.parse(evt.data); } catch { return; }
       const type = data.type;
+      if (type === 'pong') {
+        if (data.ts) {
+          this._latency = Date.now() - data.ts;
+          this._lastPongTime = Date.now();
+        }
+        return;
+      }
       if (type === 'log') {
         for (const h of this._handlers.logs || []) h(data);
       } else if (type === 'event') {
@@ -174,10 +230,16 @@ class HeimdallWebSocket {
 
     this._ws.onclose = () => {
       this._ws = null;
+      this._stopPing();
+      this._latency = -1;
       if (this.onStatusChange) this.onStatusChange(false);
       if (this._shouldConnect) {
+        this._reconnectAttempt++;
+        this._setState('reconnecting');
         setTimeout(() => this._open(), this._reconnectDelay);
         this._reconnectDelay = Math.min(this._reconnectDelay * 2, this._maxReconnectDelay);
+      } else {
+        this._setState('disconnected');
       }
     };
 

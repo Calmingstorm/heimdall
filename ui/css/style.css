@@ -2880,6 +2880,127 @@ textarea.hm-input {
 }
 
 /* ================================================================
+   WEBSOCKET CONNECTION INDICATOR
+   ================================================================ */
+.ws-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  transition: background 0.3s, box-shadow 0.3s;
+}
+.ws-connected {
+  background: var(--hm-success);
+  box-shadow: 0 0 6px var(--hm-success);
+}
+.ws-disconnected {
+  background: var(--hm-danger);
+  box-shadow: 0 0 6px var(--hm-danger);
+}
+.ws-connecting, .ws-reconnecting {
+  background: var(--hm-warning);
+  box-shadow: 0 0 6px var(--hm-warning);
+  animation: ws-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ws-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.75); }
+}
+
+/* Connection toast */
+.ws-toast {
+  position: fixed;
+  bottom: var(--hm-space-5);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  padding: var(--hm-space-3) var(--hm-space-5);
+  border-radius: var(--hm-radius-lg);
+  font-size: var(--hm-text-sm);
+  font-weight: 500;
+  box-shadow: var(--hm-shadow-lg);
+  pointer-events: none;
+}
+.ws-toast-success {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+}
+.ws-toast-warn {
+  background: rgba(234, 179, 8, 0.15);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  color: #fbbf24;
+}
+.ws-toast-info {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+}
+/* Vue transition */
+.ws-toast-enter-active { animation: ws-toast-in 0.3s ease-out; }
+.ws-toast-leave-active { animation: ws-toast-out 0.25s ease-in forwards; }
+@keyframes ws-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes ws-toast-out {
+  from { opacity: 1; transform: translateX(-50%) translateY(0); }
+  to { opacity: 0; transform: translateX(-50%) translateY(12px); }
+}
+
+/* ================================================================
+   SMOOTH DATA TRANSITIONS
+   ================================================================ */
+
+/* List item slide-in for new entries */
+.item-enter {
+  animation: item-slide-in 0.25s ease-out;
+}
+@keyframes item-slide-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Stat value counter transition */
+.dash-stat-value {
+  transition: color var(--hm-transition-slow);
+}
+
+/* Smooth badge count updates */
+.badge {
+  transition: transform var(--hm-transition-fast), background var(--hm-transition-base);
+}
+.badge-pop {
+  animation: badge-pop 0.3s var(--hm-transition-spring);
+}
+@keyframes badge-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* Optimistic action feedback */
+.action-pending {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.action-success {
+  animation: action-flash-ok 0.5s ease-out;
+}
+.action-error {
+  animation: action-flash-err 0.5s ease-out;
+}
+@keyframes action-flash-ok {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes action-flash-err {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* ================================================================
    ACCESSIBILITY — Screen reader, skip nav, reduced motion
    ================================================================ */
 
@@ -2947,6 +3068,8 @@ a:focus-visible {
   .page-fade-in { animation: none; }
   .hm-sidebar { transition: none; }
   .dash-ring-progress { transition: none; }
+  .ws-connecting, .ws-reconnecting { animation: none; }
+  .ws-toast { animation: none; }
 }
 
 /* ================================================================

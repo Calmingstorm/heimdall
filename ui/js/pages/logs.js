@@ -142,8 +142,8 @@ export default {
       <!-- Status bar -->
       <div class="flex items-center gap-3 mb-2 text-xs text-gray-500 flex-wrap">
         <div class="flex items-center gap-1.5">
-          <span class="status-dot" :class="subscribed ? 'online' : 'offline'"></span>
-          {{ subscribed ? 'Live' : 'Disconnected' }}
+          <span class="ws-indicator" :class="'ws-' + wsState"></span>
+          {{ wsStateLabel }}
         </div>
         <span class="font-mono">{{ filteredLogs.length.toLocaleString() }} / {{ logs.length.toLocaleString() }} lines</span>
         <span v-if="paused" class="badge badge-warning">Paused ({{ pauseBuffer.length }} buffered)</span>
@@ -187,6 +187,15 @@ export default {
     const textFilter = ref('');
     const useRegex = ref(false);
     const subscribed = ref(false);
+    const wsState = ref(ws.state || 'disconnected');
+    const wsStateLabel = computed(() => {
+      switch (wsState.value) {
+        case 'connected': return 'Live';
+        case 'connecting': return 'Connecting\u2026';
+        case 'reconnecting': return 'Reconnecting\u2026';
+        default: return 'Disconnected';
+      }
+    });
     const logContainer = ref(null);
     const showJumpBottom = ref(false);
     const copiedIndex = ref(null);
@@ -545,26 +554,35 @@ export default {
       if (activeLogPreset.value === id) activeLogPreset.value = 'all';
     }
 
-    // Track WS connection status
-    let statusCheckInterval = null;
+    // Track WS connection status via state callback
+    let prevStateHandler = null;
 
     onMounted(() => {
       loadCustomLogPresets();
       ws.subscribe('logs', onLog);
       subscribed.value = ws.connected;
-      statusCheckInterval = setInterval(() => {
-        subscribed.value = ws.connected;
-      }, 2000);
+      wsState.value = ws.state || 'disconnected';
+      // Listen to state changes
+      prevStateHandler = ws.onStateChange;
+      const origHandler = ws.onStateChange;
+      ws.onStateChange = (state, detail) => {
+        wsState.value = state;
+        subscribed.value = state === 'connected';
+        if (origHandler) origHandler(state, detail);
+      };
     });
 
     onUnmounted(() => {
       ws.unsubscribe('logs', onLog);
-      if (statusCheckInterval) clearInterval(statusCheckInterval);
+      // Restore previous handler
+      if (prevStateHandler !== undefined) {
+        ws.onStateChange = prevStateHandler;
+      }
     });
 
     return {
       logs, paused, autoScroll, levelFilter, textFilter, useRegex,
-      subscribed, logContainer, filteredLogs, pauseBuffer,
+      subscribed, wsState, wsStateLabel, logContainer, filteredLogs, pauseBuffer,
       showJumpBottom, copiedIndex, regexError, levels,
       logPresets, timeRanges, timeRange,
       activeLogPreset, customLogPresets,

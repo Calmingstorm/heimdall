@@ -218,7 +218,13 @@ export default {
     ];
 
     const canSend = computed(() => input.value.trim().length > 0 && !sending.value);
-    const wsStatus = computed(() => ws.connected ? 'Connected' : 'REST fallback');
+    const wsStatus = computed(() => {
+      const state = ws.state;
+      if (state === 'connected') return 'Connected';
+      if (state === 'reconnecting') return 'Reconnecting\u2026';
+      if (state === 'connecting') return 'Connecting\u2026';
+      return 'REST fallback';
+    });
 
     const typingPhrases = [
       'Watching across all realms...',

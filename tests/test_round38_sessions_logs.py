@@ -382,7 +382,7 @@ class TestLogsTemplateStructure:
         assert "badge badge-info" in logs_js
 
     def test_has_status_bar(self, logs_js):
-        assert "status-dot" in logs_js
+        assert "ws-indicator" in logs_js or "status-dot" in logs_js
         assert "Live" in logs_js
         assert "Disconnected" in logs_js
 

@@ -93,6 +93,11 @@ class WebSocketManager:
                     elif unsub == "events":
                         self._event_subscribers.discard(ws)
                         await ws.send_json({"type": "unsubscribed", "channel": "events"})
+                    elif data.get("type") == "ping":
+                        await ws.send_json({
+                            "type": "pong",
+                            "ts": data.get("ts"),
+                        })
                     elif data.get("type") == "chat":
                         await self._handle_chat(ws, data)
                     else:
