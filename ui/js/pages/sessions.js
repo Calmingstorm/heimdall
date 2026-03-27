@@ -331,7 +331,7 @@ export default {
     const newPresetName = ref('');
 
     // Thread view
-    const threadView = ref('threaded');
+    const threadView = ref('flat');
     const collapsedThreads = ref(new Set());
 
     // Load custom presets from localStorage
