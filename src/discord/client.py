@@ -1558,7 +1558,11 @@ class HeimdallBot(discord.Client):
                 log.info("Routing to Codex with tools")
                 # Use abbreviated history to reduce poisoning from stale responses
                 # (get_task_history handles compaction internally)
-                task_history = await self.sessions.get_task_history(channel_id, max_messages=20)
+                # Pass current message content for relevance scoring —
+                # older messages unrelated to the current query are dropped
+                task_history = await self.sessions.get_task_history(
+                    channel_id, max_messages=20, current_query=content,
+                )
                 if image_blocks and task_history and task_history[-1]["role"] == "user":
                     last = task_history[-1]
                     text = last["content"] if isinstance(last["content"], str) else str(last["content"])

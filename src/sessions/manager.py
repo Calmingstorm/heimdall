@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+import re
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, asdict
@@ -22,6 +23,43 @@ CompactionFn = Callable[[list[dict], str], Awaitable[str]]
 log = get_logger("sessions")
 COMPACTION_THRESHOLD = 40  # compact when history exceeds this
 CONTINUITY_MAX_AGE = 48 * 3600  # carry forward summaries from archives < 48 hours old
+
+# Relevance scoring constants
+RELEVANCE_KEEP_RECENT = 3  # always include the most recent N messages
+RELEVANCE_MIN_SCORE = 0.15  # minimum overlap score to include an older message
+RELEVANCE_MAX_OLDER = 7  # max older messages to include beyond recent window
+
+# Common stop words to ignore when scoring relevance
+_STOP_WORDS = frozenset({
+    "a", "an", "the", "is", "it", "in", "on", "to", "of", "and", "or",
+    "for", "that", "this", "with", "was", "are", "be", "has", "have",
+    "had", "do", "does", "did", "but", "not", "you", "i", "me", "my",
+    "we", "he", "she", "they", "what", "how", "can", "will", "just",
+    "so", "if", "no", "yes", "at", "by", "from", "up", "out", "as",
+})
+
+_TOKEN_RE = re.compile(r"[a-z0-9_./:-]+")
+
+
+def _tokenize(text: str) -> set[str]:
+    """Extract meaningful lowercase tokens from text, filtering stop words."""
+    return {t for t in _TOKEN_RE.findall(text.lower()) if t not in _STOP_WORDS and len(t) > 1}
+
+
+def score_relevance(query: str, message_content: str) -> float:
+    """Score how relevant a message is to the current query.
+
+    Returns a float between 0.0 and 1.0 based on keyword overlap.
+    Uses Jaccard-like scoring: |intersection| / |query_tokens|.
+    """
+    query_tokens = _tokenize(query)
+    if not query_tokens:
+        return 0.0
+    msg_tokens = _tokenize(message_content)
+    if not msg_tokens:
+        return 0.0
+    overlap = query_tokens & msg_tokens
+    return len(overlap) / len(query_tokens)
 
 
 @dataclass
@@ -170,12 +208,18 @@ class SessionManager:
 
     async def get_task_history(
         self, channel_id: str, max_messages: int = 10,
+        current_query: str | None = None,
     ) -> list[dict[str, str]]:
         """Get abbreviated history for the tool-calling path.
 
         Returns fewer messages than full history to reduce the influence of
         potentially stale or poisoned older exchanges. The summary (if any)
         still provides broader context.
+
+        When *current_query* is provided, older messages (beyond the most
+        recent ``RELEVANCE_KEEP_RECENT``) are scored for keyword relevance
+        and only the most relevant ones are included.  This prevents stale
+        context from unrelated earlier conversations from bleeding in.
         """
         session = self.get_or_create(channel_id)
 
@@ -183,9 +227,41 @@ class SessionManager:
         if len(session.messages) > COMPACTION_THRESHOLD:
             await self._compact(session)
 
-        # Take only the most recent messages
-        recent = session.messages[-max_messages:]
-        messages = [{"role": m.role, "content": m.content} for m in recent]
+        # Take only the most recent messages as the candidate pool
+        candidate_msgs = session.messages[-max_messages:]
+
+        if current_query and len(candidate_msgs) > RELEVANCE_KEEP_RECENT:
+            # Always include the most recent messages unconditionally
+            recent = candidate_msgs[-RELEVANCE_KEEP_RECENT:]
+            older = candidate_msgs[:-RELEVANCE_KEEP_RECENT]
+
+            # Score older messages for relevance
+            scored: list[tuple[float, Message]] = []
+            for msg in older:
+                content = msg.content if isinstance(msg.content, str) else str(msg.content)
+                s = score_relevance(current_query, content)
+                scored.append((s, msg))
+
+            # Keep messages above the minimum score threshold, up to the cap
+            relevant = [(s, m) for s, m in scored if s >= RELEVANCE_MIN_SCORE]
+            relevant.sort(key=lambda x: x[0], reverse=True)
+            relevant = relevant[:RELEVANCE_MAX_OLDER]
+
+            dropped = len(older) - len(relevant)
+            if dropped > 0:
+                log.info(
+                    "Relevance filter: dropped %d/%d older messages for channel %s",
+                    dropped, len(older), channel_id,
+                )
+
+            # Reconstruct in original order: relevant older + recent
+            # Preserve original ordering among the kept older messages
+            kept_set = {id(m) for _, m in relevant}
+            filtered = [m for m in older if id(m) in kept_set] + list(recent)
+        else:
+            filtered = list(candidate_msgs)
+
+        messages = [{"role": m.role, "content": m.content} for m in filtered]
 
         # Prepend summary if available
         if session.summary:

@@ -1144,7 +1144,7 @@ class TestSessionPoisoningDefense:
             await stub._handle_message_inner(msg, "check disk", "chan-1")
 
         # get_task_history was called (not get_history_with_compaction)
-        stub.sessions.get_task_history.assert_called_once_with("chan-1", max_messages=20)
+        stub.sessions.get_task_history.assert_called_once_with("chan-1", max_messages=20, current_query="check disk")
 
     async def test_guest_uses_full_history(self):
         """Guest users use full history with compaction (not abbreviated)."""
@@ -1367,7 +1367,7 @@ class TestSessionPoisoningDefense:
         assert "42%" in assistant_saves[0][0][2]
 
         # Layer 3: Abbreviated history was used
-        stub.sessions.get_task_history.assert_called_once_with("chan-1", max_messages=20)
+        stub.sessions.get_task_history.assert_called_once_with("chan-1", max_messages=20, current_query="check disk")
 
         # Response was sent to Discord
         stub._send_chunked.assert_called_once()
