@@ -155,7 +155,7 @@ class TestFTS5Sanitization:
         assert '"to"' in result or '"TO"' in result
 
     def test_ip_address_quoted(self):
-        assert _prepare_query("192.168.1.1") == '"192.168.1.1"'
+        assert _prepare_query("10.0.0.50") == '"10.0.0.50"'
 
     def test_path_quoted(self):
         assert _prepare_query("/etc/passwd") == '"/etc/passwd"'
@@ -403,7 +403,7 @@ class TestSkillSandboxing:
     def test_url_blocked_private_ranges(self):
         assert is_url_blocked("http://10.0.0.1/api") is True
         assert is_url_blocked("http://172.16.0.1/api") is True
-        assert is_url_blocked("http://192.168.1.1/api") is True
+        assert is_url_blocked("http://192.168.2.1/api") is True
 
     def test_url_allowed_public(self):
         assert is_url_blocked("https://api.example.com/data") is False
