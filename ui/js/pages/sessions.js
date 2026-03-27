@@ -207,41 +207,28 @@ export default {
                 </div>
 
                 <!-- THREADED view -->
-                <div v-if="threadView === 'threaded'" class="sess-thread-container">
-                  <div v-for="(thread, ti) in threads" :key="ti" class="sess-thread"
-                       :class="{ 'sess-thread-collapsed': collapsedThreads.has(ti) }">
-                    <!-- Thread header -->
-                    <div class="sess-thread-header" @click="toggleThread(ti)" role="button" tabindex="0"
-                         @keydown.enter="toggleThread(ti)" @keydown.space.prevent="toggleThread(ti)"
-                         :aria-expanded="!collapsedThreads.has(ti)">
-                      <span class="sess-thread-num">{{ ti + 1 }}</span>
-                      <span class="sess-thread-arrow" :class="{ 'sess-thread-arrow-open': !collapsedThreads.has(ti) }" aria-hidden="true">
-                        \u25B6
-                      </span>
-                      <span class="sess-thread-summary">{{ threadSummary(thread) }}</span>
-                      <span class="sess-thread-count badge badge-info">{{ thread.length }} msg</span>
-                      <span class="text-xs text-gray-600 ml-auto" v-if="thread[0]">
-                        {{ formatTimestamp(thread[0].timestamp) }}
-                      </span>
+                <div v-if="threadView === 'threaded'" class="max-h-96 overflow-y-auto pr-1" style="scrollbar-gutter: stable;">
+                  <div v-for="(thread, ti) in threads" :key="ti" class="mb-4">
+                    <div class="flex items-center gap-2 mb-2 px-2 py-1 bg-gray-800 rounded cursor-pointer select-none"
+                         @click="toggleThread(ti)">
+                      <span class="text-xs font-bold text-amber-400">#{{ ti + 1 }}</span>
+                      <span class="text-xs text-gray-300">{{ threadSummary(thread) }}</span>
+                      <span class="text-xs bg-gray-700 px-1.5 py-0.5 rounded text-gray-300">{{ thread.length }} msg</span>
+                      <span class="text-xs text-gray-500 ml-auto" v-if="thread[0]">{{ formatTimestamp(thread[0].timestamp) }}</span>
+                      <span class="text-xs text-gray-500">{{ collapsedThreads.has(ti) ? '\u25B6' : '\u25BC' }}</span>
                     </div>
-
-                    <!-- Thread messages -->
-                    <div v-if="!collapsedThreads.has(ti)" class="sess-thread-messages">
+                    <div v-if="!collapsedThreads.has(ti)" class="space-y-2 pl-2">
                       <div v-for="(m, mi) in thread" :key="mi"
-                           class="sess-thread-msg"
-                           :class="threadMsgClass(m.role)">
-                        <div class="sess-thread-connector" v-if="mi > 0"></div>
-                        <div class="sess-msg-header">
-                          <span class="sess-role-dot" :class="roleDotClass(m.role)"></span>
-                          <span class="sess-role-label" :class="roleLabelClass(m.role)">
-                            {{ m.role === 'user' ? 'User' : m.role === 'assistant' ? 'Heimdall' : 'System' }}
-                          </span>
-                          <span v-if="m.user_id" class="text-gray-600 text-xs font-mono">{{ m.user_id }}</span>
+                           class="p-2 rounded text-sm"
+                           :class="messageClass(m.role)">
+                        <div class="flex items-center gap-2 mb-1">
+                          <span class="badge" :class="roleBadge(m.role)">{{ m.role }}</span>
+                          <span v-if="m.user_id" class="text-gray-500 text-xs font-mono">{{ m.user_id }}</span>
                           <span class="text-gray-600 text-xs ml-auto" :title="formatFullTimestamp(m.timestamp)">
                             {{ formatTimestamp(m.timestamp) }}
                           </span>
                         </div>
-                        <div class="sess-msg-content whitespace-pre-wrap break-words">{{ truncateContent(m.content) }}</div>
+                        <div class="whitespace-pre-wrap break-words text-gray-200 text-sm">{{ truncateContent(m.content) }}</div>
                       </div>
                     </div>
                   </div>
