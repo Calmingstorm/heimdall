@@ -1082,12 +1082,7 @@ textarea.hm-input {
 .sess-msg-assistant { background: rgba(99, 102, 241, 0.05); border-left: 2px solid rgba(99, 102, 241, 0.4); }
 .sess-msg-system { background: rgba(107, 114, 128, 0.05); border-left: 2px solid rgba(107, 114, 128, 0.3); }
 .sess-thread-connector {
-  position: absolute;
-  left: -1px;
-  top: -12px;
-  width: 2px;
-  height: 12px;
-  background: var(--hm-border);
+  display: none;
 }
 
 /* Message header */
