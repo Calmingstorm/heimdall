@@ -43,10 +43,11 @@ export default {
       </div>
 
       <!-- Status filter -->
-      <div v-if="agents.length > 0" class="ag-filter-bar">
+      <div v-if="agents.length > 0" class="ag-filter-bar" role="toolbar" aria-label="Filter agents by status">
         <button v-for="f in statusFilters" :key="f.value"
                 class="ag-filter-btn" :class="{ 'ag-filter-active': statusFilter === f.value }"
-                @click="statusFilter = f.value">
+                @click="statusFilter = f.value"
+                :aria-pressed="statusFilter === f.value">
           {{ f.label }}
           <span v-if="f.count > 0" class="ag-filter-count">{{ f.count }}</span>
         </button>
@@ -56,8 +57,8 @@ export default {
       <div v-if="loading && agents.length === 0" class="space-y-2">
         <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="hm-card border-red-900 error-state">
-        <span class="error-icon">\u26A0</span>
+      <div v-else-if="error" class="hm-card border-red-900 error-state" role="alert">
+        <span class="error-icon" aria-hidden="true">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchAgents" class="btn btn-ghost text-xs">Retry</button>
       </div>
@@ -68,13 +69,13 @@ export default {
       </div>
 
       <!-- Agent cards -->
-      <div v-else class="ag-card-grid">
+      <div v-else class="ag-card-grid" role="list" aria-label="Agent list">
         <div v-for="agent in filteredAgents" :key="agent.id"
-             class="ag-card" :class="'ag-card-' + agent.status">
+             class="ag-card" :class="'ag-card-' + agent.status" role="listitem">
           <!-- Card header -->
           <div class="ag-card-header">
             <div class="ag-card-title-row">
-              <span class="ag-status-dot" :class="'ag-dot-' + agent.status"></span>
+              <span class="ag-status-dot" :class="'ag-dot-' + agent.status" role="img" :aria-label="'Status: ' + agent.status"></span>
               <span class="ag-card-label">{{ agent.label }}</span>
               <span class="ag-card-id">{{ agent.id }}</span>
             </div>

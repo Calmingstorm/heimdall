@@ -103,8 +103,8 @@ export default {
       <div v-if="loading && sessions.length === 0" class="space-y-2">
         <div v-for="n in 4" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="hm-card border-red-900 error-state">
-        <span class="error-icon">\u26A0</span>
+      <div v-else-if="error" class="hm-card border-red-900 error-state" role="alert">
+        <span class="error-icon" aria-hidden="true">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="retry" class="btn btn-ghost text-xs">Retry</button>
       </div>
@@ -211,9 +211,11 @@ export default {
                   <div v-for="(thread, ti) in threads" :key="ti" class="sess-thread"
                        :class="{ 'sess-thread-collapsed': collapsedThreads.has(ti) }">
                     <!-- Thread header -->
-                    <div class="sess-thread-header" @click="toggleThread(ti)">
+                    <div class="sess-thread-header" @click="toggleThread(ti)" role="button" tabindex="0"
+                         @keydown.enter="toggleThread(ti)" @keydown.space.prevent="toggleThread(ti)"
+                         :aria-expanded="!collapsedThreads.has(ti)">
                       <span class="sess-thread-num">{{ ti + 1 }}</span>
-                      <span class="sess-thread-arrow" :class="{ 'sess-thread-arrow-open': !collapsedThreads.has(ti) }">
+                      <span class="sess-thread-arrow" :class="{ 'sess-thread-arrow-open': !collapsedThreads.has(ti) }" aria-hidden="true">
                         \u25B6
                       </span>
                       <span class="sess-thread-summary">{{ threadSummary(thread) }}</span>
@@ -271,9 +273,9 @@ export default {
       </div>
 
       <!-- Confirm clear modal (single) -->
-      <div v-if="clearTarget" class="modal-overlay" @click.self="clearTarget = null" @keyup.escape="clearTarget = null">
+      <div v-if="clearTarget" class="modal-overlay" @click.self="clearTarget = null" @keyup.escape="clearTarget = null" role="dialog" aria-modal="true" aria-labelledby="sess-clear-title">
         <div class="modal-content">
-          <h3 class="text-lg font-semibold mb-2">Clear Session</h3>
+          <h3 id="sess-clear-title" class="text-lg font-semibold mb-2">Clear Session</h3>
           <p class="text-gray-400 text-sm mb-4">
             Clear all conversation history for channel <span class="font-mono">{{ clearTarget }}</span>? This cannot be undone.
           </p>
@@ -287,9 +289,9 @@ export default {
       </div>
 
       <!-- Confirm bulk clear modal -->
-      <div v-if="bulkClearing" class="modal-overlay" @click.self="bulkClearing = false" @keyup.escape="bulkClearing = false">
+      <div v-if="bulkClearing" class="modal-overlay" @click.self="bulkClearing = false" @keyup.escape="bulkClearing = false" role="dialog" aria-modal="true" aria-labelledby="sess-bulk-clear-title">
         <div class="modal-content">
-          <h3 class="text-lg font-semibold mb-2">Clear Selected Sessions</h3>
+          <h3 id="sess-bulk-clear-title" class="text-lg font-semibold mb-2">Clear Selected Sessions</h3>
           <p class="text-gray-400 text-sm mb-4">
             Clear <strong>{{ selected.size }}</strong> selected session(s)? This cannot be undone.
           </p>

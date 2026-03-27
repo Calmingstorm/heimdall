@@ -8,9 +8,9 @@ const { ref, computed, onMounted, onUnmounted, nextTick } = Vue;
 
 export default {
   template: `
-    <div class="p-6 page-fade-in">
+    <div class="p-6 page-fade-in" role="region" aria-label="Dashboard">
       <!-- Skeleton loading -->
-      <div v-if="loading" class="space-y-4">
+      <div v-if="loading" class="space-y-4" role="status" aria-label="Loading dashboard">
         <div class="hm-card dash-hero-skeleton">
           <div class="skeleton" style="width:48px;height:48px;border-radius:50%;flex-shrink:0;"></div>
           <div style="flex:1;">
@@ -27,8 +27,8 @@ export default {
       </div>
 
       <!-- Error state with retry -->
-      <div v-else-if="error" class="hm-card border-red-900 error-state">
-        <span class="error-icon">\u26A0</span>
+      <div v-else-if="error" class="hm-card border-red-900 error-state" role="alert">
+        <span class="error-icon" aria-hidden="true">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="retry" class="btn btn-ghost text-xs">Retry</button>
       </div>
@@ -38,13 +38,13 @@ export default {
         <div class="dash-hero hm-card mb-4">
           <div class="dash-hero-left">
             <div class="dash-hero-ring" :class="status.status === 'online' ? 'ring-online' : 'ring-starting'">
-              <svg viewBox="0 0 48 48" class="dash-ring-svg">
+              <svg viewBox="0 0 48 48" class="dash-ring-svg" role="img" :aria-label="'Uptime: ' + uptime">
                 <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="3" opacity="0.15"/>
                 <circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="3"
                   stroke-dasharray="125.66" :stroke-dashoffset="uptimeRingOffset"
                   stroke-linecap="round" class="dash-ring-progress"/>
               </svg>
-              <span class="dash-hero-icon">\u2300</span>
+              <span class="dash-hero-icon" aria-hidden="true">\u2300</span>
             </div>
             <div>
               <div class="dash-hero-name">Heimdall</div>
@@ -67,7 +67,7 @@ export default {
               {{ actionLoading.stopLoops ? '...' : '\u25a0 Stop Loops' }}
             </button>
           </div>
-          <div v-if="actionMessage" class="dash-hero-toast" :class="actionMessage.ok ? 'text-green-400' : 'text-red-400'">
+          <div v-if="actionMessage" class="dash-hero-toast" :class="actionMessage.ok ? 'text-green-400' : 'text-red-400'" role="status" aria-live="polite">
             {{ actionMessage.text }}
           </div>
         </div>
@@ -87,11 +87,11 @@ export default {
         </div>
 
         <!-- Health indicators bar -->
-        <div class="dash-health-bar hm-card mb-4" v-if="healthIndicators.length > 0">
+        <div class="dash-health-bar hm-card mb-4" v-if="healthIndicators.length > 0" role="region" aria-label="System health">
           <div class="hm-section-title" style="margin-bottom:0.5rem;">System Health</div>
           <div class="dash-health-items">
             <div v-for="h in healthIndicators" :key="h.label" class="dash-health-item">
-              <span class="dash-health-dot" :class="'dash-health-' + h.status"></span>
+              <span class="dash-health-dot" :class="'dash-health-' + h.status" role="img" :aria-label="h.status"></span>
               <span class="dash-health-label">{{ h.label }}</span>
               <span v-if="h.detail" class="dash-health-detail">{{ h.detail }}</span>
             </div>

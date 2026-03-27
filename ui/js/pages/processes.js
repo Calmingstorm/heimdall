@@ -31,8 +31,8 @@ export default {
       <div v-if="loading && processes.length === 0" class="space-y-2">
         <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="hm-card border-red-900 error-state">
-        <span class="error-icon">\u26A0</span>
+      <div v-else-if="error" class="hm-card border-red-900 error-state" role="alert">
+        <span class="error-icon" aria-hidden="true">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchProcesses" class="btn btn-ghost text-xs">Retry</button>
       </div>
@@ -95,9 +95,9 @@ export default {
       </div>
 
       <!-- Kill confirmation -->
-      <div v-if="killTarget !== null" class="modal-overlay" @click.self="killTarget = null">
+      <div v-if="killTarget !== null" class="modal-overlay" @click.self="killTarget = null" role="dialog" aria-modal="true" aria-labelledby="proc-kill-title">
         <div class="modal-content">
-          <h3 class="text-lg font-semibold mb-2">Kill Process</h3>
+          <h3 id="proc-kill-title" class="text-lg font-semibold mb-2">Kill Process</h3>
           <p class="text-gray-400 text-sm mb-4">
             Kill process <span class="font-mono font-semibold text-gray-200">{{ killTarget }}</span>?
           </p>

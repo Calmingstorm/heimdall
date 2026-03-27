@@ -77,8 +77,8 @@ export default {
       <div v-if="loading && loops.length === 0" class="space-y-2">
         <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="hm-card border-red-900 error-state">
-        <span class="error-icon">\u26A0</span>
+      <div v-else-if="error" class="hm-card border-red-900 error-state" role="alert">
+        <span class="error-icon" aria-hidden="true">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchLoops" class="btn btn-ghost text-xs">Retry</button>
       </div>
@@ -176,9 +176,9 @@ export default {
       </div>
 
       <!-- Stop confirmation -->
-      <div v-if="stopTarget" class="modal-overlay" @click.self="stopTarget = null">
+      <div v-if="stopTarget" class="modal-overlay" @click.self="stopTarget = null" role="dialog" aria-modal="true" aria-labelledby="loop-stop-title">
         <div class="modal-content">
-          <h3 class="text-lg font-semibold mb-2">Stop Loop</h3>
+          <h3 id="loop-stop-title" class="text-lg font-semibold mb-2">Stop Loop</h3>
           <p class="text-gray-400 text-sm mb-4">
             Stop loop <span class="font-mono font-semibold text-gray-200">{{ stopTarget }}</span>?
             The current iteration will finish before stopping.

@@ -89,8 +89,8 @@ export default {
       <div v-if="loading && scopes.length === 0" class="space-y-2">
         <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="hm-card border-red-900 error-state">
-        <span class="error-icon">\u26A0</span>
+      <div v-else-if="error" class="hm-card border-red-900 error-state" role="alert">
+        <span class="error-icon" aria-hidden="true">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchMemory" class="btn btn-ghost text-xs">Retry</button>
       </div>
@@ -160,9 +160,9 @@ export default {
       </div>
 
       <!-- Delete confirmation (single) -->
-      <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null">
+      <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null" role="dialog" aria-modal="true" aria-labelledby="mem-delete-title">
         <div class="modal-content">
-          <h3 class="text-lg font-semibold mb-2">Delete Memory Entry</h3>
+          <h3 id="mem-delete-title" class="text-lg font-semibold mb-2">Delete Memory Entry</h3>
           <p class="text-gray-400 text-sm mb-4">
             Delete <span class="font-mono font-semibold text-gray-200">{{ deleteTarget.scope }}/{{ deleteTarget.key }}</span>? This cannot be undone.
           </p>
@@ -176,9 +176,9 @@ export default {
       </div>
 
       <!-- Bulk delete confirmation -->
-      <div v-if="showBulkDelete" class="modal-overlay" @click.self="showBulkDelete = false">
+      <div v-if="showBulkDelete" class="modal-overlay" @click.self="showBulkDelete = false" role="dialog" aria-modal="true" aria-labelledby="mem-bulk-delete-title">
         <div class="modal-content">
-          <h3 class="text-lg font-semibold mb-2">Bulk Delete</h3>
+          <h3 id="mem-bulk-delete-title" class="text-lg font-semibold mb-2">Bulk Delete</h3>
           <p class="text-gray-400 text-sm mb-4">
             Delete <span class="font-semibold text-gray-200">{{ selectedCount }}</span> selected entries? This cannot be undone.
           </p>

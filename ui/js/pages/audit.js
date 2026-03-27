@@ -59,8 +59,8 @@ export default {
       <div v-if="loading && entries.length === 0" class="space-y-2">
         <div v-for="n in 5" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="hm-card border-red-900 error-state">
-        <span class="error-icon">\u26A0</span>
+      <div v-else-if="error" class="hm-card border-red-900 error-state" role="alert">
+        <span class="error-icon" aria-hidden="true">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchAudit" class="btn btn-ghost text-xs">Retry</button>
       </div>

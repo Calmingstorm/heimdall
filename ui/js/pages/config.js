@@ -160,7 +160,7 @@ export default {
       </div>
 
       <!-- Toast -->
-      <div v-if="toast" :class="['toast', toast.type === 'success' ? 'toast-success' : 'toast-error']">
+      <div v-if="toast" :class="['toast', toast.type === 'success' ? 'toast-success' : 'toast-error']" role="status" aria-live="polite">
         {{ toast.message }}
       </div>
 
@@ -173,8 +173,8 @@ export default {
       </div>
 
       <!-- Error state -->
-      <div v-else-if="error" class="hm-card border-red-900 error-state">
-        <span class="error-icon">\u26A0</span>
+      <div v-else-if="error" class="hm-card border-red-900 error-state" role="alert">
+        <span class="error-icon" aria-hidden="true">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchConfig" class="btn btn-ghost text-xs">Retry</button>
       </div>
@@ -183,12 +183,14 @@ export default {
       <div v-else-if="config" class="space-y-4">
         <div v-for="group in visibleGroups" :key="group.key" class="cfg-group">
           <!-- Group header -->
-          <div class="cfg-group-header cursor-pointer select-none" @click="toggleGroup(group.key)">
-            <span class="cfg-group-icon">{{ group.icon }}</span>
+          <div class="cfg-group-header cursor-pointer select-none" @click="toggleGroup(group.key)"
+               role="button" tabindex="0" @keydown.enter="toggleGroup(group.key)" @keydown.space.prevent="toggleGroup(group.key)"
+               :aria-expanded="!!expandedGroups[group.key]">
+            <span class="cfg-group-icon" aria-hidden="true">{{ group.icon }}</span>
             <span class="cfg-group-label">{{ group.label }}</span>
             <span class="badge badge-info text-xs">{{ group.sections.length }}</span>
             <span v-if="editing && groupChanged(group)" class="badge badge-warning text-xs">modified</span>
-            <span class="cfg-group-arrow">{{ expandedGroups[group.key] ? '\u25BC' : '\u25B6' }}</span>
+            <span class="cfg-group-arrow" aria-hidden="true">{{ expandedGroups[group.key] ? '\u25BC' : '\u25B6' }}</span>
           </div>
 
           <!-- Group content -->
@@ -372,10 +374,10 @@ export default {
       </div>
 
       <!-- Diff modal -->
-      <div v-if="showDiffModal" class="modal-overlay" @click.self="showDiffModal = false">
+      <div v-if="showDiffModal" class="modal-overlay" @click.self="showDiffModal = false" role="dialog" aria-modal="true" aria-labelledby="cfg-diff-title">
         <div class="modal-content" style="max-width:700px">
           <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold">Review Changes</h2>
+            <h2 id="cfg-diff-title" class="text-lg font-semibold">Review Changes</h2>
             <button @click="showDiffModal = false" class="btn btn-ghost text-xs">\u2715</button>
           </div>
           <div v-if="diffEntries.length === 0" class="text-gray-500 text-sm py-4 text-center">No changes to review.</div>

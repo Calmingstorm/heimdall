@@ -60,21 +60,24 @@ router.afterEach((to) => {
 // ---------------------------------------------------------------------------
 const LoginScreen = {
   template: `
-    <div class="min-h-screen flex items-center justify-center">
+    <div class="min-h-screen flex items-center justify-center" role="main">
       <div class="hm-card w-full max-w-sm">
-        <h1 class="text-xl font-semibold mb-1 text-center">Heimdall</h1>
+        <h1 id="login-title" class="text-xl font-semibold mb-1 text-center">Heimdall</h1>
         <p class="text-gray-400 text-sm text-center mb-4">Management Interface</p>
-        <div v-if="error" class="mb-3 text-red-400 text-sm text-center">{{ error }}</div>
-        <form @submit.prevent="login">
+        <div v-if="error" class="mb-3 text-red-400 text-sm text-center" role="alert">{{ error }}</div>
+        <form @submit.prevent="login" aria-labelledby="login-title">
+          <label for="login-token" class="sr-only">API Token</label>
           <input
+            id="login-token"
             v-model="token"
             type="password"
             placeholder="API Token"
             class="hm-input mb-3"
             autofocus
+            autocomplete="current-password"
           />
           <button type="submit" class="btn btn-primary w-full justify-center" :disabled="busy">
-            <span v-if="busy" class="spinner" style="width:14px;height:14px;border-width:2px;"></span>
+            <span v-if="busy" class="spinner" style="width:14px;height:14px;border-width:2px;" aria-hidden="true"></span>
             {{ busy ? 'Connecting...' : 'Connect' }}
           </button>
         </form>
@@ -110,38 +113,42 @@ const LoginScreen = {
 // ---------------------------------------------------------------------------
 const App = {
   template: `
-    <div v-if="authState === 'checking'" class="min-h-screen flex items-center justify-center">
-      <div class="spinner"></div>
+    <div v-if="authState === 'checking'" class="min-h-screen flex items-center justify-center" role="status" aria-label="Loading">
+      <div class="spinner" aria-hidden="true"></div>
+      <span class="sr-only">Loading application...</span>
     </div>
     <login-screen v-else-if="authState === 'login'" :on-login="onLogin" />
     <div v-else class="flex min-h-screen">
       <!-- Sidebar -->
-      <aside class="hm-sidebar" :class="{ collapsed: sidebarCollapsed, 'mobile-open': mobileOpen }">
+      <aside class="hm-sidebar" :class="{ collapsed: sidebarCollapsed, 'mobile-open': mobileOpen }" role="navigation" aria-label="Main navigation">
         <div class="flex items-center gap-2 px-3 py-3 border-b border-gray-800">
-          <button @click="toggleSidebar" class="btn-ghost p-1 rounded sidebar-toggle-btn" title="Toggle sidebar">
-            <span style="font-size:1.1rem;">{{ sidebarCollapsed ? '\u{25B6}' : '\u{2630}' }}</span>
+          <button @click="toggleSidebar" class="btn-ghost p-1 rounded sidebar-toggle-btn"
+                  :aria-expanded="!sidebarCollapsed" aria-controls="sidebar-nav"
+                  :aria-label="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'">
+            <span style="font-size:1.1rem;" aria-hidden="true">{{ sidebarCollapsed ? '\u{25B6}' : '\u{2630}' }}</span>
           </button>
           <span class="sidebar-header-text font-semibold text-sm tracking-wide">HEIMDALL</span>
         </div>
-        <nav class="flex-1 py-2 overflow-y-auto">
+        <nav id="sidebar-nav" class="flex-1 py-2 overflow-y-auto" aria-label="Page navigation">
           <router-link
             v-for="r in navRoutes"
             :key="r.path"
             :to="r.path"
             class="nav-item"
             active-class="active"
+            :aria-current="$route.path === r.path ? 'page' : undefined"
             @click="mobileOpen = false"
           >
-            <span class="nav-icon">{{ r.meta.icon }}</span>
+            <span class="nav-icon" aria-hidden="true">{{ r.meta.icon }}</span>
             <span class="nav-label">{{ r.meta.label }}</span>
           </router-link>
         </nav>
         <div class="px-3 py-2 border-t border-gray-800 text-xs text-gray-500 sidebar-header-text">
-          <div class="flex items-center gap-1.5 mb-1">
-            <span class="status-dot" :class="wsConnected ? 'online' : 'offline'"></span>
-            {{ wsConnected ? 'Live' : 'Disconnected' }}
+          <div class="flex items-center gap-1.5 mb-1" aria-live="polite">
+            <span class="status-dot" :class="wsConnected ? 'online' : 'offline'" aria-hidden="true"></span>
+            <span>{{ wsConnected ? 'Live' : 'Disconnected' }}</span>
           </div>
-          <div class="text-gray-600 mobile-hide" style="font-size:0.625rem;">
+          <div class="text-gray-600 mobile-hide" style="font-size:0.625rem;" aria-label="Keyboard shortcuts">
             <kbd class="px-1 py-0.5 bg-gray-800 rounded">/</kbd> search
             <kbd class="px-1 py-0.5 bg-gray-800 rounded ml-1">Esc</kbd> close
           </div>
@@ -149,24 +156,25 @@ const App = {
       </aside>
 
       <!-- Mobile overlay -->
-      <div v-if="mobileOpen" class="fixed inset-0 bg-black/50 z-30 md:hidden" @click="mobileOpen = false"></div>
+      <div v-if="mobileOpen" class="fixed inset-0 bg-black/50 z-30 md:hidden" @click="mobileOpen = false" aria-hidden="true"></div>
 
       <!-- Main content -->
-      <div class="hm-main">
-        <div class="hm-topbar">
-          <button class="btn-ghost p-1 rounded md:hidden" @click="mobileOpen = !mobileOpen">
-            <span style="font-size:1.1rem;">\u{2630}</span>
+      <main id="main-content" class="hm-main" role="main">
+        <header class="hm-topbar" role="banner">
+          <button class="btn-ghost p-1 rounded md:hidden" @click="mobileOpen = !mobileOpen"
+                  :aria-expanded="mobileOpen" aria-controls="sidebar-nav" aria-label="Open navigation menu">
+            <span style="font-size:1.1rem;" aria-hidden="true">\u{2630}</span>
           </button>
           <div class="flex items-center gap-2">
-            <span class="status-dot" :class="botStatus"></span>
+            <span class="status-dot" :class="botStatus" role="img" :aria-label="'Bot status: ' + botStatus"></span>
             <span class="text-sm font-medium">Heimdall</span>
           </div>
-          <span v-if="botUptime" class="text-xs text-gray-500">{{ botUptime }}</span>
+          <span v-if="botUptime" class="text-xs text-gray-500" aria-label="Uptime">{{ botUptime }}</span>
           <div class="flex-1"></div>
-          <button @click="logout" class="btn btn-ghost text-xs">Logout</button>
-        </div>
+          <button @click="logout" class="btn btn-ghost text-xs" aria-label="Log out">Logout</button>
+        </header>
         <router-view />
-      </div>
+      </main>
     </div>`,
   setup() {
     const authState = ref('checking'); // 'checking' | 'login' | 'ready'

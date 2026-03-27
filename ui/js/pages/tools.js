@@ -38,9 +38,9 @@ export default {
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-xl font-semibold">Tools</h1>
         <div class="flex gap-2 items-center">
-          <div class="tl-view-toggle">
-            <button @click="viewMode = 'cards'" class="tl-view-btn" :class="{ 'tl-view-active': viewMode === 'cards' }" title="Card view">\u25A6</button>
-            <button @click="viewMode = 'table'" class="tl-view-btn" :class="{ 'tl-view-active': viewMode === 'table' }" title="Table view">\u2630</button>
+          <div class="tl-view-toggle" role="toolbar" aria-label="View mode">
+            <button @click="viewMode = 'cards'" class="tl-view-btn" :class="{ 'tl-view-active': viewMode === 'cards' }" :aria-pressed="viewMode === 'cards'" aria-label="Card view"><span aria-hidden="true">\u25A6</span></button>
+            <button @click="viewMode = 'table'" class="tl-view-btn" :class="{ 'tl-view-active': viewMode === 'table' }" :aria-pressed="viewMode === 'table'" aria-label="Table view"><span aria-hidden="true">\u2630</span></button>
           </div>
           <button @click="refresh" class="btn btn-ghost text-xs" :disabled="loading">
             {{ loading ? 'Loading...' : 'Refresh' }}
@@ -62,8 +62,8 @@ export default {
       </div>
 
       <!-- Error state -->
-      <div v-else-if="error" class="hm-card border-red-900 error-state">
-        <span class="error-icon">\u26A0</span>
+      <div v-else-if="error" class="hm-card border-red-900 error-state" role="alert">
+        <span class="error-icon" aria-hidden="true">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="refresh" class="btn btn-ghost text-xs">Retry</button>
       </div>
@@ -129,13 +129,15 @@ export default {
         <!-- Search + Category filter -->
         <div class="flex flex-wrap gap-2 mb-4 items-center">
           <input v-model="search" type="text" class="hm-input tl-search" placeholder="Search tools by name or description..." />
-          <div class="tl-category-chips">
+          <div class="tl-category-chips" role="toolbar" aria-label="Filter by category">
             <button @click="activeCategory = null"
-                    class="tl-category-chip" :class="{ 'tl-category-active': !activeCategory }">All</button>
+                    class="tl-category-chip" :class="{ 'tl-category-active': !activeCategory }"
+                    :aria-pressed="!activeCategory">All</button>
             <button v-for="cat in usedCategories" :key="cat.id"
                     @click="activeCategory = activeCategory === cat.id ? null : cat.id"
-                    class="tl-category-chip" :class="{ 'tl-category-active': activeCategory === cat.id }">
-              {{ cat.icon }} {{ cat.label }}
+                    class="tl-category-chip" :class="{ 'tl-category-active': activeCategory === cat.id }"
+                    :aria-pressed="activeCategory === cat.id">
+              <span aria-hidden="true">{{ cat.icon }}</span> {{ cat.label }}
             </button>
           </div>
         </div>

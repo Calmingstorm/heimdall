@@ -57,9 +57,9 @@ function extractImageUrls(text) {
 
 export default {
   template: `
-    <div class="chat-container page-fade-in">
+    <div class="chat-container page-fade-in" role="region" aria-label="Chat">
       <!-- Message list -->
-      <div class="chat-messages" ref="messagesEl">
+      <div class="chat-messages" ref="messagesEl" role="log" aria-live="polite" aria-label="Messages">
         <!-- Empty state -->
         <div v-if="messages.length === 0" class="chat-empty">
           <div class="chat-welcome">
@@ -116,8 +116,9 @@ export default {
 
                 <!-- Tool cards -->
                 <div v-if="msg.tools_used && msg.tools_used.length > 0" class="chat-tool-cards">
-                  <button class="chat-tools-toggle" @click="msg._showTools = !msg._showTools">
-                    <span class="chat-tools-toggle-icon">{{ msg._showTools ? '\u25BC' : '\u25B6' }}</span>
+                  <button class="chat-tools-toggle" @click="msg._showTools = !msg._showTools"
+                          :aria-expanded="msg._showTools" aria-label="Toggle tool details">
+                    <span class="chat-tools-toggle-icon" aria-hidden="true">{{ msg._showTools ? '\u25BC' : '\u25B6' }}</span>
                     <span class="chat-tools-toggle-count">{{ msg.tools_used.length }}</span>
                     <span>tool{{ msg.tools_used.length > 1 ? 's' : '' }} executed</span>
                   </button>
@@ -147,17 +148,17 @@ export default {
         </template>
 
         <!-- Typing indicator -->
-        <div v-if="sending" class="chat-message chat-bot">
+        <div v-if="sending" class="chat-message chat-bot" role="status" aria-label="Heimdall is responding">
           <div class="chat-avatar chat-avatar-bot">
             <span class="chat-avatar-eye chat-avatar-pulse">
-              <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor">
+              <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor" aria-hidden="true">
                 <path d="M10 3C5 3 1.73 7.11 1 10c.73 2.89 4 7 9 7s8.27-4.11 9-7c-.73-2.89-4-7-9-7zm0 12a5 5 0 110-10 5 5 0 010 10zm0-8a3 3 0 100 6 3 3 0 000-6z"/>
               </svg>
             </span>
           </div>
           <div class="chat-bubble-wrap">
             <div class="chat-bubble chat-bubble-bot chat-bubble-typing">
-              <div class="chat-typing">
+              <div class="chat-typing" aria-hidden="true">
                 <span></span><span></span><span></span>
               </div>
               <span class="chat-typing-text">{{ typingText }}</span>
@@ -167,9 +168,11 @@ export default {
       </div>
 
       <!-- Input area -->
-      <div class="chat-input-area">
+      <div class="chat-input-area" role="form" aria-label="Send message">
         <div class="chat-input-row">
+          <label for="chat-message-input" class="sr-only">Message</label>
           <textarea
+            id="chat-message-input"
             ref="inputEl"
             v-model="input"
             class="chat-input"
@@ -179,9 +182,9 @@ export default {
             @keydown.enter.exact.prevent="send"
             @input="autoResize"
           ></textarea>
-          <button class="btn btn-primary chat-send-btn" :disabled="!canSend" @click="send">
-            <span v-if="sending" class="spinner" style="width:14px;height:14px;border-width:2px;"></span>
-            <svg v-else viewBox="0 0 20 20" width="16" height="16" fill="currentColor" class="chat-send-icon">
+          <button class="btn btn-primary chat-send-btn" :disabled="!canSend" @click="send" aria-label="Send message">
+            <span v-if="sending" class="spinner" style="width:14px;height:14px;border-width:2px;" aria-hidden="true"></span>
+            <svg v-else viewBox="0 0 20 20" width="16" height="16" fill="currentColor" class="chat-send-icon" aria-hidden="true">
               <path d="M2.94 5.34l6.22 2.6L2.94 5.34zM9.16 12.06l-6.22 2.6 1.36-5.2 4.86 2.6zM18.44 10L2.12 2.4l2.06 7.6-2.06 7.6L18.44 10z"/>
             </svg>
           </button>

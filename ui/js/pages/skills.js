@@ -89,8 +89,8 @@ export default {
       </div>
 
       <!-- Error state -->
-      <div v-else-if="error" class="hm-card border-red-900 error-state">
-        <span class="error-icon">\u26A0</span>
+      <div v-else-if="error" class="hm-card border-red-900 error-state" role="alert">
+        <span class="error-icon" aria-hidden="true">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchSkills" class="btn btn-ghost text-xs">Retry</button>
       </div>
@@ -225,9 +225,9 @@ export default {
       </div>
 
       <!-- Delete confirmation -->
-      <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null">
+      <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null" role="dialog" aria-modal="true" aria-labelledby="skill-delete-title">
         <div class="modal-content">
-          <h3 class="text-lg font-semibold mb-2">Delete Skill</h3>
+          <h3 id="skill-delete-title" class="text-lg font-semibold mb-2">Delete Skill</h3>
           <p class="text-gray-400 text-sm mb-4">
             Delete skill <span class="font-mono font-semibold text-gray-200">{{ deleteTarget }}</span>? This cannot be undone.
           </p>

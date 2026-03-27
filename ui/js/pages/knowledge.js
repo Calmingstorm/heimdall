@@ -111,11 +111,11 @@ export default {
       </div>
 
       <!-- Sources tree view -->
-      <div v-if="loading && sources.length === 0" class="space-y-2">
+      <div v-if="loading && sources.length === 0" class="space-y-2" role="status" aria-label="Loading sources">
         <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="hm-card border-red-900 error-state">
-        <span class="error-icon">\u26A0</span>
+      <div v-else-if="error" class="hm-card border-red-900 error-state" role="alert">
+        <span class="error-icon" aria-hidden="true">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchSources" class="btn btn-ghost text-xs">Retry</button>
       </div>
@@ -131,8 +131,10 @@ export default {
         <div class="kb-tree-list">
           <div v-for="s in sources" :key="s.source || s.name || s" class="kb-tree-node">
             <!-- Source header (tree branch) -->
-            <div class="kb-tree-header" @click="toggleSource(s.source || s.name || s)">
-              <span class="kb-tree-arrow" :class="{ 'kb-tree-arrow-open': expanded[s.source || s.name || s] }">
+            <div class="kb-tree-header" @click="toggleSource(s.source || s.name || s)"
+                 role="button" tabindex="0" @keydown.enter="toggleSource(s.source || s.name || s)" @keydown.space.prevent="toggleSource(s.source || s.name || s)"
+                 :aria-expanded="!!expanded[s.source || s.name || s]">
+              <span class="kb-tree-arrow" :class="{ 'kb-tree-arrow-open': expanded[s.source || s.name || s] }" aria-hidden="true">
                 \u25B6
               </span>
               <span class="kb-tree-icon">\u{1F4C4}</span>
@@ -193,9 +195,9 @@ export default {
       </div>
 
       <!-- Delete confirmation -->
-      <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null">
+      <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null" role="dialog" aria-modal="true" aria-labelledby="kb-delete-title">
         <div class="modal-content">
-          <h3 class="text-lg font-semibold mb-2">Delete Source</h3>
+          <h3 id="kb-delete-title" class="text-lg font-semibold mb-2">Delete Source</h3>
           <p class="text-gray-400 text-sm mb-4">
             Delete all chunks for <span class="font-mono font-semibold text-gray-200">{{ deleteTarget }}</span>? This cannot be undone.
           </p>
