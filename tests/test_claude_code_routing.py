@@ -19,7 +19,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import LokiBot  # noqa: E402
+from src.discord.client import HeimdallBot  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -27,7 +27,7 @@ from src.discord.client import LokiBot  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Create a minimal LokiBot stub for _handle_message_inner tests."""
+    """Create a minimal HeimdallBot stub for _handle_message_inner tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -96,7 +96,7 @@ class TestTaskRouting:
         stub.codex_client = MagicMock()
         stub.codex_client.chat = AsyncMock(return_value="Chat response")
         stub._process_with_tools = AsyncMock(return_value=("Tool result", False, False, ["check_disk"], False))
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "check the server metrics", "chan-1")
 
@@ -111,7 +111,7 @@ class TestTaskRouting:
         stub = _make_bot_stub()
         msg = _make_message()
         stub.codex_client = None
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "restart apache", "chan-1")
 
@@ -124,7 +124,7 @@ class TestTaskRouting:
         """A plain message (no keywords, no images) should route to task."""
         stub = _make_bot_stub()
         msg = _make_message()
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "hello there", "chan-1")
 
@@ -147,7 +147,7 @@ class TestKeywordBypassUnchanged:
         stub._process_with_tools = AsyncMock(
             return_value=("Done", False, False, [], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "deploy the latest code", "chan-1")
 
@@ -162,7 +162,7 @@ class TestKeywordBypassUnchanged:
         stub._process_with_tools = AsyncMock(
             return_value=("I see the image", False, False, [], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(
             msg, "what is this?", "chan-1",

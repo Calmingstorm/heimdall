@@ -76,13 +76,13 @@ class TestConfigLoadingErrors:
 # ---------------------------------------------------------------------------
 
 class TestStartupConfigWarnings:
-    """LokiBot._log_startup_config should log useful warnings for new users."""
+    """HeimdallBot._log_startup_config should log useful warnings for new users."""
 
     def _make_stub(self, **config_overrides):
-        """Create a minimal LokiBot stub for _log_startup_config tests."""
-        from src.discord.client import LokiBot
+        """Create a minimal HeimdallBot stub for _log_startup_config tests."""
+        from src.discord.client import HeimdallBot
 
-        stub = MagicMock(spec=LokiBot)
+        stub = MagicMock(spec=HeimdallBot)
         stub.config = MagicMock()
         stub.config.tools.hosts = {}
         stub.config.tools.claude_code_host = ""
@@ -102,54 +102,54 @@ class TestStartupConfigWarnings:
 
     def test_warns_on_empty_hosts(self, caplog):
         stub = self._make_stub()
-        with caplog.at_level(logging.WARNING, logger="loki.discord"):
-            from src.discord.client import LokiBot
-            LokiBot._log_startup_config(stub)
+        with caplog.at_level(logging.WARNING, logger="heimdall.discord"):
+            from src.discord.client import HeimdallBot
+            HeimdallBot._log_startup_config(stub)
         assert any("No hosts configured" in r.message for r in caplog.records)
 
     def test_logs_configured_hosts(self, caplog):
         stub = self._make_stub()
         stub.config.tools.hosts = {"webserver": MagicMock(), "dbserver": MagicMock()}
-        with caplog.at_level(logging.INFO, logger="loki.discord"):
-            from src.discord.client import LokiBot
-            LokiBot._log_startup_config(stub)
+        with caplog.at_level(logging.INFO, logger="heimdall.discord"):
+            from src.discord.client import HeimdallBot
+            HeimdallBot._log_startup_config(stub)
         assert any("webserver" in r.message and "dbserver" in r.message for r in caplog.records)
 
     def test_warns_on_codex_enabled_but_unconfigured(self, caplog):
         stub = self._make_stub(**{"config.openai_codex.enabled": True})
         stub.codex_client = None
-        with caplog.at_level(logging.WARNING, logger="loki.discord"):
-            from src.discord.client import LokiBot
-            LokiBot._log_startup_config(stub)
+        with caplog.at_level(logging.WARNING, logger="heimdall.discord"):
+            from src.discord.client import HeimdallBot
+            HeimdallBot._log_startup_config(stub)
         assert any("Codex enabled but not configured" in r.message for r in caplog.records)
 
     def test_logs_respond_to_bots_enabled(self, caplog):
         stub = self._make_stub(**{"config.discord.respond_to_bots": True})
-        with caplog.at_level(logging.INFO, logger="loki.discord"):
-            from src.discord.client import LokiBot
-            LokiBot._log_startup_config(stub)
+        with caplog.at_level(logging.INFO, logger="heimdall.discord"):
+            from src.discord.client import HeimdallBot
+            HeimdallBot._log_startup_config(stub)
         assert any("Bot interaction enabled" in r.message for r in caplog.records)
 
     def test_logs_require_mention_enabled(self, caplog):
         stub = self._make_stub(**{"config.discord.require_mention": True})
-        with caplog.at_level(logging.INFO, logger="loki.discord"):
-            from src.discord.client import LokiBot
-            LokiBot._log_startup_config(stub)
+        with caplog.at_level(logging.INFO, logger="heimdall.discord"):
+            from src.discord.client import HeimdallBot
+            HeimdallBot._log_startup_config(stub)
         assert any("Mention-only mode" in r.message for r in caplog.records)
 
     def test_no_codex_warning_when_disabled(self, caplog):
         stub = self._make_stub(**{"config.openai_codex.enabled": False})
         stub.codex_client = None
-        with caplog.at_level(logging.WARNING, logger="loki.discord"):
-            from src.discord.client import LokiBot
-            LokiBot._log_startup_config(stub)
+        with caplog.at_level(logging.WARNING, logger="heimdall.discord"):
+            from src.discord.client import HeimdallBot
+            HeimdallBot._log_startup_config(stub)
         assert not any("Codex" in r.message for r in caplog.records)
 
     def test_info_on_missing_claude_code_host(self, caplog):
         stub = self._make_stub()
-        with caplog.at_level(logging.INFO, logger="loki.discord"):
-            from src.discord.client import LokiBot
-            LokiBot._log_startup_config(stub)
+        with caplog.at_level(logging.INFO, logger="heimdall.discord"):
+            from src.discord.client import HeimdallBot
+            HeimdallBot._log_startup_config(stub)
         assert any("claude_code_host not set" in r.message for r in caplog.records)
 
 

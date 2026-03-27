@@ -22,7 +22,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 import discord  # noqa: E402
 import pytest  # noqa: E402
 
-from src.discord.client import LokiBot, DISCORD_MAX_LEN  # noqa: E402
+from src.discord.client import HeimdallBot, DISCORD_MAX_LEN  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -31,9 +31,9 @@ from src.discord.client import LokiBot, DISCORD_MAX_LEN  # noqa: E402
 
 def _make_bot_and_message():
     """Create minimal stubs for _send_chunked testing."""
-    bot = MagicMock(spec=LokiBot)
+    bot = MagicMock(spec=HeimdallBot)
     # Wire up the real _send_chunked method (unbound) to the stub
-    bot._send_chunked = LokiBot._send_chunked.__get__(bot)
+    bot._send_chunked = HeimdallBot._send_chunked.__get__(bot)
     bot._send_with_retry = AsyncMock(return_value=MagicMock())
     # _pending_files is a per-channel dict
     bot._pending_files = {}

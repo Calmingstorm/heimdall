@@ -410,8 +410,8 @@ class TestClientBackfillOffload:
     async def test_backfill_fts_uses_to_thread(self):
         """_backfill_archives should offload backfill_fts via asyncio.to_thread."""
         import inspect
-        from src.discord.client import LokiBot
-        source = inspect.getsource(LokiBot._backfill_archives)
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot._backfill_archives)
         assert "asyncio.to_thread(self._knowledge_store.backfill_fts)" in source
 
 
@@ -444,10 +444,10 @@ class TestCachingVerification:
     """Verify performance-critical caches are properly set up."""
 
     def test_merged_tools_cached(self):
-        """LokiBot should cache merged tool definitions."""
+        """HeimdallBot should cache merged tool definitions."""
         import inspect
-        from src.discord.client import LokiBot
-        source = inspect.getsource(LokiBot._merged_tool_definitions)
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot._merged_tool_definitions)
         assert "_cached_merged_tools" in source
 
     def test_tool_conversion_cached(self):
@@ -460,15 +460,15 @@ class TestCachingVerification:
     def test_memory_cache_has_ttl(self):
         """Memory cache should have a TTL."""
         import inspect
-        from src.discord.client import LokiBot
-        source = inspect.getsource(LokiBot)
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot)
         assert "_memory_cache_ttl" in source
 
     def test_reflector_cache_has_ttl(self):
         """Reflector cache should have a TTL."""
         import inspect
-        from src.discord.client import LokiBot
-        source = inspect.getsource(LokiBot)
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot)
         assert "_reflector_cache_ttl" in source
 
     def test_tool_memory_cache_has_ttl(self):

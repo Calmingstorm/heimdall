@@ -14,7 +14,7 @@ from ..llm.secret_scrubber import scrub_output_secrets
 from ..logging import get_logger
 
 if TYPE_CHECKING:
-    from ..discord.client import LokiBot
+    from ..discord.client import HeimdallBot
 
 log = get_logger("web.chat")
 
@@ -96,7 +96,7 @@ _scrub = scrub_output_secrets
 
 
 async def process_web_chat(
-    bot: LokiBot,
+    bot: HeimdallBot,
     content: str,
     channel_id: str,
     user_id: str = "web-user",

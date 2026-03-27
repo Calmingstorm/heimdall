@@ -79,7 +79,7 @@ class TestIncusDeployScript:
         content = Path("scripts/incus-deploy.sh").read_text()
         assert content.startswith("#!/bin/bash")
 
-    def test_incus_deploy_creates_loki_user(self):
+    def test_incus_deploy_creates_heimdall_user(self):
         content = Path("scripts/incus-deploy.sh").read_text()
         assert "useradd" in content and "loki" in content
 

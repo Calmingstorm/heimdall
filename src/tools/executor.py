@@ -337,7 +337,7 @@ class ToolExecutor:
             "node": ".js", "ruby": ".rb", "perl": ".pl",
         }
         ext = ext_map.get(interpreter, ".sh")
-        filename = inp.get("filename") or f"loki_script{ext}"
+        filename = inp.get("filename") or f"heimdall_script{ext}"
 
         # Sanitize interpreter to prevent injection
         allowed_interpreters = {"bash", "sh", "python3", "python", "node", "ruby", "perl"}

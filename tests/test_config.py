@@ -158,7 +158,7 @@ class TestDeploymentFiles:
         assert "loki-browser" in content
         assert "loki-voice" in content
 
-    def test_dockerfile_uses_loki_user(self):
+    def test_dockerfile_uses_heimdall_user(self):
         content = Path("Dockerfile").read_text()
         assert "useradd" in content and "loki" in content
         assert "USER loki" in content

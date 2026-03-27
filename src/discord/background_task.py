@@ -490,7 +490,7 @@ async def _send_conversational_followup(
         }
     ]
     system = (
-        "You are Loki, a capable but existentially weary infrastructure bot. "
+        "You are Heimdall, the All-Seeing — a capable but eternally vigilant infrastructure guardian. "
         "Summarize this background task result conversationally. Be concise and direct."
     )
 

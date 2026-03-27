@@ -68,39 +68,39 @@ class TestURLSchemeValidation:
 
     async def test_image_rejects_file_url(self):
         """analyze_image must reject file:// URLs."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
 
-        bot = MagicMock(spec=LokiBot)
+        bot = MagicMock(spec=HeimdallBot)
         bot.tool_executor = MagicMock()
         message = MagicMock()
 
-        result = await LokiBot._handle_analyze_image(bot, message, {"url": "file:///etc/shadow"})
+        result = await HeimdallBot._handle_analyze_image(bot, message, {"url": "file:///etc/shadow"})
         assert "Only http:// and https://" in result
 
     async def test_image_rejects_ftp_url(self):
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
 
-        bot = MagicMock(spec=LokiBot)
+        bot = MagicMock(spec=HeimdallBot)
         message = MagicMock()
-        result = await LokiBot._handle_analyze_image(bot, message, {"url": "ftp://evil.com/img.png"})
+        result = await HeimdallBot._handle_analyze_image(bot, message, {"url": "ftp://evil.com/img.png"})
         assert "Only http:// and https://" in result
 
     async def test_image_rejects_javascript_url(self):
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
 
-        bot = MagicMock(spec=LokiBot)
+        bot = MagicMock(spec=HeimdallBot)
         message = MagicMock()
-        result = await LokiBot._handle_analyze_image(bot, message, {"url": "javascript:alert(1)"})
+        result = await HeimdallBot._handle_analyze_image(bot, message, {"url": "javascript:alert(1)"})
         assert "Only http:// and https://" in result
 
     async def test_image_accepts_https(self):
         """https:// URLs pass the scheme check (may fail at fetch)."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
 
-        bot = MagicMock(spec=LokiBot)
+        bot = MagicMock(spec=HeimdallBot)
         message = MagicMock()
         # Will fail at fetch, not scheme check
-        result = await LokiBot._handle_analyze_image(bot, message, {"url": "https://example.com/img.png"})
+        result = await HeimdallBot._handle_analyze_image(bot, message, {"url": "https://example.com/img.png"})
         assert "Only http://" not in result
 
 
@@ -251,13 +251,13 @@ class TestDiscordOutputScrubbing:
 
     async def test_broadcast_scrubs_password(self):
         """Broadcast handler must scrub secrets from text before Discord send."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
 
-        bot = MagicMock(spec=LokiBot)
+        bot = MagicMock(spec=HeimdallBot)
         message = MagicMock()
         message.channel.send = AsyncMock()
 
-        await LokiBot._handle_broadcast(bot, message, {
+        await HeimdallBot._handle_broadcast(bot, message, {
             "text": "Here is the password=hunter2 for the server",
         })
 
@@ -269,13 +269,13 @@ class TestDiscordOutputScrubbing:
         assert "[REDACTED]" in sent_content
 
     async def test_broadcast_scrubs_api_key(self):
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
 
-        bot = MagicMock(spec=LokiBot)
+        bot = MagicMock(spec=HeimdallBot)
         message = MagicMock()
         message.channel.send = AsyncMock()
 
-        await LokiBot._handle_broadcast(bot, message, {
+        await HeimdallBot._handle_broadcast(bot, message, {
             "text": "Use api_key=sk-abcdefghijklmnopqrstuvwxyz1234567890",
         })
 
@@ -284,13 +284,13 @@ class TestDiscordOutputScrubbing:
         assert "[REDACTED]" in sent_content
 
     async def test_broadcast_preserves_safe_text(self):
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
 
-        bot = MagicMock(spec=LokiBot)
+        bot = MagicMock(spec=HeimdallBot)
         message = MagicMock()
         message.channel.send = AsyncMock()
 
-        await LokiBot._handle_broadcast(bot, message, {
+        await HeimdallBot._handle_broadcast(bot, message, {
             "text": "Server is running fine with 99.9% uptime.",
         })
 
@@ -300,9 +300,9 @@ class TestDiscordOutputScrubbing:
     async def test_poll_scrubs_question_secrets(self):
         """Poll questions must be scrubbed for secrets."""
         import discord
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
 
-        bot = MagicMock(spec=LokiBot)
+        bot = MagicMock(spec=HeimdallBot)
         message = MagicMock()
         message.channel.send = AsyncMock()
 
@@ -311,7 +311,7 @@ class TestDiscordOutputScrubbing:
             mock_poll_instance = MagicMock()
             mock_poll.return_value = mock_poll_instance
 
-            await LokiBot._handle_create_poll(bot, message, {
+            await HeimdallBot._handle_create_poll(bot, message, {
                 "question": "The password=secret123 was leaked?",
                 "options": ["Yes", "No"],
             })
@@ -324,9 +324,9 @@ class TestDiscordOutputScrubbing:
     async def test_poll_scrubs_options_secrets(self):
         """Poll options must also be scrubbed."""
         import discord
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
 
-        bot = MagicMock(spec=LokiBot)
+        bot = MagicMock(spec=HeimdallBot)
         message = MagicMock()
         message.channel.send = AsyncMock()
 
@@ -334,7 +334,7 @@ class TestDiscordOutputScrubbing:
             mock_poll_instance = MagicMock()
             mock_poll.return_value = mock_poll_instance
 
-            await LokiBot._handle_create_poll(bot, message, {
+            await HeimdallBot._handle_create_poll(bot, message, {
                 "question": "Which key?",
                 "options": ["sk-abcdefghijklmnopqrstuvwxyz1234567890", "Other"],
             })
@@ -348,9 +348,9 @@ class TestDiscordOutputScrubbing:
     async def test_generate_image_caption_scrubbed(self):
         """Image generation caption must scrub secrets before Discord send."""
         import discord
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
 
-        bot = MagicMock(spec=LokiBot)
+        bot = MagicMock(spec=HeimdallBot)
         bot.config = MagicMock()
         bot.config.comfyui.enabled = True
         bot.config.comfyui.url = "http://localhost:8188"
@@ -364,7 +364,7 @@ class TestDiscordOutputScrubbing:
             mock_client.generate = AsyncMock(return_value=fake_png)
             MockClient.return_value = mock_client
 
-            await LokiBot._handle_generate_image(bot, message, {
+            await HeimdallBot._handle_generate_image(bot, message, {
                 "prompt": "a picture with password=admin123 in it",
             })
 

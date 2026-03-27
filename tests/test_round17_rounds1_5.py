@@ -27,7 +27,7 @@ from src.llm.system_prompt import (
     SYSTEM_PROMPT_TEMPLATE,
     build_system_prompt,
 )
-from src.discord.client import LokiBot, DISCORD_MAX_LEN
+from src.discord.client import HeimdallBot, DISCORD_MAX_LEN
 from src.tools.skill_context import SkillContext
 
 _ARCH_PATH = Path(__file__).parent.parent / "data" / "context" / "architecture.md"
@@ -39,7 +39,7 @@ _ARCH_CONTEXT = _ARCH_PATH.read_text()
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub(**overrides):
-    """Minimal LokiBot stub for method-level tests."""
+    """Minimal HeimdallBot stub for method-level tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -194,7 +194,7 @@ class TestSelfAwarenessDirective:
 
     def test_rule_12_mentions_source_code_location(self):
         prompt = _build_prompt()
-        assert "/opt/loki" in prompt
+        assert "/opt/heimdall" in prompt
 
     def test_rule_12_warns_against_searching_own_code(self):
         prompt = _build_prompt()
@@ -214,9 +214,9 @@ class TestSelfAwarenessDirective:
         assert "/custom/loki/path" in prompt
 
     def test_rule_12_default_claude_code_dir(self):
-        """Default claude_code_dir is /opt/loki."""
+        """Default claude_code_dir is /opt/heimdall."""
         prompt = _build_prompt()
-        assert "/opt/loki" in prompt
+        assert "/opt/heimdall" in prompt
 
 
 # ===========================================================================
@@ -270,7 +270,7 @@ class TestContextSeparatorMessageID:
         )
 
         # Call _process_with_tools
-        result = await LokiBot._process_with_tools(stub, msg, history)
+        result = await HeimdallBot._process_with_tools(stub, msg, history)
 
         # Verify chat_with_tools was called
         assert stub.codex_client.chat_with_tools.called
@@ -299,7 +299,7 @@ class TestContextSeparatorMessageID:
             return_value=LLMResponse(text="hi", tool_calls=[])
         )
 
-        result = await LokiBot._process_with_tools(stub, msg, history)
+        result = await HeimdallBot._process_with_tools(stub, msg, history)
 
         call_args = stub.codex_client.chat_with_tools.call_args
         messages = call_args[1].get("messages") or call_args[0][0]
@@ -326,7 +326,7 @@ class TestContextSeparatorMessageID:
             return_value=LLMResponse(text="ok", tool_calls=[])
         )
 
-        await LokiBot._process_with_tools(stub, msg, history)
+        await HeimdallBot._process_with_tools(stub, msg, history)
 
         call_args = stub.codex_client.chat_with_tools.call_args
         messages = call_args[1].get("messages") or call_args[0][0]
@@ -350,7 +350,7 @@ class TestAddReactionMessageIDResolution:
         fetched_msg.add_reaction = AsyncMock()
         msg.channel.fetch_message = AsyncMock(return_value=fetched_msg)
 
-        result = await LokiBot._handle_add_reaction(
+        result = await HeimdallBot._handle_add_reaction(
             stub, msg, {"message_id": "this", "emoji": "thumbsup"}
         )
 
@@ -366,7 +366,7 @@ class TestAddReactionMessageIDResolution:
         fetched_msg.add_reaction = AsyncMock()
         msg.channel.fetch_message = AsyncMock(return_value=fetched_msg)
 
-        result = await LokiBot._handle_add_reaction(
+        result = await HeimdallBot._handle_add_reaction(
             stub, msg, {"message_id": "current", "emoji": "fire"}
         )
 
@@ -381,7 +381,7 @@ class TestAddReactionMessageIDResolution:
         fetched_msg.add_reaction = AsyncMock()
         msg.channel.fetch_message = AsyncMock(return_value=fetched_msg)
 
-        result = await LokiBot._handle_add_reaction(
+        result = await HeimdallBot._handle_add_reaction(
             stub, msg, {"message_id": "self", "emoji": "heart"}
         )
 
@@ -396,7 +396,7 @@ class TestAddReactionMessageIDResolution:
         fetched_msg.add_reaction = AsyncMock()
         msg.channel.fetch_message = AsyncMock(return_value=fetched_msg)
 
-        result = await LokiBot._handle_add_reaction(
+        result = await HeimdallBot._handle_add_reaction(
             stub, msg, {"message_id": "", "emoji": "wave"}
         )
 
@@ -411,7 +411,7 @@ class TestAddReactionMessageIDResolution:
         fetched_msg.add_reaction = AsyncMock()
         msg.channel.fetch_message = AsyncMock(return_value=fetched_msg)
 
-        result = await LokiBot._handle_add_reaction(
+        result = await HeimdallBot._handle_add_reaction(
             stub, msg, {"emoji": "check"}
         )
 
@@ -426,7 +426,7 @@ class TestAddReactionMessageIDResolution:
         fetched_msg.add_reaction = AsyncMock()
         msg.channel.fetch_message = AsyncMock(return_value=fetched_msg)
 
-        result = await LokiBot._handle_add_reaction(
+        result = await HeimdallBot._handle_add_reaction(
             stub, msg, {"message_id": "999888777", "emoji": "star"}
         )
 
@@ -439,7 +439,7 @@ class TestAddReactionMessageIDResolution:
         stub = _make_bot_stub()
         msg = _make_message()
 
-        result = await LokiBot._handle_add_reaction(stub, msg, {"message_id": "123"})
+        result = await HeimdallBot._handle_add_reaction(stub, msg, {"message_id": "123"})
         assert "required" in result.lower() or "emoji" in result.lower()
 
 

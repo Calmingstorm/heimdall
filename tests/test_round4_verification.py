@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
-from src.discord.client import LokiBot  # noqa: E402
+from src.discord.client import HeimdallBot  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -22,7 +22,7 @@ from src.discord.client import LokiBot  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub(respond_to_bots=False):
-    """Minimal LokiBot stub for routing verification."""
+    """Minimal HeimdallBot stub for routing verification."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -94,7 +94,7 @@ class TestHumanMessageRouting:
     async def test_human_message_uses_tools(self):
         """A normal user message routes through _process_with_tools."""
         stub = _make_bot_stub()
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message(is_bot=False)
         await stub._handle_message_inner(msg, "check disk on server", "chan-1")
@@ -108,7 +108,7 @@ class TestHumanMessageRouting:
         stub._process_with_tools = AsyncMock(
             return_value=("Hey there!", False, False, [], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message(is_bot=False)
         await stub._handle_message_inner(msg, "hello", "chan-1")
@@ -121,7 +121,7 @@ class TestHumanMessageRouting:
         """Guest users get chat route (no tools)."""
         stub = _make_bot_stub()
         stub.permissions.is_guest = MagicMock(return_value=True)
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message(is_bot=False)
         await stub._handle_message_inner(msg, "hello", "chan-1")
@@ -140,7 +140,7 @@ class TestBotMessageRouting:
     async def test_bot_message_uses_tools(self):
         """Bot message routes through _process_with_tools, not chat."""
         stub = _make_bot_stub(respond_to_bots=True)
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message(is_bot=True)
         await stub._handle_message_inner(msg, "deploy latest build", "chan-1")
@@ -155,7 +155,7 @@ class TestBotMessageRouting:
         stub._process_with_tools = AsyncMock(
             return_value=("Build deployed to production.", False, False, ["run_command"], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message(is_bot=True)
         await stub._handle_message_inner(msg, "deploy latest build", "chan-1")
@@ -175,18 +175,18 @@ class TestSingleRoutingPath:
     async def test_no_msg_type_variable(self):
         """_handle_message_inner should not set msg_type (removed in Round 3)."""
         import inspect
-        source = inspect.getsource(LokiBot._handle_message_inner)
+        source = inspect.getsource(HeimdallBot._handle_message_inner)
         assert 'msg_type = "chat"' not in source
         assert 'msg_type = "claude_code"' not in source
 
     async def test_no_keyword_detection(self):
         """No keyword detection in _handle_message_inner."""
         import inspect
-        source = inspect.getsource(LokiBot._handle_message_inner)
+        source = inspect.getsource(HeimdallBot._handle_message_inner)
         assert "is_task_by_keyword" not in source
 
     async def test_no_classifier_call(self):
         """No classifier call in _handle_message_inner."""
         import inspect
-        source = inspect.getsource(LokiBot._handle_message_inner)
+        source = inspect.getsource(HeimdallBot._handle_message_inner)
         assert "classifier" not in source.lower() or "no classifier" in source.lower()

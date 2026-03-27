@@ -1,7 +1,7 @@
 """Round 21: Performance optimizations.
 
 Tests for:
-1. Tool definition caching (LokiBot._merged_tool_definitions)
+1. Tool definition caching (HeimdallBot._merged_tool_definitions)
 2. Tool conversion caching (CodexChatClient._convert_tools_cached)
 3. History optimization (no double-fetch for non-guests)
 4. Memory cleanup (stale cache eviction)
@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.discord.client import LokiBot
+from src.discord.client import HeimdallBot
 from src.llm.openai_codex import CodexChatClient
 from src.sessions.manager import SessionManager
 from src.tools.registry import get_tool_definitions
@@ -28,7 +28,7 @@ from src.tools.registry import get_tool_definitions
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub(**overrides):
-    """Minimal LokiBot stub for performance tests."""
+    """Minimal HeimdallBot stub for performance tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -104,7 +104,7 @@ class TestToolDefinitionCaching:
 
     def test_returns_list_on_first_call(self):
         stub = _make_bot_stub()
-        stub._merged_tool_definitions = LokiBot._merged_tool_definitions.__get__(stub)
+        stub._merged_tool_definitions = HeimdallBot._merged_tool_definitions.__get__(stub)
         result = stub._merged_tool_definitions()
         assert isinstance(result, list)
         assert len(result) >= 50  # built-in tools
@@ -112,7 +112,7 @@ class TestToolDefinitionCaching:
     def test_second_call_returns_cached(self):
         """Second call returns the exact same list object (identity)."""
         stub = _make_bot_stub()
-        stub._merged_tool_definitions = LokiBot._merged_tool_definitions.__get__(stub)
+        stub._merged_tool_definitions = HeimdallBot._merged_tool_definitions.__get__(stub)
         first = stub._merged_tool_definitions()
         second = stub._merged_tool_definitions()
         assert first is second
@@ -120,7 +120,7 @@ class TestToolDefinitionCaching:
     def test_get_tool_definitions_called_once(self):
         """get_tool_definitions (from registry) called only on first invocation."""
         stub = _make_bot_stub()
-        stub._merged_tool_definitions = LokiBot._merged_tool_definitions.__get__(stub)
+        stub._merged_tool_definitions = HeimdallBot._merged_tool_definitions.__get__(stub)
         with patch("src.discord.client.get_tool_definitions") as mock_get:
             mock_get.return_value = [{"name": "test_tool", "description": "test"}]
             stub._cached_merged_tools = None
@@ -132,7 +132,7 @@ class TestToolDefinitionCaching:
     def test_cache_invalidated_on_none(self):
         """Setting _cached_merged_tools = None forces rebuild."""
         stub = _make_bot_stub()
-        stub._merged_tool_definitions = LokiBot._merged_tool_definitions.__get__(stub)
+        stub._merged_tool_definitions = HeimdallBot._merged_tool_definitions.__get__(stub)
         first = stub._merged_tool_definitions()
         stub._cached_merged_tools = None
         second = stub._merged_tool_definitions()
@@ -146,7 +146,7 @@ class TestToolDefinitionCaching:
         stub.skill_manager.get_tool_definitions = MagicMock(return_value=[
             {"name": "my_skill", "description": "skill", "input_schema": {}},
         ])
-        stub._merged_tool_definitions = LokiBot._merged_tool_definitions.__get__(stub)
+        stub._merged_tool_definitions = HeimdallBot._merged_tool_definitions.__get__(stub)
         result = stub._merged_tool_definitions()
         names = [t["name"] for t in result]
         assert "my_skill" in names
@@ -157,7 +157,7 @@ class TestToolDefinitionCaching:
         stub.skill_manager.get_tool_definitions = MagicMock(return_value=[
             {"name": "check_disk", "description": "shadow builtin"},
         ])
-        stub._merged_tool_definitions = LokiBot._merged_tool_definitions.__get__(stub)
+        stub._merged_tool_definitions = HeimdallBot._merged_tool_definitions.__get__(stub)
         result = stub._merged_tool_definitions()
         names = [t["name"] for t in result]
         assert names.count("check_disk") == 1
@@ -165,7 +165,7 @@ class TestToolDefinitionCaching:
     def test_skill_create_invalidates_cache(self):
         """Simulating create_skill sets _cached_merged_tools = None."""
         stub = _make_bot_stub()
-        stub._merged_tool_definitions = LokiBot._merged_tool_definitions.__get__(stub)
+        stub._merged_tool_definitions = HeimdallBot._merged_tool_definitions.__get__(stub)
         first = stub._merged_tool_definitions()
         assert stub._cached_merged_tools is first
         # Simulate what _run_tool does on create_skill
@@ -255,7 +255,7 @@ class TestHistoryOptimization:
         """Non-guest message calls get_task_history, not get_history_with_compaction."""
         from src.llm.types import LLMResponse
         stub = _make_bot_stub()
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub._build_system_prompt = MagicMock(return_value="sys prompt")
         stub._inject_tool_hints = AsyncMock(return_value="sys prompt")
         stub._process_with_tools = AsyncMock(return_value=("result", False, False, ["run_command"], False))
@@ -279,7 +279,7 @@ class TestHistoryOptimization:
     async def test_guest_uses_full_history(self):
         """Guest message calls get_history_with_compaction."""
         stub = _make_bot_stub()
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub._build_chat_system_prompt = MagicMock(return_value="chat prompt")
         stub._send_chunked = AsyncMock()
         stub._send_with_retry = AsyncMock()
@@ -305,7 +305,7 @@ class TestHistoryOptimization:
     async def test_handoff_uses_get_history(self):
         """Skill handoff path uses get_history (not get_history_with_compaction)."""
         stub = _make_bot_stub()
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub._build_system_prompt = MagicMock(return_value="sys prompt")
         stub._build_chat_system_prompt = MagicMock(return_value="chat prompt")
         stub._inject_tool_hints = AsyncMock(return_value="sys prompt")
@@ -334,7 +334,7 @@ class TestHistoryOptimization:
     async def test_non_guest_images_injected_into_task_history(self):
         """Non-guest with images: images injected into task_history, not full history."""
         stub = _make_bot_stub()
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub._build_system_prompt = MagicMock(return_value="sys prompt")
         stub._inject_tool_hints = AsyncMock(return_value="sys prompt")
         stub._send_chunked = AsyncMock()
@@ -377,7 +377,7 @@ class TestCacheCleanup:
     def test_removes_expired_recent_actions(self):
         """Expired _recent_actions entries are removed."""
         stub = _make_bot_stub()
-        stub._cleanup_stale_caches = LokiBot._cleanup_stale_caches.__get__(stub)
+        stub._cleanup_stale_caches = HeimdallBot._cleanup_stale_caches.__get__(stub)
         stub._recent_actions_expiry = 3600
         # Add an expired entry (2 hours ago)
         stub._recent_actions = {
@@ -391,7 +391,7 @@ class TestCacheCleanup:
     def test_removes_stale_channel_locks(self):
         """Locks for channels without active sessions are removed."""
         stub = _make_bot_stub()
-        stub._cleanup_stale_caches = LokiBot._cleanup_stale_caches.__get__(stub)
+        stub._cleanup_stale_caches = HeimdallBot._cleanup_stale_caches.__get__(stub)
         stub._recent_actions_expiry = 3600
         stub._recent_actions = {}
         stub._channel_locks = {"chan-active": asyncio.Lock(), "chan-stale": asyncio.Lock()}
@@ -404,7 +404,7 @@ class TestCacheCleanup:
     def test_cleanup_empty_actions_list(self):
         """Empty actions list for a channel gets cleaned up."""
         stub = _make_bot_stub()
-        stub._cleanup_stale_caches = LokiBot._cleanup_stale_caches.__get__(stub)
+        stub._cleanup_stale_caches = HeimdallBot._cleanup_stale_caches.__get__(stub)
         stub._recent_actions_expiry = 3600
         stub._recent_actions = {"chan-1": []}
         stub._cleanup_stale_caches()
@@ -413,7 +413,7 @@ class TestCacheCleanup:
     def test_cleanup_keeps_fresh_actions(self):
         """Fresh actions within expiry window are kept."""
         stub = _make_bot_stub()
-        stub._cleanup_stale_caches = LokiBot._cleanup_stale_caches.__get__(stub)
+        stub._cleanup_stale_caches = HeimdallBot._cleanup_stale_caches.__get__(stub)
         stub._recent_actions_expiry = 3600
         now = time.time()
         stub._recent_actions = {
@@ -426,7 +426,7 @@ class TestCacheCleanup:
     def test_cleanup_all_expired(self):
         """All expired actions removes the channel key entirely."""
         stub = _make_bot_stub()
-        stub._cleanup_stale_caches = LokiBot._cleanup_stale_caches.__get__(stub)
+        stub._cleanup_stale_caches = HeimdallBot._cleanup_stale_caches.__get__(stub)
         stub._recent_actions_expiry = 3600
         stub._recent_actions = {
             "chan-1": [(time.time() - 7200, "old")],
@@ -441,7 +441,7 @@ class TestMaybeCleanupCaches:
     def test_throttled_by_interval(self):
         """Cleanup only runs when interval elapsed."""
         stub = _make_bot_stub()
-        stub._maybe_cleanup_caches = LokiBot._maybe_cleanup_caches.__get__(stub)
+        stub._maybe_cleanup_caches = HeimdallBot._maybe_cleanup_caches.__get__(stub)
         stub._cleanup_stale_caches = MagicMock()
         stub._last_cache_cleanup = time.time()  # just ran
         stub._cache_cleanup_interval = 300.0
@@ -452,7 +452,7 @@ class TestMaybeCleanupCaches:
     def test_runs_when_interval_elapsed(self):
         """Cleanup runs when enough time has passed."""
         stub = _make_bot_stub()
-        stub._maybe_cleanup_caches = LokiBot._maybe_cleanup_caches.__get__(stub)
+        stub._maybe_cleanup_caches = HeimdallBot._maybe_cleanup_caches.__get__(stub)
         stub._cleanup_stale_caches = MagicMock()
         stub._last_cache_cleanup = time.time() - 400  # 400s ago
         stub._cache_cleanup_interval = 300.0
@@ -463,7 +463,7 @@ class TestMaybeCleanupCaches:
     def test_exception_does_not_propagate(self):
         """Errors in cleanup don't break message processing."""
         stub = _make_bot_stub()
-        stub._maybe_cleanup_caches = LokiBot._maybe_cleanup_caches.__get__(stub)
+        stub._maybe_cleanup_caches = HeimdallBot._maybe_cleanup_caches.__get__(stub)
         stub._cleanup_stale_caches = MagicMock(side_effect=RuntimeError("boom"))
         stub._last_cache_cleanup = 0.0
         stub._cache_cleanup_interval = 0.0
@@ -474,7 +474,7 @@ class TestMaybeCleanupCaches:
     def test_works_on_mock_stub(self):
         """Works even when attributes are MagicMock (defensive getattr)."""
         stub = MagicMock()
-        bound = LokiBot._maybe_cleanup_caches.__get__(stub)
+        bound = HeimdallBot._maybe_cleanup_caches.__get__(stub)
         # Should not raise even without proper attributes
         bound()
 
@@ -488,7 +488,7 @@ class TestSessionSaveNonBlocking:
 
     def test_save_in_to_thread_in_source(self):
         """Source code uses asyncio.to_thread(self.sessions.save)."""
-        src = inspect.getsource(LokiBot._handle_message_inner)
+        src = inspect.getsource(HeimdallBot._handle_message_inner)
         assert "asyncio.to_thread(self.sessions.save)" in src
 
 
@@ -551,7 +551,7 @@ class TestMemoryUsagePatterns:
     def test_recent_actions_capped_per_channel(self):
         """Per-channel actions list is capped at _recent_actions_max."""
         stub = _make_bot_stub()
-        stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
+        stub._track_recent_action = HeimdallBot._track_recent_action.__get__(stub)
         for i in range(20):
             stub._track_recent_action(
                 f"tool_{i}", {"host": "server"}, "OK", 100, channel_id="chan-1",
@@ -583,12 +583,12 @@ class TestPerformanceSourceStructure:
 
     def test_cached_merged_tools_attr_in_init(self):
         """_cached_merged_tools initialized in __init__."""
-        src = inspect.getsource(LokiBot.__init__)
+        src = inspect.getsource(HeimdallBot.__init__)
         assert "_cached_merged_tools" in src
 
     def test_cache_invalidation_in_create_skill(self):
         """create_skill handler invalidates tool cache."""
-        src = inspect.getsource(LokiBot._process_with_tools)
+        src = inspect.getsource(HeimdallBot._process_with_tools)
         # Find the create_skill section
         idx = src.find("create_skill")
         assert idx > 0
@@ -597,7 +597,7 @@ class TestPerformanceSourceStructure:
 
     def test_cache_invalidation_in_edit_skill(self):
         """edit_skill handler invalidates tool cache."""
-        src = inspect.getsource(LokiBot._process_with_tools)
+        src = inspect.getsource(HeimdallBot._process_with_tools)
         idx = src.find("edit_skill")
         assert idx > 0
         section = src[idx:idx + 500]
@@ -605,7 +605,7 @@ class TestPerformanceSourceStructure:
 
     def test_cache_invalidation_in_delete_skill(self):
         """delete_skill handler invalidates tool cache."""
-        src = inspect.getsource(LokiBot._process_with_tools)
+        src = inspect.getsource(HeimdallBot._process_with_tools)
         idx = src.find("delete_skill")
         assert idx > 0
         section = src[idx:idx + 500]
@@ -622,21 +622,21 @@ class TestPerformanceSourceStructure:
         assert "self._convert_tools(" not in src
 
     def test_cleanup_stale_caches_method_exists(self):
-        """LokiBot has _cleanup_stale_caches method."""
-        assert hasattr(LokiBot, "_cleanup_stale_caches")
+        """HeimdallBot has _cleanup_stale_caches method."""
+        assert hasattr(HeimdallBot, "_cleanup_stale_caches")
 
     def test_maybe_cleanup_caches_method_exists(self):
-        """LokiBot has _maybe_cleanup_caches method."""
-        assert hasattr(LokiBot, "_maybe_cleanup_caches")
+        """HeimdallBot has _maybe_cleanup_caches method."""
+        assert hasattr(HeimdallBot, "_maybe_cleanup_caches")
 
     def test_maybe_cleanup_in_handle_message_inner(self):
         """_maybe_cleanup_caches is called in _handle_message_inner."""
-        src = inspect.getsource(LokiBot._handle_message_inner)
+        src = inspect.getsource(HeimdallBot._handle_message_inner)
         assert "_maybe_cleanup_caches" in src
 
     def test_no_double_history_fetch_for_non_guest(self):
         """Non-guest path in _handle_message_inner does not call get_history_with_compaction."""
-        src = inspect.getsource(LokiBot._handle_message_inner)
+        src = inspect.getsource(HeimdallBot._handle_message_inner)
         # get_history_with_compaction should only appear in the guest branch
         lines = src.split("\n")
         in_guest_branch = False
@@ -658,7 +658,7 @@ class TestPerformanceSourceStructure:
 
     def test_last_cache_cleanup_attr(self):
         """_last_cache_cleanup and _cache_cleanup_interval in __init__."""
-        src = inspect.getsource(LokiBot.__init__)
+        src = inspect.getsource(HeimdallBot.__init__)
         assert "_last_cache_cleanup" in src
         assert "_cache_cleanup_interval" in src
 
@@ -677,7 +677,7 @@ class TestCrossRoundConsistency:
 
     def test_no_classifier_call_in_source(self):
         """No classifier.classify() call in _handle_message_inner."""
-        src = inspect.getsource(LokiBot._handle_message_inner)
+        src = inspect.getsource(HeimdallBot._handle_message_inner)
         assert "classifier.classify" not in src
 
     def test_prompt_under_5000_chars(self):
@@ -690,7 +690,7 @@ class TestCrossRoundConsistency:
 
     def test_personality_present(self):
         from src.llm.system_prompt import SYSTEM_PROMPT_TEMPLATE
-        assert "self-aware" in SYSTEM_PROMPT_TEMPLATE.lower()
+        assert "not okay" in SYSTEM_PROMPT_TEMPLATE.lower()
 
     def test_local_execution_intact(self):
         from src.tools.ssh import is_local_address, run_local_command

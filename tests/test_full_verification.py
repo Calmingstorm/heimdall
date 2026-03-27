@@ -1,7 +1,7 @@
 """Full functionality verification tests — Round 13.
 
 Comprehensive end-to-end verification of all major subsystems after
-the Loki transformation (Rounds 1-12).
+the Heimdall transformation (Rounds 1-12).
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ SRC = ROOT / "src"
 # ---------------------------------------------------------------------------
 
 class TestIdentityComplete:
-    """Verify the Loki identity rename is 100% complete."""
+    """Verify the Heimdall identity rename is 100% complete."""
 
     def _source_files(self):
         for f in SRC.rglob("*.py"):
@@ -36,42 +36,42 @@ class TestIdentityComplete:
             content = f.read_text()
             assert "AnsiblexBot" not in content, f"{f.name} contains AnsiblexBot"
 
-    def test_loki_bot_class_exists(self):
-        from src.discord.client import LokiBot
-        assert LokiBot.__name__ == "LokiBot"
+    def test_heimdall_bot_class_exists(self):
+        from src.discord.client import HeimdallBot
+        assert HeimdallBot.__name__ == "HeimdallBot"
 
-    def test_loki_bot_exported(self):
-        from src.discord import LokiBot
-        assert LokiBot is not None
+    def test_heimdall_bot_exported(self):
+        from src.discord import HeimdallBot
+        assert HeimdallBot is not None
 
-    def test_logger_namespace_is_loki(self):
+    def test_logger_namespace_is_heimdall(self):
         from src.logging import get_logger
         log = get_logger("test")
-        assert log.name.startswith("loki")
+        assert log.name.startswith("heimdall")
 
-    def test_main_entry_says_loki(self):
+    def test_main_entry_says_heimdall(self):
         content = (SRC / "__main__.py").read_text()
-        assert "Starting Loki" in content
-        assert "Loki stopped" in content
+        assert "Starting Heimdall" in content
+        assert "Heimdall stopped" in content
 
-    def test_system_prompt_says_loki(self):
+    def test_system_prompt_says_heimdall(self):
         from src.llm.system_prompt import build_system_prompt, build_chat_system_prompt
         sp = build_system_prompt("", {}, [], [])
-        assert "Loki" in sp
+        assert "Heimdall" in sp
         assert "Ansiblex" not in sp
         cp = build_chat_system_prompt()
-        assert "Loki" in cp
+        assert "Heimdall" in cp
         assert "Ansiblex" not in cp
 
-    def test_pyproject_name_is_loki(self):
+    def test_pyproject_name_is_heimdall(self):
         content = (ROOT / "pyproject.toml").read_text()
-        assert 'name = "loki"' in content
+        assert 'name = "heimdall"' in content
 
-    def test_dockerfile_user_is_loki(self):
+    def test_dockerfile_user_is_heimdall(self):
         content = (ROOT / "Dockerfile").read_text()
         assert "loki" in content.lower()
 
-    def test_docker_compose_services_are_loki(self):
+    def test_docker_compose_services_are_heimdall(self):
         content = (ROOT / "docker-compose.yml").read_text()
         assert "loki-bot" in content
         assert "loki-browser" in content
@@ -394,9 +394,9 @@ class TestSkillSystem:
             # Should compile without syntax errors
             compile(content, str(tmpl), "exec")
 
-    def test_skill_module_prefix_is_loki(self):
+    def test_skill_module_prefix_is_heimdall(self):
         content = (SRC / "tools" / "skill_manager.py").read_text()
-        assert "loki_skill_" in content
+        assert "heimdall_skill_" in content
         assert "ansiblex_skill_" not in content
 
     def test_create_skill_tool_documents_api(self):

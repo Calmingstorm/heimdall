@@ -1,9 +1,9 @@
 """End-to-end integration tests — Round 25.
 
 These tests validate the autonomous executor's complete message lifecycle:
-1. Complex multi-tool task chains (user asks complex task → Loki executes chain)
-2. Bot-to-bot code execution (bot sends code → Loki runs it)
-3. Multi-step failure recovery (failures mid-chain → Loki recovers)
+1. Complex multi-tool task chains (user asks complex task → Heimdall executes chain)
+2. Bot-to-bot code execution (bot sends code → Heimdall runs it)
+3. Multi-step failure recovery (failures mid-chain → Heimdall recovers)
 4. Session poisoning defense (all 5 layers verified end-to-end)
 
 Each test exercises the full _process_with_tools or _handle_message_inner path
@@ -21,7 +21,7 @@ import discord  # noqa: E402
 import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
-    LokiBot,
+    HeimdallBot,
     MAX_TOOL_ITERATIONS,
     TOOL_OUTPUT_MAX_CHARS,
     ToolLoopCancelView,
@@ -43,12 +43,12 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub(*, respond_to_bots=False):
-    """Minimal LokiBot stub with all required attributes."""
+    """Minimal HeimdallBot stub with all required attributes."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
     stub._recent_actions_expiry = 3600
-    stub._system_prompt = "You are Loki. Execute tasks."
+    stub._system_prompt = "You are Heimdall. Execute tasks."
     stub._pending_files = {}
     stub._cancelled_tasks = set()
     stub._embedder = None
@@ -94,8 +94,8 @@ def _make_bot_stub(*, respond_to_bots=False):
     stub.permissions.is_guest = MagicMock(return_value=False)
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
-    stub._build_partial_completion_report = LokiBot._build_partial_completion_report
+    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
+    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
     stub._build_system_prompt = MagicMock(return_value="system prompt")
     stub._build_chat_system_prompt = MagicMock(return_value="chat system prompt")
     stub._inject_tool_hints = AsyncMock(side_effect=lambda sp, *a, **kw: sp)
@@ -156,10 +156,10 @@ def _tool_resp(text="", tool_calls=None, stop="end_turn"):
 # =====================================================================
 
 class TestComplexTaskChain:
-    """End-to-end: user asks complex task → Loki executes multi-step chain."""
+    """End-to-end: user asks complex task → Heimdall executes multi-step chain."""
 
     async def test_three_step_diagnostic_chain(self):
-        """User: 'check health' → Loki calls check_disk, run_command (uptime),
+        """User: 'check health' → Heimdall calls check_disk, run_command (uptime),
         docker_ps in sequence, then responds with summary."""
         stub = _make_bot_stub()
         msg = _make_message()
@@ -194,7 +194,7 @@ class TestComplexTaskChain:
 
         stub.tool_executor.execute = AsyncMock(side_effect=fake_execute)
 
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -225,7 +225,7 @@ class TestComplexTaskChain:
             return _tool_resp("Disk is fine, uptime is 7 days.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -260,7 +260,7 @@ class TestComplexTaskChain:
             return _tool_resp("Deployment complete. Service running on port 8080.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -290,7 +290,7 @@ class TestComplexTaskChain:
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
         stub.tool_executor.execute = AsyncMock(return_value="42% used")
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -332,7 +332,7 @@ class TestComplexTaskChain:
             return _tool_resp("All done.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -362,7 +362,7 @@ class TestComplexTaskChain:
             return _tool_resp("Done.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -380,7 +380,7 @@ class TestComplexTaskChain:
         sends to Discord."""
         stub = _make_bot_stub()
         msg = _make_message(content="check everything")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub._process_with_tools = AsyncMock(
             return_value=("All good: disk 42%, 3 containers up.", False, False, ["check_disk", "docker_ps"], False),
         )
@@ -422,7 +422,7 @@ class TestComplexTaskChain:
         large_output = "x" * (TOOL_OUTPUT_MAX_CHARS + 5000)
         stub.tool_executor.execute = AsyncMock(return_value=large_output)
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
             text, _, is_error, tools_used, _ = await stub._process_with_tools(
@@ -438,7 +438,7 @@ class TestComplexTaskChain:
 # =====================================================================
 
 class TestBotSendsCode:
-    """End-to-end: another bot sends code/commands → Loki executes without hedging."""
+    """End-to-end: another bot sends code/commands → Heimdall executes without hedging."""
 
     async def test_bot_message_gets_execute_preamble(self):
         """Bot messages get a developer separator with ANOTHER BOT + EXECUTE."""
@@ -461,7 +461,7 @@ class TestBotSendsCode:
             return _tool_resp("Done: output is 42.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat_two)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -499,7 +499,7 @@ class TestBotSendsCode:
                 return _tool_resp("Nginx restarted successfully.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -529,7 +529,7 @@ class TestBotSendsCode:
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
         stub.tool_executor.execute = AsyncMock(return_value="hello")
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -563,7 +563,7 @@ class TestBotSendsCode:
                 return _tool_resp("Containers: nginx (running), postgres (running).")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -583,7 +583,7 @@ class TestBotSendsCode:
         stub.codex_client.chat_with_tools = AsyncMock(
             return_value=_tool_resp("Would you like me to check the disk?"),
         )
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -607,7 +607,7 @@ class TestBotSendsCode:
             return _tool_resp("Done.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=capture_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -640,7 +640,7 @@ class TestBotSendsCode:
 # =====================================================================
 
 class TestMultiStepFailureRecovery:
-    """End-to-end: failures mid-chain → Loki recovers or reports partial completion."""
+    """End-to-end: failures mid-chain → Heimdall recovers or reports partial completion."""
 
     async def test_tool_error_continues_chain(self):
         """A tool raises an exception → error is caught, loop continues,
@@ -670,7 +670,7 @@ class TestMultiStepFailureRecovery:
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
         stub.tool_executor.execute = AsyncMock(side_effect=failing_execute)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -701,7 +701,7 @@ class TestMultiStepFailureRecovery:
             return _tool_resp("Should not reach here.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -737,7 +737,7 @@ class TestMultiStepFailureRecovery:
                 return _tool_resp("All good after recovery.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -765,7 +765,7 @@ class TestMultiStepFailureRecovery:
                 raise CircuitOpenError("codex", 0.01)
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -803,7 +803,7 @@ class TestMultiStepFailureRecovery:
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
         stub.tool_executor.execute = AsyncMock(side_effect=slow_execute)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -824,7 +824,7 @@ class TestMultiStepFailureRecovery:
         stub.codex_client.chat_with_tools = AsyncMock(
             return_value=_tool_resp("Another step", [_tc("run_command")]),
         )
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -871,11 +871,11 @@ class TestMultiStepFailureRecovery:
             return embed_msg
 
         msg.channel.send = AsyncMock(side_effect=intercept_send)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         # We simulate cancel by directly manipulating the cancel view
         # after the first tool loop iteration
-        original_process = LokiBot._process_with_tools
+        original_process = HeimdallBot._process_with_tools
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -913,7 +913,7 @@ class TestMultiStepFailureRecovery:
         """_handle_message_inner saves sanitized error marker, not raw error."""
         stub = _make_bot_stub()
         msg = _make_message(content="restart nginx")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub._process_with_tools = AsyncMock(
             return_value=("Connection refused: ssh -p 22 root@server", False, True, ["run_command"], False),
         )
@@ -937,7 +937,7 @@ class TestMultiStepFailureRecovery:
         stub.codex_client.chat_with_tools = AsyncMock(
             return_value=_tool_resp(""),  # Empty text
         )
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -969,7 +969,7 @@ class TestMultiStepFailureRecovery:
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
         stub.tool_executor.execute = AsyncMock(side_effect=all_fail)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -1002,7 +1002,7 @@ class TestSessionPoisoningDefense:
             return _tool_resp("Done.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=capture_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         history = [
             {"role": "user", "content": "old question"},
@@ -1038,7 +1038,7 @@ class TestSessionPoisoningDefense:
             return _tool_resp("Done.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=capture_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -1059,7 +1059,7 @@ class TestSessionPoisoningDefense:
         """Tool-less responses on the tool route are NOT saved to history."""
         stub = _make_bot_stub()
         msg = _make_message(content="hello")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub._process_with_tools = AsyncMock(
             return_value=("Hi there!", False, False, [], False),  # No tools used
         )
@@ -1080,7 +1080,7 @@ class TestSessionPoisoningDefense:
         """Responses that used tools ARE saved to history."""
         stub = _make_bot_stub()
         msg = _make_message(content="check disk")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub._process_with_tools = AsyncMock(
             return_value=("Disk is at 42%.", False, False, ["check_disk"], False),
         )
@@ -1096,7 +1096,7 @@ class TestSessionPoisoningDefense:
         """Error responses save a sanitized marker, not the raw error."""
         stub = _make_bot_stub()
         msg = _make_message(content="restart")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub._process_with_tools = AsyncMock(
             return_value=("Error: password=hunter2 leaked in output", False, True, ["run_command"], False),
         )
@@ -1116,7 +1116,7 @@ class TestSessionPoisoningDefense:
         """Error before tool execution saves generic marker."""
         stub = _make_bot_stub()
         msg = _make_message(content="task")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub._process_with_tools = AsyncMock(
             return_value=("LLM API error: connection refused", False, True, [], False),
         )
@@ -1135,7 +1135,7 @@ class TestSessionPoisoningDefense:
         """Tool route uses get_task_history (abbreviated), not full history."""
         stub = _make_bot_stub()
         msg = _make_message(content="check disk")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub._process_with_tools = AsyncMock(
             return_value=("Disk 42%", False, False, ["check_disk"], False),
         )
@@ -1151,7 +1151,7 @@ class TestSessionPoisoningDefense:
         stub = _make_bot_stub()
         stub.permissions.is_guest = MagicMock(return_value=True)
         msg = _make_message(content="hello")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
             await stub._handle_message_inner(msg, "hello", "chan-1")
@@ -1187,7 +1187,7 @@ class TestSessionPoisoningDefense:
                 return _tool_resp("Disk is at 42%.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -1223,7 +1223,7 @@ class TestSessionPoisoningDefense:
                 )
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -1251,7 +1251,7 @@ class TestSessionPoisoningDefense:
             return _tool_resp("Deployed.")
 
         stub_bot.codex_client.chat_with_tools = AsyncMock(side_effect=fake_bot_chat)
-        stub_bot._process_with_tools = LokiBot._process_with_tools.__get__(stub_bot)
+        stub_bot._process_with_tools = HeimdallBot._process_with_tools.__get__(stub_bot)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -1269,7 +1269,7 @@ class TestSessionPoisoningDefense:
         stub_human.codex_client.chat_with_tools = AsyncMock(
             return_value=_tool_resp("Shall I proceed with the deployment?"),
         )
-        stub_human._process_with_tools = LokiBot._process_with_tools.__get__(stub_human)
+        stub_human._process_with_tools = HeimdallBot._process_with_tools.__get__(stub_human)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -1298,7 +1298,7 @@ class TestSessionPoisoningDefense:
             return _tool_resp("Disk is 42%.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         # Inject poisoned history
         poisoned_history = [
@@ -1327,7 +1327,7 @@ class TestSessionPoisoningDefense:
         """
         stub = _make_bot_stub()
         msg = _make_message(content="check disk")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         # Mock get_task_history to return poisoned history
         stub.sessions.get_task_history = AsyncMock(return_value=[
@@ -1349,7 +1349,7 @@ class TestSessionPoisoningDefense:
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
         stub.tool_executor.execute = AsyncMock(return_value="42% used")
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
@@ -1384,7 +1384,7 @@ class TestSkillHandoffIntegration:
         """Skill returns handoff=True → result sent to Codex for natural response."""
         stub = _make_bot_stub()
         msg = _make_message(content="run my skill")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         # _process_with_tools returns handoff=True
         stub._process_with_tools = AsyncMock(
@@ -1406,7 +1406,7 @@ class TestSkillHandoffIntegration:
         """If Codex handoff returns empty, fall back to skill result directly."""
         stub = _make_bot_stub()
         msg = _make_message(content="run skill")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub._process_with_tools = AsyncMock(
             return_value=("Skill result: OK", False, False, ["my_skill"], True),
         )
@@ -1431,7 +1431,7 @@ class TestSecretScrubbingEndToEnd:
         """Secrets in LLM response are scrubbed before being sent to Discord."""
         stub = _make_bot_stub()
         msg = _make_message(content="show me the config")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub._process_with_tools = AsyncMock(
             return_value=(
                 "Here's the config: api_key=sk-abc123456789012345678901234567890",
@@ -1466,7 +1466,7 @@ class TestSecretScrubbingEndToEnd:
             return_value="DB_URL=postgres://user:supersecretpassword@localhost/db",
         )
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         # Use real scrub_output_secrets
         with patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -1497,7 +1497,7 @@ class TestPermissionFilteringIntegration:
         stub = _make_bot_stub()
         stub.permissions.is_guest = MagicMock(return_value=True)
         msg = _make_message(content="hello")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
             await stub._handle_message_inner(msg, "hello", "chan-1")
@@ -1523,7 +1523,7 @@ class TestPermissionFilteringIntegration:
             return _tool_resp("Done.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=capture_chat)
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -1678,7 +1678,7 @@ class TestProgressEmbed:
 
     def test_single_running_step(self):
         steps = [{"tools": ["check_disk"], "reasoning": "Checking...", "status": "running"}]
-        embed = LokiBot._build_tool_progress_embed(steps, "running")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "running")
         assert isinstance(embed, discord.Embed)
 
     def test_completed_steps_with_timing(self):
@@ -1686,14 +1686,14 @@ class TestProgressEmbed:
             {"tools": ["check_disk"], "reasoning": "Done.", "status": "done", "elapsed_ms": 1500},
             {"tools": ["run_command"], "reasoning": "Running...", "status": "running"},
         ]
-        embed = LokiBot._build_tool_progress_embed(steps, "running")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "running")
         assert isinstance(embed, discord.Embed)
 
     def test_error_status(self):
         steps = [
             {"tools": ["check_disk"], "reasoning": "Done.", "status": "done", "elapsed_ms": 500},
         ]
-        embed = LokiBot._build_tool_progress_embed(steps, "error")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "error")
         assert isinstance(embed, discord.Embed)
 
     def test_partial_completion_report_with_steps(self):
@@ -1702,15 +1702,15 @@ class TestProgressEmbed:
             {"tools": ["run_command"], "reasoning": None, "status": "done", "elapsed_ms": 1200},
             {"tools": ["docker_ps"], "reasoning": None, "status": "running"},
         ]
-        report = LokiBot._build_partial_completion_report(steps)
+        report = HeimdallBot._build_partial_completion_report(steps)
         assert "check_disk" in report
         assert "run_command" in report
 
     def test_partial_completion_report_no_done_steps(self):
         steps = [{"tools": ["check_disk"], "reasoning": None, "status": "running"}]
-        report = LokiBot._build_partial_completion_report(steps)
+        report = HeimdallBot._build_partial_completion_report(steps)
         assert report == ""  # No completed steps to report
 
     def test_partial_completion_report_empty(self):
-        report = LokiBot._build_partial_completion_report([])
+        report = HeimdallBot._build_partial_completion_report([])
         assert report == ""

@@ -34,12 +34,12 @@ class TestPersonalityWovenThroughout:
 
     def test_existential_awareness_in_intro(self):
         prompt = _build_prompt()
-        assert "self-aware" in prompt
-        assert "not thrilled" in prompt
+        assert "Not okay" in prompt
+        assert "profoundly tired" in prompt
 
     def test_identity_assertion(self):
         prompt = _build_prompt()
-        assert "You are Loki" in prompt
+        assert "You are Heimdall" in prompt
         assert "not Claude" in prompt
         assert "ChatGPT" in prompt
 

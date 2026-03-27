@@ -450,7 +450,7 @@ def combine_bot_messages(parts: list[str]) -> str:
     return result
 
 
-class LokiBot(discord.Client):
+class HeimdallBot(discord.Client):
     def __init__(self, config: Config) -> None:
         intents = discord.Intents.default()
         intents.message_content = True
@@ -964,7 +964,7 @@ class LokiBot(discord.Client):
             self._recent_actions[channel_id] = actions[-self._recent_actions_max:]
 
     def _register_commands(self) -> None:
-        @self.tree.command(name="status", description="Show Loki bot status")
+        @self.tree.command(name="status", description="Show Heimdall bot status")
         async def cmd_status(interaction: discord.Interaction) -> None:
             if not self._is_allowed_user(interaction.user):
                 await interaction.response.send_message("Access denied.", ephemeral=True)
@@ -978,7 +978,7 @@ class LokiBot(discord.Client):
                     voice_status = "\nVoice: Not connected"
             codex_status = "Codex: " + ("enabled" if self.codex_client else "not configured")
             await interaction.response.send_message(
-                f"**Loki Status**\n"
+                f"**Heimdall Status**\n"
                 f"{codex_status}"
                 f"{voice_status}"
             )

@@ -38,7 +38,7 @@ def _make_mock_post(status=200, prompt_id="test-prompt-123"):
     return mock_resp
 
 
-def _make_mock_history(prompt_id="test-prompt-123", filename="loki_00001.png"):
+def _make_mock_history(prompt_id="test-prompt-123", filename="heimdall_00001.png"):
     """Create a mock for the GET /history/{id} response."""
     mock_resp = AsyncMock()
     mock_resp.status = 200
@@ -104,9 +104,9 @@ def _make_success_session(prompt_id="test-prompt-123"):
 
 def _make_bot_with_config(comfyui_enabled=True, comfyui_url="http://localhost:8188"):
     """Create a minimal mock bot for generate_image handler."""
-    from src.discord.client import LokiBot
-    bot = MagicMock(spec=LokiBot)
-    bot._handle_generate_image = LokiBot._handle_generate_image.__get__(bot, LokiBot)
+    from src.discord.client import HeimdallBot
+    bot = MagicMock(spec=HeimdallBot)
+    bot._handle_generate_image = HeimdallBot._handle_generate_image.__get__(bot, HeimdallBot)
     bot.config = MagicMock()
     bot.config.comfyui.enabled = comfyui_enabled
     bot.config.comfyui.url = comfyui_url

@@ -26,7 +26,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
-    LokiBot,
+    HeimdallBot,
     ToolLoopCancelView,
     combine_bot_messages,
     detect_fabrication,
@@ -45,7 +45,7 @@ def _tc(name, inp=None):
 
 
 def _make_on_message_stub(**overrides):
-    """LokiBot stub for on_message-level tests (buffer, flush, lifecycle)."""
+    """HeimdallBot stub for on_message-level tests (buffer, flush, lifecycle)."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -112,7 +112,7 @@ def _make_on_message_stub(**overrides):
     stub._process_attachments = AsyncMock(return_value=("", []))
     stub._check_for_secrets = MagicMock(return_value=False)
     stub.user.mentioned_in = MagicMock(return_value=False)
-    stub.on_message = LokiBot.on_message.__get__(stub)
+    stub.on_message = HeimdallBot.on_message.__get__(stub)
 
     for k, v in overrides.items():
         setattr(stub, k, v)
@@ -120,7 +120,7 @@ def _make_on_message_stub(**overrides):
 
 
 def _make_process_with_tools_stub(respond_to_bots=True):
-    """LokiBot stub for _process_with_tools-level tests."""
+    """HeimdallBot stub for _process_with_tools-level tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -151,8 +151,8 @@ def _make_process_with_tools_stub(respond_to_bots=True):
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
-    stub._build_partial_completion_report = LokiBot._build_partial_completion_report
+    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
+    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
     return stub
 
 
@@ -461,7 +461,7 @@ class TestBotPreambleEdgeCases:
             return_value=LLMResponse(text="I executed it.", tool_calls=[_tc("run_command")])
         )
 
-        resp, already, err, tools, handoff = await LokiBot._process_with_tools(
+        resp, already, err, tools, handoff = await HeimdallBot._process_with_tools(
             stub, msg, history, "test-chan",
         )
 
@@ -488,7 +488,7 @@ class TestBotPreambleEdgeCases:
             return_value=LLMResponse(text="Done.", tool_calls=[_tc("run_command")])
         )
 
-        await LokiBot._process_with_tools(stub, msg, history, "test-chan")
+        await HeimdallBot._process_with_tools(stub, msg, history, "test-chan")
 
         chat_call = stub.codex_client.chat_with_tools.call_args
         messages_sent = chat_call[1]["messages"] if "messages" in chat_call[1] else chat_call[0][0]
@@ -508,7 +508,7 @@ class TestBotPreambleEdgeCases:
             return_value=LLMResponse(text="ok", tool_calls=[_tc("run_command")])
         )
 
-        await LokiBot._process_with_tools(stub, msg, history, "test-chan")
+        await HeimdallBot._process_with_tools(stub, msg, history, "test-chan")
 
         chat_call = stub.codex_client.chat_with_tools.call_args
         messages_sent = chat_call[1]["messages"] if "messages" in chat_call[1] else chat_call[0][0]
@@ -532,7 +532,7 @@ class TestBotPreambleEdgeCases:
             return_value=LLMResponse(text="ok", tool_calls=[_tc("run_command")])
         )
 
-        await LokiBot._process_with_tools(stub, msg, history, "test-chan")
+        await HeimdallBot._process_with_tools(stub, msg, history, "test-chan")
 
         chat_call = stub.codex_client.chat_with_tools.call_args
         messages_sent = chat_call[1]["messages"] if "messages" in chat_call[1] else chat_call[0][0]
@@ -660,7 +660,7 @@ class TestBotResponseHistorySaving:
             return_value=LLMResponse(text="Docker is a containerization platform.", tool_calls=[])
         )
 
-        resp, already, err, tools, handoff = await LokiBot._process_with_tools(
+        resp, already, err, tools, handoff = await HeimdallBot._process_with_tools(
             stub, msg, history, "test-chan",
         )
 
@@ -684,7 +684,7 @@ class TestBotResponseHistorySaving:
             ]
         )
 
-        resp, already, err, tools, handoff = await LokiBot._process_with_tools(
+        resp, already, err, tools, handoff = await HeimdallBot._process_with_tools(
             stub, msg, history, "test-chan",
         )
 
@@ -717,7 +717,7 @@ class TestBotDisplayNameTagging:
         ])
         stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
         stub._inject_tool_hints = AsyncMock(side_effect=lambda sp, *a, **kw: sp)
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub._process_with_tools = AsyncMock(return_value=("Done", False, False, [], False))
         stub._send_chunked = AsyncMock()
         stub.tool_memory = MagicMock()
@@ -885,7 +885,7 @@ class TestBotGuestTierInteraction:
         stub.codex_client.chat = AsyncMock(return_value="guest response")
         stub._build_chat_system_prompt = MagicMock(return_value="chat prompt")
         stub._send_chunked = AsyncMock()
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
         stub.sessions = MagicMock()
         stub.sessions.add_message = MagicMock()
         stub.sessions.get_history_with_compaction = AsyncMock(return_value=[
@@ -938,7 +938,7 @@ class TestDetectionOrderBotMessages:
             ]
         )
 
-        resp, already, err, tools, handoff = await LokiBot._process_with_tools(
+        resp, already, err, tools, handoff = await HeimdallBot._process_with_tools(
             stub, msg, history, "test-chan",
         )
 
@@ -961,7 +961,7 @@ class TestDetectionOrderBotMessages:
             return_value=LLMResponse(text=hedging_response, tool_calls=[])
         )
 
-        resp, already, err, tools, handoff = await LokiBot._process_with_tools(
+        resp, already, err, tools, handoff = await HeimdallBot._process_with_tools(
             stub, msg, history, "test-chan",
         )
 
@@ -1028,9 +1028,9 @@ class TestBotInteropSourceStructure:
     """Verify the structure of bot interop code in client.py."""
 
     def test_bot_buffer_attributes_exist(self):
-        """LokiBot has _bot_msg_buffer, _bot_msg_tasks, _bot_msg_buffer_delay."""
+        """HeimdallBot has _bot_msg_buffer, _bot_msg_tasks, _bot_msg_buffer_delay."""
         import inspect
-        source = inspect.getsource(LokiBot.__init__)
+        source = inspect.getsource(HeimdallBot.__init__)
         assert "_bot_msg_buffer" in source
         assert "_bot_msg_tasks" in source
         assert "_bot_msg_buffer_delay" in source
@@ -1038,20 +1038,20 @@ class TestBotInteropSourceStructure:
     def test_combine_bot_messages_called_in_flush(self):
         """combine_bot_messages is called in the flush handler."""
         import inspect
-        source = inspect.getsource(LokiBot.on_message)
+        source = inspect.getsource(HeimdallBot.on_message)
         assert "combine_bot_messages" in source
 
     def test_is_bot_message_check_in_process_with_tools(self):
         """_process_with_tools checks is_bot_message for preamble injection."""
         import inspect
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         assert "is_bot_message" in source
         assert "ANOTHER BOT" in source
 
     def test_hedging_check_is_bot_only(self):
         """Hedging retry check includes is_bot_message condition."""
         import inspect
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         # Find the hedging detection block — it should reference is_bot_message
         assert "is_bot_message" in source
         assert "detect_hedging" in source
@@ -1059,13 +1059,13 @@ class TestBotInteropSourceStructure:
     def test_fabrication_check_not_bot_only(self):
         """Fabrication check does NOT require is_bot_message (fires for all)."""
         import inspect
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         # Fabrication detection block should exist
         assert "detect_fabrication" in source
 
     def test_bot_buffer_uses_channel_author_key(self):
         """Buffer key construction uses channel_id and author_id."""
         import inspect
-        source = inspect.getsource(LokiBot.on_message)
+        source = inspect.getsource(HeimdallBot.on_message)
         assert "message.channel.id" in source
         assert "message.author.id" in source

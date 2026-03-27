@@ -16,7 +16,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import LokiBot  # noqa: E402
+from src.discord.client import HeimdallBot  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
@@ -25,7 +25,7 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Minimal LokiBot stub for reasoning text tests."""
+    """Minimal HeimdallBot stub for reasoning text tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -55,7 +55,7 @@ def _make_bot_stub():
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
+    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
     return stub
 
 
@@ -100,7 +100,7 @@ class TestReasoningTextInProgress:
         stub.codex_client.chat_with_tools = AsyncMock(
             side_effect=[tool_response, final_response]
         )
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         await stub._process_with_tools(msg, [])
 
@@ -124,7 +124,7 @@ class TestReasoningTextInProgress:
         stub.codex_client.chat_with_tools = AsyncMock(
             side_effect=[tool_response, final_response]
         )
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         await stub._process_with_tools(msg, [])
 
@@ -148,7 +148,7 @@ class TestReasoningTextInProgress:
         stub.codex_client.chat_with_tools = AsyncMock(
             side_effect=[tool_response, final_response]
         )
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         await stub._process_with_tools(msg, [])
 
@@ -173,7 +173,7 @@ class TestReasoningTextInProgress:
         stub.codex_client.chat_with_tools = AsyncMock(
             side_effect=[tool_response, final_response]
         )
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         await stub._process_with_tools(msg, [])
 
@@ -199,7 +199,7 @@ class TestReasoningTextInProgress:
         stub.codex_client.chat_with_tools = AsyncMock(
             side_effect=[tool_response, final_response]
         )
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         await stub._process_with_tools(msg, [])
 
@@ -226,7 +226,7 @@ class TestReasoningTextInProgress:
         stub.codex_client.chat_with_tools = AsyncMock(
             side_effect=[resp1, resp2, final]
         )
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         await stub._process_with_tools(msg, [])
 
@@ -261,7 +261,7 @@ class TestReasoningTextInProgress:
         stub.codex_client.chat_with_tools = AsyncMock(
             side_effect=[tool_response, final_response]
         )
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         await stub._process_with_tools(msg, [])
 

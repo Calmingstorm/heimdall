@@ -82,7 +82,7 @@ class TestBuildSystemPrompt:
 class TestBuildChatSystemPrompt:
     def test_includes_identity(self):
         prompt = build_chat_system_prompt()
-        assert "Loki" in prompt
+        assert "Heimdall" in prompt
         assert "not Claude or ChatGPT" in prompt
 
     def test_includes_datetime(self):
@@ -172,7 +172,7 @@ class TestSystemPromptQuality:
             context="", hosts={}, services=[], playbooks=[],
         )
         # Identity
-        assert "Loki" in prompt
+        assert "Heimdall" in prompt
         assert "not Claude" in prompt
         # Key rules
         assert "emojis" in prompt.lower()

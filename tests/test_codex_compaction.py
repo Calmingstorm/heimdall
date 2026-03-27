@@ -272,12 +272,12 @@ class TestCodexChatMaxTokens:
 class TestClientWiresCompaction:
     def test_codex_sets_compaction_fn(self):
         """When Codex client is created, sessions.set_compaction_fn is called."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
 
         with (
-            patch.object(LokiBot, "__init__", lambda self, *a, **kw: None),
+            patch.object(HeimdallBot, "__init__", lambda self, *a, **kw: None),
         ):
-            bot = LokiBot.__new__(LokiBot)
+            bot = HeimdallBot.__new__(HeimdallBot)
 
         # Simulate the relevant __init__ wiring
         bot.sessions = MagicMock()

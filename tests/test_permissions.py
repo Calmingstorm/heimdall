@@ -21,7 +21,7 @@ import pytest  # noqa: E402
 from src.permissions.manager import PermissionManager, VALID_TIERS, USER_TIER_TOOLS  # noqa: E402
 from src.config.schema import PermissionsConfig, Config  # noqa: E402
 from src.tools.registry import TOOLS, get_tool_definitions  # noqa: E402
-from src.discord.client import LokiBot  # noqa: E402
+from src.discord.client import HeimdallBot  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -285,8 +285,8 @@ class TestHandleSetPermission:
     @pytest.fixture
     def bot(self, config, tmp_dir):
         """Minimal bot mock with real PermissionManager."""
-        with patch.object(LokiBot, "__init__", lambda self, *a, **k: None):
-            bot = LokiBot.__new__(LokiBot)
+        with patch.object(HeimdallBot, "__init__", lambda self, *a, **k: None):
+            bot = HeimdallBot.__new__(HeimdallBot)
         bot.permissions = PermissionManager(
             config_tiers={"111": "admin"},
             default_tier="user",
@@ -321,8 +321,8 @@ class TestToolFilteringIntegration:
     @pytest.fixture
     def bot(self, config, tmp_dir):
         """Minimal bot mock to test _process_with_tools tool filtering."""
-        with patch.object(LokiBot, "__init__", lambda self, *a, **k: None):
-            bot = LokiBot.__new__(LokiBot)
+        with patch.object(HeimdallBot, "__init__", lambda self, *a, **k: None):
+            bot = HeimdallBot.__new__(HeimdallBot)
         bot.config = config
         bot.permissions = PermissionManager(
             config_tiers={"111": "admin"},

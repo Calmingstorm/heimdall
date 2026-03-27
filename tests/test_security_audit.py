@@ -136,7 +136,7 @@ class TestNoPersonalNames:
 
 
 class TestNoAnsiblexReferences:
-    """Verify 'ansiblex' is fully renamed to 'loki' everywhere."""
+    """Verify 'ansiblex' is fully renamed to 'heimdall' everywhere."""
 
     def test_no_ansiblex_in_source(self):
         for f in _get_tracked_source_files():

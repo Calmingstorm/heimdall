@@ -74,7 +74,7 @@ class TestReadmeAccuracy:
     def test_personality_mentioned(self):
         """README mentions the personality."""
         lower = self.readme.lower()
-        assert "existential" in lower or "self-aware" in lower or "not thrilled" in lower
+        assert "not okay" in lower or "all-seeing" in lower or "profoundly tired" in lower
 
     def test_no_three_way_routing(self):
         """README should not describe 3-way routing."""
@@ -146,14 +146,14 @@ class TestClaudeMdAccuracy:
         assert "src/discord/approval.py" not in self.claude_md
 
     def test_autonomous_executor_identity(self):
-        """CLAUDE.md describes Loki as autonomous executor."""
+        """CLAUDE.md describes Heimdall as autonomous executor."""
         lower = self.claude_md.lower()
         assert "autonomous" in lower
 
     def test_personality_documented(self):
         """CLAUDE.md documents the personality."""
         lower = self.claude_md.lower()
-        assert "self-aware" in lower or "existential" in lower or "not thrilled" in lower
+        assert "not okay" in lower or "all-seeing" in lower or "profoundly tired" in lower
 
     def test_no_classifier_architecture(self):
         """CLAUDE.md should not show classifier in architecture."""

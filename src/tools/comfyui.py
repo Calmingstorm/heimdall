@@ -52,7 +52,7 @@ _DEFAULT_WORKFLOW = {
     },
     "9": {
         "class_type": "SaveImage",
-        "inputs": {"filename_prefix": "loki", "images": ["8", 0]},
+        "inputs": {"filename_prefix": "heimdall", "images": ["8", 0]},
     },
 }
 

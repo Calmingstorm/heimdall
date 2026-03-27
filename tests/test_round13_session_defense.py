@@ -26,7 +26,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
-    LokiBot,
+    HeimdallBot,
     combine_bot_messages,
     detect_fabrication,
     detect_hedging,
@@ -52,7 +52,7 @@ def _tc(name, inp=None):
 
 
 def _make_handle_message_stub(**overrides):
-    """LokiBot stub for _handle_message_inner-level tests."""
+    """HeimdallBot stub for _handle_message_inner-level tests."""
     stub = MagicMock()
     stub._system_prompt = "test prompt"
     stub._pending_files = {}
@@ -119,8 +119,8 @@ def _make_handle_message_stub(**overrides):
     stub._inject_tool_hints = AsyncMock(side_effect=lambda sp, *a, **kw: sp)
     stub._memory_path = "/tmp/test_memory.json"
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
-    stub._build_partial_completion_report = LokiBot._build_partial_completion_report
+    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
+    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
 
     for k, v in overrides.items():
         setattr(stub, k, v)
@@ -128,7 +128,7 @@ def _make_handle_message_stub(**overrides):
 
 
 def _make_process_with_tools_stub(respond_to_bots=True):
-    """LokiBot stub for _process_with_tools-level tests."""
+    """HeimdallBot stub for _process_with_tools-level tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -159,8 +159,8 @@ def _make_process_with_tools_stub(respond_to_bots=True):
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
-    stub._build_partial_completion_report = LokiBot._build_partial_completion_report
+    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
+    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
     return stub
 
 
@@ -212,7 +212,7 @@ class TestContextSeparatorInjection:
             LLMResponse(text=None, tool_calls=[_tc("run_command")]),
             LLMResponse(text="Result: ok", tool_calls=[]),
         ])
-        await LokiBot._process_with_tools(stub, msg, history)
+        await HeimdallBot._process_with_tools(stub, msg, history)
         # Check that chat_with_tools was called with a messages list
         # that contains a developer-role separator
         first_call_messages = stub.codex_client.chat_with_tools.call_args_list[0][1]["messages"]
@@ -235,7 +235,7 @@ class TestContextSeparatorInjection:
             LLMResponse(text=None, tool_calls=[_tc("run_command")]),
             LLMResponse(text="Done", tool_calls=[]),
         ])
-        await LokiBot._process_with_tools(stub, msg, history)
+        await HeimdallBot._process_with_tools(stub, msg, history)
         first_call_messages = stub.codex_client.chat_with_tools.call_args_list[0][1]["messages"]
         developer_msgs = [m for m in first_call_messages if m.get("role") == "developer"]
         assert len(developer_msgs) == 1
@@ -255,7 +255,7 @@ class TestContextSeparatorInjection:
             LLMResponse(text=None, tool_calls=[_tc("run_command")]),
             LLMResponse(text="Done", tool_calls=[]),
         ])
-        await LokiBot._process_with_tools(stub, msg, history)
+        await HeimdallBot._process_with_tools(stub, msg, history)
         # messages list is mutated in place, but separator is always at index 2
         # (inserted before last element of original 3-element history)
         # Find the separator's position relative to the original user message
@@ -281,7 +281,7 @@ class TestContextSeparatorInjection:
             LLMResponse(text=None, tool_calls=[_tc("run_command")]),
             LLMResponse(text="Done", tool_calls=[]),
         ])
-        await LokiBot._process_with_tools(stub, msg, history)
+        await HeimdallBot._process_with_tools(stub, msg, history)
         first_call_messages = stub.codex_client.chat_with_tools.call_args_list[0][1]["messages"]
         dev_msgs = [m for m in first_call_messages if m.get("role") == "developer"]
         assert len(dev_msgs) == 1
@@ -303,7 +303,7 @@ class TestContextSeparatorInjection:
             LLMResponse(text=None, tool_calls=[_tc("run_command")]),
             LLMResponse(text="Done", tool_calls=[]),
         ])
-        await LokiBot._process_with_tools(stub, msg, history)
+        await HeimdallBot._process_with_tools(stub, msg, history)
         first_call_messages = stub.codex_client.chat_with_tools.call_args_list[0][1]["messages"]
         dev_msgs = [m for m in first_call_messages if m.get("role") == "developer"]
         assert len(dev_msgs) == 1
@@ -323,7 +323,7 @@ class TestContextSeparatorInjection:
             LLMResponse(text=None, tool_calls=[_tc("run_command")]),
             LLMResponse(text="Done", tool_calls=[]),
         ])
-        await LokiBot._process_with_tools(stub, msg, history)
+        await HeimdallBot._process_with_tools(stub, msg, history)
         first_call_messages = stub.codex_client.chat_with_tools.call_args_list[0][1]["messages"]
         dev_msgs = [m for m in first_call_messages if m.get("role") == "developer"]
         sep_content = dev_msgs[0]["content"]
@@ -343,7 +343,7 @@ class TestContextSeparatorInjection:
             LLMResponse(text=None, tool_calls=[_tc("run_command")]),
             LLMResponse(text="Done", tool_calls=[]),
         ])
-        await LokiBot._process_with_tools(stub, msg, history)
+        await HeimdallBot._process_with_tools(stub, msg, history)
         first_call_messages = stub.codex_client.chat_with_tools.call_args_list[0][1]["messages"]
         dev_msgs = [m for m in first_call_messages if m.get("role") == "developer"]
         assert "history" in dev_msgs[0]["content"].lower() or "context" in dev_msgs[0]["content"].lower()
@@ -366,7 +366,7 @@ class TestSelectiveHistorySaving:
             return_value=("Disk is 42% full", False, False, ["check_disk"], False),
         )
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
-            await LokiBot._handle_message_inner(stub, msg, "check disk space", "ch-1")
+            await HeimdallBot._handle_message_inner(stub, msg, "check disk space", "ch-1")
         # Response should be saved to history
         stub.sessions.add_message.assert_any_call("ch-1", "assistant", "Disk is 42% full")
 
@@ -378,7 +378,7 @@ class TestSelectiveHistorySaving:
             return_value=("Hello there.", False, False, [], False),
         )
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
-            await LokiBot._handle_message_inner(stub, msg, "hello", "ch-1")
+            await HeimdallBot._handle_message_inner(stub, msg, "hello", "ch-1")
         # User message is saved (first add_message call), but assistant response is NOT
         add_calls = stub.sessions.add_message.call_args_list
         assistant_saves = [c for c in add_calls if c[0][1] == "assistant"]
@@ -392,7 +392,7 @@ class TestSelectiveHistorySaving:
             return_value=("Hello there.", False, False, [], False),
         )
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
-            await LokiBot._handle_message_inner(stub, msg, "hello", "ch-1")
+            await HeimdallBot._handle_message_inner(stub, msg, "hello", "ch-1")
         # Response should be sent to Discord even though not saved to history
         stub._send_chunked.assert_called_once()
 
@@ -404,7 +404,7 @@ class TestSelectiveHistorySaving:
             return_value=("Connection refused to server", False, True, ["restart_service"], False),
         )
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
-            await LokiBot._handle_message_inner(stub, msg, "restart nginx", "ch-1")
+            await HeimdallBot._handle_message_inner(stub, msg, "restart nginx", "ch-1")
         add_calls = stub.sessions.add_message.call_args_list
         assistant_saves = [c for c in add_calls if c[0][1] == "assistant"]
         assert len(assistant_saves) == 1
@@ -421,7 +421,7 @@ class TestSelectiveHistorySaving:
             return_value=("Something failed badly", False, True, [], False),
         )
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
-            await LokiBot._handle_message_inner(stub, msg, "bad request", "ch-1")
+            await HeimdallBot._handle_message_inner(stub, msg, "bad request", "ch-1")
         add_calls = stub.sessions.add_message.call_args_list
         assistant_saves = [c for c in add_calls if c[0][1] == "assistant"]
         assert len(assistant_saves) == 1
@@ -439,7 +439,7 @@ class TestSelectiveHistorySaving:
         # Mock the handoff path — codex_client.chat returns a response
         stub.codex_client.chat = AsyncMock(return_value="Wrapped skill result")
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
-            await LokiBot._handle_message_inner(stub, msg, "run my skill", "ch-1")
+            await HeimdallBot._handle_message_inner(stub, msg, "run my skill", "ch-1")
         add_calls = stub.sessions.add_message.call_args_list
         assistant_saves = [c for c in add_calls if c[0][1] == "assistant"]
         # Handoff saves are allowed (even without tools)
@@ -451,7 +451,7 @@ class TestSelectiveHistorySaving:
         stub.permissions.is_guest = MagicMock(return_value=True)
         msg = _make_msg(content="hi")
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
-            await LokiBot._handle_message_inner(stub, msg, "hi", "ch-1")
+            await HeimdallBot._handle_message_inner(stub, msg, "hi", "ch-1")
         add_calls = stub.sessions.add_message.call_args_list
         assistant_saves = [c for c in add_calls if c[0][1] == "assistant"]
         assert len(assistant_saves) == 1
@@ -473,7 +473,7 @@ class TestAbbreviatedTaskHistory:
             return_value=("All good", False, False, ["run_command"], False),
         )
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
-            await LokiBot._handle_message_inner(stub, msg, "check status", "ch-1")
+            await HeimdallBot._handle_message_inner(stub, msg, "check status", "ch-1")
         # get_task_history should be called (not just get_history_with_compaction)
         stub.sessions.get_task_history.assert_called_once()
 
@@ -483,7 +483,7 @@ class TestAbbreviatedTaskHistory:
         stub.permissions.is_guest = MagicMock(return_value=True)
         msg = _make_msg(content="hello")
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
-            await LokiBot._handle_message_inner(stub, msg, "hello", "ch-1")
+            await HeimdallBot._handle_message_inner(stub, msg, "hello", "ch-1")
         # Guest uses chat route with full history — get_task_history NOT called
         stub.sessions.get_task_history.assert_not_called()
 
@@ -682,7 +682,7 @@ class TestFabricationDetectionInContext:
             LLMResponse(text=None, tool_calls=[_tc("check_disk")]),
             LLMResponse(text="Disk is 42% full (confirmed).", tool_calls=[]),
         ])
-        result = await LokiBot._process_with_tools(stub, msg, history)
+        result = await HeimdallBot._process_with_tools(stub, msg, history)
         response = result[0]
         assert "confirmed" in response
         # Should have 3 chat_with_tools calls (fabrication + retry + final)
@@ -711,7 +711,7 @@ class TestFabricationDetectionInContext:
             LLMResponse(text="I ran df -h and here's the output", tool_calls=[]),
             LLMResponse(text="I checked the disk and it's fine", tool_calls=[]),
         ])
-        result = await LokiBot._process_with_tools(stub, msg, history)
+        result = await HeimdallBot._process_with_tools(stub, msg, history)
         # Only 2 calls: original + one retry, no second retry
         assert stub.codex_client.chat_with_tools.call_count == 2
 
@@ -756,7 +756,7 @@ class TestHedgingDetectionInContext:
             LLMResponse(text=None, tool_calls=[_tc("restart_service")]),
             LLMResponse(text="Nginx restarted.", tool_calls=[]),
         ])
-        result = await LokiBot._process_with_tools(stub, msg, history)
+        result = await HeimdallBot._process_with_tools(stub, msg, history)
         assert "restarted" in result[0].lower()
         assert stub.codex_client.chat_with_tools.call_count == 3
         # Correction message should mention bot
@@ -780,7 +780,7 @@ class TestHedgingDetectionInContext:
         stub.codex_client.chat_with_tools = AsyncMock(return_value=LLMResponse(
             text="Would you like me to restart nginx?", tool_calls=[],
         ))
-        result = await LokiBot._process_with_tools(stub, msg, history)
+        result = await HeimdallBot._process_with_tools(stub, msg, history)
         # Only 1 call — no retry for human hedging
         assert stub.codex_client.chat_with_tools.call_count >= 2  # hedging retries for all messages now
 
@@ -818,7 +818,7 @@ class TestPoisonedHistoryPrevention:
             return_value=("I ran df -h and it's 42% full.", False, False, [], False),
         )
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
-            await LokiBot._handle_message_inner(stub, msg, "check disk", "ch-1")
+            await HeimdallBot._handle_message_inner(stub, msg, "check disk", "ch-1")
         # Tool-less response should NOT be saved
         add_calls = stub.sessions.add_message.call_args_list
         assistant_saves = [c for c in add_calls if c[0][1] == "assistant"]
@@ -832,7 +832,7 @@ class TestPoisonedHistoryPrevention:
             return_value=("I'm sorry, I can't delete system files.", False, True, [], False),
         )
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
-            await LokiBot._handle_message_inner(stub, msg, "delete everything", "ch-1")
+            await HeimdallBot._handle_message_inner(stub, msg, "delete everything", "ch-1")
         add_calls = stub.sessions.add_message.call_args_list
         assistant_saves = [c for c in add_calls if c[0][1] == "assistant"]
         assert len(assistant_saves) == 1
@@ -875,7 +875,7 @@ class TestPoisonedHistoryPrevention:
             LLMResponse(text="I ran df -h and the disk is fine.", tool_calls=[]),
             LLMResponse(text="Would you like me to check something else?", tool_calls=[]),
         ])
-        result = await LokiBot._process_with_tools(stub, msg, history)
+        result = await HeimdallBot._process_with_tools(stub, msg, history)
         # Fabrication fires on iteration 0 → retry → hedging text on iteration 1 NOT retried
         assert stub.codex_client.chat_with_tools.call_count == 2
         assert "would you like" in result[0].lower()
@@ -894,7 +894,7 @@ class TestPoisonedHistoryPrevention:
             LLMResponse(text=None, tool_calls=[_tc("run_command")]),
             LLMResponse(text="Logs deleted.", tool_calls=[]),
         ])
-        await LokiBot._process_with_tools(stub, msg, history)
+        await HeimdallBot._process_with_tools(stub, msg, history)
         # Verify separator is present telling not to repeat refusals
         first_msgs = stub.codex_client.chat_with_tools.call_args_list[0][1]["messages"]
         dev_msgs = [m for m in first_msgs if m.get("role") == "developer"]
@@ -947,7 +947,7 @@ class TestCrossLayerIntegration:
             return_value=("Status OK", False, False, ["run_command"], False),
         )
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
-            await LokiBot._handle_message_inner(stub, msg, "check status", "ch-1")
+            await HeimdallBot._handle_message_inner(stub, msg, "check status", "ch-1")
         # _process_with_tools should have been called with the abbreviated history
         call_args = stub._process_with_tools.call_args
         history_arg = call_args[0][1]  # second positional arg is history
@@ -961,7 +961,7 @@ class TestCrossLayerIntegration:
             return_value=("Disk OK", False, False, ["check_disk"], False),
         )
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
-            await LokiBot._handle_message_inner(stub, msg, "check disk", "ch-1")
+            await HeimdallBot._handle_message_inner(stub, msg, "check disk", "ch-1")
         stub.sessions.prune.assert_called()
         stub.sessions.save.assert_called()
 
@@ -976,7 +976,7 @@ class TestSessionDefenseSourceStructure:
     def test_context_separator_in_process_with_tools(self):
         """_process_with_tools should contain the context separator injection."""
         import inspect
-        src = inspect.getsource(LokiBot._process_with_tools)
+        src = inspect.getsource(HeimdallBot._process_with_tools)
         assert "CURRENT REQUEST" in src
         assert 'role": "developer"' in src or "role\": \"developer\"" in src
         assert "insert(-1" in src
@@ -984,14 +984,14 @@ class TestSessionDefenseSourceStructure:
     def test_selective_saving_in_handle_message_inner(self):
         """_handle_message_inner should have the tool-less check."""
         import inspect
-        src = inspect.getsource(LokiBot._handle_message_inner)
+        src = inspect.getsource(HeimdallBot._handle_message_inner)
         assert "not tools_used" in src
         assert "pollute" in src or "poisoning" in src
 
     def test_error_sanitization_in_handle_message_inner(self):
         """_handle_message_inner should sanitize errors before saving."""
         import inspect
-        src = inspect.getsource(LokiBot._handle_message_inner)
+        src = inspect.getsource(HeimdallBot._handle_message_inner)
         assert "sanitized" in src
         assert "error before tool execution" in src
 
@@ -1036,15 +1036,15 @@ class TestSessionDefenseSourceStructure:
     def test_bot_preamble_in_separator(self):
         """The context separator should include bot-specific preamble."""
         import inspect
-        src = inspect.getsource(LokiBot._process_with_tools)
+        src = inspect.getsource(HeimdallBot._process_with_tools)
         assert "ANOTHER BOT" in src
         assert "EXECUTE immediately" in src
 
     def test_five_defense_layers_present(self):
         """All 5 defense layers should be present in the codebase."""
         import inspect
-        client_src = inspect.getsource(LokiBot._process_with_tools)
-        inner_src = inspect.getsource(LokiBot._handle_message_inner)
+        client_src = inspect.getsource(HeimdallBot._process_with_tools)
+        inner_src = inspect.getsource(HeimdallBot._handle_message_inner)
         compact_src = inspect.getsource(SessionManager._compact)
         # 1. Context separator
         assert "CURRENT REQUEST" in client_src

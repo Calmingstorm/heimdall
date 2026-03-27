@@ -1,3 +1,3 @@
-from .client import LokiBot
+from .client import HeimdallBot
 
-__all__ = ["LokiBot"]
+__all__ = ["HeimdallBot"]

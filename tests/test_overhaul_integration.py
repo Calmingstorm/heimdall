@@ -1,4 +1,4 @@
-"""Cross-feature integration tests for the Loki Overhaul (Rounds 1-14).
+"""Cross-feature integration tests for the Heimdall Overhaul (Rounds 1-14).
 
 Covers: tool pack filtering with new tools, knowledge/session search
 with LocalEmbedder, FTS-only fallback mode, handler coverage,
@@ -446,13 +446,13 @@ class TestAllNewToolsHaveHandlers:
     def test_new_client_tools_have_handlers(self):
         """New client-side tools have handler methods on the bot class."""
         import src.discord.client as client_mod
-        bot_cls = client_mod.LokiBot
+        bot_cls = client_mod.HeimdallBot
 
         client_handled = {"add_reaction", "create_poll", "analyze_image", "generate_image"}
         for tool_name in client_handled:
             handler_name = f"_handle_{tool_name}"
             assert hasattr(bot_cls, handler_name), (
-                f"LokiBot missing handler '{handler_name}' for tool '{tool_name}'"
+                f"HeimdallBot missing handler '{handler_name}' for tool '{tool_name}'"
             )
 
     def test_new_executor_tools_have_handlers(self):
@@ -573,11 +573,11 @@ class TestProtectedCodeStillExists:
         import inspect
         from src.discord import client as client_mod
 
-        # Get the source of the LokiBot class
-        source = inspect.getsource(client_mod.LokiBot)
-        assert "detect_fabrication" in source, "detect_fabrication not used in LokiBot"
-        assert "detect_hedging" in source, "detect_hedging not used in LokiBot"
-        assert "detect_premature_failure" in source, "detect_premature_failure not used in LokiBot"
+        # Get the source of the HeimdallBot class
+        source = inspect.getsource(client_mod.HeimdallBot)
+        assert "detect_fabrication" in source, "detect_fabrication not used in HeimdallBot"
+        assert "detect_hedging" in source, "detect_hedging not used in HeimdallBot"
+        assert "detect_premature_failure" in source, "detect_premature_failure not used in HeimdallBot"
 
 
 # ---------------------------------------------------------------------------

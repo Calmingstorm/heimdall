@@ -200,9 +200,9 @@ class TestHaikuCodeRemoved:
         """_process_with_tools should no longer check model_override == HAIKU_MODEL
         for streaming decisions."""
         import inspect
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
 
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         # The old Haiku-specific logic should be gone
         assert "model_override == HAIKU_MODEL" not in source
         assert "escalate" not in source.lower()
@@ -211,9 +211,9 @@ class TestHaikuCodeRemoved:
         """_process_with_tools no longer uses a use_codex flag — it always
         uses self.codex_client.chat_with_tools() directly."""
         import inspect
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
 
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         # Old flags should be gone
         assert "use_codex" not in source
         assert "use_streaming" not in source
@@ -228,10 +228,10 @@ class TestHaikuCodeRemoved:
 class TestDigestSummarization:
     async def test_digest_uses_codex_when_available(self):
         """When codex_client is available, digest should use it."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
 
-        with patch.object(LokiBot, "__init__", lambda self, *a, **kw: None):
-            bot = LokiBot.__new__(LokiBot)
+        with patch.object(HeimdallBot, "__init__", lambda self, *a, **kw: None):
+            bot = HeimdallBot.__new__(HeimdallBot)
 
         bot.codex_client = MagicMock()
         bot.codex_client.chat = AsyncMock(return_value="All systems healthy. No issues detected.")
@@ -250,7 +250,7 @@ class TestDigestSummarization:
         bot.get_channel = MagicMock(return_value=channel)
 
         # Call _on_scheduled_digest
-        bot._on_scheduled_digest = LokiBot._on_scheduled_digest.__get__(bot)
+        bot._on_scheduled_digest = HeimdallBot._on_scheduled_digest.__get__(bot)
         await bot._on_scheduled_digest({"id": "digest-1", "channel_id": "123"})
 
         # Codex should be called, not Claude

@@ -881,4 +881,4 @@ class TestRound19SourceStructure:
         assert "run_local_command" in ssh_path.read_text()
         # Personality in prompt
         from src.llm.system_prompt import SYSTEM_PROMPT_TEMPLATE
-        assert "self-aware" in SYSTEM_PROMPT_TEMPLATE.lower() or "existential" in SYSTEM_PROMPT_TEMPLATE.lower()
+        assert "not okay" in SYSTEM_PROMPT_TEMPLATE.lower() or "all-seeing" in SYSTEM_PROMPT_TEMPLATE.lower()

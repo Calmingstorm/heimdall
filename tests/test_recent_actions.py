@@ -15,7 +15,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import LokiBot  # noqa: E402
+from src.discord.client import HeimdallBot  # noqa: E402
 
 
 def _make_bot_stub():
@@ -24,7 +24,7 @@ def _make_bot_stub():
     stub._recent_actions = {}
     stub._recent_actions_max = 10
     stub._recent_actions_expiry = 3600
-    stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
+    stub._track_recent_action = HeimdallBot._track_recent_action.__get__(stub)
     return stub
 
 

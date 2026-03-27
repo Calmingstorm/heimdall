@@ -231,9 +231,9 @@ class TestProcessWithToolsFallback:
         )
 
         # Minimal bot setup — _process_with_tools reads several attrs
-        from src.discord.client import LokiBot
-        with patch.object(LokiBot, "__init__", lambda self, *a, **kw: None):
-            bot = LokiBot.__new__(LokiBot)
+        from src.discord.client import HeimdallBot
+        with patch.object(HeimdallBot, "__init__", lambda self, *a, **kw: None):
+            bot = HeimdallBot.__new__(HeimdallBot)
 
         bot.codex_client = mock_codex
         bot._cancelled_tasks = set()

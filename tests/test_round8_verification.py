@@ -136,7 +136,7 @@ class TestChatPromptIntact:
 
     def test_chat_prompt_builds(self):
         prompt = build_chat_system_prompt()
-        assert "Loki" in prompt
+        assert "Heimdall" in prompt
 
     def test_chat_prompt_no_tools(self):
         """Chat prompt should not mention tool execution capabilities."""

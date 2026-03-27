@@ -2,7 +2,7 @@
 
 Checks:
 - routing.py deleted (resolve_claude_code_target, CLAUDE_CODE_DEFAULTS gone)
-- _init_routing_defaults removed from LokiBot
+- _init_routing_defaults removed from HeimdallBot
 - No imports of routing module anywhere in src/
 - Unused conftest mock_ssh fixture removed
 - Test files have clean imports (no unused patch/json/call)
@@ -48,15 +48,15 @@ class TestRoutingModuleRemoved:
 
 
 class TestInitRoutingDefaultsRemoved:
-    """_init_routing_defaults method should be gone from LokiBot."""
+    """_init_routing_defaults method should be gone from HeimdallBot."""
 
     def test_no_init_routing_defaults_in_client(self):
         source = Path("src/discord/client.py").read_text()
         assert "_init_routing_defaults" not in source
 
-    def test_lokibot_has_no_init_routing_defaults(self):
-        from src.discord.client import LokiBot
-        assert not hasattr(LokiBot, "_init_routing_defaults")
+    def test_heimdallbot_has_no_init_routing_defaults(self):
+        from src.discord.client import HeimdallBot
+        assert not hasattr(HeimdallBot, "_init_routing_defaults")
 
 
 class TestUnusedImportsCleanedUp:

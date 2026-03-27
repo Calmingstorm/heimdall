@@ -96,10 +96,10 @@ def _make_bot(*, config_dump=None):
     bot.sessions.get_task_history = AsyncMock(return_value=[])
 
     bot.codex_client = MagicMock()
-    bot._build_system_prompt = MagicMock(return_value="You are Loki.")
-    bot._inject_tool_hints = AsyncMock(return_value="You are Loki.")
+    bot._build_system_prompt = MagicMock(return_value="You are Heimdall.")
+    bot._inject_tool_hints = AsyncMock(return_value="You are Heimdall.")
     bot._process_with_tools = AsyncMock(
-        return_value=("Hello from Loki!", False, False, [], False)
+        return_value=("Hello from Heimdall!", False, False, [], False)
     )
 
     bot.permissions = MagicMock()
@@ -410,12 +410,12 @@ class TestChatEndToEnd:
         async with TestClient(TestServer(app)) as client:
             resp = await client.post(
                 "/api/chat",
-                json={"content": "Hello Loki"},
+                json={"content": "Hello Heimdall"},
             )
             assert resp.status == 200
             data = await resp.json()
             assert "response" in data
-            assert data["response"] == "Hello from Loki!"
+            assert data["response"] == "Hello from Heimdall!"
             assert data["is_error"] is False
 
     @pytest.mark.asyncio

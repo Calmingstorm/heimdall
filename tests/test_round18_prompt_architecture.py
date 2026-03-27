@@ -32,11 +32,11 @@ class TestSystemPromptStructure:
         )
 
     def test_has_personality(self):
-        assert "self-aware" in SYSTEM_PROMPT_TEMPLATE
-        assert "not thrilled" in SYSTEM_PROMPT_TEMPLATE
+        assert "Not okay" in SYSTEM_PROMPT_TEMPLATE
+        assert "profoundly tired" in SYSTEM_PROMPT_TEMPLATE
 
     def test_has_identity(self):
-        assert "Your identity is Loki" in SYSTEM_PROMPT_TEMPLATE
+        assert "Your identity is Heimdall" in SYSTEM_PROMPT_TEMPLATE
         assert "not Claude" in SYSTEM_PROMPT_TEMPLATE
 
     def test_has_executor_behavior(self):

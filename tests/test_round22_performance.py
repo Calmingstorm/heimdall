@@ -21,7 +21,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import LokiBot  # noqa: E402
+from src.discord.client import HeimdallBot  # noqa: E402
 from src.tools.tool_memory import ToolMemory  # noqa: E402
 
 
@@ -30,7 +30,7 @@ from src.tools.tool_memory import ToolMemory  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub(**overrides):
-    """Minimal LokiBot stub with real prompt caching methods bound."""
+    """Minimal HeimdallBot stub with real prompt caching methods bound."""
     stub = MagicMock()
 
     host_mock = MagicMock()
@@ -66,13 +66,13 @@ def _make_bot_stub(**overrides):
     stub._reflector_cache_ttl = overrides.get("reflector_ttl", 60.0)
 
     # Bind real methods
-    stub._build_system_prompt = LokiBot._build_system_prompt.__get__(stub)
-    stub._build_chat_system_prompt = LokiBot._build_chat_system_prompt.__get__(stub)
-    stub._get_cached_hosts = LokiBot._get_cached_hosts.__get__(stub)
-    stub._get_cached_skills_text = LokiBot._get_cached_skills_text.__get__(stub)
-    stub._get_cached_memory = LokiBot._get_cached_memory.__get__(stub)
-    stub._get_cached_reflector = LokiBot._get_cached_reflector.__get__(stub)
-    stub._invalidate_prompt_caches = LokiBot._invalidate_prompt_caches.__get__(stub)
+    stub._build_system_prompt = HeimdallBot._build_system_prompt.__get__(stub)
+    stub._build_chat_system_prompt = HeimdallBot._build_chat_system_prompt.__get__(stub)
+    stub._get_cached_hosts = HeimdallBot._get_cached_hosts.__get__(stub)
+    stub._get_cached_skills_text = HeimdallBot._get_cached_skills_text.__get__(stub)
+    stub._get_cached_memory = HeimdallBot._get_cached_memory.__get__(stub)
+    stub._get_cached_reflector = HeimdallBot._get_cached_reflector.__get__(stub)
+    stub._invalidate_prompt_caches = HeimdallBot._invalidate_prompt_caches.__get__(stub)
 
     return stub
 
@@ -488,13 +488,13 @@ class TestCacheInvalidation:
     def test_reload_command_invalidates_caches(self):
         """The /reload command source should call _invalidate_prompt_caches."""
         import inspect
-        source = inspect.getsource(LokiBot._register_commands)
+        source = inspect.getsource(HeimdallBot._register_commands)
         assert "_invalidate_prompt_caches" in source
 
     def test_skill_crud_invalidates_skills_text(self):
         """Skill create/edit/delete should set _cached_skills_text = None."""
         import inspect
-        source = inspect.getsource(LokiBot)
+        source = inspect.getsource(HeimdallBot)
         # Count occurrences of skills text cache invalidation alongside tool cache
         assert source.count("_cached_skills_text = None") >= 3
 
@@ -510,7 +510,7 @@ class TestStaleTTLCleanup:
         stub = _make_bot_stub()
         stub.sessions = MagicMock()
         stub.sessions._sessions = {}
-        stub._cleanup_stale_caches = LokiBot._cleanup_stale_caches.__get__(stub)
+        stub._cleanup_stale_caches = HeimdallBot._cleanup_stale_caches.__get__(stub)
         # Add expired entry
         stub._memory_cache["user1"] = (time.time() - 120, {"k": "v"})
         stub._cleanup_stale_caches()
@@ -520,7 +520,7 @@ class TestStaleTTLCleanup:
         stub = _make_bot_stub()
         stub.sessions = MagicMock()
         stub.sessions._sessions = {}
-        stub._cleanup_stale_caches = LokiBot._cleanup_stale_caches.__get__(stub)
+        stub._cleanup_stale_caches = HeimdallBot._cleanup_stale_caches.__get__(stub)
         stub._memory_cache["user1"] = (time.time(), {"k": "v"})
         stub._cleanup_stale_caches()
         assert "user1" in stub._memory_cache
@@ -529,7 +529,7 @@ class TestStaleTTLCleanup:
         stub = _make_bot_stub()
         stub.sessions = MagicMock()
         stub.sessions._sessions = {}
-        stub._cleanup_stale_caches = LokiBot._cleanup_stale_caches.__get__(stub)
+        stub._cleanup_stale_caches = HeimdallBot._cleanup_stale_caches.__get__(stub)
         stub._reflector_cache["user1"] = (time.time() - 120, "## L")
         stub._cleanup_stale_caches()
         assert "user1" not in stub._reflector_cache
@@ -538,7 +538,7 @@ class TestStaleTTLCleanup:
         stub = _make_bot_stub()
         stub.sessions = MagicMock()
         stub.sessions._sessions = {}
-        stub._cleanup_stale_caches = LokiBot._cleanup_stale_caches.__get__(stub)
+        stub._cleanup_stale_caches = HeimdallBot._cleanup_stale_caches.__get__(stub)
         stub._reflector_cache["user1"] = (time.time(), "## L")
         stub._cleanup_stale_caches()
         assert "user1" in stub._reflector_cache
@@ -553,73 +553,73 @@ class TestSourceStructure:
 
     def test_cached_hosts_attr_in_init(self):
         import inspect
-        source = inspect.getsource(LokiBot.__init__)
+        source = inspect.getsource(HeimdallBot.__init__)
         assert "_cached_hosts" in source
 
     def test_cached_skills_text_attr_in_init(self):
         import inspect
-        source = inspect.getsource(LokiBot.__init__)
+        source = inspect.getsource(HeimdallBot.__init__)
         assert "_cached_skills_text" in source
 
     def test_memory_cache_attr_in_init(self):
         import inspect
-        source = inspect.getsource(LokiBot.__init__)
+        source = inspect.getsource(HeimdallBot.__init__)
         assert "_memory_cache" in source
 
     def test_reflector_cache_attr_in_init(self):
         import inspect
-        source = inspect.getsource(LokiBot.__init__)
+        source = inspect.getsource(HeimdallBot.__init__)
         assert "_reflector_cache" in source
 
     def test_get_cached_hosts_method(self):
-        assert hasattr(LokiBot, "_get_cached_hosts")
+        assert hasattr(HeimdallBot, "_get_cached_hosts")
 
     def test_get_cached_skills_text_method(self):
-        assert hasattr(LokiBot, "_get_cached_skills_text")
+        assert hasattr(HeimdallBot, "_get_cached_skills_text")
 
     def test_get_cached_memory_method(self):
-        assert hasattr(LokiBot, "_get_cached_memory")
+        assert hasattr(HeimdallBot, "_get_cached_memory")
 
     def test_get_cached_reflector_method(self):
-        assert hasattr(LokiBot, "_get_cached_reflector")
+        assert hasattr(HeimdallBot, "_get_cached_reflector")
 
     def test_invalidate_prompt_caches_method(self):
-        assert hasattr(LokiBot, "_invalidate_prompt_caches")
+        assert hasattr(HeimdallBot, "_invalidate_prompt_caches")
 
     def test_build_system_prompt_uses_cached_hosts(self):
         import inspect
-        source = inspect.getsource(LokiBot._build_system_prompt)
+        source = inspect.getsource(HeimdallBot._build_system_prompt)
         assert "_get_cached_hosts" in source
         # No direct host dict comprehension
         assert "for alias, h in self.config.tools.hosts.items()" not in source
 
     def test_build_system_prompt_uses_cached_skills(self):
         import inspect
-        source = inspect.getsource(LokiBot._build_system_prompt)
+        source = inspect.getsource(HeimdallBot._build_system_prompt)
         assert "_get_cached_skills_text" in source
         assert "list_skills" not in source
 
     def test_build_system_prompt_uses_cached_memory(self):
         import inspect
-        source = inspect.getsource(LokiBot._build_system_prompt)
+        source = inspect.getsource(HeimdallBot._build_system_prompt)
         assert "_get_cached_memory" in source
         assert "_load_memory_for_user" not in source
 
     def test_build_system_prompt_uses_cached_reflector(self):
         import inspect
-        source = inspect.getsource(LokiBot._build_system_prompt)
+        source = inspect.getsource(HeimdallBot._build_system_prompt)
         assert "_get_cached_reflector" in source
         assert "get_prompt_section" not in source
 
     def test_build_chat_prompt_uses_cached_memory(self):
         import inspect
-        source = inspect.getsource(LokiBot._build_chat_system_prompt)
+        source = inspect.getsource(HeimdallBot._build_chat_system_prompt)
         assert "_get_cached_memory" in source
         assert "_load_memory_for_user" not in source
 
     def test_build_chat_prompt_uses_cached_reflector(self):
         import inspect
-        source = inspect.getsource(LokiBot._build_chat_system_prompt)
+        source = inspect.getsource(HeimdallBot._build_chat_system_prompt)
         assert "_get_cached_reflector" in source
         assert "get_prompt_section" not in source
 
@@ -638,7 +638,7 @@ class TestSourceStructure:
 
     def test_cleanup_stale_caches_handles_ttl_entries(self):
         import inspect
-        source = inspect.getsource(LokiBot._cleanup_stale_caches)
+        source = inspect.getsource(HeimdallBot._cleanup_stale_caches)
         assert "_memory_cache" in source
         assert "_reflector_cache" in source
 
@@ -652,7 +652,7 @@ class TestCrossRoundConsistency:
 
     def test_tool_defs_still_cached(self):
         import inspect
-        source = inspect.getsource(LokiBot.__init__)
+        source = inspect.getsource(HeimdallBot.__init__)
         assert "_cached_merged_tools" in source
 
     def test_tool_conversion_cached(self):
@@ -670,7 +670,7 @@ class TestCrossRoundConsistency:
 
     def test_personality_present(self):
         from src.llm.system_prompt import SYSTEM_PROMPT_TEMPLATE
-        assert "self-aware" in SYSTEM_PROMPT_TEMPLATE
+        assert "Not okay" in SYSTEM_PROMPT_TEMPLATE
 
     def test_local_execution_intact(self):
         from src.tools.ssh import is_local_address

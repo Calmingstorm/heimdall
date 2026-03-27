@@ -17,7 +17,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import LokiBot  # noqa: E402
+from src.discord.client import HeimdallBot  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
@@ -26,7 +26,7 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Create a minimal LokiBot stub with all required attributes."""
+    """Create a minimal HeimdallBot stub with all required attributes."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -141,7 +141,7 @@ class TestMultiTurnToolLoop:
             "Total: 16G  Used: 9.6G  Free: 6.4G",
             "CPU: 15% idle",
         ])
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -180,7 +180,7 @@ class TestMultiTurnToolLoop:
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=capture_chat)
         stub.tool_executor.execute = AsyncMock(return_value="ok")
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -215,7 +215,7 @@ class TestMultiTurnToolLoop:
             LLMResponse(text="All systems healthy.", tool_calls=[], stop_reason="end_turn"),
         ])
         stub.tool_executor.execute = AsyncMock(return_value="ok")
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -239,7 +239,7 @@ class TestTaskRouteErrorHandling:
         stub = _make_bot_stub()
 
         stub._process_with_tools = AsyncMock(side_effect=RuntimeError("Codex API error"))
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "check disk on server", "chan-1")
@@ -254,7 +254,7 @@ class TestTaskRouteErrorHandling:
         stub = _make_bot_stub()
 
         stub._process_with_tools = AsyncMock(side_effect=RuntimeError("Codex API error"))
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -279,7 +279,7 @@ class TestEndToEndRouting:
         stub._process_with_tools = AsyncMock(
             return_value=("Disk is 42% full on server.", False, False, ["check_disk"], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "check disk on server", "chan-1")
@@ -295,7 +295,7 @@ class TestEndToEndRouting:
         stub._process_with_tools = AsyncMock(
             return_value=("Hello! How can I help you today?", False, False, [], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "hello", "chan-1")
@@ -314,7 +314,7 @@ class TestEndToEndRouting:
             return ("Disk checked.", False, False, ["check_disk"], False)
 
         stub._process_with_tools = mock_process
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -329,7 +329,7 @@ class TestEndToEndRouting:
         stub._process_with_tools = AsyncMock(
             return_value=("Here's the result.", False, False, ["some_tool"], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "ambiguous message", "chan-1")
@@ -448,7 +448,7 @@ class TestToolLoopEdgeCases:
             ),
         ])
         stub.tool_executor.execute = AsyncMock(side_effect=Exception("SSH connection refused"))
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -468,7 +468,7 @@ class TestToolLoopEdgeCases:
         stub.codex_client.chat_with_tools = AsyncMock(
             return_value=LLMResponse(text="", tool_calls=[], stop_reason="end_turn")
         )
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         text, _, _, _, _ = await stub._process_with_tools(
             msg, [], system_prompt_override="test",
@@ -492,7 +492,7 @@ class TestToolLoopEdgeCases:
             LLMResponse(text="Disk is 42% full.", tool_calls=[], stop_reason="end_turn"),
         ])
         stub.tool_executor.execute = AsyncMock(return_value="50G total, 21G used")
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
@@ -507,7 +507,7 @@ class TestToolLoopEdgeCases:
         """When Codex is not available, error is returned."""
         stub = _make_bot_stub()
         stub.codex_client = None
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "check disk", "chan-1")
@@ -529,7 +529,7 @@ class TestImageBlocksRouting:
         stub._process_with_tools = AsyncMock(
             return_value=("I can see the image.", False, False, [], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         image_blocks = [{"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}}]

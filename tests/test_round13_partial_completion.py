@@ -15,7 +15,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import LokiBot, MAX_TOOL_ITERATIONS  # noqa: E402
+from src.discord.client import HeimdallBot, MAX_TOOL_ITERATIONS  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
@@ -24,7 +24,7 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Minimal LokiBot stub for partial completion tests."""
+    """Minimal HeimdallBot stub for partial completion tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -55,8 +55,8 @@ def _make_bot_stub():
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
-    stub._build_partial_completion_report = LokiBot._build_partial_completion_report
+    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
+    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
     return stub
 
 
@@ -85,21 +85,21 @@ class TestBuildPartialCompletionReport:
     """Unit tests for the static _build_partial_completion_report method."""
 
     def test_empty_steps_returns_empty(self):
-        result = LokiBot._build_partial_completion_report([])
+        result = HeimdallBot._build_partial_completion_report([])
         assert result == ""
 
     def test_no_done_steps_returns_empty(self):
         steps = [
             {"tools": ["run_command"], "status": "running", "reasoning": None},
         ]
-        result = LokiBot._build_partial_completion_report(steps)
+        result = HeimdallBot._build_partial_completion_report(steps)
         assert result == ""
 
     def test_one_done_step(self):
         steps = [
             {"tools": ["check_disk"], "status": "done", "elapsed_ms": 1200, "reasoning": None},
         ]
-        result = LokiBot._build_partial_completion_report(steps)
+        result = HeimdallBot._build_partial_completion_report(steps)
         assert "**Partial completion (1/1 steps):**" in result
         assert "`check_disk`" in result
         assert "1.2s" in result
@@ -110,7 +110,7 @@ class TestBuildPartialCompletionReport:
             {"tools": ["run_command"], "status": "done", "elapsed_ms": 3400, "reasoning": None},
             {"tools": ["restart_service"], "status": "running", "reasoning": None},
         ]
-        result = LokiBot._build_partial_completion_report(steps)
+        result = HeimdallBot._build_partial_completion_report(steps)
         assert "**Partial completion (2/3 steps):**" in result
         assert "`check_disk`" in result
         assert "1.2s" in result
@@ -123,7 +123,7 @@ class TestBuildPartialCompletionReport:
         steps = [
             {"tools": ["check_disk", "check_memory"], "status": "done", "elapsed_ms": 2000, "reasoning": None},
         ]
-        result = LokiBot._build_partial_completion_report(steps)
+        result = HeimdallBot._build_partial_completion_report(steps)
         assert "`check_disk`" in result
         assert "`check_memory`" in result
 
@@ -131,14 +131,14 @@ class TestBuildPartialCompletionReport:
         steps = [
             {"tools": ["check_disk"], "status": "done", "reasoning": None},
         ]
-        result = LokiBot._build_partial_completion_report(steps)
+        result = HeimdallBot._build_partial_completion_report(steps)
         assert "0.0s" in result
 
     def test_checkmark_in_report(self):
         steps = [
             {"tools": ["run_command"], "status": "done", "elapsed_ms": 500, "reasoning": None},
         ]
-        result = LokiBot._build_partial_completion_report(steps)
+        result = HeimdallBot._build_partial_completion_report(steps)
         assert "\u2713" in result  # ✓ checkmark
 
 
@@ -164,7 +164,7 @@ class TestPartialCompletionOnApiError:
             ConnectionError("API unreachable"),
         ])
 
-        result, _, is_error, tools_used, _ = await LokiBot._process_with_tools(
+        result, _, is_error, tools_used, _ = await HeimdallBot._process_with_tools(
             stub, msg, [],
         )
 
@@ -183,7 +183,7 @@ class TestPartialCompletionOnApiError:
             side_effect=ConnectionError("API unreachable"),
         )
 
-        result, _, is_error, _, _ = await LokiBot._process_with_tools(
+        result, _, is_error, _, _ = await HeimdallBot._process_with_tools(
             stub, msg, [],
         )
 
@@ -207,7 +207,7 @@ class TestPartialCompletionOnApiError:
             RuntimeError("Server error"),
         ])
 
-        result, _, is_error, _, _ = await LokiBot._process_with_tools(
+        result, _, is_error, _, _ = await HeimdallBot._process_with_tools(
             stub, msg, [],
         )
 
@@ -238,7 +238,7 @@ class TestPartialCompletionOnMaxIterations:
             text="", tool_calls=[ToolCall(id="t1", name="run_command", input={})],
         ))
 
-        result, _, is_error, tools_used, _ = await LokiBot._process_with_tools(
+        result, _, is_error, tools_used, _ = await HeimdallBot._process_with_tools(
             stub, msg, [],
         )
 
@@ -270,7 +270,7 @@ class TestPartialCompletionOnMaxIterations:
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=alternating_tools)
 
-        result, _, is_error, _, _ = await LokiBot._process_with_tools(
+        result, _, is_error, _, _ = await HeimdallBot._process_with_tools(
             stub, msg, [],
         )
 
@@ -299,7 +299,7 @@ class TestNoReportOnSuccess:
             LLMResponse(text="All disks are healthy!", tool_calls=[]),
         ])
 
-        result, _, is_error, _, _ = await LokiBot._process_with_tools(
+        result, _, is_error, _, _ = await HeimdallBot._process_with_tools(
             stub, msg, [],
         )
 

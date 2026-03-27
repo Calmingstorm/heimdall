@@ -18,7 +18,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 import discord  # noqa: E402
 import pytest  # noqa: E402
 
-from src.discord.client import LokiBot  # noqa: E402
+from src.discord.client import HeimdallBot  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
@@ -27,7 +27,7 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Minimal LokiBot stub with embed support."""
+    """Minimal HeimdallBot stub with embed support."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -57,7 +57,7 @@ def _make_bot_stub():
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
+    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
     return stub
 
 
@@ -90,14 +90,14 @@ class TestBuildToolProgressEmbed:
     def test_running_step_shows_arrow(self):
         """Running steps show a right-arrow marker."""
         steps = [{"tools": ["check_disk"], "reasoning": None, "status": "running"}]
-        embed = LokiBot._build_tool_progress_embed(steps, "running")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "running")
         assert "\u25b6 Step 1:" in embed.description  # ► arrow
         assert "`check_disk`" in embed.description
 
     def test_done_step_shows_checkmark(self):
         """Completed steps show a checkmark with elapsed time."""
         steps = [{"tools": ["check_disk"], "reasoning": None, "status": "done", "elapsed_ms": 1500}]
-        embed = LokiBot._build_tool_progress_embed(steps, "running")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "running")
         assert "\u2713 Step 1:" in embed.description  # ✓ checkmark
         assert "(1.5s)" in embed.description
 
@@ -107,7 +107,7 @@ class TestBuildToolProgressEmbed:
             {"tools": ["check_disk"], "reasoning": None, "status": "done", "elapsed_ms": 1000},
             {"tools": ["restart_service"], "reasoning": None, "status": "running"},
         ]
-        embed = LokiBot._build_tool_progress_embed(steps, "running")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "running")
         assert "Step 1:" in embed.description
         assert "Step 2:" in embed.description
         assert "`check_disk`" in embed.description
@@ -116,42 +116,42 @@ class TestBuildToolProgressEmbed:
     def test_multiple_tools_in_one_step(self):
         """A step with multiple concurrent tools lists all names."""
         steps = [{"tools": ["check_disk", "check_memory"], "reasoning": None, "status": "running"}]
-        embed = LokiBot._build_tool_progress_embed(steps, "running")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "running")
         assert "`check_disk`, `check_memory`" in embed.description
 
     def test_reasoning_shown_for_running_step(self):
         """Reasoning text appears in italics when the latest step is running."""
         steps = [{"tools": ["check_disk"], "reasoning": "I'll check the disk.", "status": "running"}]
-        embed = LokiBot._build_tool_progress_embed(steps, "running")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "running")
         assert "*I'll check the disk.*" in embed.description
 
     def test_reasoning_not_shown_for_done_step(self):
         """Reasoning text is NOT shown when the latest step is done."""
         steps = [{"tools": ["check_disk"], "reasoning": "I'll check the disk.", "status": "done", "elapsed_ms": 500}]
-        embed = LokiBot._build_tool_progress_embed(steps, "running")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "running")
         assert "*I'll check the disk.*" not in embed.description
 
     def test_running_color_blue(self):
         """Running status uses blue color."""
         steps = [{"tools": ["check_disk"], "reasoning": None, "status": "running"}]
-        embed = LokiBot._build_tool_progress_embed(steps, "running")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "running")
         assert embed.color == discord.Color.blue()
 
     def test_complete_color_green(self):
         """Complete status uses green color."""
         steps = [{"tools": ["check_disk"], "reasoning": None, "status": "done", "elapsed_ms": 100}]
-        embed = LokiBot._build_tool_progress_embed(steps, "complete")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "complete")
         assert embed.color == discord.Color.green()
 
     def test_error_color_red(self):
         """Error status uses red color."""
         steps = [{"tools": ["check_disk"], "reasoning": None, "status": "running"}]
-        embed = LokiBot._build_tool_progress_embed(steps, "error")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "error")
         assert embed.color == discord.Color.red()
 
     def test_empty_steps_shows_starting(self):
         """Empty steps list shows 'Starting...'."""
-        embed = LokiBot._build_tool_progress_embed([], "running")
+        embed = HeimdallBot._build_tool_progress_embed([], "running")
         assert embed.description == "Starting..."
 
     def test_description_truncated_over_4000(self):
@@ -161,7 +161,7 @@ class TestBuildToolProgressEmbed:
             {"tools": [f"tool_{i}"], "reasoning": None, "status": "done", "elapsed_ms": 100}
             for i in range(500)
         ]
-        embed = LokiBot._build_tool_progress_embed(steps, "running")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "running")
         assert len(embed.description) <= 4020  # 4000 + truncation marker
 
 
@@ -181,7 +181,7 @@ class TestProgressEmbedLifecycle:
             LLMResponse(text="", tool_calls=[ToolCall(id="tc-1", name="check_disk", input={})], stop_reason="tool_use"),
             LLMResponse(text="Done.", tool_calls=[], stop_reason="end_turn"),
         ])
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         await stub._process_with_tools(msg, [])
 
@@ -199,7 +199,7 @@ class TestProgressEmbedLifecycle:
             LLMResponse(text="", tool_calls=[ToolCall(id="tc-1", name="check_disk", input={})], stop_reason="tool_use"),
             LLMResponse(text="Done.", tool_calls=[], stop_reason="end_turn"),
         ])
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         await stub._process_with_tools(msg, [])
 
@@ -216,7 +216,7 @@ class TestProgressEmbedLifecycle:
             LLMResponse(text="", tool_calls=[ToolCall(id="tc-1", name="check_disk", input={})], stop_reason="tool_use"),
             LLMResponse(text="Done.", tool_calls=[], stop_reason="end_turn"),
         ])
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         await stub._process_with_tools(msg, [])
 
@@ -239,7 +239,7 @@ class TestProgressEmbedLifecycle:
                 stop_reason="tool_use",
             )
         )
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         text, _, is_error, _, _ = await stub._process_with_tools(msg, [])
 
@@ -260,7 +260,7 @@ class TestProgressEmbedLifecycle:
             LLMResponse(text="", tool_calls=[ToolCall(id="tc-2", name="check_disk", input={})], stop_reason="tool_use"),
             LLMResponse(text="Done.", tool_calls=[], stop_reason="end_turn"),
         ])
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         await stub._process_with_tools(msg, [])
 
@@ -278,7 +278,7 @@ class TestProgressEmbedLifecycle:
         stub.codex_client.chat_with_tools = AsyncMock(
             return_value=LLMResponse(text="Hello!", tool_calls=[], stop_reason="end_turn")
         )
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         text, _, _, _, _ = await stub._process_with_tools(msg, [])
 
@@ -295,7 +295,7 @@ class TestProgressEmbedLifecycle:
             LLMResponse(text="", tool_calls=[ToolCall(id="tc-1", name="check_disk", input={})], stop_reason="tool_use"),
             LLMResponse(text="Done.", tool_calls=[], stop_reason="end_turn"),
         ])
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         await stub._process_with_tools(msg, [])
 
@@ -322,7 +322,7 @@ class TestProgressEmbedLifecycle:
             LLMResponse(text="", tool_calls=[ToolCall(id="tc-1", name="check_disk", input={})], stop_reason="tool_use"),
             LLMResponse(text="Done.", tool_calls=[], stop_reason="end_turn"),
         ])
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         text, _, _, tools, _ = await stub._process_with_tools(msg, [])
 

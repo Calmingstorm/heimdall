@@ -19,12 +19,12 @@ import discord
 
 def _make_bot():
     """Create a minimal mock bot with the relevant handler methods."""
-    from src.discord.client import LokiBot
-    bot = MagicMock(spec=LokiBot)
+    from src.discord.client import HeimdallBot
+    bot = MagicMock(spec=HeimdallBot)
     # Bind real async methods from the class
-    bot._handle_add_reaction = LokiBot._handle_add_reaction.__get__(bot, LokiBot)
-    bot._handle_create_poll = LokiBot._handle_create_poll.__get__(bot, LokiBot)
-    bot._handle_broadcast = LokiBot._handle_broadcast.__get__(bot, LokiBot)
+    bot._handle_add_reaction = HeimdallBot._handle_add_reaction.__get__(bot, HeimdallBot)
+    bot._handle_create_poll = HeimdallBot._handle_create_poll.__get__(bot, HeimdallBot)
+    bot._handle_broadcast = HeimdallBot._handle_broadcast.__get__(bot, HeimdallBot)
     return bot
 
 

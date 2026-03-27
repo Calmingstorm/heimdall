@@ -16,7 +16,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import LokiBot, MAX_TOOL_ITERATIONS  # noqa: E402
+from src.discord.client import HeimdallBot, MAX_TOOL_ITERATIONS  # noqa: E402
 from src.llm.circuit_breaker import CircuitOpenError  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
@@ -26,7 +26,7 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Minimal LokiBot stub for circuit breaker recovery tests."""
+    """Minimal HeimdallBot stub for circuit breaker recovery tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -57,8 +57,8 @@ def _make_bot_stub():
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
-    stub._build_partial_completion_report = LokiBot._build_partial_completion_report
+    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
+    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
     return stub
 
 
@@ -90,21 +90,21 @@ class TestProgressEmbedFooter:
         steps = [
             {"tools": ["check_disk"], "status": "done", "elapsed_ms": 1200, "reasoning": None},
         ]
-        embed = LokiBot._build_tool_progress_embed(steps, "running", footer="Waiting for recovery...")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "running", footer="Waiting for recovery...")
         assert "Waiting for recovery..." in embed.description
 
     def test_no_footer_by_default(self):
         steps = [
             {"tools": ["check_disk"], "status": "done", "elapsed_ms": 1200, "reasoning": None},
         ]
-        embed = LokiBot._build_tool_progress_embed(steps, "running")
+        embed = HeimdallBot._build_tool_progress_embed(steps, "running")
         assert "Waiting" not in embed.description
 
     def test_footer_with_none(self):
         steps = [
             {"tools": ["check_disk"], "status": "done", "elapsed_ms": 1200, "reasoning": None},
         ]
-        embed = LokiBot._build_tool_progress_embed(steps, "running", footer=None)
+        embed = HeimdallBot._build_tool_progress_embed(steps, "running", footer=None)
         # Should be same as no footer
         assert "recovery" not in embed.description.lower()
 
@@ -132,7 +132,7 @@ class TestCircuitBreakerRecoverySuccess:
         )
 
         with patch("src.discord.client.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-            text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+            text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
                 stub, msg, [{"role": "user", "content": "check disk"}]
             )
 
@@ -165,7 +165,7 @@ class TestCircuitBreakerRecoverySuccess:
         )
 
         with patch("src.discord.client.asyncio.sleep", new_callable=AsyncMock):
-            text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+            text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
                 stub, msg, [{"role": "user", "content": "check disk"}]
             )
 
@@ -191,7 +191,7 @@ class TestCircuitBreakerRecoveryFailure:
         )
 
         with patch("src.discord.client.asyncio.sleep", new_callable=AsyncMock):
-            text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+            text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
                 stub, msg, [{"role": "user", "content": "check disk"}]
             )
 
@@ -221,7 +221,7 @@ class TestCircuitBreakerRecoveryFailure:
         )
 
         with patch("src.discord.client.asyncio.sleep", new_callable=AsyncMock):
-            text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+            text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
                 stub, msg, [{"role": "user", "content": "check all disks"}]
             )
 
@@ -245,7 +245,7 @@ class TestCircuitBreakerRecoveryFailure:
         )
 
         with patch("src.discord.client.asyncio.sleep", new_callable=AsyncMock):
-            text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+            text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
                 stub, msg, [{"role": "user", "content": "check disk"}]
             )
 
@@ -270,7 +270,7 @@ class TestCircuitBreakerWaitCap:
         )
 
         with patch("src.discord.client.asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
-            text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+            text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
                 stub, msg, [{"role": "user", "content": "check disk"}]
             )
 
@@ -307,7 +307,7 @@ class TestCircuitBreakerEmbedUpdates:
         msg.channel.send = AsyncMock(return_value=embed_msg)
 
         with patch("src.discord.client.asyncio.sleep", new_callable=AsyncMock):
-            text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+            text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
                 stub, msg, [{"role": "user", "content": "check disk"}]
             )
 
@@ -348,7 +348,7 @@ class TestCircuitBreakerEmbedUpdates:
         msg.channel.send = AsyncMock(return_value=embed_msg)
 
         with patch("src.discord.client.asyncio.sleep", new_callable=AsyncMock):
-            text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+            text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
                 stub, msg, [{"role": "user", "content": "check disk"}]
             )
 
@@ -374,7 +374,7 @@ class TestCircuitBreakerNoRegression:
             side_effect=RuntimeError("Connection refused")
         )
 
-        text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+        text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "check disk"}]
         )
 

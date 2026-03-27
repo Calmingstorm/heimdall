@@ -1,6 +1,6 @@
 """Tests for bot interop improvements (Round 7).
 
-When Loki receives messages from other bots:
+When Heimdall receives messages from other bots:
 1. A bot-specific preamble is injected into the context separator telling Codex
    to execute immediately and never hedge.
 2. detect_hedging() catches phrases like "shall I", "if you want" that bots
@@ -18,7 +18,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
-    LokiBot,
+    HeimdallBot,
     detect_hedging,
     _HEDGING_RETRY_MSG,
     _HEDGING_PATTERNS,
@@ -32,7 +32,7 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
 def _make_bot_stub(respond_to_bots=False):
-    """Minimal LokiBot stub for bot interop tests."""
+    """Minimal HeimdallBot stub for bot interop tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -64,8 +64,8 @@ def _make_bot_stub(respond_to_bots=False):
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
-    stub._build_partial_completion_report = LokiBot._build_partial_completion_report
+    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
+    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
     return stub
 
 
@@ -234,7 +234,7 @@ class TestBotPreambleInjection:
 
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=mock_chat)
 
-        await LokiBot._process_with_tools(
+        await HeimdallBot._process_with_tools(
             bot, msg,
             [
                 {"role": "user", "content": "old message"},
@@ -265,7 +265,7 @@ class TestBotPreambleInjection:
 
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=mock_chat)
 
-        await LokiBot._process_with_tools(
+        await HeimdallBot._process_with_tools(
             bot, msg,
             [
                 {"role": "user", "content": "old message"},
@@ -294,7 +294,7 @@ class TestBotPreambleInjection:
 
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=mock_chat)
 
-        await LokiBot._process_with_tools(
+        await HeimdallBot._process_with_tools(
             bot, msg,
             [
                 {"role": "user", "content": "old msg"},
@@ -321,7 +321,7 @@ class TestBotPreambleInjection:
 
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=mock_chat)
 
-        await LokiBot._process_with_tools(
+        await HeimdallBot._process_with_tools(
             bot, msg,
             [
                 {"role": "user", "content": "old msg"},
@@ -374,7 +374,7 @@ class TestHedgingRetry:
 
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=mock_chat)
 
-        text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+        text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "check disk on server1"}],
         )
 
@@ -394,7 +394,7 @@ class TestHedgingRetry:
             stop_reason="end_turn",
         ))
 
-        text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+        text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "check disk"}],
         )
 
@@ -428,7 +428,7 @@ class TestHedgingRetry:
 
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=mock_chat)
 
-        text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+        text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "check disk"}],
         )
 
@@ -462,7 +462,7 @@ class TestHedgingRetry:
 
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=mock_chat)
 
-        await LokiBot._process_with_tools(
+        await HeimdallBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "check disk"}],
         )
 
@@ -499,7 +499,7 @@ class TestHedgingRetry:
 
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=mock_chat)
 
-        text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+        text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "check disk"}],
         )
 
@@ -574,7 +574,7 @@ class TestHedgingFabricationInteraction:
 
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=extended_mock)
 
-        text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+        text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "check disk"}],
         )
 
@@ -620,7 +620,7 @@ class TestHedgingFabricationInteraction:
 
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=ext)
 
-        text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+        text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "check disk"}],
         )
 

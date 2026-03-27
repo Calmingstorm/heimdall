@@ -34,7 +34,7 @@ import pytest  # noqa: E402
 import discord  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
-    LokiBot,
+    HeimdallBot,
     scrub_response_secrets,
     truncate_tool_output,
     DISCORD_MAX_LEN,
@@ -48,7 +48,7 @@ from src.discord.client import (  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub(**overrides):
-    """Create a minimal LokiBot stub for method-level tests.
+    """Create a minimal HeimdallBot stub for method-level tests.
 
     Follows the pattern from test_chat_path_optimization.py.
     """
@@ -224,95 +224,95 @@ class TestTruncateToolOutput:
 
 
 class TestDetectImageType:
-    """Tests for LokiBot._detect_image_type."""
+    """Tests for HeimdallBot._detect_image_type."""
 
     def test_png(self):
         """Should detect PNG from magic bytes."""
         data = b"\x89PNG\r\n\x1a\n" + b"\x00" * 10
-        assert LokiBot._detect_image_type(data) == "image/png"
+        assert HeimdallBot._detect_image_type(data) == "image/png"
 
     def test_jpeg(self):
         """Should detect JPEG from magic bytes."""
         data = b"\xff\xd8\xff\xe0" + b"\x00" * 10
-        assert LokiBot._detect_image_type(data) == "image/jpeg"
+        assert HeimdallBot._detect_image_type(data) == "image/jpeg"
 
     def test_gif(self):
         """Should detect GIF from magic bytes."""
         data = b"GIF89a" + b"\x00" * 10
-        assert LokiBot._detect_image_type(data) == "image/gif"
+        assert HeimdallBot._detect_image_type(data) == "image/gif"
 
     def test_webp(self):
         """Should detect WebP from magic bytes."""
         data = b"RIFF\x00\x00\x00\x00WEBP" + b"\x00" * 10
-        assert LokiBot._detect_image_type(data) == "image/webp"
+        assert HeimdallBot._detect_image_type(data) == "image/webp"
 
     def test_unknown(self):
         """Should return None for unknown formats."""
         data = b"\x00\x00\x00\x00\x00\x00\x00\x00"
-        assert LokiBot._detect_image_type(data) is None
+        assert HeimdallBot._detect_image_type(data) is None
 
 
 class TestGetAttachmentHint:
-    """Tests for LokiBot._get_attachment_hint."""
+    """Tests for HeimdallBot._get_attachment_hint."""
 
     def test_python_file(self):
         """Python files should suggest skill creation."""
-        hint = LokiBot._get_attachment_hint("tool.py", ".py", 1000)
+        hint = HeimdallBot._get_attachment_hint("tool.py", ".py", 1000)
         assert "skill" in hint.lower()
 
     def test_yaml_config(self):
         """YAML config files should suggest deploying or ingesting."""
-        hint = LokiBot._get_attachment_hint("config.yml", ".yml", 500)
+        hint = HeimdallBot._get_attachment_hint("config.yml", ".yml", 500)
         assert "configuration" in hint.lower()
 
     def test_shell_script(self):
         """Shell scripts should suggest deploying or reviewing."""
-        hint = LokiBot._get_attachment_hint("deploy.sh", ".sh", 500)
+        hint = HeimdallBot._get_attachment_hint("deploy.sh", ".sh", 500)
         assert "shell script" in hint.lower()
 
     def test_systemd_unit(self):
         """Systemd unit files should suggest deploying."""
-        hint = LokiBot._get_attachment_hint("app.service", ".service", 200)
+        hint = HeimdallBot._get_attachment_hint("app.service", ".service", 200)
         assert "systemd" in hint.lower()
 
     def test_markdown_doc(self):
         """Markdown files should suggest knowledge base ingestion."""
-        hint = LokiBot._get_attachment_hint("readme.md", ".md", 2000)
+        hint = HeimdallBot._get_attachment_hint("readme.md", ".md", 2000)
         assert "documentation" in hint.lower()
 
     def test_large_file_extra_hint(self):
         """Files over 50KB should get an extra ingest suggestion."""
-        hint = LokiBot._get_attachment_hint("big.py", ".py", 60000)
+        hint = HeimdallBot._get_attachment_hint("big.py", ".py", 60000)
         assert "large" in hint.lower()
 
     def test_no_hint_for_unknown(self):
         """Unknown file types without large size should return empty."""
-        hint = LokiBot._get_attachment_hint("data.bin", ".bin", 1000)
+        hint = HeimdallBot._get_attachment_hint("data.bin", ".bin", 1000)
         assert hint == ""
 
     def test_json_config(self):
         """JSON config files should suggest deploying or ingesting."""
-        hint = LokiBot._get_attachment_hint("package.json", ".json", 500)
+        hint = HeimdallBot._get_attachment_hint("package.json", ".json", 500)
         assert "configuration" in hint.lower()
 
     def test_timer_unit(self):
         """Timer files should suggest deploying."""
-        hint = LokiBot._get_attachment_hint("backup.timer", ".timer", 100)
+        hint = HeimdallBot._get_attachment_hint("backup.timer", ".timer", 100)
         assert "systemd" in hint.lower()
 
     def test_txt_doc(self):
         """Text files should suggest knowledge base ingestion."""
-        hint = LokiBot._get_attachment_hint("notes.txt", ".txt", 500)
+        hint = HeimdallBot._get_attachment_hint("notes.txt", ".txt", 500)
         assert "documentation" in hint.lower()
 
     def test_bash_script(self):
         """Bash scripts should suggest deploying or reviewing."""
-        hint = LokiBot._get_attachment_hint("init.bash", ".bash", 300)
+        hint = HeimdallBot._get_attachment_hint("init.bash", ".bash", 300)
         assert "shell script" in hint.lower()
 
     def test_ini_config(self):
         """INI files should be recognized as config."""
-        hint = LokiBot._get_attachment_hint("app.ini", ".ini", 200)
+        hint = HeimdallBot._get_attachment_hint("app.ini", ".ini", 200)
         assert "configuration" in hint.lower()
 
 
@@ -326,7 +326,7 @@ class TestAccessChecks:
     def test_allowed_user_in_list(self):
         """User in allowed list should return True."""
         stub = _make_bot_stub()
-        stub._is_allowed_user = LokiBot._is_allowed_user.__get__(stub)
+        stub._is_allowed_user = HeimdallBot._is_allowed_user.__get__(stub)
         user = MagicMock()
         user.id = 12345
         assert stub._is_allowed_user(user) is True
@@ -334,7 +334,7 @@ class TestAccessChecks:
     def test_disallowed_user(self):
         """User not in allowed list should return False."""
         stub = _make_bot_stub()
-        stub._is_allowed_user = LokiBot._is_allowed_user.__get__(stub)
+        stub._is_allowed_user = HeimdallBot._is_allowed_user.__get__(stub)
         user = MagicMock()
         user.id = 99999
         assert stub._is_allowed_user(user) is False
@@ -343,7 +343,7 @@ class TestAccessChecks:
         """Empty allowed_users list should allow everyone."""
         stub = _make_bot_stub()
         stub.config.discord.allowed_users = []
-        stub._is_allowed_user = LokiBot._is_allowed_user.__get__(stub)
+        stub._is_allowed_user = HeimdallBot._is_allowed_user.__get__(stub)
         user = MagicMock()
         user.id = 99999
         assert stub._is_allowed_user(user) is True
@@ -351,32 +351,32 @@ class TestAccessChecks:
     def test_allowed_channel(self):
         """Channel in allowed list should return True."""
         stub = _make_bot_stub()
-        stub._is_allowed_channel = LokiBot._is_allowed_channel.__get__(stub)
+        stub._is_allowed_channel = HeimdallBot._is_allowed_channel.__get__(stub)
         assert stub._is_allowed_channel(67890) is True
 
     def test_disallowed_channel(self):
         """Channel not in allowed list should return False."""
         stub = _make_bot_stub()
-        stub._is_allowed_channel = LokiBot._is_allowed_channel.__get__(stub)
+        stub._is_allowed_channel = HeimdallBot._is_allowed_channel.__get__(stub)
         assert stub._is_allowed_channel(11111) is False
 
     def test_empty_channels_allows_all(self):
         """Empty channels list should allow all channels."""
         stub = _make_bot_stub()
         stub.config.discord.channels = []
-        stub._is_allowed_channel = LokiBot._is_allowed_channel.__get__(stub)
+        stub._is_allowed_channel = HeimdallBot._is_allowed_channel.__get__(stub)
         assert stub._is_allowed_channel(99999) is True
 
     def test_check_for_secrets_api_key(self):
         """Should detect API keys."""
         stub = _make_bot_stub()
-        stub._check_for_secrets = LokiBot._check_for_secrets.__get__(stub)
+        stub._check_for_secrets = HeimdallBot._check_for_secrets.__get__(stub)
         assert stub._check_for_secrets("here is sk-abcdefghijklmnopqrstuvwxyz") is True
 
     def test_check_for_secrets_clean(self):
         """Should not flag clean text."""
         stub = _make_bot_stub()
-        stub._check_for_secrets = LokiBot._check_for_secrets.__get__(stub)
+        stub._check_for_secrets = HeimdallBot._check_for_secrets.__get__(stub)
         assert stub._check_for_secrets("check the server disk space") is False
 
 
@@ -390,7 +390,7 @@ class TestSendWithRetry:
     async def test_successful_reply(self):
         """Should send a reply on first attempt."""
         stub = _make_bot_stub()
-        stub._send_with_retry = LokiBot._send_with_retry.__get__(stub)
+        stub._send_with_retry = HeimdallBot._send_with_retry.__get__(stub)
         msg = _make_message()
         sent = MagicMock(id=999)
         msg.reply = AsyncMock(return_value=sent)
@@ -402,7 +402,7 @@ class TestSendWithRetry:
     async def test_channel_send_not_reply(self):
         """Should use channel.send when as_reply=False."""
         stub = _make_bot_stub()
-        stub._send_with_retry = LokiBot._send_with_retry.__get__(stub)
+        stub._send_with_retry = HeimdallBot._send_with_retry.__get__(stub)
         msg = _make_message()
         sent = MagicMock(id=999)
         msg.channel.send = AsyncMock(return_value=sent)
@@ -414,7 +414,7 @@ class TestSendWithRetry:
     async def test_retry_on_http_exception(self):
         """Should retry on Discord HTTPException and succeed."""
         stub = _make_bot_stub()
-        stub._send_with_retry = LokiBot._send_with_retry.__get__(stub)
+        stub._send_with_retry = HeimdallBot._send_with_retry.__get__(stub)
         msg = _make_message()
         sent = MagicMock(id=999)
         msg.reply = AsyncMock(
@@ -428,7 +428,7 @@ class TestSendWithRetry:
     async def test_all_retries_fail(self):
         """Should return None after all retries fail."""
         stub = _make_bot_stub()
-        stub._send_with_retry = LokiBot._send_with_retry.__get__(stub)
+        stub._send_with_retry = HeimdallBot._send_with_retry.__get__(stub)
         msg = _make_message()
         msg.reply = AsyncMock(
             side_effect=discord.HTTPException(MagicMock(), "fail")
@@ -448,7 +448,7 @@ class TestSendChunked:
     async def test_short_message(self):
         """Short messages should be sent as a single reply."""
         stub = _make_bot_stub()
-        stub._send_chunked = LokiBot._send_chunked.__get__(stub)
+        stub._send_chunked = HeimdallBot._send_chunked.__get__(stub)
         msg = _make_message()
 
         await stub._send_chunked(msg, "short message")
@@ -457,7 +457,7 @@ class TestSendChunked:
     async def test_very_long_message_as_file(self):
         """Very long messages should be sent as a file attachment."""
         stub = _make_bot_stub()
-        stub._send_chunked = LokiBot._send_chunked.__get__(stub)
+        stub._send_chunked = HeimdallBot._send_chunked.__get__(stub)
         msg = _make_message()
 
         text = "x" * (DISCORD_MAX_LEN * 5)
@@ -470,7 +470,7 @@ class TestSendChunked:
     async def test_medium_long_message_chunked(self):
         """Messages between 2000 and 8000 chars should be split into chunks."""
         stub = _make_bot_stub()
-        stub._send_chunked = LokiBot._send_chunked.__get__(stub)
+        stub._send_chunked = HeimdallBot._send_chunked.__get__(stub)
         msg = _make_message()
 
         # Create a message that needs 2-3 chunks
@@ -482,7 +482,7 @@ class TestSendChunked:
     async def test_code_block_splitting(self):
         """Code blocks should be properly closed and reopened across chunks."""
         stub = _make_bot_stub()
-        stub._send_chunked = LokiBot._send_chunked.__get__(stub)
+        stub._send_chunked = HeimdallBot._send_chunked.__get__(stub)
         msg = _make_message()
 
         # Create a long code block that will span chunks
@@ -501,7 +501,7 @@ class TestHandlePurge:
     async def test_purge_success(self):
         """Should purge messages and reset session."""
         stub = _make_bot_stub()
-        stub._handle_purge = LokiBot._handle_purge.__get__(stub)
+        stub._handle_purge = HeimdallBot._handle_purge.__get__(stub)
         msg = _make_message()
 
         result = await stub._handle_purge(msg, {"count": 50})
@@ -511,7 +511,7 @@ class TestHandlePurge:
     async def test_purge_caps_at_500(self):
         """Should cap count at 500."""
         stub = _make_bot_stub()
-        stub._handle_purge = LokiBot._handle_purge.__get__(stub)
+        stub._handle_purge = HeimdallBot._handle_purge.__get__(stub)
         msg = _make_message()
 
         await stub._handle_purge(msg, {"count": 1000})
@@ -520,7 +520,7 @@ class TestHandlePurge:
     async def test_purge_forbidden(self):
         """Should handle Forbidden error gracefully."""
         stub = _make_bot_stub()
-        stub._handle_purge = LokiBot._handle_purge.__get__(stub)
+        stub._handle_purge = HeimdallBot._handle_purge.__get__(stub)
         msg = _make_message()
         msg.channel.purge = AsyncMock(side_effect=discord.Forbidden(MagicMock(), "nope"))
 
@@ -530,7 +530,7 @@ class TestHandlePurge:
     async def test_purge_generic_error(self):
         """Should handle generic errors gracefully."""
         stub = _make_bot_stub()
-        stub._handle_purge = LokiBot._handle_purge.__get__(stub)
+        stub._handle_purge = HeimdallBot._handle_purge.__get__(stub)
         msg = _make_message()
         msg.channel.purge = AsyncMock(side_effect=RuntimeError("oops"))
 
@@ -544,7 +544,7 @@ class TestHandleBrowserScreenshot:
     async def test_no_browser_manager(self):
         """Should return error when browser is not enabled."""
         stub = _make_bot_stub()
-        stub._handle_browser_screenshot = LokiBot._handle_browser_screenshot.__get__(stub)
+        stub._handle_browser_screenshot = HeimdallBot._handle_browser_screenshot.__get__(stub)
         msg = _make_message()
 
         result = await stub._handle_browser_screenshot(msg, {"url": "http://example.com"})
@@ -554,7 +554,7 @@ class TestHandleBrowserScreenshot:
         """Should post screenshot to channel."""
         stub = _make_bot_stub()
         stub.browser_manager = MagicMock()
-        stub._handle_browser_screenshot = LokiBot._handle_browser_screenshot.__get__(stub)
+        stub._handle_browser_screenshot = HeimdallBot._handle_browser_screenshot.__get__(stub)
         msg = _make_message()
 
         mock_handler = AsyncMock(return_value=("Screenshot taken", b"PNG_DATA"))
@@ -569,7 +569,7 @@ class TestHandleBrowserScreenshot:
         """Should handle browser errors gracefully."""
         stub = _make_bot_stub()
         stub.browser_manager = MagicMock()
-        stub._handle_browser_screenshot = LokiBot._handle_browser_screenshot.__get__(stub)
+        stub._handle_browser_screenshot = HeimdallBot._handle_browser_screenshot.__get__(stub)
         msg = _make_message()
 
         mock_handler = AsyncMock(side_effect=RuntimeError("browser crash"))
@@ -586,7 +586,7 @@ class TestHandleGenerateFile:
     async def test_generate_file_success(self):
         """Should create and post a file to Discord."""
         stub = _make_bot_stub()
-        stub._handle_generate_file = LokiBot._handle_generate_file.__get__(stub)
+        stub._handle_generate_file = HeimdallBot._handle_generate_file.__get__(stub)
         msg = _make_message()
 
         result = await stub._handle_generate_file(msg, {
@@ -600,7 +600,7 @@ class TestHandleGenerateFile:
     async def test_generate_file_defaults(self):
         """Should use defaults when fields are missing."""
         stub = _make_bot_stub()
-        stub._handle_generate_file = LokiBot._handle_generate_file.__get__(stub)
+        stub._handle_generate_file = HeimdallBot._handle_generate_file.__get__(stub)
         msg = _make_message()
 
         result = await stub._handle_generate_file(msg, {})
@@ -609,7 +609,7 @@ class TestHandleGenerateFile:
     async def test_generate_file_error(self):
         """Should handle send errors."""
         stub = _make_bot_stub()
-        stub._handle_generate_file = LokiBot._handle_generate_file.__get__(stub)
+        stub._handle_generate_file = HeimdallBot._handle_generate_file.__get__(stub)
         msg = _make_message()
         msg.channel.send = AsyncMock(side_effect=RuntimeError("fail"))
 
@@ -623,7 +623,7 @@ class TestHandlePostFile:
     async def test_missing_params(self):
         """Should return error when host or path is missing."""
         stub = _make_bot_stub()
-        stub._handle_post_file = LokiBot._handle_post_file.__get__(stub)
+        stub._handle_post_file = HeimdallBot._handle_post_file.__get__(stub)
         msg = _make_message()
 
         result = await stub._handle_post_file(msg, {})
@@ -633,7 +633,7 @@ class TestHandlePostFile:
         """Should return error for unknown host."""
         stub = _make_bot_stub()
         stub.tool_executor._resolve_host = MagicMock(return_value=None)
-        stub._handle_post_file = LokiBot._handle_post_file.__get__(stub)
+        stub._handle_post_file = HeimdallBot._handle_post_file.__get__(stub)
         msg = _make_message()
 
         result = await stub._handle_post_file(msg, {"host": "unknown", "path": "/tmp/file"})
@@ -644,7 +644,7 @@ class TestHandlePostFile:
         stub = _make_bot_stub()
         stub.config.tools.ssh_key_path = "/tmp/key"
         stub.config.tools.ssh_known_hosts_path = "/tmp/hosts"
-        stub._handle_post_file = LokiBot._handle_post_file.__get__(stub)
+        stub._handle_post_file = HeimdallBot._handle_post_file.__get__(stub)
         msg = _make_message()
 
         file_data = base64.b64encode(b"file content here")
@@ -663,7 +663,7 @@ class TestHandlePostFile:
         stub = _make_bot_stub()
         stub.config.tools.ssh_key_path = "/tmp/key"
         stub.config.tools.ssh_known_hosts_path = "/tmp/hosts"
-        stub._handle_post_file = LokiBot._handle_post_file.__get__(stub)
+        stub._handle_post_file = HeimdallBot._handle_post_file.__get__(stub)
         msg = _make_message()
 
         mock_proc = AsyncMock()
@@ -681,7 +681,7 @@ class TestHandlePostFile:
         stub = _make_bot_stub()
         stub.config.tools.ssh_key_path = "/tmp/key"
         stub.config.tools.ssh_known_hosts_path = "/tmp/hosts"
-        stub._handle_post_file = LokiBot._handle_post_file.__get__(stub)
+        stub._handle_post_file = HeimdallBot._handle_post_file.__get__(stub)
         msg = _make_message()
 
         with patch("asyncio.create_subprocess_exec", new=AsyncMock(side_effect=asyncio.TimeoutError())):
@@ -697,7 +697,7 @@ class TestHandleScheduleTask:
     def test_schedule_task_success(self):
         """Should create a scheduled task."""
         stub = _make_bot_stub()
-        stub._handle_schedule_task = LokiBot._handle_schedule_task.__get__(stub)
+        stub._handle_schedule_task = HeimdallBot._handle_schedule_task.__get__(stub)
         msg = _make_message()
 
         result = stub._handle_schedule_task(msg, {
@@ -711,7 +711,7 @@ class TestHandleScheduleTask:
     def test_schedule_one_time_task(self):
         """Should create a one-time scheduled task."""
         stub = _make_bot_stub()
-        stub._handle_schedule_task = LokiBot._handle_schedule_task.__get__(stub)
+        stub._handle_schedule_task = HeimdallBot._handle_schedule_task.__get__(stub)
         msg = _make_message()
 
         result = stub._handle_schedule_task(msg, {
@@ -728,7 +728,7 @@ class TestHandleScheduleTask:
             "id": "sched-2", "description": "Deploy hook",
             "trigger": {"type": "gitea", "repo": "myproject"},
         })
-        stub._handle_schedule_task = LokiBot._handle_schedule_task.__get__(stub)
+        stub._handle_schedule_task = HeimdallBot._handle_schedule_task.__get__(stub)
         msg = _make_message()
 
         result = stub._handle_schedule_task(msg, {
@@ -742,7 +742,7 @@ class TestHandleScheduleTask:
         """Should handle invalid schedule gracefully."""
         stub = _make_bot_stub()
         stub.scheduler.add = MagicMock(side_effect=ValueError("Invalid cron"))
-        stub._handle_schedule_task = LokiBot._handle_schedule_task.__get__(stub)
+        stub._handle_schedule_task = HeimdallBot._handle_schedule_task.__get__(stub)
         msg = _make_message()
 
         result = stub._handle_schedule_task(msg, {"cron": "invalid"})
@@ -752,7 +752,7 @@ class TestHandleScheduleTask:
         """Should handle unexpected errors."""
         stub = _make_bot_stub()
         stub.scheduler.add = MagicMock(side_effect=RuntimeError("oops"))
-        stub._handle_schedule_task = LokiBot._handle_schedule_task.__get__(stub)
+        stub._handle_schedule_task = HeimdallBot._handle_schedule_task.__get__(stub)
         msg = _make_message()
 
         result = stub._handle_schedule_task(msg, {})
@@ -765,7 +765,7 @@ class TestHandleListSchedules:
     def test_no_schedules(self):
         """Should return message when no schedules exist."""
         stub = _make_bot_stub()
-        stub._handle_list_schedules = LokiBot._handle_list_schedules.__get__(stub)
+        stub._handle_list_schedules = HeimdallBot._handle_list_schedules.__get__(stub)
 
         result = stub._handle_list_schedules()
         assert "No scheduled" in result
@@ -778,7 +778,7 @@ class TestHandleListSchedules:
             "cron": "0 8 * * *", "next_run": "2026-03-19T08:00:00",
             "last_run": "2026-03-18T08:00:00",
         }])
-        stub._handle_list_schedules = LokiBot._handle_list_schedules.__get__(stub)
+        stub._handle_list_schedules = HeimdallBot._handle_list_schedules.__get__(stub)
 
         result = stub._handle_list_schedules()
         assert "Disk check" in result
@@ -793,7 +793,7 @@ class TestHandleListSchedules:
             "next_run": "on trigger",
             "last_run": "never",
         }])
-        stub._handle_list_schedules = LokiBot._handle_list_schedules.__get__(stub)
+        stub._handle_list_schedules = HeimdallBot._handle_list_schedules.__get__(stub)
 
         result = stub._handle_list_schedules()
         assert "trigger" in result
@@ -807,7 +807,7 @@ class TestHandleListSchedules:
             "next_run": "2026-03-19T10:00:00",
             "last_run": "never",
         }])
-        stub._handle_list_schedules = LokiBot._handle_list_schedules.__get__(stub)
+        stub._handle_list_schedules = HeimdallBot._handle_list_schedules.__get__(stub)
 
         result = stub._handle_list_schedules()
         assert "one-time" in result
@@ -819,7 +819,7 @@ class TestHandleDeleteSchedule:
     def test_delete_success(self):
         """Should delete an existing schedule."""
         stub = _make_bot_stub()
-        stub._handle_delete_schedule = LokiBot._handle_delete_schedule.__get__(stub)
+        stub._handle_delete_schedule = HeimdallBot._handle_delete_schedule.__get__(stub)
 
         result = stub._handle_delete_schedule({"schedule_id": "s1"})
         assert "Deleted" in result
@@ -828,7 +828,7 @@ class TestHandleDeleteSchedule:
         """Should return not found for missing schedule."""
         stub = _make_bot_stub()
         stub.scheduler.delete = MagicMock(return_value=False)
-        stub._handle_delete_schedule = LokiBot._handle_delete_schedule.__get__(stub)
+        stub._handle_delete_schedule = HeimdallBot._handle_delete_schedule.__get__(stub)
 
         result = stub._handle_delete_schedule({"schedule_id": "nonexistent"})
         assert "not found" in result
@@ -840,7 +840,7 @@ class TestHandleParseTime:
     def test_parse_time_success(self):
         """Should parse a valid time expression."""
         stub = _make_bot_stub()
-        stub._handle_parse_time = LokiBot._handle_parse_time.__get__(stub)
+        stub._handle_parse_time = HeimdallBot._handle_parse_time.__get__(stub)
 
         result = stub._handle_parse_time({"expression": "in 2 hours"})
         assert "Parsed" in result
@@ -848,7 +848,7 @@ class TestHandleParseTime:
     def test_parse_time_empty(self):
         """Should return error for empty expression."""
         stub = _make_bot_stub()
-        stub._handle_parse_time = LokiBot._handle_parse_time.__get__(stub)
+        stub._handle_parse_time = HeimdallBot._handle_parse_time.__get__(stub)
 
         result = stub._handle_parse_time({"expression": ""})
         assert "required" in result.lower()
@@ -856,7 +856,7 @@ class TestHandleParseTime:
     def test_parse_time_no_expression(self):
         """Should return error when expression field is missing."""
         stub = _make_bot_stub()
-        stub._handle_parse_time = LokiBot._handle_parse_time.__get__(stub)
+        stub._handle_parse_time = HeimdallBot._handle_parse_time.__get__(stub)
 
         result = stub._handle_parse_time({})
         assert "required" in result.lower()
@@ -868,7 +868,7 @@ class TestHandleSearchHistory:
     async def test_search_no_query(self):
         """Should return error without a query."""
         stub = _make_bot_stub()
-        stub._handle_search_history = LokiBot._handle_search_history.__get__(stub)
+        stub._handle_search_history = HeimdallBot._handle_search_history.__get__(stub)
 
         result = await stub._handle_search_history({"query": ""})
         assert "required" in result.lower()
@@ -876,7 +876,7 @@ class TestHandleSearchHistory:
     async def test_search_no_results(self):
         """Should return message when no results found."""
         stub = _make_bot_stub()
-        stub._handle_search_history = LokiBot._handle_search_history.__get__(stub)
+        stub._handle_search_history = HeimdallBot._handle_search_history.__get__(stub)
 
         result = await stub._handle_search_history({"query": "nonexistent"})
         assert "No past conversations" in result
@@ -889,7 +889,7 @@ class TestHandleSearchHistory:
             "type": "user",
             "content": "check disk space on server",
         }])
-        stub._handle_search_history = LokiBot._handle_search_history.__get__(stub)
+        stub._handle_search_history = HeimdallBot._handle_search_history.__get__(stub)
 
         result = await stub._handle_search_history({"query": "disk"})
         assert "Found 1" in result
@@ -902,7 +902,7 @@ class TestHandleSearchKnowledge:
     async def test_no_knowledge_store(self):
         """Should return error when knowledge store is not available."""
         stub = _make_bot_stub()
-        stub._handle_search_knowledge = LokiBot._handle_search_knowledge.__get__(stub)
+        stub._handle_search_knowledge = HeimdallBot._handle_search_knowledge.__get__(stub)
 
         result = await stub._handle_search_knowledge({"query": "test"})
         assert "not available" in result
@@ -912,7 +912,7 @@ class TestHandleSearchKnowledge:
         stub = _make_bot_stub()
         stub._knowledge_store = MagicMock()
         stub._embedder = MagicMock()
-        stub._handle_search_knowledge = LokiBot._handle_search_knowledge.__get__(stub)
+        stub._handle_search_knowledge = HeimdallBot._handle_search_knowledge.__get__(stub)
 
         result = await stub._handle_search_knowledge({"query": ""})
         assert "required" in result.lower()
@@ -923,7 +923,7 @@ class TestHandleSearchKnowledge:
         stub._knowledge_store = MagicMock()
         stub._knowledge_store.search_hybrid = AsyncMock(return_value=[])
         stub._embedder = MagicMock()
-        stub._handle_search_knowledge = LokiBot._handle_search_knowledge.__get__(stub)
+        stub._handle_search_knowledge = HeimdallBot._handle_search_knowledge.__get__(stub)
 
         result = await stub._handle_search_knowledge({"query": "obscure topic"})
         assert "web_search" in result or "No knowledge" in result
@@ -938,7 +938,7 @@ class TestHandleSearchKnowledge:
             "content": "This is relevant content about the topic.",
         }])
         stub._embedder = MagicMock()
-        stub._handle_search_knowledge = LokiBot._handle_search_knowledge.__get__(stub)
+        stub._handle_search_knowledge = HeimdallBot._handle_search_knowledge.__get__(stub)
 
         result = await stub._handle_search_knowledge({"query": "relevant"})
         assert "Found 1" in result
@@ -951,7 +951,7 @@ class TestHandleIngestDocument:
     async def test_no_knowledge_store(self):
         """Should return error when knowledge store is not available."""
         stub = _make_bot_stub()
-        stub._handle_ingest_document = LokiBot._handle_ingest_document.__get__(stub)
+        stub._handle_ingest_document = HeimdallBot._handle_ingest_document.__get__(stub)
 
         result = await stub._handle_ingest_document({"source": "doc.md", "content": "text"}, "user")
         assert "not available" in result
@@ -961,7 +961,7 @@ class TestHandleIngestDocument:
         stub = _make_bot_stub()
         stub._knowledge_store = MagicMock()
         stub._embedder = MagicMock()
-        stub._handle_ingest_document = LokiBot._handle_ingest_document.__get__(stub)
+        stub._handle_ingest_document = HeimdallBot._handle_ingest_document.__get__(stub)
 
         result = await stub._handle_ingest_document({"source": "", "content": ""}, "user")
         assert "required" in result.lower()
@@ -972,7 +972,7 @@ class TestHandleIngestDocument:
         stub._knowledge_store = MagicMock()
         stub._knowledge_store.ingest = AsyncMock(return_value=5)
         stub._embedder = MagicMock()
-        stub._handle_ingest_document = LokiBot._handle_ingest_document.__get__(stub)
+        stub._handle_ingest_document = HeimdallBot._handle_ingest_document.__get__(stub)
 
         result = await stub._handle_ingest_document(
             {"source": "readme.md", "content": "Hello world content"},
@@ -986,7 +986,7 @@ class TestHandleIngestDocument:
         stub._knowledge_store = MagicMock()
         stub._knowledge_store.ingest = AsyncMock(return_value=0)
         stub._embedder = MagicMock()
-        stub._handle_ingest_document = LokiBot._handle_ingest_document.__get__(stub)
+        stub._handle_ingest_document = HeimdallBot._handle_ingest_document.__get__(stub)
 
         result = await stub._handle_ingest_document(
             {"source": "bad.md", "content": "x"}, "user",
@@ -1000,7 +1000,7 @@ class TestHandleListKnowledge:
     def test_no_knowledge_store(self):
         """Should return error when knowledge store is not available."""
         stub = _make_bot_stub()
-        stub._handle_list_knowledge = LokiBot._handle_list_knowledge.__get__(stub)
+        stub._handle_list_knowledge = HeimdallBot._handle_list_knowledge.__get__(stub)
 
         result = stub._handle_list_knowledge()
         assert "not available" in result
@@ -1010,7 +1010,7 @@ class TestHandleListKnowledge:
         stub = _make_bot_stub()
         stub._knowledge_store = MagicMock()
         stub._knowledge_store.list_sources = MagicMock(return_value=[])
-        stub._handle_list_knowledge = LokiBot._handle_list_knowledge.__get__(stub)
+        stub._handle_list_knowledge = HeimdallBot._handle_list_knowledge.__get__(stub)
 
         result = stub._handle_list_knowledge()
         assert "empty" in result.lower()
@@ -1025,7 +1025,7 @@ class TestHandleListKnowledge:
             {"source": "config.yml", "chunks": 3, "uploader": "Bot",
              "ingested_at": "2026-03-17T08:00:00"},
         ])
-        stub._handle_list_knowledge = LokiBot._handle_list_knowledge.__get__(stub)
+        stub._handle_list_knowledge = HeimdallBot._handle_list_knowledge.__get__(stub)
 
         result = stub._handle_list_knowledge()
         assert "2 document(s)" in result
@@ -1039,7 +1039,7 @@ class TestHandleDeleteKnowledge:
     def test_no_knowledge_store(self):
         """Should return error when knowledge store is not available."""
         stub = _make_bot_stub()
-        stub._handle_delete_knowledge = LokiBot._handle_delete_knowledge.__get__(stub)
+        stub._handle_delete_knowledge = HeimdallBot._handle_delete_knowledge.__get__(stub)
 
         result = stub._handle_delete_knowledge({"source": "doc.md"})
         assert "not available" in result
@@ -1048,7 +1048,7 @@ class TestHandleDeleteKnowledge:
         """Should return error when source is missing."""
         stub = _make_bot_stub()
         stub._knowledge_store = MagicMock()
-        stub._handle_delete_knowledge = LokiBot._handle_delete_knowledge.__get__(stub)
+        stub._handle_delete_knowledge = HeimdallBot._handle_delete_knowledge.__get__(stub)
 
         result = stub._handle_delete_knowledge({"source": ""})
         assert "required" in result.lower()
@@ -1058,7 +1058,7 @@ class TestHandleDeleteKnowledge:
         stub = _make_bot_stub()
         stub._knowledge_store = MagicMock()
         stub._knowledge_store.delete_source = MagicMock(return_value=5)
-        stub._handle_delete_knowledge = LokiBot._handle_delete_knowledge.__get__(stub)
+        stub._handle_delete_knowledge = HeimdallBot._handle_delete_knowledge.__get__(stub)
 
         result = stub._handle_delete_knowledge({"source": "old.md"})
         assert "5 chunks removed" in result
@@ -1068,7 +1068,7 @@ class TestHandleDeleteKnowledge:
         stub = _make_bot_stub()
         stub._knowledge_store = MagicMock()
         stub._knowledge_store.delete_source = MagicMock(return_value=0)
-        stub._handle_delete_knowledge = LokiBot._handle_delete_knowledge.__get__(stub)
+        stub._handle_delete_knowledge = HeimdallBot._handle_delete_knowledge.__get__(stub)
 
         result = stub._handle_delete_knowledge({"source": "nonexistent.md"})
         assert "No document" in result
@@ -1080,7 +1080,7 @@ class TestHandleSearchAudit:
     async def test_no_results(self):
         """Should return message when no entries found."""
         stub = _make_bot_stub()
-        stub._handle_search_audit = LokiBot._handle_search_audit.__get__(stub)
+        stub._handle_search_audit = HeimdallBot._handle_search_audit.__get__(stub)
 
         result = await stub._handle_search_audit({})
         assert "No audit log" in result
@@ -1097,7 +1097,7 @@ class TestHandleSearchAudit:
             "result_summary": "Disk: 42% used",
             "error": None,
         }])
-        stub._handle_search_audit = LokiBot._handle_search_audit.__get__(stub)
+        stub._handle_search_audit = HeimdallBot._handle_search_audit.__get__(stub)
 
         result = await stub._handle_search_audit({"tool_name": "check_disk"})
         assert "1 entries" in result
@@ -1116,7 +1116,7 @@ class TestHandleSearchAudit:
             "result_summary": "",
             "error": "SSH timeout",
         }])
-        stub._handle_search_audit = LokiBot._handle_search_audit.__get__(stub)
+        stub._handle_search_audit = HeimdallBot._handle_search_audit.__get__(stub)
 
         result = await stub._handle_search_audit({})
         assert "ERROR" in result
@@ -1129,7 +1129,7 @@ class TestHandleCreateDigest:
     def test_create_digest_success(self):
         """Should create a digest schedule."""
         stub = _make_bot_stub()
-        stub._handle_create_digest = LokiBot._handle_create_digest.__get__(stub)
+        stub._handle_create_digest = HeimdallBot._handle_create_digest.__get__(stub)
         msg = _make_message()
 
         result = stub._handle_create_digest(msg, {
@@ -1141,7 +1141,7 @@ class TestHandleCreateDigest:
     def test_create_digest_default_cron(self):
         """Should use default cron when not specified."""
         stub = _make_bot_stub()
-        stub._handle_create_digest = LokiBot._handle_create_digest.__get__(stub)
+        stub._handle_create_digest = HeimdallBot._handle_create_digest.__get__(stub)
         msg = _make_message()
 
         result = stub._handle_create_digest(msg, {})
@@ -1153,7 +1153,7 @@ class TestHandleCreateDigest:
         """Should handle scheduler error."""
         stub = _make_bot_stub()
         stub.scheduler.add = MagicMock(side_effect=ValueError("bad cron"))
-        stub._handle_create_digest = LokiBot._handle_create_digest.__get__(stub)
+        stub._handle_create_digest = HeimdallBot._handle_create_digest.__get__(stub)
         msg = _make_message()
 
         result = stub._handle_create_digest(msg, {"cron": "invalid"})
@@ -1170,7 +1170,7 @@ class TestHandleDelegateTask:
     async def test_no_steps(self):
         """Should return error when no steps provided."""
         stub = _make_bot_stub()
-        stub._handle_delegate_task = LokiBot._handle_delegate_task.__get__(stub)
+        stub._handle_delegate_task = HeimdallBot._handle_delegate_task.__get__(stub)
         msg = _make_message()
 
         result = await stub._handle_delegate_task(msg, {"description": "test"})
@@ -1179,7 +1179,7 @@ class TestHandleDelegateTask:
     async def test_too_many_steps(self):
         """Should return error when too many steps."""
         stub = _make_bot_stub()
-        stub._handle_delegate_task = LokiBot._handle_delegate_task.__get__(stub)
+        stub._handle_delegate_task = HeimdallBot._handle_delegate_task.__get__(stub)
         msg = _make_message()
 
         from src.discord.background_task import MAX_STEPS
@@ -1192,7 +1192,7 @@ class TestHandleDelegateTask:
     async def test_invalid_step(self):
         """Should return error for steps without tool_name."""
         stub = _make_bot_stub()
-        stub._handle_delegate_task = LokiBot._handle_delegate_task.__get__(stub)
+        stub._handle_delegate_task = HeimdallBot._handle_delegate_task.__get__(stub)
         msg = _make_message()
 
         result = await stub._handle_delegate_task(msg, {
@@ -1203,7 +1203,7 @@ class TestHandleDelegateTask:
     async def test_delegate_success(self):
         """Should create and start a background task."""
         stub = _make_bot_stub()
-        stub._handle_delegate_task = LokiBot._handle_delegate_task.__get__(stub)
+        stub._handle_delegate_task = HeimdallBot._handle_delegate_task.__get__(stub)
         msg = _make_message()
 
         with patch("src.discord.client.run_background_task", new=AsyncMock()):
@@ -1233,7 +1233,7 @@ class TestHandleListTasks:
     def test_no_tasks(self):
         """Should return message when no tasks exist."""
         stub = _make_bot_stub()
-        stub._handle_list_tasks = LokiBot._handle_list_tasks.__get__(stub)
+        stub._handle_list_tasks = HeimdallBot._handle_list_tasks.__get__(stub)
 
         result = stub._handle_list_tasks()
         assert "No background" in result
@@ -1248,7 +1248,7 @@ class TestHandleListTasks:
         task.steps = [MagicMock(), MagicMock()]
         task.results = [MagicMock(status="ok")]
         stub._background_tasks = {"task-1": task}
-        stub._handle_list_tasks = LokiBot._handle_list_tasks.__get__(stub)
+        stub._handle_list_tasks = HeimdallBot._handle_list_tasks.__get__(stub)
 
         result = stub._handle_list_tasks()
         assert "task-1" in result
@@ -1271,7 +1271,7 @@ class TestHandleListTasks:
         result_mock.output = "Disk: 42% used"
         task.results = [result_mock]
         stub._background_tasks = {"task-1": task}
-        stub._handle_list_tasks = LokiBot._handle_list_tasks.__get__(stub)
+        stub._handle_list_tasks = HeimdallBot._handle_list_tasks.__get__(stub)
 
         result = stub._handle_list_tasks({"task_id": "task-1"})
         assert "Deploy check" in result
@@ -1282,7 +1282,7 @@ class TestHandleListTasks:
         """Should return error for nonexistent task."""
         stub = _make_bot_stub()
         stub._background_tasks = {"task-1": MagicMock()}
-        stub._handle_list_tasks = LokiBot._handle_list_tasks.__get__(stub)
+        stub._handle_list_tasks = HeimdallBot._handle_list_tasks.__get__(stub)
 
         result = stub._handle_list_tasks({"task_id": "nonexistent"})
         assert "No task found" in result
@@ -1298,7 +1298,7 @@ class TestHandleCancelTask:
         task.status = "running"
         task.cancel = MagicMock()
         stub._background_tasks = {"task-1": task}
-        stub._handle_cancel_task = LokiBot._handle_cancel_task.__get__(stub)
+        stub._handle_cancel_task = HeimdallBot._handle_cancel_task.__get__(stub)
 
         result = stub._handle_cancel_task({"task_id": "task-1"})
         assert "Cancellation" in result
@@ -1307,7 +1307,7 @@ class TestHandleCancelTask:
     def test_cancel_not_found(self):
         """Should return error for nonexistent task."""
         stub = _make_bot_stub()
-        stub._handle_cancel_task = LokiBot._handle_cancel_task.__get__(stub)
+        stub._handle_cancel_task = HeimdallBot._handle_cancel_task.__get__(stub)
 
         result = stub._handle_cancel_task({"task_id": "nonexistent"})
         assert "No task found" in result
@@ -1318,7 +1318,7 @@ class TestHandleCancelTask:
         task = MagicMock()
         task.status = "completed"
         stub._background_tasks = {"task-1": task}
-        stub._handle_cancel_task = LokiBot._handle_cancel_task.__get__(stub)
+        stub._handle_cancel_task = HeimdallBot._handle_cancel_task.__get__(stub)
 
         result = stub._handle_cancel_task({"task_id": "task-1"})
         assert "not running" in result
@@ -1334,7 +1334,7 @@ class TestOnScheduledTask:
     async def test_no_channel_id(self):
         """Should warn and return when no channel_id."""
         stub = _make_bot_stub()
-        stub._on_scheduled_task = LokiBot._on_scheduled_task.__get__(stub)
+        stub._on_scheduled_task = HeimdallBot._on_scheduled_task.__get__(stub)
 
         await stub._on_scheduled_task({"id": "s1", "action": "reminder"})
         # Should not crash
@@ -1342,7 +1342,7 @@ class TestOnScheduledTask:
     async def test_channel_not_found(self):
         """Should warn when channel is not found."""
         stub = _make_bot_stub()
-        stub._on_scheduled_task = LokiBot._on_scheduled_task.__get__(stub)
+        stub._on_scheduled_task = HeimdallBot._on_scheduled_task.__get__(stub)
 
         await stub._on_scheduled_task({
             "id": "s1", "action": "reminder", "channel_id": "99999",
@@ -1356,7 +1356,7 @@ class TestOnScheduledTask:
         channel.send = AsyncMock()
         stub.get_channel = MagicMock(return_value=channel)
         stub._resolve_mentions = MagicMock(side_effect=lambda x: x)
-        stub._on_scheduled_task = LokiBot._on_scheduled_task.__get__(stub)
+        stub._on_scheduled_task = HeimdallBot._on_scheduled_task.__get__(stub)
 
         await stub._on_scheduled_task({
             "id": "s1", "action": "reminder", "channel_id": "67890",
@@ -1372,7 +1372,7 @@ class TestOnScheduledTask:
         channel = AsyncMock()
         channel.send = AsyncMock()
         stub.get_channel = MagicMock(return_value=channel)
-        stub._on_scheduled_task = LokiBot._on_scheduled_task.__get__(stub)
+        stub._on_scheduled_task = HeimdallBot._on_scheduled_task.__get__(stub)
 
         await stub._on_scheduled_task({
             "id": "s1", "action": "check", "channel_id": "67890",
@@ -1389,7 +1389,7 @@ class TestOnScheduledTask:
         channel.send = AsyncMock()
         stub.get_channel = MagicMock(return_value=channel)
         stub.tool_executor.execute = AsyncMock(side_effect=RuntimeError("timeout"))
-        stub._on_scheduled_task = LokiBot._on_scheduled_task.__get__(stub)
+        stub._on_scheduled_task = HeimdallBot._on_scheduled_task.__get__(stub)
 
         await stub._on_scheduled_task({
             "id": "s1", "action": "check", "channel_id": "67890",
@@ -1405,7 +1405,7 @@ class TestOnScheduledTask:
         channel = AsyncMock()
         stub.get_channel = MagicMock(return_value=channel)
         stub._on_scheduled_digest = AsyncMock()
-        stub._on_scheduled_task = LokiBot._on_scheduled_task.__get__(stub)
+        stub._on_scheduled_task = HeimdallBot._on_scheduled_task.__get__(stub)
 
         schedule = {"id": "s1", "action": "digest", "channel_id": "67890"}
         await stub._on_scheduled_task(schedule)
@@ -1417,7 +1417,7 @@ class TestOnScheduledTask:
         channel = AsyncMock()
         stub.get_channel = MagicMock(return_value=channel)
         stub._run_scheduled_workflow = AsyncMock()
-        stub._on_scheduled_task = LokiBot._on_scheduled_task.__get__(stub)
+        stub._on_scheduled_task = HeimdallBot._on_scheduled_task.__get__(stub)
 
         schedule = {
             "id": "s1", "action": "workflow", "channel_id": "67890",
@@ -1431,7 +1431,7 @@ class TestOnScheduledTask:
         stub = _make_bot_stub()
         channel = AsyncMock()
         stub.get_channel = MagicMock(return_value=channel)
-        stub._on_scheduled_task = LokiBot._on_scheduled_task.__get__(stub)
+        stub._on_scheduled_task = HeimdallBot._on_scheduled_task.__get__(stub)
 
         with patch("src.discord.client.log") as mock_log:
             await stub._on_scheduled_task({
@@ -1447,7 +1447,7 @@ class TestOnScheduledDigest:
     async def test_no_channel(self):
         """Should return when channel is not found."""
         stub = _make_bot_stub()
-        stub._on_scheduled_digest = LokiBot._on_scheduled_digest.__get__(stub)
+        stub._on_scheduled_digest = HeimdallBot._on_scheduled_digest.__get__(stub)
 
         await stub._on_scheduled_digest({"id": "d1", "channel_id": "99999"})
         # Should not crash
@@ -1461,7 +1461,7 @@ class TestOnScheduledDigest:
         stub._format_digest_raw = AsyncMock(return_value="### Disk\n42% used\n### Memory\n60% used")
         # codex_client.chat returns a plain string (Codex path)
         stub.codex_client.chat = AsyncMock(return_value="All systems healthy.")
-        stub._on_scheduled_digest = LokiBot._on_scheduled_digest.__get__(stub)
+        stub._on_scheduled_digest = HeimdallBot._on_scheduled_digest.__get__(stub)
 
         await stub._on_scheduled_digest({"id": "d1", "channel_id": "67890"})
         channel.send.assert_awaited()
@@ -1475,7 +1475,7 @@ class TestOnScheduledDigest:
         stub.get_channel = MagicMock(return_value=channel)
         stub._format_digest_raw = AsyncMock(return_value="raw data here")
         stub.codex_client.chat = AsyncMock(side_effect=RuntimeError("API down"))
-        stub._on_scheduled_digest = LokiBot._on_scheduled_digest.__get__(stub)
+        stub._on_scheduled_digest = HeimdallBot._on_scheduled_digest.__get__(stub)
 
         await stub._on_scheduled_digest({"id": "d1", "channel_id": "67890"})
         channel.send.assert_awaited()
@@ -1489,7 +1489,7 @@ class TestOnScheduledDigest:
         channel.send = AsyncMock()
         stub.get_channel = MagicMock(return_value=channel)
         stub._format_digest_raw = AsyncMock(side_effect=RuntimeError("SSH timeout"))
-        stub._on_scheduled_digest = LokiBot._on_scheduled_digest.__get__(stub)
+        stub._on_scheduled_digest = HeimdallBot._on_scheduled_digest.__get__(stub)
 
         await stub._on_scheduled_digest({"id": "d1", "channel_id": "67890"})
         channel.send.assert_awaited()
@@ -1499,7 +1499,7 @@ class TestOnScheduledDigest:
     async def test_digest_no_channel_id(self):
         """Should warn and return when schedule has no channel_id."""
         stub = _make_bot_stub()
-        stub._on_scheduled_digest = LokiBot._on_scheduled_digest.__get__(stub)
+        stub._on_scheduled_digest = HeimdallBot._on_scheduled_digest.__get__(stub)
 
         await stub._on_scheduled_digest({"id": "d1"})
         # Should not crash
@@ -1513,7 +1513,7 @@ class TestFormatDigestRaw:
         stub = _make_bot_stub()
         stub.config.tools.hosts = {"server": MagicMock(), "desktop": MagicMock()}
         stub.tool_executor.execute = AsyncMock(return_value="42% used")
-        stub._format_digest_raw = LokiBot._format_digest_raw.__get__(stub)
+        stub._format_digest_raw = HeimdallBot._format_digest_raw.__get__(stub)
 
         result = await stub._format_digest_raw()
         assert "Disk" in result
@@ -1534,7 +1534,7 @@ class TestFormatDigestRaw:
             return "OK"
 
         stub.tool_executor.execute = AsyncMock(side_effect=side_effect)
-        stub._format_digest_raw = LokiBot._format_digest_raw.__get__(stub)
+        stub._format_digest_raw = HeimdallBot._format_digest_raw.__get__(stub)
 
         result = await stub._format_digest_raw()
         assert "ERROR" in result
@@ -1548,7 +1548,7 @@ class TestRunScheduledWorkflow:
         stub = _make_bot_stub()
         channel = AsyncMock()
         channel.send = AsyncMock()
-        stub._run_scheduled_workflow = LokiBot._run_scheduled_workflow.__get__(stub)
+        stub._run_scheduled_workflow = HeimdallBot._run_scheduled_workflow.__get__(stub)
 
         schedule = {
             "description": "Deploy flow",
@@ -1569,7 +1569,7 @@ class TestRunScheduledWorkflow:
         stub.tool_executor.execute = AsyncMock(return_value="disk 85% used - warning")
         channel = AsyncMock()
         channel.send = AsyncMock()
-        stub._run_scheduled_workflow = LokiBot._run_scheduled_workflow.__get__(stub)
+        stub._run_scheduled_workflow = HeimdallBot._run_scheduled_workflow.__get__(stub)
 
         schedule = {
             "description": "Conditional check",
@@ -1589,7 +1589,7 @@ class TestRunScheduledWorkflow:
         stub.tool_executor.execute = AsyncMock(return_value="disk 42% used - healthy")
         channel = AsyncMock()
         channel.send = AsyncMock()
-        stub._run_scheduled_workflow = LokiBot._run_scheduled_workflow.__get__(stub)
+        stub._run_scheduled_workflow = HeimdallBot._run_scheduled_workflow.__get__(stub)
 
         schedule = {
             "description": "Conditional check",
@@ -1611,7 +1611,7 @@ class TestRunScheduledWorkflow:
         stub.tool_executor.execute = AsyncMock(return_value="disk 42% - healthy")
         channel = AsyncMock()
         channel.send = AsyncMock()
-        stub._run_scheduled_workflow = LokiBot._run_scheduled_workflow.__get__(stub)
+        stub._run_scheduled_workflow = HeimdallBot._run_scheduled_workflow.__get__(stub)
 
         schedule = {
             "description": "Negated check",
@@ -1632,7 +1632,7 @@ class TestRunScheduledWorkflow:
         stub.tool_executor.execute = AsyncMock(side_effect=RuntimeError("SSH timeout"))
         channel = AsyncMock()
         channel.send = AsyncMock()
-        stub._run_scheduled_workflow = LokiBot._run_scheduled_workflow.__get__(stub)
+        stub._run_scheduled_workflow = HeimdallBot._run_scheduled_workflow.__get__(stub)
 
         schedule = {
             "description": "Failing workflow",
@@ -1662,7 +1662,7 @@ class TestRunScheduledWorkflow:
         stub.tool_executor.execute = AsyncMock(side_effect=side_effect)
         channel = AsyncMock()
         channel.send = AsyncMock()
-        stub._run_scheduled_workflow = LokiBot._run_scheduled_workflow.__get__(stub)
+        stub._run_scheduled_workflow = HeimdallBot._run_scheduled_workflow.__get__(stub)
 
         schedule = {
             "description": "Resilient workflow",
@@ -1683,7 +1683,7 @@ class TestRunScheduledWorkflow:
         stub.skill_manager.execute = AsyncMock(return_value="skill result")
         channel = AsyncMock()
         channel.send = AsyncMock()
-        stub._run_scheduled_workflow = LokiBot._run_scheduled_workflow.__get__(stub)
+        stub._run_scheduled_workflow = HeimdallBot._run_scheduled_workflow.__get__(stub)
 
         schedule = {
             "description": "Skill workflow",
@@ -1700,7 +1700,7 @@ class TestRunScheduledWorkflow:
         stub.tool_executor.execute = AsyncMock(return_value="x" * 500)
         channel = AsyncMock()
         channel.send = AsyncMock()
-        stub._run_scheduled_workflow = LokiBot._run_scheduled_workflow.__get__(stub)
+        stub._run_scheduled_workflow = HeimdallBot._run_scheduled_workflow.__get__(stub)
 
         schedule = {
             "description": "Long workflow",
@@ -1729,7 +1729,7 @@ class TestResolveMentions:
         guild = MagicMock()
         guild.members = [member]
         stub.guilds = [guild]
-        stub._resolve_mentions = LokiBot._resolve_mentions.__get__(stub)
+        stub._resolve_mentions = HeimdallBot._resolve_mentions.__get__(stub)
 
         result = stub._resolve_mentions("Hey @testuser check this out")
         assert "<@12345>" in result
@@ -1744,7 +1744,7 @@ class TestResolveMentions:
         guild = MagicMock()
         guild.members = [member]
         stub.guilds = [guild]
-        stub._resolve_mentions = LokiBot._resolve_mentions.__get__(stub)
+        stub._resolve_mentions = HeimdallBot._resolve_mentions.__get__(stub)
 
         result = stub._resolve_mentions("Hey @bob")
         assert "<@99999>" in result
@@ -1753,7 +1753,7 @@ class TestResolveMentions:
         """Should leave unknown mentions unchanged."""
         stub = _make_bot_stub()
         stub.guilds = [MagicMock(members=[])]
-        stub._resolve_mentions = LokiBot._resolve_mentions.__get__(stub)
+        stub._resolve_mentions = HeimdallBot._resolve_mentions.__get__(stub)
 
         result = stub._resolve_mentions("Hey @unknown")
         assert "@unknown" in result
@@ -1772,7 +1772,7 @@ class TestOnMonitorAlert:
         channel = AsyncMock()
         channel.send = AsyncMock()
         stub.get_channel = MagicMock(return_value=channel)
-        stub._on_monitor_alert = LokiBot._on_monitor_alert.__get__(stub)
+        stub._on_monitor_alert = HeimdallBot._on_monitor_alert.__get__(stub)
 
         await stub._on_monitor_alert("Disk usage above 90%!")
         channel.send.assert_awaited_once_with("Disk usage above 90%!")
@@ -1785,7 +1785,7 @@ class TestOnMonitorAlert:
         channel = AsyncMock()
         channel.send = AsyncMock()
         stub.get_channel = MagicMock(return_value=channel)
-        stub._on_monitor_alert = LokiBot._on_monitor_alert.__get__(stub)
+        stub._on_monitor_alert = HeimdallBot._on_monitor_alert.__get__(stub)
 
         await stub._on_monitor_alert("Memory critical!")
         stub.get_channel.assert_called_with(12345)
@@ -1795,7 +1795,7 @@ class TestOnMonitorAlert:
         stub = _make_bot_stub()
         stub.config.monitoring.alert_channel_id = ""
         stub.config.discord.channels = []
-        stub._on_monitor_alert = LokiBot._on_monitor_alert.__get__(stub)
+        stub._on_monitor_alert = HeimdallBot._on_monitor_alert.__get__(stub)
 
         await stub._on_monitor_alert("Alert!")
         # Should not crash
@@ -1803,7 +1803,7 @@ class TestOnMonitorAlert:
     async def test_alert_channel_not_found(self):
         """Should warn when channel object is not found."""
         stub = _make_bot_stub()
-        stub._on_monitor_alert = LokiBot._on_monitor_alert.__get__(stub)
+        stub._on_monitor_alert = HeimdallBot._on_monitor_alert.__get__(stub)
 
         await stub._on_monitor_alert("Alert!")
         # get_channel returns None by default, should not crash
@@ -1814,7 +1814,7 @@ class TestOnMonitorAlert:
         channel = AsyncMock()
         channel.send = AsyncMock(side_effect=RuntimeError("fail"))
         stub.get_channel = MagicMock(return_value=channel)
-        stub._on_monitor_alert = LokiBot._on_monitor_alert.__get__(stub)
+        stub._on_monitor_alert = HeimdallBot._on_monitor_alert.__get__(stub)
 
         await stub._on_monitor_alert("Alert!")
         # Should not crash
@@ -1830,8 +1830,8 @@ class TestProcessAttachments:
     async def test_no_attachments(self):
         """Should return empty results for no attachments."""
         stub = _make_bot_stub()
-        stub._process_attachments = LokiBot._process_attachments.__get__(stub)
-        stub._detect_image_type = LokiBot._detect_image_type
+        stub._process_attachments = HeimdallBot._process_attachments.__get__(stub)
+        stub._detect_image_type = HeimdallBot._detect_image_type
         msg = _make_message()
         msg.attachments = []
 
@@ -1842,9 +1842,9 @@ class TestProcessAttachments:
     async def test_image_attachment(self):
         """Should process image as base64 content block."""
         stub = _make_bot_stub()
-        stub._process_attachments = LokiBot._process_attachments.__get__(stub)
-        stub._detect_image_type = LokiBot._detect_image_type
-        stub._get_attachment_hint = LokiBot._get_attachment_hint
+        stub._process_attachments = HeimdallBot._process_attachments.__get__(stub)
+        stub._detect_image_type = HeimdallBot._detect_image_type
+        stub._get_attachment_hint = HeimdallBot._get_attachment_hint
 
         att = AsyncMock()
         att.filename = "screenshot.png"
@@ -1864,8 +1864,8 @@ class TestProcessAttachments:
     async def test_oversized_image(self):
         """Should skip images over 5MB."""
         stub = _make_bot_stub()
-        stub._process_attachments = LokiBot._process_attachments.__get__(stub)
-        stub._detect_image_type = LokiBot._detect_image_type
+        stub._process_attachments = HeimdallBot._process_attachments.__get__(stub)
+        stub._detect_image_type = HeimdallBot._detect_image_type
 
         att = AsyncMock()
         att.filename = "huge.png"
@@ -1882,9 +1882,9 @@ class TestProcessAttachments:
     async def test_text_file_attachment(self):
         """Should inline text file contents."""
         stub = _make_bot_stub()
-        stub._process_attachments = LokiBot._process_attachments.__get__(stub)
-        stub._detect_image_type = LokiBot._detect_image_type
-        stub._get_attachment_hint = LokiBot._get_attachment_hint
+        stub._process_attachments = HeimdallBot._process_attachments.__get__(stub)
+        stub._detect_image_type = HeimdallBot._detect_image_type
+        stub._get_attachment_hint = HeimdallBot._get_attachment_hint
 
         att = AsyncMock()
         att.filename = "config.yml"
@@ -1903,8 +1903,8 @@ class TestProcessAttachments:
     async def test_large_text_file(self):
         """Should preview large text files and suggest ingestion."""
         stub = _make_bot_stub()
-        stub._process_attachments = LokiBot._process_attachments.__get__(stub)
-        stub._detect_image_type = LokiBot._detect_image_type
+        stub._process_attachments = HeimdallBot._process_attachments.__get__(stub)
+        stub._detect_image_type = HeimdallBot._detect_image_type
 
         att = AsyncMock()
         att.filename = "big_log.txt"
@@ -1921,8 +1921,8 @@ class TestProcessAttachments:
     async def test_binary_attachment(self):
         """Should report binary files without reading content."""
         stub = _make_bot_stub()
-        stub._process_attachments = LokiBot._process_attachments.__get__(stub)
-        stub._detect_image_type = LokiBot._detect_image_type
+        stub._process_attachments = HeimdallBot._process_attachments.__get__(stub)
+        stub._detect_image_type = HeimdallBot._detect_image_type
 
         att = AsyncMock()
         att.filename = "data.bin"
@@ -1939,8 +1939,8 @@ class TestProcessAttachments:
     async def test_large_non_text_attachment(self):
         """Should report large non-text attachments as too large."""
         stub = _make_bot_stub()
-        stub._process_attachments = LokiBot._process_attachments.__get__(stub)
-        stub._detect_image_type = LokiBot._detect_image_type
+        stub._process_attachments = HeimdallBot._process_attachments.__get__(stub)
+        stub._detect_image_type = HeimdallBot._detect_image_type
 
         att = AsyncMock()
         att.filename = "archive.zip"
@@ -1956,8 +1956,8 @@ class TestProcessAttachments:
     async def test_image_read_failure(self):
         """Should handle image read errors gracefully."""
         stub = _make_bot_stub()
-        stub._process_attachments = LokiBot._process_attachments.__get__(stub)
-        stub._detect_image_type = LokiBot._detect_image_type
+        stub._process_attachments = HeimdallBot._process_attachments.__get__(stub)
+        stub._detect_image_type = HeimdallBot._detect_image_type
 
         att = AsyncMock()
         att.filename = "broken.png"
@@ -1975,9 +1975,9 @@ class TestProcessAttachments:
     async def test_jpg_media_type_normalization(self):
         """Should normalize image/jpg to image/jpeg."""
         stub = _make_bot_stub()
-        stub._process_attachments = LokiBot._process_attachments.__get__(stub)
-        stub._detect_image_type = LokiBot._detect_image_type
-        stub._get_attachment_hint = LokiBot._get_attachment_hint
+        stub._process_attachments = HeimdallBot._process_attachments.__get__(stub)
+        stub._detect_image_type = HeimdallBot._detect_image_type
+        stub._get_attachment_hint = HeimdallBot._get_attachment_hint
 
         att = AsyncMock()
         att.filename = "photo.jpg"
@@ -2007,7 +2007,7 @@ class TestOnMessage:
     async def test_ignores_bot_messages(self):
         """Should ignore messages from bots."""
         stub = _make_bot_stub()
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
         msg = _make_message()
         msg.author.bot = True
 
@@ -2018,7 +2018,7 @@ class TestOnMessage:
         """Should ignore messages from disallowed users."""
         stub = _make_bot_stub()
         stub._is_allowed_user = MagicMock(return_value=False)
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
         msg = _make_message(author_id="99999")
 
         await stub.on_message(msg)
@@ -2029,7 +2029,7 @@ class TestOnMessage:
         stub = _make_bot_stub()
         stub._is_allowed_user = MagicMock(return_value=True)
         stub._is_allowed_channel = MagicMock(return_value=False)
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
         msg = _make_message(channel_id="99999")
 
         await stub.on_message(msg)
@@ -2041,7 +2041,7 @@ class TestOnMessage:
         stub._is_allowed_user = MagicMock(return_value=True)
         stub._is_allowed_channel = MagicMock(return_value=True)
         stub._processed_messages = {123: None}
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
         msg = _make_message()
         msg.id = 123
 
@@ -2058,7 +2058,7 @@ class TestOnMessage:
         stub._check_for_secrets = MagicMock(return_value=False)
         stub._handle_message = AsyncMock()
         stub.user.mentioned_in = MagicMock(return_value=True)
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content=f"<@111> check disk")
         msg.id = int(time.time() * 1000) + 1
@@ -2077,7 +2077,7 @@ class TestOnMessage:
         stub._processed_messages = {}
         stub._process_attachments = AsyncMock(return_value=("", []))
         stub._check_for_secrets = MagicMock(return_value=True)
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content="api_key=supersecretkey12345")
         msg.id = int(time.time() * 1000) + 2
@@ -2094,7 +2094,7 @@ class TestOnMessage:
         stub._processed_messages = {}
         stub._process_attachments = AsyncMock(return_value=("", []))
         stub._check_for_secrets = MagicMock(return_value=True)
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content="api_key=supersecretkey12345")
         msg.id = int(time.time() * 1000) + 3
@@ -2113,7 +2113,7 @@ class TestOnMessage:
         stub._process_attachments = AsyncMock(return_value=("", []))
         stub._check_for_secrets = MagicMock(return_value=False)
         stub._handle_message = AsyncMock()
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content="")
         msg.id = int(time.time() * 1000) + 4
@@ -2130,7 +2130,7 @@ class TestOnMessage:
         stub._process_attachments = AsyncMock(return_value=("", [{"type": "image"}]))
         stub._check_for_secrets = MagicMock(return_value=False)
         stub._handle_message = AsyncMock()
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content="")
         msg.id = int(time.time() * 1000) + 5
@@ -2152,7 +2152,7 @@ class TestHandleMessage:
     async def test_acquires_channel_lock(self):
         """Should acquire per-channel lock."""
         stub = _make_bot_stub()
-        stub._handle_message = LokiBot._handle_message.__get__(stub)
+        stub._handle_message = HeimdallBot._handle_message.__get__(stub)
         stub._handle_message_inner = AsyncMock()
         msg = _make_message()
 
@@ -2163,7 +2163,7 @@ class TestHandleMessage:
     async def test_thread_context_inheritance(self):
         """Should inherit context from parent channel for threads."""
         stub = _make_bot_stub()
-        stub._handle_message = LokiBot._handle_message.__get__(stub)
+        stub._handle_message = HeimdallBot._handle_message.__get__(stub)
         stub._handle_message_inner = AsyncMock()
 
         msg = _make_message()
@@ -2207,7 +2207,7 @@ class TestHandleMessageInnerErrors:
         """Should send error message when _process_with_tools raises any exception."""
         stub = _make_bot_stub()
         stub._process_with_tools = AsyncMock(side_effect=RuntimeError("tool loop crashed"))
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "check disk", "67890")
@@ -2222,7 +2222,7 @@ class TestHandleMessageInnerErrors:
         """Should send 'No tool backend' message when codex_client is None."""
         stub = _make_bot_stub()
         stub.codex_client = None
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "check disk", "67890")
@@ -2238,7 +2238,7 @@ class TestHandleMessageInnerErrors:
         stub._process_with_tools = AsyncMock(
             return_value=("Tool execution failed: timeout", False, True, [], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "check disk", "67890")
@@ -2256,7 +2256,7 @@ class TestHandleMessageInnerErrors:
         # Make get_task_history raise, which bubbles to outer except
         # (this is called before the inner try/except around _process_with_tools)
         stub.sessions.get_task_history = AsyncMock(side_effect=RuntimeError("db crashed"))
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "hello", "67890")
@@ -2271,7 +2271,7 @@ class TestHandleMessageInnerErrors:
         stub._process_with_tools = AsyncMock(
             return_value=("Hello!", False, False, [], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         voice_cb = AsyncMock()
@@ -2287,7 +2287,7 @@ class TestHandleMessageInnerErrors:
         stub._process_with_tools = AsyncMock(
             return_value=("Disk: 42%", False, False, ["check_disk"], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "check disk", "67890")
@@ -2300,7 +2300,7 @@ class TestHandleMessageInnerErrors:
         stub._process_with_tools = AsyncMock(
             return_value=("Error occurred", False, True, [], False)  # is_error=True
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "check disk", "67890")
@@ -2326,7 +2326,7 @@ class TestTaskNoCodex:
         """Should return 'No tool backend' message for task when codex_client is None."""
         stub = _make_bot_stub()
         stub.codex_client = None
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "check disk", "67890")
@@ -2353,7 +2353,7 @@ class TestImageInjection:
         stub._process_with_tools = AsyncMock(
             return_value=("I see a cat!", False, False, [], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         image_blocks = [{"type": "image", "source": {"type": "base64", "data": "abc"}}]
@@ -2377,7 +2377,7 @@ class TestTrackRecentAction:
     def test_tracks_action(self):
         """Should record tool execution in recent actions."""
         stub = _make_bot_stub()
-        stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
+        stub._track_recent_action = HeimdallBot._track_recent_action.__get__(stub)
 
         stub._track_recent_action(
             "check_disk", {"host": "server"}, "42% used", 150, channel_id="67890",
@@ -2388,7 +2388,7 @@ class TestTrackRecentAction:
     def test_no_channel_id_skips(self):
         """Should skip tracking when no channel_id."""
         stub = _make_bot_stub()
-        stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
+        stub._track_recent_action = HeimdallBot._track_recent_action.__get__(stub)
 
         stub._track_recent_action("check_disk", {}, "ok", 100, channel_id=None)
         assert len(stub._recent_actions) == 0
@@ -2397,7 +2397,7 @@ class TestTrackRecentAction:
         """Should cap actions per channel to max."""
         stub = _make_bot_stub()
         stub._recent_actions_max = 3
-        stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
+        stub._track_recent_action = HeimdallBot._track_recent_action.__get__(stub)
 
         for i in range(5):
             stub._track_recent_action(f"tool_{i}", {}, "ok", 100, channel_id="67890")
@@ -2414,7 +2414,7 @@ class TestInjectToolHints:
     async def test_injects_hints(self):
         """Should return prompt with tool hints appended."""
         stub = _make_bot_stub()
-        stub._inject_tool_hints = LokiBot._inject_tool_hints.__get__(stub)
+        stub._inject_tool_hints = HeimdallBot._inject_tool_hints.__get__(stub)
         stub.tool_memory = MagicMock()
         stub.tool_memory.format_hints = AsyncMock(return_value="## Tool Hints\nUse check_disk for disk checks")
 
@@ -2425,7 +2425,7 @@ class TestInjectToolHints:
     async def test_no_hints_available(self):
         """Should return prompt unchanged when no hints available."""
         stub = _make_bot_stub()
-        stub._inject_tool_hints = LokiBot._inject_tool_hints.__get__(stub)
+        stub._inject_tool_hints = HeimdallBot._inject_tool_hints.__get__(stub)
         stub.tool_memory = MagicMock()
         stub.tool_memory.format_hints = AsyncMock(return_value="")
 
@@ -2435,7 +2435,7 @@ class TestInjectToolHints:
     async def test_handles_exception(self):
         """Should return prompt unchanged on exception."""
         stub = _make_bot_stub()
-        stub._inject_tool_hints = LokiBot._inject_tool_hints.__get__(stub)
+        stub._inject_tool_hints = HeimdallBot._inject_tool_hints.__get__(stub)
         stub.tool_memory = MagicMock()
         stub.tool_memory.format_hints = AsyncMock(side_effect=RuntimeError("fail"))
 
@@ -2445,7 +2445,7 @@ class TestInjectToolHints:
     async def test_no_tool_memory(self):
         """Should return prompt unchanged when tool_memory missing."""
         stub = _make_bot_stub()
-        stub._inject_tool_hints = LokiBot._inject_tool_hints.__get__(stub)
+        stub._inject_tool_hints = HeimdallBot._inject_tool_hints.__get__(stub)
         del stub.tool_memory
 
         result = await stub._inject_tool_hints("base prompt", "test")
@@ -2463,7 +2463,7 @@ class TestMergedToolDefinitions:
         """Should return all builtin tools when no skills."""
         stub = _make_bot_stub()
         stub._cached_merged_tools = None
-        stub._merged_tool_definitions = LokiBot._merged_tool_definitions.__get__(stub)
+        stub._merged_tool_definitions = HeimdallBot._merged_tool_definitions.__get__(stub)
 
         result = stub._merged_tool_definitions()
         # Should contain builtin tools
@@ -2477,7 +2477,7 @@ class TestMergedToolDefinitions:
             {"name": "check_disk", "description": "custom check_disk"},
             {"name": "my_custom_skill", "description": "custom skill"},
         ])
-        stub._merged_tool_definitions = LokiBot._merged_tool_definitions.__get__(stub)
+        stub._merged_tool_definitions = HeimdallBot._merged_tool_definitions.__get__(stub)
 
         result = stub._merged_tool_definitions()
         names = [t["name"] for t in result]
@@ -2504,7 +2504,7 @@ class TestVoiceCommands:
         stub._processed_messages = {}
         stub._process_attachments = AsyncMock(return_value=("", []))
         stub._check_for_secrets = MagicMock(return_value=False)
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content="join voice channel")
         msg.id = int(time.time() * 1000) + 10
@@ -2529,7 +2529,7 @@ class TestVoiceCommands:
         stub._processed_messages = {}
         stub._process_attachments = AsyncMock(return_value=("", []))
         stub._check_for_secrets = MagicMock(return_value=False)
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content="leave voice")
         msg.id = int(time.time() * 1000) + 11
@@ -2547,7 +2547,7 @@ class TestVoiceCommands:
         stub._processed_messages = {}
         stub._process_attachments = AsyncMock(return_value=("", []))
         stub._check_for_secrets = MagicMock(return_value=False)
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content="join voice channel")
         msg.id = int(time.time() * 1000) + 12
@@ -2576,7 +2576,7 @@ class TestProcessWithTools:
         from src.llm.types import LLMResponse, ToolCall
 
         stub = _make_bot_stub()
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
         # Track iteration count
         iteration_count = [0]
@@ -2624,7 +2624,7 @@ class TestGuestTierForcing:
         stub.permissions.is_guest = MagicMock(return_value=True)
         stub.codex_client = MagicMock()
         stub.codex_client.chat = AsyncMock(return_value="Chat response")
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         # Even with task keyword, guest should get chat
@@ -2646,7 +2646,7 @@ class TestTaskRouteWithCodex:
         """When Codex available, task route calls _process_with_tools."""
         stub = _make_bot_stub()
         stub._process_with_tools = AsyncMock(return_value=("Tool result", False, False, ["check_disk"], False))
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "check status", "67890")

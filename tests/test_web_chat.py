@@ -93,13 +93,13 @@ def _make_chat_bot(*, codex_available=True, process_result=None):
         bot.codex_client = None
 
     # System prompt builders
-    bot._build_system_prompt = MagicMock(return_value="You are Loki.")
-    bot._inject_tool_hints = AsyncMock(return_value="You are Loki.")
+    bot._build_system_prompt = MagicMock(return_value="You are Heimdall.")
+    bot._inject_tool_hints = AsyncMock(return_value="You are Heimdall.")
 
     # _process_with_tools
     if process_result is None:
         # Default: simple text response, no tools, no error
-        process_result = ("Hello from Loki!", False, False, [], False)
+        process_result = ("Hello from Heimdall!", False, False, [], False)
     bot._process_with_tools = AsyncMock(return_value=process_result)
 
     # Permissions
@@ -214,7 +214,7 @@ class TestProcessWebChat:
     async def test_basic_chat(self):
         bot = _make_chat_bot()
         result = await process_web_chat(bot, "hello", "web-1")
-        assert result["response"] == "Hello from Loki!"
+        assert result["response"] == "Hello from Heimdall!"
         assert result["tools_used"] == []
         assert result["is_error"] is False
 
@@ -351,7 +351,7 @@ class TestChatEndpoint:
             )
             assert resp.status == 200
             body = await resp.json()
-            assert body["response"] == "Hello from Loki!"
+            assert body["response"] == "Hello from Heimdall!"
             assert body["tools_used"] == []
             assert body["is_error"] is False
 
@@ -482,7 +482,7 @@ class TestWebSocketChat:
             })
             resp = await ws.receive_json()
             assert resp["type"] == "chat_response"
-            assert resp["content"] == "Hello from Loki!"
+            assert resp["content"] == "Hello from Heimdall!"
             assert resp["tools_used"] == []
             assert resp["is_error"] is False
             await ws.close()

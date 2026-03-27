@@ -45,7 +45,7 @@ from src.discord.client import (
     detect_hedging,
     detect_code_hedging,
     DISCORD_MAX_LEN,
-    LokiBot,
+    HeimdallBot,
 )
 from src.discord.background_task import (
     _is_error_output,
@@ -73,7 +73,7 @@ from src.tools.skill_context import SkillContext
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub(**overrides):
-    """Minimal LokiBot stub for method-level tests."""
+    """Minimal HeimdallBot stub for method-level tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -504,7 +504,7 @@ class TestSendChunked:
     async def test_short_message_sent_directly(self, bot_stub, msg):
         """Messages under 2000 chars sent as-is."""
         text = "Hello world"
-        await LokiBot._send_chunked(bot_stub, msg, text)
+        await HeimdallBot._send_chunked(bot_stub, msg, text)
         bot_stub._send_with_retry.assert_called_once()
         call_args = bot_stub._send_with_retry.call_args
         assert call_args[0][1] == text
@@ -513,13 +513,13 @@ class TestSendChunked:
         """Messages over 2000 chars split into multiple sends."""
         # Create text that's ~3000 chars
         text = ("A" * 100 + "\n") * 30  # 30 lines of 101 chars = 3030 chars
-        await LokiBot._send_chunked(bot_stub, msg, text)
+        await HeimdallBot._send_chunked(bot_stub, msg, text)
         assert bot_stub._send_with_retry.call_count >= 2
 
     async def test_very_long_message_sent_as_file(self, bot_stub, msg):
         """Messages over 4x DISCORD_MAX_LEN sent as file attachment."""
         text = "X" * (DISCORD_MAX_LEN * 4 + 1)
-        await LokiBot._send_chunked(bot_stub, msg, text)
+        await HeimdallBot._send_chunked(bot_stub, msg, text)
         call_args = bot_stub._send_with_retry.call_args
         files = call_args.kwargs.get("files") or call_args[1].get("files", [])
         assert any(
@@ -538,7 +538,7 @@ class TestSendChunked:
 
         assert len(text) > DISCORD_MAX_LEN
 
-        await LokiBot._send_chunked(bot_stub, msg, text)
+        await HeimdallBot._send_chunked(bot_stub, msg, text)
         assert bot_stub._send_with_retry.call_count >= 2
 
         # Second chunk should reopen the code block
@@ -552,7 +552,7 @@ class TestSendChunked:
             (b"filedata", "output.txt"),
         ]
         text = ("A" * 100 + "\n") * 30  # >2000 chars
-        await LokiBot._send_chunked(bot_stub, msg, text)
+        await HeimdallBot._send_chunked(bot_stub, msg, text)
         # First call should have files
         first_call = bot_stub._send_with_retry.call_args_list[0]
         files = first_call.kwargs.get("files") or first_call[1].get("files", [])

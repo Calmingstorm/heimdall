@@ -23,7 +23,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
-    LokiBot,
+    HeimdallBot,
     MAX_TOOL_ITERATIONS,
     TOOL_OUTPUT_MAX_CHARS,
     truncate_tool_output,
@@ -37,7 +37,7 @@ from src.llm.secret_scrubber import scrub_output_secrets  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Minimal LokiBot stub for _process_with_tools and Discord-native tools."""
+    """Minimal HeimdallBot stub for _process_with_tools and Discord-native tools."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -78,26 +78,26 @@ def _make_bot_stub():
     stub._background_tasks = {}
     stub._background_tasks_max = 10
     # Bind real methods
-    stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
-    stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
-    stub._handle_purge = LokiBot._handle_purge.__get__(stub)
-    stub._handle_generate_file = LokiBot._handle_generate_file.__get__(stub)
-    stub._handle_post_file = LokiBot._handle_post_file.__get__(stub)
-    stub._handle_schedule_task = LokiBot._handle_schedule_task.__get__(stub)
-    stub._handle_list_schedules = LokiBot._handle_list_schedules.__get__(stub)
-    stub._handle_delete_schedule = LokiBot._handle_delete_schedule.__get__(stub)
-    stub._handle_parse_time = LokiBot._handle_parse_time.__get__(stub)
-    stub._handle_search_history = LokiBot._handle_search_history.__get__(stub)
-    stub._handle_search_knowledge = LokiBot._handle_search_knowledge.__get__(stub)
-    stub._handle_list_knowledge = LokiBot._handle_list_knowledge.__get__(stub)
-    stub._handle_delete_knowledge = LokiBot._handle_delete_knowledge.__get__(stub)
-    stub._handle_ingest_document = LokiBot._handle_ingest_document.__get__(stub)
-    stub._handle_set_permission = LokiBot._handle_set_permission.__get__(stub)
-    stub._handle_search_audit = LokiBot._handle_search_audit.__get__(stub)
-    stub._handle_create_digest = LokiBot._handle_create_digest.__get__(stub)
-    stub._handle_delegate_task = LokiBot._handle_delegate_task.__get__(stub)
-    stub._handle_list_tasks = LokiBot._handle_list_tasks.__get__(stub)
-    stub._handle_cancel_task = LokiBot._handle_cancel_task.__get__(stub)
+    stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
+    stub._track_recent_action = HeimdallBot._track_recent_action.__get__(stub)
+    stub._handle_purge = HeimdallBot._handle_purge.__get__(stub)
+    stub._handle_generate_file = HeimdallBot._handle_generate_file.__get__(stub)
+    stub._handle_post_file = HeimdallBot._handle_post_file.__get__(stub)
+    stub._handle_schedule_task = HeimdallBot._handle_schedule_task.__get__(stub)
+    stub._handle_list_schedules = HeimdallBot._handle_list_schedules.__get__(stub)
+    stub._handle_delete_schedule = HeimdallBot._handle_delete_schedule.__get__(stub)
+    stub._handle_parse_time = HeimdallBot._handle_parse_time.__get__(stub)
+    stub._handle_search_history = HeimdallBot._handle_search_history.__get__(stub)
+    stub._handle_search_knowledge = HeimdallBot._handle_search_knowledge.__get__(stub)
+    stub._handle_list_knowledge = HeimdallBot._handle_list_knowledge.__get__(stub)
+    stub._handle_delete_knowledge = HeimdallBot._handle_delete_knowledge.__get__(stub)
+    stub._handle_ingest_document = HeimdallBot._handle_ingest_document.__get__(stub)
+    stub._handle_set_permission = HeimdallBot._handle_set_permission.__get__(stub)
+    stub._handle_search_audit = HeimdallBot._handle_search_audit.__get__(stub)
+    stub._handle_create_digest = HeimdallBot._handle_create_digest.__get__(stub)
+    stub._handle_delegate_task = HeimdallBot._handle_delegate_task.__get__(stub)
+    stub._handle_list_tasks = HeimdallBot._handle_list_tasks.__get__(stub)
+    stub._handle_cancel_task = HeimdallBot._handle_cancel_task.__get__(stub)
     return stub
 
 
@@ -1613,7 +1613,7 @@ class TestSourceStructureVerification:
     def test_all_discord_native_tools_in_run_tool(self):
         """All Discord-native tool names appear in _run_tool dispatch."""
         import inspect
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
 
         discord_native = [
             "purge_messages", "browser_screenshot", "generate_file", "post_file",
@@ -1627,39 +1627,39 @@ class TestSourceStructureVerification:
             assert tool_name in source, f"Discord-native tool {tool_name} not in _process_with_tools"
 
     def test_scrub_output_secrets_called_in_run_tool(self):
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         assert "scrub_output_secrets" in source
 
     def test_audit_log_called_in_run_tool(self):
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         assert "audit.log_execution" in source
 
     def test_truncate_tool_output_called_in_run_tool(self):
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         assert "truncate_tool_output" in source
 
     def test_asyncio_gather_for_parallel_execution(self):
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         assert "asyncio.gather" in source
 
     def test_wait_for_timeout_wrapping(self):
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         assert "asyncio.wait_for" in source
         assert "tool_timeout" in source
 
     def test_max_tool_iterations_guard(self):
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         assert "MAX_TOOL_ITERATIONS" in source
 
     def test_fallback_to_tool_executor(self):
         """Unknown tools fall through to tool_executor.execute."""
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         assert "tool_executor.execute" in source
 
     def test_tool_choice_is_auto(self):
         """chat_with_tools uses tool_choice='auto'."""
         import inspect
-        source = inspect.getsource(LokiBot)
+        source = inspect.getsource(HeimdallBot)
         # Check in codex client
         from src.llm.openai_codex import CodexChatClient
         codex_source = inspect.getsource(CodexChatClient.chat_with_tools)
@@ -1667,7 +1667,7 @@ class TestSourceStructureVerification:
 
     def test_no_approval_in_run_tool(self):
         """No approval checks in the tool execution path."""
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         assert "request_approval" not in source
         assert "requires_approval" not in source
         assert "ApprovalView" not in source

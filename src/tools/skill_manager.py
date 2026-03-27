@@ -78,7 +78,7 @@ class SkillManager:
             log.info("Loaded %d skill(s): %s", len(self._skills), ", ".join(self._skills))
 
     def _load_skill(self, path: Path) -> LoadedSkill | None:
-        module_name = f"loki_skill_{path.stem}"
+        module_name = f"heimdall_skill_{path.stem}"
         try:
             spec = importlib.util.spec_from_file_location(module_name, path)
             if not spec or not spec.loader:
@@ -131,7 +131,7 @@ class SkillManager:
             # Use the actual module name stored during load (based on file stem)
             # rather than deriving from skill name, which could differ for
             # manually placed skill files.
-            mod_name = skill.module_name or f"loki_skill_{name}"
+            mod_name = skill.module_name or f"heimdall_skill_{name}"
             sys.modules.pop(mod_name, None)
             del self._skills[name]
 

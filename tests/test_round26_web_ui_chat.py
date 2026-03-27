@@ -102,11 +102,11 @@ def _make_chat_bot(*, codex_available=True, process_result=None):
     else:
         bot.codex_client = None
 
-    bot._build_system_prompt = MagicMock(return_value="You are Loki.")
-    bot._inject_tool_hints = AsyncMock(return_value="You are Loki.")
+    bot._build_system_prompt = MagicMock(return_value="You are Heimdall.")
+    bot._inject_tool_hints = AsyncMock(return_value="You are Heimdall.")
 
     if process_result is None:
-        process_result = ("Hello from Loki!", False, False, [], False)
+        process_result = ("Hello from Heimdall!", False, False, [], False)
     bot._process_with_tools = AsyncMock(return_value=process_result)
 
     bot.permissions = MagicMock()
@@ -192,7 +192,7 @@ class TestChatSessionSaveResilience:
         # Should not raise — save is wrapped in try/except
         result = await process_web_chat(bot, "hello", "web-1")
         # Still returns the response
-        assert result["response"] == "Hello from Loki!"
+        assert result["response"] == "Hello from Heimdall!"
         assert result["is_error"] is False
 
     @pytest.mark.asyncio

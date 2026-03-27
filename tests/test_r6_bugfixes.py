@@ -42,8 +42,8 @@ class TestToolsUsedLocalVariable:
     """Verify _process_with_tools returns tools_used as 4th tuple element."""
 
     def _make_bot_stub(self):
-        """Minimal LokiBot stub for _process_with_tools."""
-        from src.discord.client import LokiBot  # noqa
+        """Minimal HeimdallBot stub for _process_with_tools."""
+        from src.discord.client import HeimdallBot  # noqa
 
         stub = SimpleNamespace()
         stub._system_prompt = "test prompt"
@@ -62,13 +62,13 @@ class TestToolsUsedLocalVariable:
         stub._send_with_retry = AsyncMock()
         stub._merged_tool_definitions = MagicMock(return_value=[])
         stub.skill_manager = MagicMock()
-        stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
+        stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
 
         msg = MagicMock()
         msg.author.id = 100000000000000001
         msg.channel.id = 123
 
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
         return stub, msg
 
     async def test_returns_5_tuple(self):

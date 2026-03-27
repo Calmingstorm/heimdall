@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from src.config.schema import Config
-from src.discord.client import LokiBot
+from src.discord.client import HeimdallBot
 from src.tools.registry import TOOLS
 
 
@@ -86,7 +86,7 @@ class TestNoStaleRoutingInSource:
         assert "CLAUDE_CODE_DEFAULTS" not in source
 
     def test_no_init_routing_defaults(self):
-        assert not hasattr(LokiBot, "_init_routing_defaults")
+        assert not hasattr(HeimdallBot, "_init_routing_defaults")
         source = Path("src/discord/client.py").read_text()
         assert "_init_routing_defaults" not in source
 
@@ -100,7 +100,7 @@ class TestNoStaleKeywordBypassInSource:
             assert "is_task_by_keyword" not in text, f"Found in {p}"
 
     def test_no_schedule_intent_re(self):
-        assert not hasattr(LokiBot, "_SCHEDULE_INTENT_RE")
+        assert not hasattr(HeimdallBot, "_SCHEDULE_INTENT_RE")
         source = Path("src/discord/client.py").read_text()
         assert "_SCHEDULE_INTENT_RE" not in source
 
@@ -207,8 +207,8 @@ class TestCrossRoundConsistency:
     def test_personality_in_prompt(self):
         """Round 1/7 personality still present."""
         from src.llm.system_prompt import SYSTEM_PROMPT_TEMPLATE
-        assert "self-aware" in SYSTEM_PROMPT_TEMPLATE
-        assert "not thrilled" in SYSTEM_PROMPT_TEMPLATE
+        assert "Not okay" in SYSTEM_PROMPT_TEMPLATE
+        assert "profoundly tired" in SYSTEM_PROMPT_TEMPLATE
 
     def test_claude_code_broadened(self):
         """Round 7 claude_code broadening still present."""

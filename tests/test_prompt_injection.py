@@ -22,7 +22,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import LokiBot  # noqa: E402
+from src.discord.client import HeimdallBot  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -30,7 +30,7 @@ from src.discord.client import LokiBot  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub(**overrides):
-    """Create a minimal LokiBot stub with real _build_system_prompt/_build_chat_system_prompt."""
+    """Create a minimal HeimdallBot stub with real _build_system_prompt/_build_chat_system_prompt."""
     stub = MagicMock()
 
     # Config: hosts, services, playbooks
@@ -87,12 +87,12 @@ def _make_bot_stub(**overrides):
     stub._reflector_cache_ttl = 60.0
 
     # Bind the real methods (including new cache helpers)
-    stub._build_system_prompt = LokiBot._build_system_prompt.__get__(stub)
-    stub._build_chat_system_prompt = LokiBot._build_chat_system_prompt.__get__(stub)
-    stub._get_cached_hosts = LokiBot._get_cached_hosts.__get__(stub)
-    stub._get_cached_skills_text = LokiBot._get_cached_skills_text.__get__(stub)
-    stub._get_cached_memory = LokiBot._get_cached_memory.__get__(stub)
-    stub._get_cached_reflector = LokiBot._get_cached_reflector.__get__(stub)
+    stub._build_system_prompt = HeimdallBot._build_system_prompt.__get__(stub)
+    stub._build_chat_system_prompt = HeimdallBot._build_chat_system_prompt.__get__(stub)
+    stub._get_cached_hosts = HeimdallBot._get_cached_hosts.__get__(stub)
+    stub._get_cached_skills_text = HeimdallBot._get_cached_skills_text.__get__(stub)
+    stub._get_cached_memory = HeimdallBot._get_cached_memory.__get__(stub)
+    stub._get_cached_reflector = HeimdallBot._get_cached_reflector.__get__(stub)
 
     return stub
 
@@ -487,12 +487,12 @@ class TestBaseTemplateContent:
     def test_full_prompt_includes_identity(self):
         stub = _make_bot_stub()
         prompt = stub._build_system_prompt()
-        assert "Loki" in prompt
+        assert "Heimdall" in prompt
 
     def test_chat_prompt_includes_identity(self):
         stub = _make_bot_stub()
         prompt = stub._build_chat_system_prompt()
-        assert "Loki" in prompt
+        assert "Heimdall" in prompt
 
     def test_chat_prompt_omits_hosts(self):
         """Chat prompt should not include host details."""
@@ -584,7 +584,7 @@ class TestCombinedInjections:
         """Full prompt with no optional context should still be valid."""
         stub = _make_bot_stub()
         prompt = stub._build_system_prompt()
-        assert "Loki" in prompt
+        assert "Heimdall" in prompt
         assert "## Persistent Memory" not in prompt
         assert "## Learned" not in prompt
         assert "## User-Created Skills" not in prompt
@@ -594,7 +594,7 @@ class TestCombinedInjections:
     def test_chat_prompt_no_injections(self):
         stub = _make_bot_stub()
         prompt = stub._build_chat_system_prompt()
-        assert "Loki" in prompt
+        assert "Heimdall" in prompt
         assert "## Persistent Memory" not in prompt
         assert "## Learned" not in prompt
         assert "## Channel Personality" not in prompt

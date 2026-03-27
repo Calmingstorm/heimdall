@@ -117,9 +117,9 @@ class TestAuditLogResilience:
 
     async def test_audit_failure_does_not_crash_tool(self):
         """When audit.log_execution raises, the tool result should still be returned."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         # Verify audit.log_execution is wrapped: the try keyword must appear
         # before the log_execution call, with an except catching audit_err
         audit_idx = source.index("log_execution")
@@ -132,18 +132,18 @@ class TestAuditLogResilience:
 
     async def test_audit_failure_logged_as_warning(self):
         """Audit failure should log a warning, not silently swallow."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         # Check that the audit try/except logs the error
         assert "audit_err" in source or "audit log failed" in source.lower(), \
             "Audit failure should be logged with a warning"
 
     async def test_track_recent_action_wrapped(self):
         """_track_recent_action in _run_tool should be wrapped in try/except."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         # The tracking call should have error handling
         assert "Non-critical tracking" in source or "track_recent_action" in source
 
@@ -157,19 +157,19 @@ class TestSessionSaveResilience:
 
     async def test_session_save_wrapped_in_try(self):
         """sessions.save() should be inside try/except in _handle_message_inner."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import ast
         import inspect
-        source = inspect.getsource(LokiBot._handle_message_inner)
+        source = inspect.getsource(HeimdallBot._handle_message_inner)
         # Check that save_err is referenced (our try/except pattern)
         assert "save_err" in source, \
             "sessions.save() must be wrapped in try/except with save_err"
 
     async def test_session_save_failure_logged(self):
         """Session save failure should log a warning."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._handle_message_inner)
+        source = inspect.getsource(HeimdallBot._handle_message_inner)
         assert "Session save failed" in source
 
 
@@ -340,25 +340,25 @@ class TestSendWithRetryResilience:
 
     async def test_catches_connection_error(self):
         """ConnectionError should be caught and retried."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._send_with_retry)
+        source = inspect.getsource(HeimdallBot._send_with_retry)
         assert "ConnectionError" in source, \
             "_send_with_retry should catch ConnectionError"
 
     async def test_catches_os_error(self):
         """OSError should be caught and retried."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._send_with_retry)
+        source = inspect.getsource(HeimdallBot._send_with_retry)
         assert "OSError" in source, \
             "_send_with_retry should catch OSError"
 
     async def test_still_catches_http_exception(self):
         """discord.HTTPException should still be caught."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._send_with_retry)
+        source = inspect.getsource(HeimdallBot._send_with_retry)
         assert "HTTPException" in source
 
 
@@ -371,17 +371,17 @@ class TestScheduledReminderResilience:
 
     async def test_reminder_send_wrapped(self):
         """The reminder channel.send should be in a try/except."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._on_scheduled_task)
+        source = inspect.getsource(HeimdallBot._on_scheduled_task)
         # The reminder section should have error handling
         assert "Failed to send scheduled reminder" in source
 
     async def test_check_action_already_wrapped(self):
         """The check action was already wrapped — verify."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._on_scheduled_task)
+        source = inspect.getsource(HeimdallBot._on_scheduled_task)
         assert "Scheduled task failed" in source
 
 
@@ -394,37 +394,37 @@ class TestGracefulDegradation:
 
     async def test_browser_disabled_returns_message(self):
         """Browser tools return helpful message when browser is disabled."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._handle_browser_screenshot)
+        source = inspect.getsource(HeimdallBot._handle_browser_screenshot)
         assert "Browser automation is not enabled" in source
 
     async def test_comfyui_disabled_returns_message(self):
         """Generate image returns helpful message when ComfyUI is disabled."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._handle_generate_image)
+        source = inspect.getsource(HeimdallBot._handle_generate_image)
         assert "Image generation is disabled" in source
 
     async def test_comfyui_failure_returns_message(self):
         """Generate image returns helpful message when ComfyUI fails."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._handle_generate_image)
+        source = inspect.getsource(HeimdallBot._handle_generate_image)
         assert "ComfyUI may be unavailable" in source
 
     async def test_knowledge_store_unavailable_returns_message(self):
         """Knowledge operations return message when store is unavailable."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._handle_search_knowledge)
+        source = inspect.getsource(HeimdallBot._handle_search_knowledge)
         assert "Knowledge base is not available" in source
 
     async def test_codex_not_configured_returns_message(self):
         """No codex client returns a helpful message."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._handle_message_inner)
+        source = inspect.getsource(HeimdallBot._handle_message_inner)
         assert "No tool backend available" in source
 
 
@@ -633,17 +633,17 @@ class TestToolExecutionTimeout:
 
         # The timeout wrapper in _process_with_tools catches TimeoutError
         # and returns a tool_result dict with an error message
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         assert "asyncio.TimeoutError" in source
         assert "timed out after" in source
 
     async def test_timeout_audits_the_error(self):
         """Timeout should audit log the error."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         # The timeout handler should try to audit
         assert "audit.log_execution" in source
 
@@ -657,25 +657,25 @@ class TestErrorResponseToUser:
 
     async def test_error_response_scrubbed(self):
         """Error messages sent to Discord should be scrubbed for secrets."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._handle_message_inner)
+        source = inspect.getsource(HeimdallBot._handle_message_inner)
         # The outer error handler should scrub secrets
         assert "scrub_response_secrets" in source
 
     async def test_error_markers_sanitized_in_history(self):
         """Error history entries should be sanitized, not raw error text."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._handle_message_inner)
+        source = inspect.getsource(HeimdallBot._handle_message_inner)
         assert "Previous request" in source
         assert "encountered an error" in source
 
     async def test_codex_error_in_tool_loop_returns_partial_report(self):
         """When Codex API fails mid-loop, partial completion report is included."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         assert "_build_partial_completion_report" in source
         assert "LLM API error" in source
 
@@ -695,16 +695,16 @@ class TestEmptyResponseFallback:
 
     async def test_tool_loop_uses_fallback_on_empty(self):
         """Tool loop returns fallback when LLM response is empty."""
-        from src.discord.client import LokiBot, _EMPTY_RESPONSE_FALLBACK
+        from src.discord.client import HeimdallBot, _EMPTY_RESPONSE_FALLBACK
         import inspect
-        source = inspect.getsource(LokiBot._process_with_tools)
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         assert "_EMPTY_RESPONSE_FALLBACK" in source
 
     async def test_guest_chat_uses_fallback_on_empty(self):
         """Guest chat path uses fallback when Codex returns empty."""
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         import inspect
-        source = inspect.getsource(LokiBot._handle_message_inner)
+        source = inspect.getsource(HeimdallBot._handle_message_inner)
         assert "_EMPTY_RESPONSE_FALLBACK" in source
 
 

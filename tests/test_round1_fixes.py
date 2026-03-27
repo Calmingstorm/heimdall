@@ -81,7 +81,7 @@ class TestNonlocalSystemPromptBehavior:
     for subsequent tool loop iterations (the nonlocal fix)."""
 
     def _make_bot_stub(self):
-        from src.discord.client import LokiBot
+        from src.discord.client import HeimdallBot
         from src.llm.types import LLMResponse, ToolCall
 
         stub = MagicMock()
@@ -119,8 +119,8 @@ class TestNonlocalSystemPromptBehavior:
         stub._build_system_prompt = MagicMock(return_value="Updated prompt with skills")
 
         # Bind real methods
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
-        stub._track_recent_action = LokiBot._track_recent_action.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
+        stub._track_recent_action = HeimdallBot._track_recent_action.__get__(stub)
         return stub
 
     def _make_message(self):

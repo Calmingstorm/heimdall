@@ -1,4 +1,4 @@
-"""Voice channel manager for Loki.
+"""Voice channel manager for Heimdall.
 
 Uses discord.py 2.7+ with davey (DAVE protocol) for voice connections,
 and discord-ext-voice-recv for receiving audio from users.
@@ -20,7 +20,7 @@ from discord.ext import voice_recv
 if TYPE_CHECKING:
     from ..config.schema import VoiceConfig
 
-log = logging.getLogger("loki.voice")
+log = logging.getLogger("heimdall.voice")
 
 
 def _patch_voice_recv_dave():
@@ -157,7 +157,7 @@ class VoiceManager:
         self._shutting_down = False
         self._loop: asyncio.AbstractEventLoop | None = None
 
-        # Callback set by LokiBot to route transcriptions
+        # Callback set by HeimdallBot to route transcriptions
         self.on_transcription: Callable[[str, discord.Member, discord.TextChannel], Awaitable[None]] | None = None
 
     @property

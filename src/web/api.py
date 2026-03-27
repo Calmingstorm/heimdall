@@ -1,4 +1,4 @@
-"""REST API for Loki web management UI.
+"""REST API for Heimdall web management UI.
 
 All endpoints are prefixed with /api/ and require Bearer token auth
 (unless api_token is empty in config, which disables auth for dev mode).
@@ -23,7 +23,7 @@ from ..tools.registry import TOOL_PACKS, get_tool_definitions, get_pack_tool_nam
 from .chat import MAX_CHAT_CONTENT_LEN, process_web_chat
 
 if TYPE_CHECKING:
-    from ..discord.client import LokiBot
+    from ..discord.client import HeimdallBot
 
 log = get_logger("web.api")
 
@@ -106,7 +106,7 @@ def _write_config(path: Path, data: dict) -> None:
         yaml.dump(data, f, default_flow_style=False)
 
 
-def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
+def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
     """Create all API route handlers bound to the given bot instance."""
     routes = web.RouteTableDef()
 
@@ -962,7 +962,7 @@ def create_api_routes(bot: LokiBot) -> web.RouteTableDef:
     return routes
 
 
-def setup_api(app: web.Application, bot: LokiBot) -> None:
+def setup_api(app: web.Application, bot: HeimdallBot) -> None:
     """Register all API routes on the given aiohttp application."""
     routes = create_api_routes(bot)
     app.router.add_routes(routes)

@@ -432,7 +432,7 @@ class TestChatSystemPromptTemplate:
 
     def test_chat_template_identity(self):
         from src.llm.system_prompt import CHAT_SYSTEM_PROMPT_TEMPLATE
-        assert "Loki" in CHAT_SYSTEM_PROMPT_TEMPLATE
+        assert "Heimdall" in CHAT_SYSTEM_PROMPT_TEMPLATE
         assert "not Claude" in CHAT_SYSTEM_PROMPT_TEMPLATE
 
     def test_chat_template_shorter_than_main(self):
@@ -449,7 +449,7 @@ class TestBuildChatSystemPrompt:
     def test_basic_output(self):
         from src.llm.system_prompt import build_chat_system_prompt
         result = build_chat_system_prompt()
-        assert "Loki" in result
+        assert "Heimdall" in result
         assert "Voice support is not enabled" in result
 
     def test_voice_info_injected(self):
@@ -903,29 +903,29 @@ class TestSendWithRetrySource:
     def test_catches_connection_error(self):
         """ConnectionError is in the except clause."""
         import inspect
-        from src.discord.client import LokiBot
-        source = inspect.getsource(LokiBot._send_with_retry)
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot._send_with_retry)
         assert "ConnectionError" in source
 
     def test_catches_os_error(self):
         """OSError is in the except clause."""
         import inspect
-        from src.discord.client import LokiBot
-        source = inspect.getsource(LokiBot._send_with_retry)
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot._send_with_retry)
         assert "OSError" in source
 
     def test_retry_sleep_pattern(self):
         """Retry uses incremental sleep: 1 + attempt."""
         import inspect
-        from src.discord.client import LokiBot
-        source = inspect.getsource(LokiBot._send_with_retry)
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot._send_with_retry)
         assert "1 + attempt" in source
 
     def test_returns_none_on_exhaustion(self):
         """Function returns None after exhausting retries."""
         import inspect
-        from src.discord.client import LokiBot
-        source = inspect.getsource(LokiBot._send_with_retry)
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot._send_with_retry)
         assert "return None" in source
 
 
@@ -951,16 +951,16 @@ class TestAuditLogResilience:
 
     def test_audit_wrapped_in_try(self):
         import inspect
-        from src.discord.client import LokiBot
-        source = inspect.getsource(LokiBot._process_with_tools)
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         # The _run_tool nested function wraps audit in try/except
         assert "audit" in source.lower()
         assert "audit_err" in source or "Audit log" in source
 
     def test_tracking_wrapped_in_try(self):
         import inspect
-        from src.discord.client import LokiBot
-        source = inspect.getsource(LokiBot._process_with_tools)
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot._process_with_tools)
         assert "_track_recent_action" in source
 
 
@@ -969,15 +969,15 @@ class TestSessionSaveResilience:
 
     def test_session_save_in_try_block(self):
         import inspect
-        from src.discord.client import LokiBot
-        source = inspect.getsource(LokiBot._handle_message_inner)
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot._handle_message_inner)
         # Find "save" calls near "except" blocks
         assert "save_err" in source or "Session save" in source
 
     def test_scheduled_reminder_wrapped(self):
         import inspect
-        from src.discord.client import LokiBot
-        source = inspect.getsource(LokiBot._on_scheduled_task)
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot._on_scheduled_task)
         assert "Failed to send scheduled reminder" in source
 
 

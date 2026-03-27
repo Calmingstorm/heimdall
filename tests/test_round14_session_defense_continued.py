@@ -781,49 +781,49 @@ class TestSessionDefenseSourceStructure:
         """scrub_response_secrets is called on the response in client.py."""
         import inspect
         from src.discord import client
-        source = inspect.getsource(client.LokiBot._handle_message_inner)
+        source = inspect.getsource(client.HeimdallBot._handle_message_inner)
         assert "scrub_response_secrets" in source
 
     def test_scrub_tool_output_in_run_tool(self):
         """scrub_output_secrets is called on tool results in client.py."""
         import inspect
         from src.discord import client
-        source = inspect.getsource(client.LokiBot._process_with_tools)
+        source = inspect.getsource(client.HeimdallBot._process_with_tools)
         assert "scrub_output_secrets" in source
 
     def test_prune_called_after_success(self):
         """sessions.prune() is called after successful message handling."""
         import inspect
         from src.discord import client
-        source = inspect.getsource(client.LokiBot._handle_message_inner)
+        source = inspect.getsource(client.HeimdallBot._handle_message_inner)
         assert "self.sessions.prune()" in source
 
     def test_prune_called_on_startup(self):
         """sessions.prune() is called in on_ready for startup cleanup."""
         import inspect
         from src.discord import client
-        source = inspect.getsource(client.LokiBot.on_ready)
+        source = inspect.getsource(client.HeimdallBot.on_ready)
         assert "self.sessions.prune()" in source
 
     def test_check_for_secrets_in_message_flow(self):
         """_check_for_secrets is called in on_message (outer handler)."""
         import inspect
         from src.discord import client
-        source = inspect.getsource(client.LokiBot.on_message)
+        source = inspect.getsource(client.HeimdallBot.on_message)
         assert "_check_for_secrets" in source
 
     def test_scrub_secrets_removes_from_history(self):
         """scrub_secrets is called when secrets are detected in on_message."""
         import inspect
         from src.discord import client
-        source = inspect.getsource(client.LokiBot.on_message)
+        source = inspect.getsource(client.HeimdallBot.on_message)
         assert "scrub_secrets" in source
 
     def test_message_delete_on_secret_detection(self):
         """Secret detection attempts to delete the user's message."""
         import inspect
         from src.discord import client
-        source = inspect.getsource(client.LokiBot.on_message)
+        source = inspect.getsource(client.HeimdallBot.on_message)
         assert "message.delete()" in source
 
     def test_compaction_threshold_value(self):

@@ -22,7 +22,7 @@ from ..logging import get_logger
 from .chat import MAX_CHAT_CONTENT_LEN, process_web_chat
 
 if TYPE_CHECKING:
-    from ..discord.client import LokiBot
+    from ..discord.client import HeimdallBot
 
 log = get_logger("web.ws")
 
@@ -35,7 +35,7 @@ _LOG_POLL_INTERVAL = 1.0
 class WebSocketManager:
     """Manages WebSocket connections and broadcasts events."""
 
-    def __init__(self, bot: LokiBot, *, api_token: str = "") -> None:
+    def __init__(self, bot: HeimdallBot, *, api_token: str = "") -> None:
         self._bot = bot
         self._api_token = api_token
         self._clients: set[web.WebSocketResponse] = set()
@@ -209,7 +209,7 @@ class WebSocketManager:
 
 
 def setup_websocket(
-    app: web.Application, bot: LokiBot, *, api_token: str = "",
+    app: web.Application, bot: HeimdallBot, *, api_token: str = "",
 ) -> WebSocketManager:
     """Register the WebSocket endpoint and return the manager."""
     manager = WebSocketManager(bot, api_token=api_token)

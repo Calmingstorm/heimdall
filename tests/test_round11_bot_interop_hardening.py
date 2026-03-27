@@ -5,7 +5,7 @@ Tests:
 2. Bot instructions → immediate execution (no hedging)
 3. run_script with all interpreter types
 4. Fabrication detection + retry with realistic Codex responses
-5. Integration: bot sends code → Loki executes via run_script
+5. Integration: bot sends code → Heimdall executes via run_script
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
-    LokiBot,
+    HeimdallBot,
     combine_bot_messages,
     detect_fabrication,
     detect_hedging,
@@ -40,7 +40,7 @@ def _tc(name, inp=None):
 
 
 def _make_bot_stub(respond_to_bots=True):
-    """Minimal LokiBot stub for bot interop tests."""
+    """Minimal HeimdallBot stub for bot interop tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -72,8 +72,8 @@ def _make_bot_stub(respond_to_bots=True):
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
-    stub._build_partial_completion_report = LokiBot._build_partial_completion_report
+    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
+    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
     return stub
 
 
@@ -215,7 +215,7 @@ class TestBoostieStyleMultiMessage:
 
 
 class TestBotInstructionExecution:
-    """Bot sends task instructions → Loki executes immediately with tools."""
+    """Bot sends task instructions → Heimdall executes immediately with tools."""
 
     async def test_bot_instruction_calls_tool(self):
         """Bot says 'restart nginx' → Codex calls run_command, no hedging."""
@@ -229,7 +229,7 @@ class TestBotInstructionExecution:
         ))
 
         history = [{"role": "user", "content": "restart nginx on server"}]
-        text, _, _, tools_used, _ = await LokiBot._process_with_tools(stub, msg, history)
+        text, _, _, tools_used, _ = await HeimdallBot._process_with_tools(stub, msg, history)
         assert "run_command" in tools_used
 
     async def test_bot_code_block_triggers_run_script(self):
@@ -244,7 +244,7 @@ class TestBotInstructionExecution:
         ))
 
         history = [{"role": "user", "content": "```bash\necho hello\n```"}]
-        text, _, _, tools_used, _ = await LokiBot._process_with_tools(stub, msg, history)
+        text, _, _, tools_used, _ = await HeimdallBot._process_with_tools(stub, msg, history)
         assert "run_script" in tools_used
 
     async def test_bot_message_gets_execute_preamble(self):
@@ -264,7 +264,7 @@ class TestBotInstructionExecution:
             {"role": "user", "content": "previous context"},
             {"role": "user", "content": "do the thing"},
         ]
-        await LokiBot._process_with_tools(stub, msg, history)
+        await HeimdallBot._process_with_tools(stub, msg, history)
 
         # Find the developer separator message
         dev_msgs = [m for m in captured_messages if m.get("role") == "developer"]
@@ -291,7 +291,7 @@ class TestBotInstructionExecution:
             {"role": "user", "content": "previous context"},
             {"role": "user", "content": "do the thing"},
         ]
-        await LokiBot._process_with_tools(stub, msg, history)
+        await HeimdallBot._process_with_tools(stub, msg, history)
 
         dev_msgs = [m for m in captured_messages if m.get("role") == "developer"]
         for dm in dev_msgs:
@@ -327,7 +327,7 @@ class TestBotInstructionExecution:
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=_side_effect)
 
         history = [{"role": "user", "content": "restart nginx"}]
-        text, _, _, tools_used, _ = await LokiBot._process_with_tools(stub, msg, history)
+        text, _, _, tools_used, _ = await HeimdallBot._process_with_tools(stub, msg, history)
         assert call_count == 3  # hedge → tool call → final
         assert "run_command" in tools_used
 
@@ -356,7 +356,7 @@ class TestBotInstructionExecution:
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=_side_effect)
 
         history = [{"role": "user", "content": "check disk on server"}]
-        text, _, _, tools_used, _ = await LokiBot._process_with_tools(stub, msg, history)
+        text, _, _, tools_used, _ = await HeimdallBot._process_with_tools(stub, msg, history)
         # Tools were used — hedging is fine, no retry beyond the normal loop
         assert "check_disk" in tools_used
 
@@ -399,7 +399,7 @@ class TestRunScriptAllInterpreters:
             cmd = mock_exec.call_args[0][1]  # second positional arg is the command
             assert f"{interpreter} " in cmd
             # Verify temp file has correct extension
-            assert f"loki_script{ext}" in cmd
+            assert f"heimdall_script{ext}" in cmd
 
     async def test_default_interpreter_is_bash(self, executor):
         """Omitting interpreter defaults to bash."""
@@ -605,7 +605,7 @@ class TestFabricationRetryRealistic:
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=_side_effect)
 
         history = [{"role": "user", "content": "show running containers"}]
-        text, _, _, tools_used, _ = await LokiBot._process_with_tools(stub, msg, history)
+        text, _, _, tools_used, _ = await HeimdallBot._process_with_tools(stub, msg, history)
         assert call_count == 3  # fabrication → tool call → final
         assert "run_command" in tools_used
 
@@ -633,7 +633,7 @@ class TestFabricationRetryRealistic:
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=_side_effect)
 
         history = [{"role": "user", "content": "check uptime"}]
-        await LokiBot._process_with_tools(stub, msg, history)
+        await HeimdallBot._process_with_tools(stub, msg, history)
 
         dev_msgs = [m for m in captured_messages if m.get("role") == "developer"]
         correction_texts = [m["content"] for m in dev_msgs]
@@ -662,7 +662,7 @@ class TestFabricationRetryRealistic:
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=_side_effect)
 
         history = [{"role": "user", "content": "health check"}]
-        text, _, _, tools_used, _ = await LokiBot._process_with_tools(stub, msg, history)
+        text, _, _, tools_used, _ = await HeimdallBot._process_with_tools(stub, msg, history)
         # Second response returned — fabrication retry only fires on iteration 0
         assert call_count == 2
         assert not tools_used
@@ -746,7 +746,7 @@ class TestBotHedgingRetryIntegration:
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=_side_effect)
 
         history = [{"role": "user", "content": "deploy the app"}]
-        text, _, _, tools_used, _ = await LokiBot._process_with_tools(stub, msg, history)
+        text, _, _, tools_used, _ = await HeimdallBot._process_with_tools(stub, msg, history)
         assert call_count == 3  # hedge → tool → final
         assert "run_script" in tools_used
 
@@ -761,7 +761,7 @@ class TestBotHedgingRetryIntegration:
         ))
 
         history = [{"role": "user", "content": "restart nginx"}]
-        text, _, _, tools_used, _ = await LokiBot._process_with_tools(stub, msg, history)
+        text, _, _, tools_used, _ = await HeimdallBot._process_with_tools(stub, msg, history)
         # Only one call — no retry for humans
         assert stub.codex_client.chat_with_tools.call_count >= 2  # hedging retries for all
         assert "Would you like" in text
@@ -802,7 +802,7 @@ class TestFabricationThenHedging:
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=_side_effect)
 
         history = [{"role": "user", "content": "check the server"}]
-        text, _, _, tools_used, _ = await LokiBot._process_with_tools(stub, msg, history)
+        text, _, _, tools_used, _ = await HeimdallBot._process_with_tools(stub, msg, history)
         assert call_count == 2
         assert "Would you like" in text
 

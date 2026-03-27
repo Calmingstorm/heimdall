@@ -314,13 +314,13 @@ class TestBotBufferLimit:
     """Test that the bot message buffer has a size cap."""
 
     def test_buffer_max_attribute_exists(self):
-        """LokiBot should have a _bot_msg_buffer_max attribute."""
-        from src.discord.client import LokiBot
+        """HeimdallBot should have a _bot_msg_buffer_max attribute."""
+        from src.discord.client import HeimdallBot
         with patch("discord.Client.__init__", return_value=None):
-            bot = object.__new__(LokiBot)
+            bot = object.__new__(HeimdallBot)
             # Check the class has the attribute set in __init__
-            # We can't easily instantiate LokiBot, but we can check the default
-            assert hasattr(LokiBot, "__init__")
+            # We can't easily instantiate HeimdallBot, but we can check the default
+            assert hasattr(HeimdallBot, "__init__")
 
     def test_buffer_limit_drops_oldest(self):
         """When buffer exceeds max, the oldest message should be dropped."""
@@ -436,28 +436,28 @@ class TestContextSeparator:
         # This is verified by reading the source — we test the role value
         from src.discord import client
         import inspect
-        source = inspect.getsource(client.LokiBot._process_with_tools)
+        source = inspect.getsource(client.HeimdallBot._process_with_tools)
         assert '"role": "developer"' in source or "'role': 'developer'" in source
 
     def test_separator_has_current_request_header(self):
         """The separator should have the '=== CURRENT REQUEST ===' header."""
         from src.discord import client
         import inspect
-        source = inspect.getsource(client.LokiBot._process_with_tools)
+        source = inspect.getsource(client.HeimdallBot._process_with_tools)
         assert "=== CURRENT REQUEST ===" in source
 
     def test_separator_mentions_bot_execution(self):
         """The bot preamble should tell the LLM to execute immediately."""
         from src.discord import client
         import inspect
-        source = inspect.getsource(client.LokiBot._process_with_tools)
+        source = inspect.getsource(client.HeimdallBot._process_with_tools)
         assert "EXECUTE immediately" in source
 
     def test_separator_mentions_tool_evaluation(self):
         """The separator should instruct fresh tool evaluation."""
         from src.discord import client
         import inspect
-        source = inspect.getsource(client.LokiBot._process_with_tools)
+        source = inspect.getsource(client.HeimdallBot._process_with_tools)
         assert "CURRENTLY AVAILABLE" in source
 
 

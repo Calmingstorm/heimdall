@@ -19,7 +19,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 import discord  # noqa: E402
 import pytest  # noqa: E402
 
-from src.discord.client import LokiBot  # noqa: E402
+from src.discord.client import HeimdallBot  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -27,7 +27,7 @@ from src.discord.client import LokiBot  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Create a minimal LokiBot stub."""
+    """Create a minimal HeimdallBot stub."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -93,7 +93,7 @@ class TestStreamErrorPreviewCleanup:
         stub._process_with_tools = AsyncMock(
             return_value=("Tool execution failed: timeout", False, True, [], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
 
@@ -106,7 +106,7 @@ class TestStreamErrorPreviewCleanup:
         msg = _make_message()
 
         stub._process_with_tools = AsyncMock(side_effect=RuntimeError("Codex API down"))
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
 
@@ -123,7 +123,7 @@ class TestStreamErrorPreviewCleanup:
         stub._process_with_tools = AsyncMock(
             return_value=("The AI service is temporarily overloaded. Try again in a moment.", False, True, [], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
 
@@ -139,7 +139,7 @@ class TestStreamErrorPreviewCleanup:
         stub._process_with_tools = AsyncMock(
             return_value=("The AI service is temporarily overloaded.", False, True, [], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
 
@@ -156,7 +156,7 @@ class TestStreamErrorPreviewCleanup:
         stub._process_with_tools = AsyncMock(
             return_value=("Here are the results.", False, False, ["check_disk"], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "check disk", str(msg.channel.id))
 

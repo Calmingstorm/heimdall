@@ -24,7 +24,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
-    LokiBot,
+    HeimdallBot,
     ToolLoopCancelView,
     combine_bot_messages,
     detect_fabrication,
@@ -49,7 +49,7 @@ def _tc(name, inp=None):
 
 
 def _make_stub(**overrides):
-    """LokiBot stub for on_message-level tests."""
+    """HeimdallBot stub for on_message-level tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -130,9 +130,9 @@ def _make_stub(**overrides):
     stub._process_attachments = AsyncMock(return_value=("", []))
     stub._check_for_secrets = MagicMock(return_value=False)
     stub.user.mentioned_in = MagicMock(return_value=False)
-    stub.on_message = LokiBot.on_message.__get__(stub)
-    stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
-    stub._handle_message_bound = LokiBot._handle_message.__get__(stub)
+    stub.on_message = HeimdallBot.on_message.__get__(stub)
+    stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
+    stub._handle_message_bound = HeimdallBot._handle_message.__get__(stub)
 
     for k, v in overrides.items():
         setattr(stub, k, v)
@@ -176,7 +176,7 @@ class TestEmptyMessageHandling:
         stub = _make_stub()
         stub._process_attachments = AsyncMock(return_value=("", []))
         msg = _make_msg(content="")
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         stub._handle_message.assert_not_called()
 
     async def test_whitespace_only_no_images_returns_early(self):
@@ -185,7 +185,7 @@ class TestEmptyMessageHandling:
         stub._process_attachments = AsyncMock(return_value=("", []))
         stub.user.mentioned_in = MagicMock(return_value=True)
         msg = _make_msg(content=f"<@111>  ")
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         stub._handle_message.assert_not_called()
 
     async def test_empty_content_with_image_uses_placeholder(self):
@@ -194,7 +194,7 @@ class TestEmptyMessageHandling:
         image_block = {"type": "image", "source": {"type": "base64", "data": "abc"}}
         stub._process_attachments = AsyncMock(return_value=("", [image_block]))
         msg = _make_msg(content="")
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         stub._handle_message.assert_called_once()
         call_args = stub._handle_message.call_args
         assert call_args[0][1] == "(see attached image)"
@@ -206,7 +206,7 @@ class TestEmptyMessageHandling:
             return_value=("**Attached file: test.py**\n```\nprint('hello')\n```", [])
         )
         msg = _make_msg(content="")
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         stub._handle_message.assert_called_once()
         content_arg = stub._handle_message.call_args[0][1]
         assert "Attached file" in content_arg
@@ -219,7 +219,7 @@ class TestEmptyMessageHandling:
             return_value=("", False, False, [], False)
         )
         msg = _make_msg(content="hello")
-        await LokiBot._handle_message_inner(
+        await HeimdallBot._handle_message_inner(
             stub, msg, "hello", "67890", image_blocks=[],
         )
         # Empty response on task path → _send_chunked still called with empty
@@ -227,7 +227,7 @@ class TestEmptyMessageHandling:
         # So verify at the _process_with_tools level using the real method:
         # Use the real tool loop to test this:
         stub2 = _make_stub()
-        stub2._process_with_tools = LokiBot._process_with_tools.__get__(stub2)
+        stub2._process_with_tools = HeimdallBot._process_with_tools.__get__(stub2)
         stub2.codex_client.chat_with_tools = AsyncMock(return_value=LLMResponse(
             text="", tool_calls=[], stop_reason="end_turn",
         ))
@@ -239,7 +239,7 @@ class TestEmptyMessageHandling:
     async def test_none_codex_response_gets_fallback(self):
         """When Codex returns None text, the fallback is used."""
         stub = _make_stub()
-        stub._process_with_tools = LokiBot._process_with_tools.__get__(stub)
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
         stub.codex_client.chat_with_tools = AsyncMock(return_value=LLMResponse(
             text=None, tool_calls=[], stop_reason="end_turn",
         ))
@@ -261,7 +261,7 @@ class TestVeryLongMessages:
         stub = _make_stub()
         msg = _make_msg()
         text = "Short response"
-        await LokiBot._send_chunked(stub, msg, text)
+        await HeimdallBot._send_chunked(stub, msg, text)
         stub._send_with_retry.assert_called_once()
 
     async def test_send_chunked_splits_long_message(self):
@@ -270,7 +270,7 @@ class TestVeryLongMessages:
         msg = _make_msg()
         # Create text slightly over the limit so it gets chunked
         text = "x" * (DISCORD_MAX_LEN + 100)
-        await LokiBot._send_chunked(stub, msg, text)
+        await HeimdallBot._send_chunked(stub, msg, text)
         # Should be called more than once (chunked)
         assert stub._send_with_retry.call_count >= 2
 
@@ -279,7 +279,7 @@ class TestVeryLongMessages:
         stub = _make_stub()
         msg = _make_msg()
         text = "x" * (DISCORD_MAX_LEN * 5)
-        await LokiBot._send_chunked(stub, msg, text)
+        await HeimdallBot._send_chunked(stub, msg, text)
         # Should be a single call with file
         call_args = stub._send_with_retry.call_args
         assert "Response too long" in str(call_args)
@@ -289,7 +289,7 @@ class TestVeryLongMessages:
         stub = _make_stub()
         long_content = "word " * 10000  # ~50K chars
         msg = _make_msg(content=long_content)
-        await LokiBot._handle_message_inner(
+        await HeimdallBot._handle_message_inner(
             stub, msg, long_content, "67890", image_blocks=[],
         )
         # Verify session add_message was called with full content
@@ -303,7 +303,7 @@ class TestVeryLongMessages:
         # Build a message with a code block that's longer than one chunk
         code_content = "x\n" * (DISCORD_MAX_LEN // 2)
         text = f"Here's some code:\n```python\n{code_content}```\nDone."
-        await LokiBot._send_chunked(stub, msg, text)
+        await HeimdallBot._send_chunked(stub, msg, text)
         # Multiple chunks sent
         assert stub._send_with_retry.call_count >= 2
 
@@ -323,8 +323,8 @@ class TestRapidFireMessages:
         msg2 = _make_msg(content="second", msg_id=1002)
         # Simulate concurrent calls
         await asyncio.gather(
-            LokiBot._handle_message(stub, msg1, "first", image_blocks=[]),
-            LokiBot._handle_message(stub, msg2, "second", image_blocks=[]),
+            HeimdallBot._handle_message(stub, msg1, "first", image_blocks=[]),
+            HeimdallBot._handle_message(stub, msg2, "second", image_blocks=[]),
         )
         # Both should be processed (sequentially via lock)
         assert stub._handle_message_inner.call_count == 2
@@ -333,11 +333,11 @@ class TestRapidFireMessages:
         """Same message ID processed twice — second is skipped."""
         stub = _make_stub()
         msg = _make_msg(content="test", msg_id=42)
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         call_count_1 = stub._handle_message.call_count
         # Send same message again (same ID)
         msg2 = _make_msg(content="test", msg_id=42)
-        await LokiBot.on_message(stub, msg2)
+        await HeimdallBot.on_message(stub, msg2)
         # Should not be called again
         assert stub._handle_message.call_count == call_count_1
 
@@ -346,8 +346,8 @@ class TestRapidFireMessages:
         stub = _make_stub()
         msg1 = _make_msg(content="first", msg_id=100)
         msg2 = _make_msg(content="second", msg_id=101)
-        await LokiBot.on_message(stub, msg1)
-        await LokiBot.on_message(stub, msg2)
+        await HeimdallBot.on_message(stub, msg1)
+        await HeimdallBot.on_message(stub, msg2)
         assert stub._handle_message.call_count == 2
 
     async def test_dedup_bounded_size(self):
@@ -356,7 +356,7 @@ class TestRapidFireMessages:
         stub._processed_messages_max = 5
         for i in range(10):
             msg = _make_msg(content=f"msg-{i}", msg_id=i + 1)
-            await LokiBot.on_message(stub, msg)
+            await HeimdallBot.on_message(stub, msg)
         # Only last 5 should be in the dedup cache
         assert len(stub._processed_messages) <= 5
 
@@ -369,8 +369,8 @@ class TestRapidFireMessages:
         # Same author+channel
         msg2.author = msg1.author
         msg2.channel = msg1.channel
-        await LokiBot.on_message(stub, msg1)
-        await LokiBot.on_message(stub, msg2)
+        await HeimdallBot.on_message(stub, msg1)
+        await HeimdallBot.on_message(stub, msg2)
         # Wait for flush
         await asyncio.sleep(0.05)
         # _handle_message should be called once with combined content
@@ -386,8 +386,8 @@ class TestRapidFireMessages:
         msg1 = _make_msg(content="ch1", channel_id="100")
         msg2 = _make_msg(content="ch2", channel_id="200")
         await asyncio.gather(
-            LokiBot._handle_message(stub, msg1, "ch1", image_blocks=[]),
-            LokiBot._handle_message(stub, msg2, "ch2", image_blocks=[]),
+            HeimdallBot._handle_message(stub, msg1, "ch1", image_blocks=[]),
+            HeimdallBot._handle_message(stub, msg2, "ch2", image_blocks=[]),
         )
         assert stub._handle_message_inner.call_count == 2
 
@@ -421,7 +421,7 @@ class TestMultipleImages:
 
         stub._process_with_tools = AsyncMock(side_effect=capture_process)
 
-        await LokiBot._handle_message_inner(
+        await HeimdallBot._handle_message_inner(
             stub, msg, "look at these", "67890", image_blocks=images,
         )
         # Find the message with multimodal content
@@ -435,57 +435,57 @@ class TestMultipleImages:
     async def test_image_type_detection_png(self):
         """PNG magic bytes detected correctly."""
         data = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
-        result = LokiBot._detect_image_type(data)
+        result = HeimdallBot._detect_image_type(data)
         assert result == "image/png"
 
     async def test_image_type_detection_jpeg(self):
         """JPEG magic bytes detected correctly."""
         data = b"\xff\xd8\xff\xe0" + b"\x00" * 100
-        result = LokiBot._detect_image_type(data)
+        result = HeimdallBot._detect_image_type(data)
         assert result == "image/jpeg"
 
     async def test_image_type_detection_gif(self):
         """GIF magic bytes detected correctly."""
         data = b"GIF89a" + b"\x00" * 100
-        result = LokiBot._detect_image_type(data)
+        result = HeimdallBot._detect_image_type(data)
         assert result == "image/gif"
 
     async def test_image_type_detection_webp(self):
         """WEBP magic bytes detected correctly."""
         data = b"RIFF\x00\x00\x00\x00WEBP" + b"\x00" * 100
-        result = LokiBot._detect_image_type(data)
+        result = HeimdallBot._detect_image_type(data)
         assert result == "image/webp"
 
     async def test_image_type_detection_unknown(self):
         """Unknown bytes return None."""
         data = b"\x00\x01\x02\x03" + b"\x00" * 100
-        result = LokiBot._detect_image_type(data)
+        result = HeimdallBot._detect_image_type(data)
         assert result is None
 
     async def test_oversized_image_skipped(self):
         """Images over 5MB are skipped with a text note."""
         stub = _make_stub()
-        stub._get_attachment_hint = LokiBot._get_attachment_hint
+        stub._get_attachment_hint = HeimdallBot._get_attachment_hint
         att = MagicMock()
         att.filename = "huge.png"
         att.size = 6 * 1024 * 1024  # 6MB
         att.content_type = "image/png"
         msg = _make_msg(attachments=[att])
-        text, images = await LokiBot._process_attachments(stub, msg)
+        text, images = await HeimdallBot._process_attachments(stub, msg)
         assert len(images) == 0
         assert "exceeds 5 MB" in text
 
     async def test_image_read_failure_handled(self):
         """Failed image read produces error text, not crash."""
         stub = _make_stub()
-        stub._get_attachment_hint = LokiBot._get_attachment_hint
+        stub._get_attachment_hint = HeimdallBot._get_attachment_hint
         att = MagicMock()
         att.filename = "bad.png"
         att.size = 1000
         att.content_type = "image/png"
         att.read = AsyncMock(side_effect=Exception("network error"))
         msg = _make_msg(attachments=[att])
-        text, images = await LokiBot._process_attachments(stub, msg)
+        text, images = await HeimdallBot._process_attachments(stub, msg)
         assert len(images) == 0
         assert "failed to read" in text
 
@@ -515,7 +515,7 @@ class TestVoiceCommands:
         msg.author.voice.channel = MagicMock()
         msg.reply = AsyncMock()
         stub._process_attachments = AsyncMock(return_value=("", []))
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         stub.voice_manager.join_channel.assert_called_once()
 
     async def test_leave_voice_command(self):
@@ -527,7 +527,7 @@ class TestVoiceCommands:
         msg = _make_msg(content="leave voice channel")
         msg.author.bot = False
         stub._process_attachments = AsyncMock(return_value=("", []))
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         stub.voice_manager.leave_channel.assert_called_once()
 
     async def test_no_voice_manager_skips_commands(self):
@@ -537,7 +537,7 @@ class TestVoiceCommands:
         msg = _make_msg(content="join voice")
         msg.author.bot = False
         stub._process_attachments = AsyncMock(return_value=("", []))
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         # Should proceed to _handle_message instead of crashing
         stub._handle_message.assert_called_once()
 
@@ -550,7 +550,7 @@ class TestVoiceCommands:
         msg = _make_msg(content="Can you please join the voice channel for our meeting today please")
         msg.author.bot = False
         stub._process_attachments = AsyncMock(return_value=("", []))
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         # Should NOT trigger voice join (>8 words)
         stub.voice_manager.join_channel.assert_not_called()
         stub._handle_message.assert_called_once()
@@ -560,7 +560,7 @@ class TestVoiceCommands:
         stub = _make_stub()
         voice_cb = AsyncMock()
         msg = _make_msg(content="test")
-        await LokiBot._handle_message_inner(
+        await HeimdallBot._handle_message_inner(
             stub, msg, "test", "67890",
             image_blocks=[], voice_callback=voice_cb,
         )
@@ -587,7 +587,7 @@ class TestVoiceCommands:
         """No voice callback → no crash, text still sent."""
         stub = _make_stub()
         msg = _make_msg(content="test")
-        await LokiBot._handle_message_inner(
+        await HeimdallBot._handle_message_inner(
             stub, msg, "test", "67890",
             image_blocks=[], voice_callback=None,
         )
@@ -610,7 +610,7 @@ class TestSkillHandoff:
         )
         stub.codex_client.chat = AsyncMock(return_value="wrapped response")
         msg = _make_msg(content="use my skill")
-        await LokiBot._handle_message_inner(
+        await HeimdallBot._handle_message_inner(
             stub, msg, "use my skill", "67890", image_blocks=[],
         )
         # Codex chat should be called for handoff
@@ -624,7 +624,7 @@ class TestSkillHandoff:
             return_value=("done with skill", False, False, ["my_skill"], False)
         )
         msg = _make_msg(content="use skill")
-        await LokiBot._handle_message_inner(
+        await HeimdallBot._handle_message_inner(
             stub, msg, "use skill", "67890", image_blocks=[],
         )
         # Codex chat should NOT be called (no handoff)
@@ -638,7 +638,7 @@ class TestSkillHandoff:
         )
         stub.codex_client.chat = AsyncMock(side_effect=Exception("API error"))
         msg = _make_msg(content="skill")
-        await LokiBot._handle_message_inner(
+        await HeimdallBot._handle_message_inner(
             stub, msg, "skill", "67890", image_blocks=[],
         )
         # Should have tried codex chat, failed, and used skill result
@@ -655,7 +655,7 @@ class TestSkillHandoff:
         stub._process_with_tools = AsyncMock(side_effect=mock_process)
         stub.codex_client.chat = AsyncMock(return_value="codex wrapped response")
         msg = _make_msg(content="skill")
-        await LokiBot._handle_message_inner(
+        await HeimdallBot._handle_message_inner(
             stub, msg, "skill", "67890", image_blocks=[],
         )
         # Session add_message should be called with assistant response
@@ -708,7 +708,7 @@ class TestThreadContextInheritance:
         # Patch isinstance check
         import discord as _discord
         with patch("src.discord.client.discord.Thread", type(msg.channel)):
-            await LokiBot._handle_message(stub, msg, "test", image_blocks=[])
+            await HeimdallBot._handle_message(stub, msg, "test", image_blocks=[])
 
         # Thread session should have summary from parent + context
         assert "Parent summary" in thread_session.summary
@@ -721,7 +721,7 @@ class TestThreadContextInheritance:
         msg = _make_msg(content="test")
         # Regular channel — no parent attribute matching Thread spec
         msg.channel.parent = None
-        await LokiBot._handle_message(stub, msg, "test", image_blocks=[])
+        await HeimdallBot._handle_message(stub, msg, "test", image_blocks=[])
         # Just processes normally
         stub._handle_message_inner.assert_called_once()
 
@@ -736,35 +736,35 @@ class TestAttachmentEdgeCases:
     async def test_large_text_file_shows_preview(self):
         """Text files over 100KB show preview and suggest ingestion."""
         stub = _make_stub()
-        stub._get_attachment_hint = LokiBot._get_attachment_hint
+        stub._get_attachment_hint = HeimdallBot._get_attachment_hint
         att = MagicMock()
         att.filename = "large.py"
         att.size = 150_000
         att.content_type = "text/x-python"
         att.read = AsyncMock(return_value=b"x" * 150_000)
         msg = _make_msg(attachments=[att])
-        text, images = await LokiBot._process_attachments(stub, msg)
+        text, images = await HeimdallBot._process_attachments(stub, msg)
         assert "too large to fully inline" in text
         assert "ingest" in text.lower()
 
     async def test_binary_file_shows_metadata(self):
         """Binary files show filename and size."""
         stub = _make_stub()
-        stub._get_attachment_hint = LokiBot._get_attachment_hint
+        stub._get_attachment_hint = HeimdallBot._get_attachment_hint
         att = MagicMock()
         att.filename = "data.bin"
         att.size = 5000
         att.content_type = "application/octet-stream"
         msg = _make_msg(attachments=[att])
-        text, images = await LokiBot._process_attachments(stub, msg)
+        text, images = await HeimdallBot._process_attachments(stub, msg)
         assert "data.bin" in text
         assert "5000" in text
 
     async def test_mixed_text_and_image_attachments(self):
         """Both text and image attachments are processed."""
         stub = _make_stub()
-        stub._get_attachment_hint = LokiBot._get_attachment_hint
-        stub._detect_image_type = LokiBot._detect_image_type
+        stub._get_attachment_hint = HeimdallBot._get_attachment_hint
+        stub._detect_image_type = HeimdallBot._detect_image_type
         text_att = MagicMock()
         text_att.filename = "notes.txt"
         text_att.size = 100
@@ -778,7 +778,7 @@ class TestAttachmentEdgeCases:
         img_att.read = AsyncMock(return_value=b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
 
         msg = _make_msg(attachments=[text_att, img_att])
-        text, images = await LokiBot._process_attachments(stub, msg)
+        text, images = await HeimdallBot._process_attachments(stub, msg)
         assert "notes.txt" in text
         assert "hello world" in text
         assert len(images) == 1
@@ -787,25 +787,25 @@ class TestAttachmentEdgeCases:
     async def test_no_attachments_returns_empty(self):
         """No attachments returns empty text and empty images."""
         stub = _make_stub()
-        stub._get_attachment_hint = LokiBot._get_attachment_hint
+        stub._get_attachment_hint = HeimdallBot._get_attachment_hint
         msg = _make_msg(attachments=[])
-        text, images = await LokiBot._process_attachments(stub, msg)
+        text, images = await HeimdallBot._process_attachments(stub, msg)
         assert text == ""
         assert images == []
 
     async def test_systemd_service_file_hint(self):
         """Systemd .service file gets deployment hint."""
-        hint = LokiBot._get_attachment_hint("nginx.service", ".service", 500)
+        hint = HeimdallBot._get_attachment_hint("nginx.service", ".service", 500)
         assert "systemd" in hint.lower()
 
     async def test_python_file_hint_suggests_skill(self):
         """Python file gets skill creation hint."""
-        hint = LokiBot._get_attachment_hint("my_tool.py", ".py", 500)
+        hint = HeimdallBot._get_attachment_hint("my_tool.py", ".py", 500)
         assert "skill" in hint.lower()
 
     async def test_large_file_hint_suggests_ingestion(self):
         """Files over 50KB get knowledge base ingestion hint."""
-        hint = LokiBot._get_attachment_hint("data.csv", ".csv", 60_000)
+        hint = HeimdallBot._get_attachment_hint("data.csv", ".csv", 60_000)
         assert "ingest" in hint.lower()
 
 
@@ -821,7 +821,7 @@ class TestErrorHandlingEdgeCases:
         stub = _make_stub()
         stub._process_with_tools = AsyncMock(side_effect=Exception("Codex broke"))
         msg = _make_msg(content="test")
-        await LokiBot._handle_message_inner(
+        await HeimdallBot._handle_message_inner(
             stub, msg, "test", "67890", image_blocks=[],
         )
         send_call = stub._send_chunked.call_args
@@ -834,7 +834,7 @@ class TestErrorHandlingEdgeCases:
         stub = _make_stub()
         stub.codex_client = None
         msg = _make_msg(content="test")
-        await LokiBot._handle_message_inner(
+        await HeimdallBot._handle_message_inner(
             stub, msg, "test", "67890", image_blocks=[],
         )
         stub._send_with_retry.assert_called_once()
@@ -846,7 +846,7 @@ class TestErrorHandlingEdgeCases:
         stub.permissions.is_guest = MagicMock(return_value=True)
         stub.codex_client.chat = AsyncMock(side_effect=Exception("API down"))
         msg = _make_msg(content="hello")
-        await LokiBot._handle_message_inner(
+        await HeimdallBot._handle_message_inner(
             stub, msg, "hello", "67890", image_blocks=[],
         )
         send_call = stub._send_chunked.call_args
@@ -857,7 +857,7 @@ class TestErrorHandlingEdgeCases:
         stub = _make_stub()
         stub._process_with_tools = AsyncMock(side_effect=Exception("Codex error"))
         msg = _make_msg(content="test")
-        await LokiBot._handle_message_inner(
+        await HeimdallBot._handle_message_inner(
             stub, msg, "test", "67890", image_blocks=[],
         )
         # Check that sanitized marker was saved
@@ -886,7 +886,7 @@ class TestSecretDetectionEdgeCases:
         stub._check_for_secrets = MagicMock(return_value=True)
         stub._process_attachments = AsyncMock(return_value=("", []))
         msg = _make_msg(content="my password is supersecret123")
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         msg.delete.assert_called_once()
         stub.sessions.scrub_secrets.assert_called_once()
 
@@ -895,7 +895,7 @@ class TestSecretDetectionEdgeCases:
         stub = _make_stub()
         stub._check_for_secrets = MagicMock(return_value=True)
         msg = _make_msg(content="api_key=sk-12345678901234567890", bot=True, msg_id=300)
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         # Bot messages go through buffer, not secret check
         stub._check_for_secrets.assert_not_called()
 
@@ -919,7 +919,7 @@ class TestMentionHandling:
         stub.user.mentioned_in = MagicMock(return_value=True)
         stub._process_attachments = AsyncMock(return_value=("", []))
         msg = _make_msg(content="<@111> do something")
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         # Content passed to _handle_message should have mention stripped
         content_arg = stub._handle_message.call_args[0][1]
         assert "<@111>" not in content_arg
@@ -931,7 +931,7 @@ class TestMentionHandling:
         stub.user.mentioned_in = MagicMock(return_value=True)
         stub._process_attachments = AsyncMock(return_value=("", []))
         msg = _make_msg(content="<@!111> help me")
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         content_arg = stub._handle_message.call_args[0][1]
         assert "<@!111>" not in content_arg
         assert "help me" in content_arg
@@ -943,7 +943,7 @@ class TestMentionHandling:
         stub.user.mentioned_in = MagicMock(return_value=False)
         msg = _make_msg(content="hello")
         msg.channel.guild = MagicMock()
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         stub._handle_message.assert_not_called()
 
     async def test_dm_bypasses_require_mention(self):
@@ -954,7 +954,7 @@ class TestMentionHandling:
         stub._process_attachments = AsyncMock(return_value=("", []))
         msg = _make_msg(content="hello")
         msg.channel.guild = None
-        await LokiBot.on_message(stub, msg)
+        await HeimdallBot.on_message(stub, msg)
         stub._handle_message.assert_called_once()
 
 
@@ -1015,5 +1015,5 @@ class TestEdgeCaseSourceStructure:
     def test_image_only_placeholder_in_source(self):
         """The '(see attached image)' placeholder is in the on_message source."""
         import inspect
-        src = inspect.getsource(LokiBot.on_message)
+        src = inspect.getsource(HeimdallBot.on_message)
         assert "(see attached image)" in src

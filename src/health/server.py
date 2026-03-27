@@ -15,7 +15,7 @@ from ..config.schema import WebConfig, WebhookConfig
 from ..logging import get_logger
 
 if TYPE_CHECKING:
-    from ..discord.client import LokiBot
+    from ..discord.client import HeimdallBot
 
 log = get_logger("health")
 
@@ -151,7 +151,7 @@ class HealthServer:
         """Set callback for webhook-triggered scheduler actions."""
         self._trigger_callback = callback
 
-    def set_bot(self, bot: LokiBot) -> None:
+    def set_bot(self, bot: HeimdallBot) -> None:
         """Wire the bot instance to enable the REST API and WebSocket endpoints."""
         if not self._web_config.enabled:
             return

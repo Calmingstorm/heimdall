@@ -20,7 +20,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import LokiBot  # noqa: E402
+from src.discord.client import HeimdallBot  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
@@ -29,7 +29,7 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub():
-    """Create a minimal LokiBot stub."""
+    """Create a minimal HeimdallBot stub."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -107,7 +107,7 @@ class TestCheckpointSaveOnToolLoopError:
         stub._process_with_tools = AsyncMock(
             return_value=(error_text, False, True, ["check_disk", "run_command"], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "check all hosts", "chan-1")
 
@@ -131,7 +131,7 @@ class TestCheckpointSaveOnToolLoopError:
         stub._process_with_tools = AsyncMock(
             return_value=("LLM API error: timeout", False, True, [], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "deploy app", "chan-1")
 
@@ -146,7 +146,7 @@ class TestCheckpointSaveOnToolLoopError:
         stub._process_with_tools = AsyncMock(
             return_value=("Error occurred", False, True, [], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "check disk", "chan-1")
 
@@ -161,7 +161,7 @@ class TestCheckpointSaveOnToolLoopError:
         stub._process_with_tools = AsyncMock(
             return_value=("LLM API error: rate limited", False, True, [], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "check disk", "chan-1")
 
@@ -182,7 +182,7 @@ class TestCheckpointSaveOnException:
         stub._process_with_tools = AsyncMock(
             side_effect=RuntimeError("Connection reset")
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "deploy app", "chan-1")
 
@@ -208,7 +208,7 @@ class TestCheckpointSaveOnChatError:
         stub.codex_client.chat = AsyncMock(side_effect=Exception("API down"))
         # Guest tier forces the chat route (classifier removed)
         stub.permissions.is_guest = MagicMock(return_value=True)
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "hello", "chan-1")
 
@@ -232,7 +232,7 @@ class TestCheckpointSaveSuccessUnchanged:
         stub._process_with_tools = AsyncMock(
             return_value=("Disk is 42% full.", False, False, ["check_disk"], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "check disk", "chan-1")
 
@@ -252,7 +252,7 @@ class TestCheckpointSaveSuccessUnchanged:
         stub._process_with_tools = AsyncMock(
             return_value=("Done", False, False, ["check_disk"], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "check disk", "chan-1")
 
@@ -266,7 +266,7 @@ class TestCheckpointSaveSuccessUnchanged:
         stub._process_with_tools = AsyncMock(
             return_value=("Error", False, True, ["check_disk"], False)
         )
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         await stub._handle_message_inner(msg, "check disk", "chan-1")
 
@@ -280,7 +280,7 @@ class TestNoCodexEarlyReturnUnchanged:
     async def test_no_codex_still_removes_user_message(self):
         stub = _make_bot_stub()
         stub.codex_client = None
-        stub._handle_message_inner = LokiBot._handle_message_inner.__get__(stub)
+        stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
 
         msg = _make_message()
         await stub._handle_message_inner(msg, "check disk", "chan-1")

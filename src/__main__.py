@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from .config import load_config
-from .discord import LokiBot
+from .discord import HeimdallBot
 from .discord.client import scrub_response_secrets
 from .health import HealthServer
 from .logging import setup_logging, get_logger
@@ -23,10 +23,10 @@ def main() -> None:
     setup_logging(level=config.logging.level, log_dir=config.logging.directory)
     log = get_logger("main")
 
-    log.info("Starting Loki")
+    log.info("Starting Heimdall")
 
     health = HealthServer(webhook_config=config.webhook, web_config=config.web)
-    bot = LokiBot(config)
+    bot = HeimdallBot(config)
     health.set_bot(bot)
 
     loop = asyncio.new_event_loop()
@@ -79,7 +79,7 @@ def main() -> None:
         loop.run_until_complete(shutdown())
     finally:
         loop.close()
-        log.info("Loki stopped")
+        log.info("Heimdall stopped")
 
 
 if __name__ == "__main__":

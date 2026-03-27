@@ -15,7 +15,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
-    LokiBot,
+    HeimdallBot,
     detect_fabrication,
     _FABRICATION_RETRY_MSG,
 )
@@ -28,7 +28,7 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
 def _make_bot_stub():
-    """Minimal LokiBot stub for fabrication tests."""
+    """Minimal HeimdallBot stub for fabrication tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -59,8 +59,8 @@ def _make_bot_stub():
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
-    stub._build_partial_completion_report = LokiBot._build_partial_completion_report
+    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
+    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
     return stub
 
 
@@ -214,7 +214,7 @@ class TestFabricationRetry:
 
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=mock_chat)
 
-        text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+        text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "check disk on server1"}],
         )
 
@@ -250,7 +250,7 @@ class TestFabricationRetry:
 
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=mock_chat)
 
-        text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+        text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "check nginx"}],
         )
 
@@ -273,7 +273,7 @@ class TestFabricationRetry:
             stop_reason="end_turn",
         ))
 
-        text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+        text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "check disk"}],
         )
 
@@ -309,7 +309,7 @@ class TestFabricationRetry:
 
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=mock_chat)
 
-        text, already_sent, is_error, tools_used, handoff = await LokiBot._process_with_tools(
+        text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "check disk"}],
         )
 
@@ -341,7 +341,7 @@ class TestFabricationRetry:
 
         bot.codex_client.chat_with_tools = AsyncMock(side_effect=mock_chat)
 
-        await LokiBot._process_with_tools(
+        await HeimdallBot._process_with_tools(
             bot, msg, [{"role": "user", "content": "run df -h"}],
         )
 

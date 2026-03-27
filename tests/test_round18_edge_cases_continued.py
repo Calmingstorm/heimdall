@@ -1011,8 +1011,8 @@ class TestProgressEmbedRendering:
 
     def _build(self, steps, status="running", footer=None):
         """Helper — call static method directly."""
-        from src.discord.client import LokiBot
-        return LokiBot._build_tool_progress_embed(steps, status, footer)
+        from src.discord.client import HeimdallBot
+        return HeimdallBot._build_tool_progress_embed(steps, status, footer)
 
     def test_empty_steps(self):
         """Empty steps list returns 'Starting...' embed."""
@@ -1115,8 +1115,8 @@ class TestPartialCompletionReport:
     """_build_partial_completion_report edge cases."""
 
     def _build(self, steps):
-        from src.discord.client import LokiBot
-        return LokiBot._build_partial_completion_report(steps)
+        from src.discord.client import HeimdallBot
+        return HeimdallBot._build_partial_completion_report(steps)
 
     def test_no_done_steps(self):
         """No done steps returns empty string."""
@@ -1434,14 +1434,14 @@ class TestRound18SourceStructure:
         assert isinstance(_ALLOWED_WEBHOOK_IDS, set)
 
     def test_init_allowed_webhook_ids_method_exists(self):
-        from src.discord.client import LokiBot
-        assert hasattr(LokiBot, "_init_allowed_webhook_ids")
+        from src.discord.client import HeimdallBot
+        assert hasattr(HeimdallBot, "_init_allowed_webhook_ids")
 
     def test_display_name_in_handle_message_inner(self):
         """display_name used in _handle_message_inner."""
         import inspect
-        from src.discord.client import LokiBot
-        source = inspect.getsource(LokiBot._handle_message_inner)
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot._handle_message_inner)
         assert "display_name" in source
         assert "tagged_content" in source
 
@@ -1467,15 +1467,15 @@ class TestRound18SourceStructure:
         assert hasattr(CircuitBreaker, "state")
 
     def test_progress_embed_method_exists(self):
-        from src.discord.client import LokiBot
-        assert hasattr(LokiBot, "_build_tool_progress_embed")
-        assert hasattr(LokiBot, "_build_partial_completion_report")
+        from src.discord.client import HeimdallBot
+        assert hasattr(HeimdallBot, "_build_tool_progress_embed")
+        assert hasattr(HeimdallBot, "_build_partial_completion_report")
 
     def test_background_tasks_max_is_20(self):
         """client.py uses _background_tasks_max = 20."""
         import inspect
-        from src.discord.client import LokiBot
-        source = inspect.getsource(LokiBot.__init__)
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot.__init__)
         assert "_background_tasks_max = 20" in source
 
     def test_send_progress_handles_exceptions(self):

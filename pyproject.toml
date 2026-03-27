@@ -1,7 +1,7 @@
 [project]
-name = "loki"
+name = "heimdall"
 version = "1.0.0"
-description = "AI assistant Discord bot with infrastructure management"
+description = "Heimdall — the All-Seeing autonomous infrastructure guardian Discord bot"
 requires-python = ">=3.12"
 dependencies = [
     "discord.py[voice]>=2.7.0",

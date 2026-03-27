@@ -19,7 +19,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import LokiBot  # noqa: E402
+from src.discord.client import HeimdallBot  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
 
@@ -28,7 +28,7 @@ from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub(tool_timeout: int = 300):
-    """Minimal LokiBot stub for timeout tests."""
+    """Minimal HeimdallBot stub for timeout tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -59,7 +59,7 @@ def _make_bot_stub(tool_timeout: int = 300):
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = LokiBot._build_tool_progress_embed
+    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
     return stub
 
 
@@ -109,7 +109,7 @@ class TestPerToolTimeout:
             LLMResponse(text="The tool timed out.", tool_calls=[]),
         ])
 
-        result = await LokiBot._process_with_tools(
+        result = await HeimdallBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "run slow command"}]
         )
 
@@ -145,7 +145,7 @@ class TestPerToolTimeout:
             LLMResponse(text="Done", tool_calls=[]),
         ])
 
-        await LokiBot._process_with_tools(
+        await HeimdallBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "run hanging command"}]
         )
 
@@ -191,7 +191,7 @@ class TestPerToolTimeout:
             LLMResponse(text="Mixed results", tool_calls=[]),
         ])
 
-        result = await LokiBot._process_with_tools(
+        result = await HeimdallBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "check both"}]
         )
 
@@ -220,7 +220,7 @@ class TestPerToolTimeout:
             LLMResponse(text="Disk looks good", tool_calls=[]),
         ])
 
-        result = await LokiBot._process_with_tools(
+        result = await HeimdallBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "check disk"}]
         )
 
@@ -248,7 +248,7 @@ class TestPerToolTimeout:
             LLMResponse(text="Timed out", tool_calls=[]),
         ])
 
-        await LokiBot._process_with_tools(
+        await HeimdallBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "run slow"}]
         )
 
@@ -278,7 +278,7 @@ class TestPerToolTimeout:
             LLMResponse(text="Recovered", tool_calls=[]),
         ])
 
-        result = await LokiBot._process_with_tools(
+        result = await HeimdallBot._process_with_tools(
             stub, msg, [{"role": "user", "content": "run it"}]
         )
 

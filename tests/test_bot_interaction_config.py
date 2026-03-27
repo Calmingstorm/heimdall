@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from src.config.schema import DiscordConfig
-from src.discord.client import LokiBot
+from src.discord.client import HeimdallBot
 
 
 # ---------------------------------------------------------------------------
@@ -16,7 +16,7 @@ from src.discord.client import LokiBot
 # ---------------------------------------------------------------------------
 
 def _make_bot_stub(**overrides):
-    """Minimal LokiBot stub for on_message tests."""
+    """Minimal HeimdallBot stub for on_message tests."""
     stub = MagicMock()
     stub._recent_actions = {}
     stub._recent_actions_max = 10
@@ -141,7 +141,7 @@ class TestRespondToBots:
         stub._is_allowed_user = MagicMock(return_value=True)
         stub._is_allowed_channel = MagicMock(return_value=True)
         stub._handle_message = AsyncMock()
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message()
         msg.author.bot = True
@@ -164,7 +164,7 @@ class TestRespondToBots:
         stub._bot_msg_tasks = {}
         stub._bot_msg_buffer_delay = 0
         stub._bot_msg_buffer_max = 20
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content="hello from another bot")
         msg.author.bot = True
@@ -180,7 +180,7 @@ class TestRespondToBots:
         stub = _make_bot_stub()
         stub.config.discord.respond_to_bots = True
         stub._handle_message = AsyncMock()
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message()
         msg.author = stub.user  # same object = self
@@ -204,7 +204,7 @@ class TestRespondToBots:
             stub._check_for_secrets = MagicMock(return_value=False)
             stub._handle_message = AsyncMock()
             stub.user.mentioned_in = MagicMock(return_value=False)
-            stub.on_message = LokiBot.on_message.__get__(stub)
+            stub.on_message = HeimdallBot.on_message.__get__(stub)
 
             msg = _make_message(content="webhook message")
             msg.author.bot = True
@@ -226,7 +226,7 @@ class TestRespondToBots:
         stub._check_for_secrets = MagicMock(return_value=False)
         stub._handle_message = AsyncMock()
         stub.user.mentioned_in = MagicMock(return_value=False)
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content="hello")
         msg.author.bot = False
@@ -251,7 +251,7 @@ class TestRequireMention:
         stub._is_allowed_channel = MagicMock(return_value=True)
         stub._handle_message = AsyncMock()
         stub.user.mentioned_in = MagicMock(return_value=False)
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content="hello there")
         msg.id = int(time.time() * 1000) + 200
@@ -269,7 +269,7 @@ class TestRequireMention:
         stub._check_for_secrets = MagicMock(return_value=False)
         stub._handle_message = AsyncMock()
         stub.user.mentioned_in = MagicMock(return_value=True)
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content=f"<@111> check disk")
         msg.id = int(time.time() * 1000) + 201
@@ -287,7 +287,7 @@ class TestRequireMention:
         stub._check_for_secrets = MagicMock(return_value=False)
         stub._handle_message = AsyncMock()
         stub.user.mentioned_in = MagicMock(return_value=False)
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content="hello")
         msg.id = int(time.time() * 1000) + 202
@@ -305,7 +305,7 @@ class TestRequireMention:
         stub._check_for_secrets = MagicMock(return_value=False)
         stub._handle_message = AsyncMock()
         stub.user.mentioned_in = MagicMock(return_value=False)
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content="hello in DM")
         msg.channel.guild = None  # DM channel has no guild
@@ -329,7 +329,7 @@ class TestRequireMention:
         stub._bot_msg_tasks = {}
         stub._bot_msg_buffer_delay = 0
         stub._bot_msg_buffer_max = 20
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content=f"<@111> hello from bot")
         msg.author.bot = True
@@ -348,7 +348,7 @@ class TestRequireMention:
         stub._is_allowed_channel = MagicMock(return_value=True)
         stub._handle_message = AsyncMock()
         stub.user.mentioned_in = MagicMock(return_value=False)
-        stub.on_message = LokiBot.on_message.__get__(stub)
+        stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content="hello from bot")
         msg.author.bot = True

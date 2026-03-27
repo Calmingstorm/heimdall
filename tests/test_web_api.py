@@ -42,7 +42,7 @@ from src.web.websocket import WebSocketManager, setup_websocket
 
 
 # ---------------------------------------------------------------------------
-# Helper: build a mock LokiBot with all attributes the API routes access
+# Helper: build a mock HeimdallBot with all attributes the API routes access
 # ---------------------------------------------------------------------------
 
 
