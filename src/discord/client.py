@@ -1140,9 +1140,11 @@ class HeimdallBot(discord.Client):
             return
 
         if message.author.bot:
-            # Ignore specific bot IDs completely (prevents bot-to-bot loops)
+            # Ignore specific bot IDs unless they explicitly @mention us
             if str(message.author.id) in self.config.discord.ignore_bot_ids:
-                return
+                is_mentioned = self.user and self.user.mentioned_in(message)
+                if not is_mentioned:
+                    return
             # Allow specific webhooks (via ALLOWED_WEBHOOK_IDS env var)
             is_allowed_webhook = message.webhook_id and str(message.webhook_id) in _ALLOWED_WEBHOOK_IDS
             if not is_allowed_webhook and not self.config.discord.respond_to_bots:
