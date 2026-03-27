@@ -944,6 +944,218 @@ textarea.hm-input {
 }
 .session-msg-content { font-size: var(--hm-text-base); }
 
+/* --- Source icon --- */
+.sess-source-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: var(--hm-text-sm);
+}
+.sess-source-discord {
+  background: rgba(88, 101, 242, 0.15);
+  border: 1px solid rgba(88, 101, 242, 0.3);
+}
+.sess-source-web {
+  background: var(--hm-accent-dim);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+}
+
+/* --- Expand icon --- */
+.sess-expand-icon {
+  font-size: 0.5rem;
+  color: var(--hm-text-dim);
+  transition: transform var(--hm-transition-base);
+  display: inline-block;
+  margin-right: var(--hm-space-2);
+}
+.sess-expanded { transform: rotate(90deg); }
+
+/* --- Summary banner --- */
+.sess-summary-banner {
+  padding: var(--hm-space-3) var(--hm-space-4);
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.08), rgba(234, 179, 8, 0.03));
+  border: 1px solid rgba(234, 179, 8, 0.2);
+  border-radius: var(--hm-radius-md);
+}
+.sess-summary-label {
+  font-size: var(--hm-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--hm-warning);
+}
+
+/* --- Thread view toggle --- */
+.sess-view-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  border-radius: var(--hm-radius-md);
+  padding: var(--hm-space-1) var(--hm-space-4);
+  font-size: var(--hm-text-xs);
+  color: var(--hm-text-muted);
+  cursor: pointer;
+  transition: all var(--hm-transition-base);
+  font-family: var(--hm-font-sans);
+}
+.sess-view-btn:hover { background: rgba(255, 255, 255, 0.1); }
+.sess-view-active {
+  background: var(--hm-accent-dim) !important;
+  color: var(--hm-gold);
+  border-color: rgba(217, 119, 6, 0.4);
+}
+
+/* --- Conversation threads --- */
+.sess-thread-container {
+  max-height: 32rem;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hm-space-3);
+}
+.sess-thread {
+  background: var(--hm-bg);
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-radius-md);
+  overflow: hidden;
+  transition: border-color var(--hm-transition-base);
+}
+.sess-thread:hover { border-color: rgba(255, 255, 255, 0.1); }
+.sess-thread-header {
+  display: flex;
+  align-items: center;
+  gap: var(--hm-space-2);
+  padding: var(--hm-space-3) var(--hm-space-4);
+  cursor: pointer;
+  transition: background var(--hm-transition-base);
+}
+.sess-thread-header:hover { background: rgba(255, 255, 255, 0.03); }
+.sess-thread-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--hm-accent-dim);
+  color: var(--hm-accent-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--hm-text-xs);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.sess-thread-arrow {
+  font-size: 0.5rem;
+  color: var(--hm-text-dim);
+  transition: transform var(--hm-transition-base);
+  display: inline-block;
+}
+.sess-thread-arrow-open { transform: rotate(90deg); }
+.sess-thread-summary {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--hm-text-sm);
+  color: var(--hm-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sess-thread-count { flex-shrink: 0; }
+
+/* Thread messages */
+.sess-thread-messages {
+  border-top: 1px solid var(--hm-border);
+  padding: var(--hm-space-3) var(--hm-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hm-space-3);
+}
+.sess-thread-msg {
+  padding: var(--hm-space-3);
+  border-radius: var(--hm-radius-md);
+  position: relative;
+}
+.sess-msg-user { background: rgba(6, 182, 212, 0.05); border-left: 2px solid rgba(6, 182, 212, 0.4); }
+.sess-msg-assistant { background: rgba(99, 102, 241, 0.05); border-left: 2px solid rgba(99, 102, 241, 0.4); }
+.sess-msg-system { background: rgba(107, 114, 128, 0.05); border-left: 2px solid rgba(107, 114, 128, 0.3); }
+.sess-thread-connector {
+  position: absolute;
+  left: -1px;
+  top: -12px;
+  width: 2px;
+  height: 12px;
+  background: var(--hm-border);
+}
+
+/* Message header */
+.sess-msg-header {
+  display: flex;
+  align-items: center;
+  gap: var(--hm-space-2);
+  margin-bottom: var(--hm-space-2);
+}
+.sess-role-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sess-dot-user { background: #06b6d4; box-shadow: 0 0 4px rgba(6, 182, 212, 0.5); }
+.sess-dot-assistant { background: #6366f1; box-shadow: 0 0 4px rgba(99, 102, 241, 0.5); }
+.sess-dot-system { background: #6b7280; }
+.sess-role-label {
+  font-size: var(--hm-text-xs);
+  font-weight: 600;
+}
+.sess-msg-content {
+  font-size: var(--hm-text-base);
+  color: var(--hm-text);
+  line-height: var(--hm-leading-relaxed);
+}
+
+/* --- Filter preset chips (shared by sessions + logs) --- */
+.sess-filter-bar, .logs-filter-bar {
+  border-bottom: 1px solid var(--hm-border);
+  padding-bottom: var(--hm-space-3);
+}
+.sess-preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hm-space-1);
+  padding: var(--hm-space-1) var(--hm-space-4);
+  border-radius: var(--hm-radius-full);
+  font-size: var(--hm-text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--hm-transition-base);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--hm-text-muted);
+  font-family: var(--hm-font-sans);
+}
+.sess-preset-chip:hover { background: rgba(255, 255, 255, 0.1); color: var(--hm-text); }
+.sess-preset-active {
+  background: var(--hm-accent-dim) !important;
+  color: var(--hm-gold) !important;
+  border-color: rgba(217, 119, 6, 0.4);
+}
+.sess-preset-icon { font-size: var(--hm-text-sm); }
+.sess-preset-custom {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.sess-preset-remove {
+  margin-left: var(--hm-space-1);
+  font-size: var(--hm-text-md);
+  color: var(--hm-text-dim);
+  cursor: pointer;
+  line-height: 1;
+}
+.sess-preset-remove:hover { color: var(--hm-danger); }
+
 /* ================================================================
    LOG VIEWER
    ================================================================ */
@@ -1000,6 +1212,77 @@ textarea.hm-input {
 @keyframes jump-btn-in {
   from { opacity: 0; transform: translateX(-50%) translateY(0.5rem); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* --- Log tool badge --- */
+.logs-tool-badge {
+  display: inline-block;
+  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.2);
+  border-radius: var(--hm-radius-sm);
+  padding: 0 var(--hm-space-2);
+  font-size: var(--hm-text-xs);
+  color: var(--hm-accent-hover);
+  margin-right: var(--hm-space-2);
+  font-family: var(--hm-font-mono);
+}
+
+/* --- Log timeline visualization --- */
+.logs-timeline {
+  background: var(--hm-surface);
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-radius-md);
+  padding: var(--hm-space-3) var(--hm-space-4);
+}
+.logs-timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--hm-space-2);
+}
+.logs-timeline-chart {
+  display: flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 48px;
+}
+.logs-timeline-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  min-width: 0;
+}
+.logs-timeline-bar {
+  width: 100%;
+  height: 40px;
+  display: flex;
+  flex-direction: column-reverse;
+  border-radius: 2px 2px 0 0;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.02);
+  transition: background var(--hm-transition-base);
+}
+.logs-timeline-bar-wrap:hover .logs-timeline-bar {
+  background: rgba(255, 255, 255, 0.06);
+}
+.logs-timeline-segment {
+  width: 100%;
+  min-height: 1px;
+  transition: height var(--hm-transition-slow);
+}
+.logs-tl-error { background: rgba(239, 68, 68, 0.7); }
+.logs-tl-warning { background: rgba(234, 179, 8, 0.6); }
+.logs-tl-info { background: rgba(59, 130, 246, 0.4); }
+.logs-timeline-label {
+  font-size: 0.5rem;
+  color: var(--hm-text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* ================================================================
