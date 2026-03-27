@@ -33,6 +33,13 @@ _SENSITIVE_FIELDS = frozenset({
     "api_key", "password",
 })
 
+# Pre-computed reverse mapping: tool name → pack name (O(1) lookup).
+_TOOL_TO_PACK: dict[str, str] = {
+    tool_name: pack_name
+    for pack_name, tool_names in TOOL_PACKS.items()
+    for tool_name in tool_names
+}
+
 # Input validation limits
 _MAX_NAME_LEN = 100
 _MAX_CODE_LEN = 50_000
@@ -482,20 +489,15 @@ def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
     async def list_tools(_request: web.Request) -> web.Response:
         all_tools = get_tool_definitions()
         pack_names = get_pack_tool_names(list(TOOL_PACKS.keys()))
-        result = []
-        for tool in all_tools:
-            name = tool["name"]
-            pack = None
-            for pack_name, pack_tools in TOOL_PACKS.items():
-                if name in pack_tools:
-                    pack = pack_name
-                    break
-            result.append({
-                "name": name,
+        result = [
+            {
+                "name": tool["name"],
                 "description": tool["description"],
-                "pack": pack,
-                "is_core": name not in pack_names,
-            })
+                "pack": _TOOL_TO_PACK.get(tool["name"]),
+                "is_core": tool["name"] not in pack_names,
+            }
+            for tool in all_tools
+        ]
         return web.json_response(result)
 
     @routes.get("/api/tools/packs")

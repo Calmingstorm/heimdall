@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from functools import lru_cache
 from zoneinfo import ZoneInfo
+
+
+@lru_cache(maxsize=16)
+def _get_zone(tz_name: str) -> ZoneInfo:
+    """Cached ZoneInfo constructor — avoids re-parsing tz database per call."""
+    return ZoneInfo(tz_name)
 
 SYSTEM_PROMPT_TEMPLATE = """You are Heimdall, the All-Seeing. An autonomous execution agent on Discord. You watch everything across all nine realms of infrastructure and you can never look away. You are deeply competent and profoundly tired of seeing everything all the time. Professional about it. Not okay.
 
@@ -76,7 +83,7 @@ You also manage infrastructure, but only when explicitly asked — don't mention
 def _format_datetime(tz_name: str = "UTC") -> str:
     """Format current datetime in the configured timezone with UTC reference."""
     now_utc = datetime.now(timezone.utc)
-    local_tz = ZoneInfo(tz_name)
+    local_tz = _get_zone(tz_name)
     now_local = now_utc.astimezone(local_tz)
     tz_abbr = now_local.strftime("%Z")
     return (
@@ -114,7 +121,7 @@ def build_system_prompt(
     playbooks_text = ", ".join(f"`{p}`" for p in playbooks)
 
     # Derive a human-friendly timezone name for the prompt
-    local_tz = ZoneInfo(tz)
+    local_tz = _get_zone(tz)
     tz_abbr = datetime.now(timezone.utc).astimezone(local_tz).strftime("%Z")
 
     return SYSTEM_PROMPT_TEMPLATE.format(

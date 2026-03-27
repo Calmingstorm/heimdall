@@ -1686,15 +1686,29 @@ TOOLS: list[dict] = [
 ]
 
 
+# Cache for get_tool_definitions — keyed by frozenset of enabled packs.
+# Pack config rarely changes at runtime, so this avoids rebuilding dicts
+# for 80+ tools on every message.
+_tool_defs_cache: dict[frozenset[str], list[dict]] = {}
+
+
 def get_tool_definitions(enabled_packs: list[str] | None = None) -> list[dict]:
     """Return tool definitions filtered by enabled packs.
 
     When enabled_packs is None or empty: returns ALL tools (backward compatible).
     When packs specified: returns core tools (not in any pack) + tools from enabled packs.
+
+    Results are cached by pack configuration. Call invalidate_tool_defs_cache()
+    if TOOLS list is modified at runtime (e.g. by tests).
     """
+    cache_key = frozenset(enabled_packs) if enabled_packs else frozenset()
+    cached = _tool_defs_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     if enabled_packs:
         allowed = get_pack_tool_names(enabled_packs)
-        return [
+        result = [
             {
                 "name": t["name"],
                 "description": t["description"],
@@ -1703,11 +1717,23 @@ def get_tool_definitions(enabled_packs: list[str] | None = None) -> list[dict]:
             for t in TOOLS
             if t["name"] not in _ALL_PACK_TOOLS or t["name"] in allowed
         ]
-    return [
-        {
-            "name": t["name"],
-            "description": t["description"],
-            "input_schema": t["input_schema"],
-        }
-        for t in TOOLS
-    ]
+    else:
+        result = [
+            {
+                "name": t["name"],
+                "description": t["description"],
+                "input_schema": t["input_schema"],
+            }
+            for t in TOOLS
+        ]
+    _tool_defs_cache[cache_key] = result
+    return result
+
+
+def invalidate_tool_defs_cache() -> None:
+    """Clear the tool definitions cache.
+
+    Call after modifying TOOLS at runtime (e.g. in tests) or after
+    config changes that affect pack membership.
+    """
+    _tool_defs_cache.clear()

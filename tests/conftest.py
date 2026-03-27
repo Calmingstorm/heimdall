@@ -7,6 +7,22 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from src.tools.registry import invalidate_tool_defs_cache
+
+
+@pytest.fixture(autouse=True)
+def _clear_tool_defs_cache():
+    """Clear the tool definitions cache before each test.
+
+    The cache is keyed by pack config and persists across calls, which is
+    great at runtime but causes test isolation issues when tests modify TOOLS
+    or check exact counts.
+    """
+    invalidate_tool_defs_cache()
+    yield
+    invalidate_tool_defs_cache()
+
+
 from src.config.schema import (
     Config,
     ContextConfig,

@@ -217,7 +217,7 @@ def apply_token_budget(
     return summary_pair + droppable + recent, dropped
 
 
-@dataclass
+@dataclass(slots=True)
 class Message:
     role: str
     content: str
@@ -225,7 +225,7 @@ class Message:
     user_id: str | None = None
 
 
-@dataclass
+@dataclass(slots=True)
 class Session:
     channel_id: str
     messages: list[Message] = field(default_factory=list)

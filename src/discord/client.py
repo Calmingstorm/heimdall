@@ -63,6 +63,9 @@ TOOL_OUTPUT_MAX_CHARS = 12000  # ~3000 tokens; cap tool results to prevent conte
 _LONG_TIMEOUT_TOOL_SET = frozenset({"claude_code"})  # Tools that get extended timeout (3660s vs config default)
 SEND_MAX_RETRIES = 3
 
+# Pre-compiled regex for merging adjacent code blocks in combine_bot_messages
+_ADJACENT_FENCE_RE = re.compile(r"\n```[ \t]*\n\n```(\w*)[ \t]*\n")
+
 
 class ToolLoopCancelView(discord.ui.View):
     """Cancel button attached to the tool loop progress embed.
@@ -438,18 +441,20 @@ def combine_bot_messages(parts: list[str]) -> str:
 
     # Join parts, using \n (not \n\n) when the previous part has an unclosed
     # code block — meaning the next part is a continuation of the same block.
+    # Track fence count incrementally to avoid O(n²) rescanning.
     result = parts[0]
+    fence_count = result.count("```")
     for i in range(1, len(parts)):
-        fence_count = result.count("```")
         if fence_count % 2 == 1:
             # Inside an unclosed code block — continuation, single newline
             result += "\n" + parts[i]
         else:
             result += "\n\n" + parts[i]
+        fence_count += parts[i].count("```")
 
     # Merge adjacent code blocks: \n```<ws>\n\n```<lang>\n → \n
     # This collapses e.g. "\n```\n\n```bash\n" into a single block.
-    result = re.sub(r"\n```[ \t]*\n\n```(\w*)[ \t]*\n", "\n", result)
+    result = _ADJACENT_FENCE_RE.sub("\n", result)
 
     return result
 

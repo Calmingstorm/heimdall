@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
-@dataclass
+@dataclass(slots=True)
 class ToolCall:
     """A single tool call extracted from an LLM response.
 
@@ -16,7 +16,7 @@ class ToolCall:
     input: dict  # parsed tool arguments
 
 
-@dataclass
+@dataclass(slots=True)
 class LLMResponse:
     """Normalized response from any LLM backend.
 
