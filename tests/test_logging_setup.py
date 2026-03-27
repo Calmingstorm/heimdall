@@ -81,6 +81,6 @@ class TestSetupLogging:
 
 class TestGetLogger:
     def test_returns_namespaced_logger(self):
-        """get_logger returns logger under loki namespace."""
+        """get_logger returns logger under heimdall namespace."""
         logger = get_logger("test_module")
         assert logger.name == "heimdall.test_module"

@@ -228,8 +228,8 @@ class TestExampleSkillExecution:
     async def test_hello_world_with_name(self, skill_mgr: SkillManager):
         code = _read_template("example_skill")
         skill_mgr.create_skill("hello_world", code)
-        result = await skill_mgr.execute("hello_world", {"name": "Loki"})
-        assert "Hello, Loki!" in result
+        result = await skill_mgr.execute("hello_world", {"name": "Heimdall"})
+        assert "Hello, Heimdall!" in result
 
     def test_system_info_loads(self, skill_mgr: SkillManager):
         code = _read_template("system_info")

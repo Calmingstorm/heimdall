@@ -20,7 +20,7 @@ SRC = ROOT / "src"
 
 
 # ---------------------------------------------------------------------------
-# 1. Identity verification — all references are "Loki" not "Ansiblex"
+# 1. Identity verification — all references are "Heimdall" not "Ansiblex"
 # ---------------------------------------------------------------------------
 
 class TestIdentityComplete:

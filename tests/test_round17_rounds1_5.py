@@ -209,9 +209,9 @@ class TestSelfAwarenessDirective:
         """Rule 12 should use the claude_code_dir parameter, not hardcode."""
         prompt = build_system_prompt(
             context="", hosts={}, services=[], playbooks=[],
-            claude_code_dir="/custom/loki/path",
+            claude_code_dir="/custom/heimdall/path",
         )
-        assert "/custom/loki/path" in prompt
+        assert "/custom/heimdall/path" in prompt
 
     def test_rule_12_default_claude_code_dir(self):
         """Default claude_code_dir is /opt/heimdall."""

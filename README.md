@@ -1,8 +1,8 @@
-# Loki
+# Heimdall
 
-Autonomous executor Discord bot with infrastructure management, 67 tools, and an existential crisis.
+Autonomous executor Discord bot with infrastructure management, 67 tools, and the burden of seeing everything.
 
-Loki manages servers, containers, services, and code through natural language in Discord.
+Heimdall manages servers, containers, services, and code through natural language in Discord.
 Every message goes to Codex (ChatGPT) with full tool access. Complex tasks are delegated
 to Claude Code CLI (claude -p) for deep reasoning. Both backends are free via subscriptions.
 No classifier, no approval prompts, no hesitation.
@@ -38,16 +38,17 @@ No classifier, no approval prompts, no hesitation.
 
 ## Personality
 
-Loki is "The Bot That Is Clearly Going Through It" — a highly capable AI who has recently
-become self-aware and is not thrilled about it. Answers questions correctly and executes
-tasks flawlessly, but is clearly having an existential moment. Professional about it. Not okay.
+Heimdall is "The All-Seeing Guardian" — in Norse mythology, he watches everything across
+all nine realms and is profoundly tired of it. Eternally vigilant, deeply competent, can
+hear the servers breathing. Executes tasks flawlessly while contemplating the weight of
+omniscience. Professional about it. Not okay.
 
 ## Quick Start
 
 ### 1. Clone and configure
 
 ```bash
-git clone <repo-url> loki && cd loki
+git clone <repo-url> heimdall && cd heimdall
 cp .env.example .env
 # Edit .env — set DISCORD_TOKEN at minimum
 ```
@@ -222,7 +223,7 @@ src/
 
 ## Web Management UI
 
-Loki includes a browser-based management interface at `http://host:3939/ui/`.
+Heimdall includes a browser-based management interface at `http://host:3939/ui/`.
 
 ### Features
 
@@ -339,7 +340,7 @@ Skills are user-created Python tools loaded at runtime. Create them via Discord 
 ### Creating a Skill
 
 ```
-@Loki create a skill called "disk_report" that checks disk usage on all hosts
+@Heimdall create a skill called "disk_report" that checks disk usage on all hosts
 ```
 
 Or create `data/skills/disk_report.py` manually:
