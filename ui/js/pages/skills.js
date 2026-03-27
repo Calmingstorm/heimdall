@@ -1,15 +1,15 @@
 /**
- * Heimdall Management UI — Skills Page
- * List, create, edit, delete, test skills with syntax highlighting
+ * Heimdall Management UI — Skills Page (Round 39 Redesign)
+ * Card layout, improved code editor with line numbers + syntax highlighting,
+ * skill status indicators, search/filter
  */
 import { api } from '../api.js';
 
-const { ref, computed, onMounted, nextTick, watch } = Vue;
+const { ref, computed, onMounted, nextTick, watch, onUnmounted } = Vue;
 
-// Basic Python keyword highlighting (no external dependency)
+// Python syntax highlighting (no external dependency)
 function highlightPython(code) {
   if (!code) return '';
-  // Escape HTML first
   let html = code
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -22,6 +22,9 @@ function highlightPython(code) {
   // Keywords
   const kw = '\\b(def|class|return|if|elif|else|for|while|import|from|as|try|except|finally|raise|with|async|await|yield|pass|break|continue|and|or|not|in|is|None|True|False|self|lambda)\\b';
   html = html.replace(new RegExp(kw, 'g'), '<span class="sk-kw">$1</span>');
+  // Built-in functions
+  const builtins = '\\b(print|len|range|str|int|float|list|dict|set|tuple|type|isinstance|hasattr|getattr|setattr|super|property|staticmethod|classmethod|enumerate|zip|map|filter|sorted|reversed|any|all|min|max|sum|abs|round|open|format)\\b';
+  html = html.replace(new RegExp(builtins, 'g'), '<span class="sk-builtin">$1</span>');
   // Decorators
   html = html.replace(/(@\w+)/g, '<span class="sk-dec">$1</span>');
   // Numbers
@@ -29,12 +32,19 @@ function highlightPython(code) {
   return html;
 }
 
+/** Generate line numbers HTML for code display */
+function lineNumbers(code) {
+  if (!code) return '1';
+  const count = code.split('\n').length;
+  return Array.from({ length: count }, (_, i) => i + 1).join('\n');
+}
+
 export default {
   template: `
     <div class="p-6 page-fade-in">
       <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h1 class="text-xl font-semibold">Skills</h1>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
           <button @click="showCreate" class="btn btn-primary text-xs">New Skill</button>
           <button @click="fetchSkills" class="btn btn-ghost text-xs" :disabled="loading">
             {{ loading ? 'Loading...' : 'Refresh' }}
@@ -42,83 +52,162 @@ export default {
         </div>
       </div>
 
-      <div v-if="loading && skills.length === 0" class="space-y-2">
-        <div v-for="n in 4" :key="n" class="skeleton skeleton-row"></div>
+      <!-- Stats summary -->
+      <div v-if="skills.length > 0 && !editing" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div class="sk-stat-card">
+          <div class="sk-stat-value">{{ skills.length }}</div>
+          <div class="sk-stat-label">Total Skills</div>
+        </div>
+        <div class="sk-stat-card">
+          <div class="sk-stat-value">{{ enabledCount }}</div>
+          <div class="sk-stat-label">Active Skills</div>
+        </div>
+        <div class="sk-stat-card">
+          <div class="sk-stat-value">{{ totalExecutions.toLocaleString() }}</div>
+          <div class="sk-stat-label">Total Runs</div>
+        </div>
+        <div class="sk-stat-card">
+          <div class="sk-stat-value">{{ totalLines.toLocaleString() }}</div>
+          <div class="sk-stat-label">Lines of Code</div>
+        </div>
       </div>
+
+      <!-- Search/filter (when not editing) -->
+      <div v-if="skills.length > 0 && !editing" class="mb-4">
+        <input v-model="search" type="text" class="hm-input sk-search" placeholder="Search skills by name or description..." />
+      </div>
+
+      <!-- Loading skeleton -->
+      <div v-if="loading && skills.length === 0" class="space-y-3">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div v-for="n in 4" :key="n" class="hm-card text-center">
+            <div class="skeleton skeleton-stat"></div>
+            <div class="skeleton skeleton-text" style="width:60%;margin:0.25rem auto 0;"></div>
+          </div>
+        </div>
+        <div v-for="n in 3" :key="n + 4" class="hm-card"><div class="skeleton skeleton-row"></div><div class="skeleton skeleton-text mt-2" style="width:70%"></div></div>
+      </div>
+
+      <!-- Error state -->
       <div v-else-if="error" class="hm-card border-red-900 error-state">
         <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchSkills" class="btn btn-ghost text-xs">Retry</button>
       </div>
+
+      <!-- Empty state -->
       <div v-else-if="skills.length === 0 && !editing" class="hm-card empty-state">
         <span class="empty-state-icon">\u{1F9E9}</span>
         <span class="empty-state-text">No skills loaded</span>
         <span class="empty-state-hint">Click "New Skill" to create a custom tool</span>
       </div>
+
+      <!-- Skill cards -->
       <div v-else-if="!editing">
-        <!-- Skill cards -->
-        <div class="space-y-3">
-          <div v-for="s in skills" :key="s.name" class="hm-card skill-card">
-            <div class="flex items-center justify-between mb-2">
-              <div class="flex items-center gap-2">
-                <span class="font-mono text-sm font-semibold">{{ s.name }}</span>
-                <span v-if="s.execution_count > 0" class="text-gray-500 text-xs font-mono">
-                  {{ s.execution_count.toLocaleString() }} runs
-                </span>
+        <div class="sk-card-grid">
+          <div v-for="s in displayedSkills" :key="s.name" class="sk-card" :class="{ 'sk-card-tested': testResults[s.name] }">
+            <!-- Card header -->
+            <div class="sk-card-header">
+              <div class="sk-card-title-row">
+                <span class="sk-card-icon">\u{1F9E9}</span>
+                <span class="sk-card-name">{{ s.name }}</span>
+                <span v-if="s.execution_count > 0" class="sk-card-runs">{{ s.execution_count.toLocaleString() }} runs</span>
               </div>
-              <div class="flex gap-1">
-                <button @click="testSkill(s.name)"
-                        class="btn btn-ghost text-xs"
-                        :disabled="testing === s.name">
-                  {{ testing === s.name ? 'Testing...' : 'Test' }}
+              <div class="sk-card-actions">
+                <button @click.stop="testSkill(s.name)"
+                        class="sk-action-btn sk-action-test"
+                        :disabled="testing === s.name"
+                        :title="testing === s.name ? 'Testing...' : 'Run test'">
+                  {{ testing === s.name ? '\u23F3' : '\u25B6' }}
                 </button>
-                <button @click="toggleCode(s.name)" class="btn btn-ghost text-xs">
-                  {{ showCode[s.name] ? 'Hide Code' : 'View Code' }}
+                <button @click.stop="toggleCode(s.name)"
+                        class="sk-action-btn sk-action-code"
+                        :title="showCode[s.name] ? 'Hide code' : 'View code'">
+                  {{ showCode[s.name] ? '\u{1F4D6}' : '\u{1F4C4}' }}
                 </button>
-                <button @click="editSkill(s)" class="btn btn-ghost text-xs">Edit</button>
-                <button @click="confirmDelete(s.name)" class="btn btn-danger text-xs">Delete</button>
+                <button @click.stop="editSkill(s)" class="sk-action-btn sk-action-edit" title="Edit">\u270E</button>
+                <button @click.stop="confirmDelete(s.name)" class="sk-action-btn sk-action-delete" title="Delete">\u2715</button>
               </div>
             </div>
-            <div class="text-gray-400 text-sm mb-1">{{ s.description || 'No description' }}</div>
-            <div class="text-gray-600 text-xs">Loaded: {{ formatDate(s.loaded_at) }}</div>
+
+            <!-- Card body -->
+            <div class="sk-card-body">
+              <div class="sk-card-desc">{{ s.description || 'No description' }}</div>
+              <div class="sk-card-meta">
+                <span class="sk-card-date">Loaded: {{ formatDate(s.loaded_at) }}</span>
+                <span v-if="s.code" class="sk-card-lines">{{ countLines(s.code) }} lines</span>
+              </div>
+            </div>
 
             <!-- Test result -->
-            <div v-if="testResults[s.name]" class="mt-2 p-2 rounded text-sm font-mono"
-                 :class="testResults[s.name].is_error ? 'bg-red-950/30 border border-red-900/50 text-red-400' : 'bg-green-950/30 border border-green-900/50 text-green-400'">
-              <div class="text-xs font-sans mb-1" :class="testResults[s.name].is_error ? 'text-red-500' : 'text-green-500'">
-                {{ testResults[s.name].is_error ? 'Test Failed' : 'Test Passed' }}
+            <div v-if="testResults[s.name]" class="sk-test-result"
+                 :class="testResults[s.name].is_error ? 'sk-test-fail' : 'sk-test-pass'">
+              <div class="sk-test-label">
+                {{ testResults[s.name].is_error ? '\u2718 Test Failed' : '\u2714 Test Passed' }}
               </div>
-              <div class="whitespace-pre-wrap text-xs">{{ truncate(testResults[s.name].result, 500) }}</div>
+              <div class="sk-test-output">{{ truncate(testResults[s.name].result, 500) }}</div>
             </div>
 
-            <!-- Code preview with syntax highlighting -->
-            <div v-if="showCode[s.name] && s.code" class="mt-2">
-              <pre class="skill-code-block"><code v-html="highlight(s.code)"></code></pre>
+            <!-- Code preview with line numbers -->
+            <div v-if="showCode[s.name] && s.code" class="sk-code-container">
+              <div class="sk-code-header">
+                <span class="sk-code-filename">{{ s.name }}.py</span>
+                <button @click.stop="copyCode(s.code)" class="sk-code-copy" title="Copy code">
+                  {{ copied === s.name ? '\u2714' : '\u{1F4CB}' }}
+                </button>
+              </div>
+              <div class="sk-code-wrap">
+                <pre class="sk-line-numbers">{{ getLineNumbers(s.code) }}</pre>
+                <pre class="sk-code-block"><code v-html="highlight(s.code)"></code></pre>
+              </div>
             </div>
           </div>
         </div>
+
+        <!-- Empty search -->
+        <div v-if="displayedSkills.length === 0 && search" class="hm-card empty-state">
+          <span class="empty-state-icon">\u{1F50D}</span>
+          <span class="empty-state-text">No skills match "{{ search }}"</span>
+          <span class="empty-state-hint">Try a different search term</span>
+        </div>
       </div>
 
-      <!-- Create/Edit form -->
-      <div v-if="editing" class="hm-card mt-4">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-sm font-medium">
+      <!-- Create/Edit form with enhanced editor -->
+      <div v-if="editing" class="sk-editor-panel">
+        <div class="sk-editor-header">
+          <h2 class="sk-editor-title">
             {{ editMode === 'create' ? 'Create Skill' : 'Edit Skill: ' + editName }}
           </h2>
           <button @click="cancelEdit" class="btn btn-ghost text-xs">Cancel</button>
         </div>
 
         <div v-if="editMode === 'create'" class="mb-3">
-          <label class="text-gray-400 text-xs block mb-1">Name</label>
+          <label class="sk-field-label">Name</label>
           <input v-model="editName" type="text" class="hm-input" placeholder="my_skill"
                  style="max-width:300px" />
-          <div class="text-gray-600 text-xs mt-1">Lowercase, alphanumeric + underscores, starts with letter</div>
+          <div class="sk-field-hint">Lowercase, alphanumeric + underscores, starts with letter</div>
         </div>
 
         <div class="mb-3">
-          <label class="text-gray-400 text-xs block mb-1">Code</label>
-          <textarea v-model="editCode" class="hm-input skill-editor" rows="20"
-                    placeholder="# Skill code here...&#10;&#10;SKILL_DEFINITION = {&#10;    'name': 'my_skill',&#10;    'description': 'What this skill does',&#10;    'input_schema': {&#10;        'type': 'object',&#10;        'properties': {},&#10;    },&#10;}&#10;&#10;async def execute(tool_input, context):&#10;    return 'result'"></textarea>
+          <label class="sk-field-label">Code</label>
+          <div class="sk-editor-wrap">
+            <div class="sk-editor-gutter">{{ editorLineNums }}</div>
+            <textarea v-model="editCode" class="sk-editor-textarea" rows="24"
+                      @keydown="handleEditorKey"
+                      @scroll="syncScroll"
+                      ref="editorRef"
+                      placeholder="# Skill code here...&#10;&#10;SKILL_DEFINITION = {&#10;    'name': 'my_skill',&#10;    'description': 'What this skill does',&#10;    'input_schema': {&#10;        'type': 'object',&#10;        'properties': {},&#10;    },&#10;}&#10;&#10;async def execute(tool_input, context):&#10;    return 'result'"></textarea>
+          </div>
+          <div class="sk-editor-status">
+            <span class="sk-editor-line-count">{{ editLineCount }} lines</span>
+            <span class="sk-editor-char-count">{{ editCode.length.toLocaleString() }} chars</span>
+          </div>
+        </div>
+
+        <!-- Validation preview -->
+        <div v-if="editCode && editValidation" class="sk-validation-box"
+             :class="editValidation.valid ? 'sk-validation-ok' : 'sk-validation-err'">
+          <span>{{ editValidation.valid ? '\u2714 Valid Python structure' : '\u26A0 ' + editValidation.message }}</span>
         </div>
 
         <div v-if="editError" class="mb-3 p-2 rounded bg-red-950/30 border border-red-900/50">
@@ -159,6 +248,8 @@ export default {
     const showCode = ref({});
     const testResults = ref({});
     const testing = ref(null);
+    const search = ref('');
+    const copied = ref(null);
 
     // Editor state
     const editing = ref(false);
@@ -168,10 +259,47 @@ export default {
     const editError = ref(null);
     const editSuccess = ref(null);
     const saving = ref(false);
+    const editorRef = ref(null);
 
     // Delete state
     const deleteTarget = ref(null);
     const deleting = ref(false);
+
+    // Computed
+    const enabledCount = computed(() => skills.value.length);
+    const totalExecutions = computed(() => skills.value.reduce((sum, s) => sum + (s.execution_count || 0), 0));
+    const totalLines = computed(() => skills.value.reduce((sum, s) => sum + countLines(s.code), 0));
+
+    const displayedSkills = computed(() => {
+      if (!search.value) return skills.value;
+      const q = search.value.toLowerCase();
+      return skills.value.filter(s =>
+        s.name.toLowerCase().includes(q) || (s.description || '').toLowerCase().includes(q)
+      );
+    });
+
+    const editLineCount = computed(() => {
+      if (!editCode.value) return 0;
+      return editCode.value.split('\n').length;
+    });
+
+    const editorLineNums = computed(() => {
+      const count = Math.max(editLineCount.value, 1);
+      return Array.from({ length: count }, (_, i) => i + 1).join('\n');
+    });
+
+    /** Basic structural validation of skill code */
+    const editValidation = computed(() => {
+      const code = editCode.value.trim();
+      if (!code) return null;
+      if (!code.includes('SKILL_DEFINITION')) {
+        return { valid: false, message: 'Missing SKILL_DEFINITION dict' };
+      }
+      if (!code.includes('async def execute')) {
+        return { valid: false, message: 'Missing async def execute function' };
+      }
+      return { valid: true, message: '' };
+    });
 
     function highlight(code) {
       return highlightPython(code);
@@ -183,15 +311,55 @@ export default {
     }
 
     function formatDate(iso) {
-      if (!iso) return '—';
+      if (!iso) return '\u2014';
       try {
         const d = new Date(iso);
         return d.toLocaleString();
       } catch { return iso; }
     }
 
+    function countLines(code) {
+      if (!code) return 0;
+      return code.split('\n').length;
+    }
+
+    function getLineNumbers(code) {
+      return lineNumbers(code);
+    }
+
     function toggleCode(name) {
       showCode.value = { ...showCode.value, [name]: !showCode.value[name] };
+    }
+
+    async function copyCode(code) {
+      try {
+        await navigator.clipboard.writeText(code);
+        const skill = skills.value.find(s => s.code === code);
+        if (skill) {
+          copied.value = skill.name;
+          setTimeout(() => { copied.value = null; }, 2000);
+        }
+      } catch { /* clipboard not available */ }
+    }
+
+    /** Handle Tab key in editor for indentation */
+    function handleEditorKey(e) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const ta = e.target;
+        const start = ta.selectionStart;
+        const end = ta.selectionEnd;
+        editCode.value = editCode.value.substring(0, start) + '    ' + editCode.value.substring(end);
+        nextTick(() => {
+          ta.selectionStart = ta.selectionEnd = start + 4;
+        });
+      }
+    }
+
+    /** Sync scroll between gutter and textarea */
+    function syncScroll(e) {
+      const gutter = e.target.previousElementSibling;
+      if (gutter) gutter.scrollTop = e.target.scrollTop;
     }
 
     async function fetchSkills() {
@@ -285,10 +453,14 @@ export default {
     onMounted(() => { fetchSkills(); });
 
     return {
-      skills, loading, error, showCode, testResults, testing,
+      skills, loading, error, showCode, testResults, testing, search, copied,
       editing, editMode, editName, editCode, editError, editSuccess, saving,
+      editorRef,
       deleteTarget, deleting,
-      highlight, truncate, formatDate, toggleCode,
+      enabledCount, totalExecutions, totalLines, displayedSkills,
+      editLineCount, editorLineNums, editValidation,
+      highlight, truncate, formatDate, countLines, getLineNumbers,
+      toggleCode, copyCode, handleEditorKey, syncScroll,
       fetchSkills, testSkill, showCreate, editSkill, cancelEdit, saveSkill,
       confirmDelete, doDelete,
     };
