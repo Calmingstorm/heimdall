@@ -1,10 +1,10 @@
 /**
  * Heimdall Management UI — Knowledge Page
- * Browse/search/ingest/delete knowledge documents with previews and search highlighting
+ * Visual chunk browser with tree view, search highlighting, ingest/delete
  */
 import { api } from '../api.js';
 
-const { ref, onMounted } = Vue;
+const { ref, computed, onMounted } = Vue;
 
 function escapeHtml(text) {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -37,6 +37,22 @@ export default {
         </div>
       </div>
 
+      <!-- Stats bar -->
+      <div v-if="!loading && sources.length > 0" class="kb-stats-bar">
+        <div class="kb-stat">
+          <span class="kb-stat-value">{{ sources.length }}</span>
+          <span class="kb-stat-label">Sources</span>
+        </div>
+        <div class="kb-stat">
+          <span class="kb-stat-value">{{ totalChunks }}</span>
+          <span class="kb-stat-label">Chunks</span>
+        </div>
+        <div class="kb-stat">
+          <span class="kb-stat-value">{{ uploaderCount }}</span>
+          <span class="kb-stat-label">Uploaders</span>
+        </div>
+      </div>
+
       <!-- Search bar -->
       <div class="mb-4 flex gap-2">
         <input v-model="searchQuery" type="text" class="hm-input"
@@ -63,10 +79,10 @@ export default {
           <span class="empty-state-hint">Try different search terms or ingest more documents</span>
         </div>
         <div v-else class="space-y-2">
-          <div v-for="(r, i) in searchResults" :key="i" class="hm-card">
+          <div v-for="(r, i) in searchResults" :key="i" class="hm-card kb-search-result">
             <div class="flex items-center gap-2 mb-1">
               <span class="badge badge-info">{{ r.source || 'unknown' }}</span>
-              <span v-if="r.score" class="text-gray-500 text-xs font-mono">score: {{ r.score.toFixed(3) }}</span>
+              <span v-if="r.score" class="kb-score-badge">{{ r.score.toFixed(3) }}</span>
               <span v-if="r.chunk_index !== undefined" class="text-gray-600 text-xs">chunk #{{ r.chunk_index }}</span>
             </div>
             <div class="text-sm text-gray-300 whitespace-pre-wrap break-words"
@@ -76,7 +92,7 @@ export default {
       </div>
 
       <!-- Ingest form -->
-      <div v-if="showIngest" class="hm-card mb-4">
+      <div v-if="showIngest" class="hm-card mb-4 kb-ingest-form">
         <h2 class="text-sm font-medium mb-3">Ingest Document</h2>
         <div class="mb-3">
           <label class="text-gray-400 text-xs block mb-1">Source Name</label>
@@ -94,7 +110,7 @@ export default {
         </button>
       </div>
 
-      <!-- Sources list -->
+      <!-- Sources tree view -->
       <div v-if="loading && sources.length === 0" class="space-y-2">
         <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
       </div>
@@ -108,35 +124,69 @@ export default {
         <span class="empty-state-text">No documents ingested</span>
         <span class="empty-state-hint">Click "Ingest Document" to add knowledge for Heimdall to reference</span>
       </div>
-      <div v-else-if="sources.length > 0">
+      <div v-else-if="sources.length > 0" class="kb-tree">
         <div class="text-sm font-medium text-gray-400 mb-2">
-          Ingested Sources <span class="badge badge-info">{{ sources.length }}</span>
+          Sources <span class="badge badge-info">{{ sources.length }}</span>
         </div>
-        <div class="space-y-2">
-          <div v-for="s in sources" :key="s.source || s.name || s" class="hm-card">
-            <div class="flex items-center justify-between mb-1">
-              <div class="flex items-center gap-2">
-                <span class="font-mono text-sm font-semibold">{{ s.source || s.name || s }}</span>
-                <span class="badge badge-info">{{ s.chunks || '—' }} chunks</span>
-                <span v-if="s.uploader" class="badge badge-warning text-xs">{{ s.uploader }}</span>
-              </div>
-              <div class="flex gap-1">
-                <button @click="doReingest(s.source || s.name || s)"
+        <div class="kb-tree-list">
+          <div v-for="s in sources" :key="s.source || s.name || s" class="kb-tree-node">
+            <!-- Source header (tree branch) -->
+            <div class="kb-tree-header" @click="toggleSource(s.source || s.name || s)">
+              <span class="kb-tree-arrow" :class="{ 'kb-tree-arrow-open': expanded[s.source || s.name || s] }">
+                \u25B6
+              </span>
+              <span class="kb-tree-icon">\u{1F4C4}</span>
+              <span class="kb-tree-name">{{ s.source || s.name || s }}</span>
+              <span class="badge badge-info text-xs">{{ s.chunks || 0 }} chunks</span>
+              <span v-if="s.uploader" class="badge badge-warning text-xs">{{ s.uploader }}</span>
+              <div class="kb-tree-actions">
+                <button @click.stop="doReingest(s.source || s.name || s)"
                         class="btn btn-ghost text-xs"
                         :disabled="reingesting === (s.source || s.name || s)">
                   {{ reingesting === (s.source || s.name || s) ? 'Re-ingesting...' : 'Re-ingest' }}
                 </button>
-                <button @click="confirmDelete(s.source || s.name || s)" class="btn btn-danger text-xs">Delete</button>
+                <button @click.stop="confirmDelete(s.source || s.name || s)" class="btn btn-danger text-xs">Delete</button>
               </div>
             </div>
-            <div v-if="s.ingested_at" class="text-gray-600 text-xs mb-1">
+
+            <!-- Source metadata -->
+            <div v-if="s.ingested_at && !expanded[s.source || s.name || s]" class="kb-tree-meta">
               Ingested: {{ formatDate(s.ingested_at) }}
             </div>
-            <div v-if="s.preview" class="text-gray-400 text-sm mt-1 whitespace-pre-wrap break-words knowledge-preview">{{ s.preview }}</div>
+            <div v-if="s.preview && !expanded[s.source || s.name || s]" class="kb-tree-preview">{{ s.preview }}</div>
+
+            <!-- Re-ingest result -->
             <div v-if="reingestResult && reingestResult.source === (s.source || s.name || s)"
-                 class="mt-2 text-xs"
+                 class="kb-tree-meta"
                  :class="reingestResult.error ? 'text-red-400' : 'text-green-400'">
               {{ reingestResult.message }}
+            </div>
+
+            <!-- Chunk browser (expanded) -->
+            <div v-if="expanded[s.source || s.name || s]" class="kb-chunk-browser">
+              <div v-if="loadingChunks === (s.source || s.name || s)" class="kb-chunk-loading">
+                <div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> Loading chunks...
+              </div>
+              <div v-else-if="sourceChunks[s.source || s.name || s]" class="kb-chunk-list">
+                <div class="kb-chunk-header">
+                  <span class="text-gray-400 text-xs">{{ sourceChunks[s.source || s.name || s].length }} chunks</span>
+                  <span class="text-gray-600 text-xs">Ingested: {{ formatDate(s.ingested_at) }}</span>
+                </div>
+                <div v-for="chunk in sourceChunks[s.source || s.name || s]" :key="chunk.chunk_id"
+                     class="kb-chunk-item" :class="{ 'kb-chunk-selected': selectedChunk === chunk.chunk_id }"
+                     @click="selectedChunk = selectedChunk === chunk.chunk_id ? null : chunk.chunk_id">
+                  <div class="kb-chunk-item-header">
+                    <span class="kb-chunk-index">#{{ chunk.chunk_index }}</span>
+                    <span class="kb-chunk-chars">{{ chunk.char_count }} chars</span>
+                    <div class="kb-chunk-bar">
+                      <div class="kb-chunk-bar-fill" :style="{ width: chunkBarWidth(chunk, s.source || s.name || s) + '%' }"></div>
+                    </div>
+                  </div>
+                  <div v-if="selectedChunk === chunk.chunk_id" class="kb-chunk-content">{{ chunk.content }}</div>
+                  <div v-else class="kb-chunk-preview">{{ truncate(chunk.content, 120) }}</div>
+                </div>
+              </div>
+              <div v-else class="kb-chunk-empty text-gray-500 text-xs">No chunks found</div>
             </div>
           </div>
         </div>
@@ -188,6 +238,19 @@ export default {
     const deleteTarget = ref(null);
     const deleting = ref(false);
 
+    // Tree / chunk browser
+    const expanded = ref({});
+    const sourceChunks = ref({});
+    const loadingChunks = ref(null);
+    const selectedChunk = ref(null);
+
+    // Computed stats
+    const totalChunks = computed(() => sources.value.reduce((sum, s) => sum + (s.chunks || 0), 0));
+    const uploaderCount = computed(() => {
+      const set = new Set(sources.value.map(s => s.uploader).filter(Boolean));
+      return set.size;
+    });
+
     function truncate(text, max) {
       if (!text) return '';
       return text.length > max ? text.slice(0, max) + '...' : text;
@@ -201,6 +264,14 @@ export default {
       } catch { return iso; }
     }
 
+    function chunkBarWidth(chunk, source) {
+      const chunks = sourceChunks.value[source];
+      if (!chunks || chunks.length === 0) return 0;
+      const maxChars = Math.max(...chunks.map(c => c.char_count || 0));
+      if (maxChars === 0) return 0;
+      return Math.round((chunk.char_count / maxChars) * 100);
+    }
+
     async function fetchSources() {
       loading.value = true;
       error.value = null;
@@ -211,6 +282,25 @@ export default {
         error.value = e.message;
       }
       loading.value = false;
+    }
+
+    async function toggleSource(source) {
+      if (expanded.value[source]) {
+        expanded.value[source] = false;
+        selectedChunk.value = null;
+        return;
+      }
+      expanded.value[source] = true;
+      if (sourceChunks.value[source]) return;
+
+      loadingChunks.value = source;
+      try {
+        const chunks = await api.get(`/api/knowledge/${encodeURIComponent(source)}/chunks`);
+        sourceChunks.value[source] = Array.isArray(chunks) ? chunks : [];
+      } catch {
+        sourceChunks.value[source] = [];
+      }
+      loadingChunks.value = null;
     }
 
     async function doSearch() {
@@ -249,6 +339,7 @@ export default {
         ingestSuccess.value = `Ingested ${result.chunks || 0} chunks from "${source}"`;
         ingestSource.value = '';
         ingestContent.value = '';
+        sourceChunks.value = {};
         await fetchSources();
         setTimeout(() => { showIngest.value = false; ingestSuccess.value = null; }, 1500);
       } catch (e) {
@@ -268,6 +359,7 @@ export default {
           error: false,
           message: `Re-ingested ${result.chunks || 0} chunks`,
         };
+        delete sourceChunks.value[source];
         await fetchSources();
         reingestTimer = setTimeout(() => { reingestResult.value = null; reingestTimer = null; }, 3000);
       } catch (e) {
@@ -289,6 +381,7 @@ export default {
       deleting.value = true;
       try {
         await api.del(`/api/knowledge/${encodeURIComponent(deleteTarget.value)}`);
+        delete sourceChunks.value[deleteTarget.value];
         await fetchSources();
       } catch { /* ignore */ }
       deleting.value = false;
@@ -303,7 +396,10 @@ export default {
       showIngest, ingestSource, ingestContent, ingestError, ingestSuccess, ingesting,
       reingesting, reingestResult,
       deleteTarget, deleting,
-      truncate, formatDate, highlightTerms, fetchSources, doSearch, clearSearch,
+      expanded, sourceChunks, loadingChunks, selectedChunk,
+      totalChunks, uploaderCount,
+      truncate, formatDate, highlightTerms, chunkBarWidth,
+      fetchSources, toggleSource, doSearch, clearSearch,
       doIngest, doReingest, confirmDelete, doDelete,
     };
   },

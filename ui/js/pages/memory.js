@@ -1,6 +1,6 @@
 /**
  * Heimdall Management UI — Memory Page
- * Table view of persistent memory with copy, scope badges, and bulk delete
+ * Tree-organized persistent memory with scope grouping, inline edit, search, bulk ops
  */
 import { api } from '../api.js';
 
@@ -22,20 +22,20 @@ export default {
       </div>
 
       <!-- Summary stats -->
-      <div v-if="!loading && scopes.length > 0" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <div class="hm-card text-center">
-          <div class="text-2xl font-bold">{{ totalEntries }}</div>
-          <div class="text-gray-400 text-xs">Total Entries</div>
+      <div v-if="!loading && scopes.length > 0" class="mem-stats-bar">
+        <div class="mem-stat">
+          <span class="mem-stat-value">{{ totalEntries }}</span>
+          <span class="mem-stat-label">Entries</span>
         </div>
-        <div class="hm-card text-center">
-          <div class="text-2xl font-bold">{{ scopes.length }}</div>
-          <div class="text-gray-400 text-xs">Scopes</div>
+        <div class="mem-stat">
+          <span class="mem-stat-value">{{ scopes.length }}</span>
+          <span class="mem-stat-label">Scopes</span>
         </div>
-        <div class="hm-card text-center">
-          <div class="text-2xl font-bold">{{ selectedCount }}</div>
-          <div class="text-gray-400 text-xs">Selected</div>
+        <div class="mem-stat">
+          <span class="mem-stat-value">{{ selectedCount }}</span>
+          <span class="mem-stat-label">Selected</span>
         </div>
-        <div class="hm-card text-center">
+        <div class="mem-stat mem-stat-action">
           <button v-if="selectedCount > 0" @click="confirmBulkDelete"
                   class="btn btn-danger text-xs">
             Delete Selected ({{ selectedCount }})
@@ -44,8 +44,14 @@ export default {
         </div>
       </div>
 
+      <!-- Search/filter -->
+      <div v-if="scopes.length > 0" class="mb-4">
+        <input v-model="filterQuery" type="text" class="hm-input"
+               placeholder="Filter memory keys..." />
+      </div>
+
       <!-- Add form -->
-      <div v-if="showAdd" class="hm-card mb-4">
+      <div v-if="showAdd" class="hm-card mb-4 mem-add-form">
         <h2 class="text-sm font-medium mb-3">Add Memory Entry</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
           <div>
@@ -94,75 +100,60 @@ export default {
         <span class="empty-state-hint">Click "Add Entry" or let Heimdall learn preferences through conversations</span>
       </div>
 
-      <!-- Memory table per scope -->
-      <div v-else class="space-y-4">
-        <div v-for="scope in scopes" :key="scope.name" class="hm-card">
-          <div class="flex items-center gap-2 mb-3 cursor-pointer select-none"
-               @click="toggleScope(scope.name)">
-            <span class="text-xs text-gray-500 font-mono">{{ expanded[scope.name] ? '\u25BC' : '\u25B6' }}</span>
+      <!-- Memory tree -->
+      <div v-else class="mem-tree">
+        <div v-for="scope in scopes" :key="scope.name" class="mem-tree-node">
+          <!-- Scope header -->
+          <div class="mem-tree-header" @click="toggleScope(scope.name)">
+            <span class="mem-tree-arrow" :class="{ 'mem-tree-arrow-open': expanded[scope.name] }">
+              \u25B6
+            </span>
             <span class="memory-scope-badge"
                   :class="scope.name === 'global' ? 'memory-scope-global' : 'memory-scope-user'">
               {{ scope.name }}
             </span>
             <span class="badge badge-info text-xs">{{ scope.count }} keys</span>
+            <input type="checkbox" class="memory-checkbox ml-auto"
+                   :checked="isScopeAllSelected(scope.name)"
+                   @click.stop
+                   @change="toggleSelectAll(scope.name, $event.target.checked)" />
           </div>
 
-          <div v-if="expanded[scope.name]">
-            <div v-if="loadingScope === scope.name" class="flex items-center gap-2 text-gray-400 text-sm pl-4">
+          <!-- Entries (expanded) -->
+          <div v-if="expanded[scope.name]" class="mem-tree-entries">
+            <div v-if="loadingScope === scope.name" class="mem-tree-loading">
               <div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> Loading...
             </div>
-            <div v-else-if="scopeEntries[scope.name]" class="table-responsive">
-              <table class="hm-table">
-                <thead>
-                  <tr>
-                    <th style="width:30px">
-                      <input type="checkbox"
-                             :checked="isScopeAllSelected(scope.name)"
-                             @change="toggleSelectAll(scope.name, $event.target.checked)"
-                             class="memory-checkbox" />
-                    </th>
-                    <th style="width:25%">Key</th>
-                    <th>Value</th>
-                    <th style="width:140px">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="entry in scopeEntries[scope.name]" :key="entry.key">
-                    <td>
-                      <input type="checkbox"
-                             :checked="isSelected(scope.name, entry.key)"
-                             @change="toggleSelect(scope.name, entry.key)"
-                             class="memory-checkbox" />
-                    </td>
-                    <td class="font-mono text-xs text-gray-400">{{ entry.key }}</td>
-                    <td>
-                      <div v-if="editingKey === scope.name + '/' + entry.key">
-                        <textarea v-model="editValue" class="hm-input text-sm" rows="2"></textarea>
-                        <div class="flex gap-1 mt-1">
-                          <button @click="doEdit(scope.name, entry.key)" class="btn btn-primary text-xs" :disabled="saving">
-                            {{ saving ? 'Saving...' : 'Save' }}
-                          </button>
-                          <button @click="editingKey = null" class="btn btn-ghost text-xs">Cancel</button>
-                        </div>
-                      </div>
-                      <div v-else class="text-sm text-gray-300 whitespace-pre-wrap break-words"
-                           style="max-height:6rem;overflow:hidden;">
-                        {{ entry.value }}
-                      </div>
-                    </td>
-                    <td>
-                      <div class="flex gap-1">
-                        <button @click="copyValue(entry.value)" class="btn btn-ghost text-xs"
-                                :title="'Copy value'">
-                          {{ copied === scope.name + '/' + entry.key ? 'Copied!' : 'Copy' }}
-                        </button>
-                        <button @click="startEdit(scope.name, entry.key, entry.value)" class="btn btn-ghost text-xs">Edit</button>
-                        <button @click="confirmDelete(scope.name, entry.key)" class="btn btn-danger text-xs">Del</button>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div v-else-if="filteredEntries(scope.name).length === 0" class="mem-tree-empty">
+              <span class="text-gray-500 text-xs">{{ filterQuery ? 'No matching keys' : 'No entries' }}</span>
+            </div>
+            <div v-else>
+              <div v-for="entry in filteredEntries(scope.name)" :key="entry.key"
+                   class="mem-tree-entry" :class="{ 'mem-tree-entry-selected': isSelected(scope.name, entry.key) }">
+                <div class="mem-tree-entry-header">
+                  <input type="checkbox" class="memory-checkbox"
+                         :checked="isSelected(scope.name, entry.key)"
+                         @change="toggleSelect(scope.name, entry.key)" />
+                  <span class="mem-tree-key">{{ entry.key }}</span>
+                  <div class="mem-tree-entry-actions">
+                    <button @click="copyValue(scope.name, entry)" class="btn btn-ghost text-xs">
+                      {{ copied === scope.name + '/' + entry.key ? 'Copied!' : 'Copy' }}
+                    </button>
+                    <button @click="startEdit(scope.name, entry.key, entry.value)" class="btn btn-ghost text-xs">Edit</button>
+                    <button @click="confirmDelete(scope.name, entry.key)" class="btn btn-danger text-xs">Del</button>
+                  </div>
+                </div>
+                <div v-if="editingKey === scope.name + '/' + entry.key" class="mem-tree-edit">
+                  <textarea v-model="editValue" class="hm-input text-sm" rows="2"></textarea>
+                  <div class="flex gap-1 mt-1">
+                    <button @click="doEdit(scope.name, entry.key)" class="btn btn-primary text-xs" :disabled="saving">
+                      {{ saving ? 'Saving...' : 'Save' }}
+                    </button>
+                    <button @click="editingKey = null" class="btn btn-ghost text-xs">Cancel</button>
+                  </div>
+                </div>
+                <div v-else class="mem-tree-value">{{ entry.value }}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -208,6 +199,7 @@ export default {
     const error = ref(null);
     const expanded = ref({});
     const loadingScope = ref(null);
+    const filterQuery = ref('');
 
     // Add form
     const showAdd = ref(false);
@@ -235,6 +227,16 @@ export default {
 
     const totalEntries = computed(() => scopes.value.reduce((sum, s) => sum + s.count, 0));
     const selectedCount = computed(() => selected.value.size);
+
+    function filteredEntries(scopeName) {
+      const entries = scopeEntries.value[scopeName];
+      if (!entries) return [];
+      if (!filterQuery.value.trim()) return entries;
+      const q = filterQuery.value.trim().toLowerCase();
+      return entries.filter(e =>
+        e.key.toLowerCase().includes(q) || (e.value && e.value.toLowerCase().includes(q))
+      );
+    }
 
     function isSelected(scope, key) {
       return selected.value.has(scope + '/' + key);
@@ -329,18 +331,11 @@ export default {
       saving.value = false;
     }
 
-    async function copyValue(value) {
+    async function copyValue(scopeName, entry) {
       try {
-        await navigator.clipboard.writeText(value);
-        // Find which entry was copied for feedback
-        for (const [scopeName, entries] of Object.entries(scopeEntries.value)) {
-          const entry = entries.find(e => e.value === value);
-          if (entry) {
-            copied.value = scopeName + '/' + entry.key;
-            setTimeout(() => { copied.value = null; }, 1500);
-            return;
-          }
-        }
+        await navigator.clipboard.writeText(entry.value);
+        copied.value = scopeName + '/' + entry.key;
+        setTimeout(() => { copied.value = null; }, 1500);
       } catch { /* clipboard not available */ }
     }
 
@@ -388,7 +383,6 @@ export default {
           s.count--;
           s.keys = s.keys.filter(k => k !== key);
         }
-        // Remove from selection
         const next = new Set(selected.value);
         next.delete(scope + '/' + key);
         selected.value = next;
@@ -426,7 +420,7 @@ export default {
     onMounted(() => { fetchMemory(); });
 
     return {
-      scopes, scopeEntries, loading, error, expanded, loadingScope,
+      scopes, scopeEntries, loading, error, expanded, loadingScope, filterQuery,
       showAdd, addForm, adding, addError, addSuccess,
       editingKey, editValue, saving, actionError,
       copied,
@@ -434,7 +428,7 @@ export default {
       deleteTarget, deleting, showBulkDelete,
       fetchMemory, toggleScope, startEdit, doEdit, copyValue, doAdd,
       confirmDelete, doDelete, confirmBulkDelete, doBulkDelete,
-      isSelected, toggleSelect, isScopeAllSelected, toggleSelectAll,
+      isSelected, toggleSelect, isScopeAllSelected, toggleSelectAll, filteredEntries,
     };
   },
 };

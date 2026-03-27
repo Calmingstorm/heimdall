@@ -695,6 +695,17 @@ def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
         results = await store.search_hybrid(query, embedder=bot._embedder, limit=limit)
         return web.json_response(results)
 
+    @routes.get("/api/knowledge/{source}/chunks")
+    async def list_knowledge_chunks(request: web.Request) -> web.Response:
+        store = bot._knowledge_store
+        if not store or not store.available:
+            return web.json_response({"error": "knowledge store not available"}, status=503)
+        source = request.match_info["source"]
+        chunks = await asyncio.to_thread(store.get_source_chunks, source)
+        if not chunks:
+            return web.json_response({"error": "source not found or empty"}, status=404)
+        return web.json_response(chunks)
+
     # ------------------------------------------------------------------
     # Schedules
     # ------------------------------------------------------------------

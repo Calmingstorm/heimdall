@@ -255,6 +255,30 @@ class KnowledgeStore:
             results.append(entry)
         return results
 
+    def get_source_chunks(self, source: str) -> list[dict]:
+        """Get all chunks for a source with metadata for the chunk browser."""
+        if not self.available:
+            return []
+        try:
+            rows = self._conn.execute(
+                "SELECT chunk_id, content, chunk_index, total_chunks, ingested_at "
+                "FROM knowledge_chunks WHERE source = ? ORDER BY chunk_index",
+                (source,),
+            ).fetchall()
+            return [
+                {
+                    "chunk_id": r[0],
+                    "content": r[1],
+                    "chunk_index": r[2],
+                    "total_chunks": r[3],
+                    "ingested_at": r[4],
+                    "char_count": len(r[1]) if r[1] else 0,
+                }
+                for r in rows
+            ]
+        except Exception:
+            return []
+
     def get_source_content(self, source: str) -> str | None:
         """Get the full concatenated content of a source (for re-ingest)."""
         if not self.available:

@@ -15,6 +15,7 @@ import ConfigPage from './pages/config.js';
 import LogsPage from './pages/logs.js';
 import AuditPage from './pages/audit.js';
 import MemoryPage from './pages/memory.js';
+import AgentsPage from './pages/agents.js';
 import ChatPage from './pages/chat.js';
 
 const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
@@ -40,6 +41,7 @@ const routes = [
   { path: '/config',     component: ConfigPage,     meta: { label: 'Config',     icon: '\u{2699}\u{FE0F}' } },
   { path: '/logs',       component: LogsPage,       meta: { label: 'Logs',       icon: '\u{1F4C4}' } },
   { path: '/memory',     component: MemoryPage,     meta: { label: 'Memory',     icon: '\u{1F9E0}' } },
+  { path: '/agents',     component: AgentsPage,     meta: { label: 'Agents',     icon: '\u{1F916}' } },
 ];
 
 const router = createRouter({
