@@ -4,10 +4,12 @@ import asyncio
 import importlib.util
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from collections.abc import Callable
+from typing import Any
 
 from ..logging import get_logger
 from .executor import ToolExecutor
@@ -20,6 +22,94 @@ SKILL_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,49}$")
 BUILTIN_TOOL_NAMES = {t["name"] for t in TOOLS}
 SKILL_EXECUTE_TIMEOUT = 120  # seconds
 
+# Supported metadata keys in SKILL_DEFINITION (beyond the required ones).
+_METADATA_KEYS = ("version", "author", "homepage", "tags", "dependencies", "config_schema")
+
+# Valid semantic version pattern (loose — major.minor.patch with optional pre-release).
+_SEMVER_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:[-+].+)?$")
+
+
+class SkillStatus(str, Enum):
+    """Lifecycle state of a skill."""
+    LOADED = "loaded"
+    DISABLED = "disabled"
+    ERROR = "error"
+
+
+@dataclass
+class SkillDiagnostic:
+    """A warning or error collected during skill load/validation."""
+    level: str  # "warn" or "error"
+    message: str
+
+
+@dataclass
+class SkillMetadata:
+    """Rich metadata parsed from SKILL_DEFINITION."""
+    version: str = "0.0.0"
+    author: str = ""
+    homepage: str = ""
+    tags: list[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
+    config_schema: dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_definition(cls, definition: dict) -> tuple[SkillMetadata, list[SkillDiagnostic]]:
+        """Parse metadata from a SKILL_DEFINITION dict, collecting diagnostics."""
+        diagnostics: list[SkillDiagnostic] = []
+        kwargs: dict[str, Any] = {}
+
+        # version
+        raw_version = definition.get("version", "0.0.0")
+        if isinstance(raw_version, str):
+            if raw_version and not _SEMVER_PATTERN.match(raw_version):
+                diagnostics.append(SkillDiagnostic(
+                    "warn", f"Invalid version '{raw_version}', expected semver (e.g. 1.0.0). Using 0.0.0.",
+                ))
+                kwargs["version"] = "0.0.0"
+            else:
+                kwargs["version"] = raw_version or "0.0.0"
+        else:
+            diagnostics.append(SkillDiagnostic("warn", "version must be a string. Using 0.0.0."))
+            kwargs["version"] = "0.0.0"
+
+        # author
+        raw_author = definition.get("author", "")
+        if isinstance(raw_author, str):
+            kwargs["author"] = raw_author
+        else:
+            diagnostics.append(SkillDiagnostic("warn", "author must be a string. Ignored."))
+
+        # homepage
+        raw_homepage = definition.get("homepage", "")
+        if isinstance(raw_homepage, str):
+            kwargs["homepage"] = raw_homepage
+        else:
+            diagnostics.append(SkillDiagnostic("warn", "homepage must be a string. Ignored."))
+
+        # tags
+        raw_tags = definition.get("tags", [])
+        if isinstance(raw_tags, list) and all(isinstance(t, str) for t in raw_tags):
+            kwargs["tags"] = raw_tags
+        elif raw_tags:
+            diagnostics.append(SkillDiagnostic("warn", "tags must be a list of strings. Ignored."))
+
+        # dependencies (pip packages)
+        raw_deps = definition.get("dependencies", [])
+        if isinstance(raw_deps, list) and all(isinstance(d, str) for d in raw_deps):
+            kwargs["dependencies"] = raw_deps
+        elif raw_deps:
+            diagnostics.append(SkillDiagnostic("warn", "dependencies must be a list of strings. Ignored."))
+
+        # config_schema (JSON Schema dict)
+        raw_cs = definition.get("config_schema", {})
+        if isinstance(raw_cs, dict):
+            kwargs["config_schema"] = raw_cs
+        elif raw_cs:
+            diagnostics.append(SkillDiagnostic("warn", "config_schema must be a dict. Ignored."))
+
+        return cls(**kwargs), diagnostics
+
 
 @dataclass
 class LoadedSkill:
@@ -29,6 +119,9 @@ class LoadedSkill:
     file_path: Path
     loaded_at: str
     module_name: str = ""
+    status: SkillStatus = SkillStatus.LOADED
+    metadata: SkillMetadata = field(default_factory=SkillMetadata)
+    diagnostics: list[SkillDiagnostic] = field(default_factory=list)
 
 
 class SkillManager:
@@ -109,6 +202,12 @@ class SkillManager:
                 del sys.modules[module_name]
                 return None
 
+            # Parse rich metadata from definition
+            metadata, diagnostics = SkillMetadata.from_definition(definition)
+            if diagnostics:
+                for d in diagnostics:
+                    log.warning("Skill %s metadata: %s", path.name, d.message)
+
             name = definition["name"]
             log.info("Loaded skill: %s from %s", name, path.name)
             return LoadedSkill(
@@ -118,6 +217,9 @@ class SkillManager:
                 file_path=path,
                 loaded_at=datetime.now().isoformat(),
                 module_name=module_name,
+                status=SkillStatus.LOADED,
+                metadata=metadata,
+                diagnostics=diagnostics,
             )
 
         except Exception as e:
@@ -229,6 +331,16 @@ class SkillManager:
                 "name": s.name,
                 "description": s.definition.get("description", ""),
                 "loaded_at": s.loaded_at,
+                "status": s.status.value,
+                "version": s.metadata.version,
+                "author": s.metadata.author,
+                "tags": s.metadata.tags,
+                "dependencies": s.metadata.dependencies,
+                "has_config": bool(s.metadata.config_schema),
+                "diagnostics": [
+                    {"level": d.level, "message": d.message}
+                    for d in s.diagnostics
+                ],
             }
             for s in self._skills.values()
         ]
@@ -253,6 +365,118 @@ class SkillManager:
             }
             for s in self._skills.values()
         ]
+
+    def validate_skill_code(self, code: str, filename: str = "<string>") -> dict:
+        """Validate skill code without loading it. Returns a report dict.
+
+        The report contains:
+          valid (bool), errors (list[str]), warnings (list[str]),
+          metadata (dict|None), definition_keys (list[str])
+        """
+        errors: list[str] = []
+        warnings: list[str] = []
+        metadata_out: dict | None = None
+        definition_keys: list[str] = []
+
+        # 1. Syntax check
+        try:
+            compile(code, filename, "exec")
+        except SyntaxError as e:
+            errors.append(f"Syntax error at line {e.lineno}: {e.msg}")
+            return {
+                "valid": False, "errors": errors, "warnings": warnings,
+                "metadata": None, "definition_keys": [],
+            }
+
+        # 2. Execute in a temporary namespace to inspect exports
+        ns: dict[str, Any] = {}
+        try:
+            exec(code, ns)  # noqa: S102 — skill validation needs exec
+        except Exception as e:
+            errors.append(f"Execution error: {e}")
+            return {
+                "valid": False, "errors": errors, "warnings": warnings,
+                "metadata": None, "definition_keys": [],
+            }
+
+        # 3. Check SKILL_DEFINITION
+        definition = ns.get("SKILL_DEFINITION")
+        if not isinstance(definition, dict):
+            errors.append("Missing or invalid SKILL_DEFINITION dict.")
+        else:
+            definition_keys = list(definition.keys())
+            for key in ("name", "description", "input_schema"):
+                if key not in definition:
+                    errors.append(f"SKILL_DEFINITION missing required key '{key}'.")
+
+            # Validate name if present
+            name = definition.get("name")
+            if isinstance(name, str):
+                name_err = self._validate_name(name)
+                if name_err:
+                    errors.append(name_err)
+            elif name is not None:
+                errors.append("SKILL_DEFINITION 'name' must be a string.")
+
+            # Parse metadata
+            meta, diags = SkillMetadata.from_definition(definition)
+            metadata_out = {
+                "version": meta.version, "author": meta.author,
+                "homepage": meta.homepage, "tags": meta.tags,
+                "dependencies": meta.dependencies,
+                "has_config": bool(meta.config_schema),
+            }
+            for d in diags:
+                warnings.append(d.message)
+
+        # 4. Check execute function
+        execute_fn = ns.get("execute")
+        if not callable(execute_fn):
+            errors.append("Missing execute() function.")
+        elif not asyncio.iscoroutinefunction(execute_fn):
+            warnings.append("execute() is not async. It should be 'async def execute(inp, context)'.")
+
+        return {
+            "valid": len(errors) == 0,
+            "errors": errors,
+            "warnings": warnings,
+            "metadata": metadata_out,
+            "definition_keys": definition_keys,
+        }
+
+    def get_skill_info(self, name: str) -> dict | None:
+        """Return detailed info for a single skill, or None if not found."""
+        skill = self._skills.get(name)
+        if not skill:
+            return None
+        code = None
+        try:
+            code = skill.file_path.read_text()
+        except Exception:
+            pass
+        return {
+            "name": skill.name,
+            "description": skill.definition.get("description", ""),
+            "input_schema": skill.definition.get("input_schema", {}),
+            "loaded_at": skill.loaded_at,
+            "status": skill.status.value,
+            "file_path": str(skill.file_path),
+            "metadata": {
+                "version": skill.metadata.version,
+                "author": skill.metadata.author,
+                "homepage": skill.metadata.homepage,
+                "tags": skill.metadata.tags,
+                "dependencies": skill.metadata.dependencies,
+                "has_config": bool(skill.metadata.config_schema),
+                "config_schema": skill.metadata.config_schema,
+            },
+            "diagnostics": [
+                {"level": d.level, "message": d.message}
+                for d in skill.diagnostics
+            ],
+            "handoff_to_codex": skill.definition.get("handoff_to_codex", False),
+            "code": code,
+        }
 
     async def execute(
         self, tool_name: str, tool_input: dict,

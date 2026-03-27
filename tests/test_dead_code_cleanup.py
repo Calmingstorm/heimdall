@@ -122,12 +122,12 @@ class TestSpecificCleanupsApplied:
         imports = _get_imports(tree)
         assert "re" not in imports, "browser.py still imports unused 're'"
 
-    def test_skill_manager_no_any_awaitable(self):
-        """skill_manager.py should not import Any or Awaitable (unused)."""
+    def test_skill_manager_no_awaitable(self):
+        """skill_manager.py should not import Awaitable (unused)."""
         source = (SRC_DIR / "tools" / "skill_manager.py").read_text()
         tree = ast.parse(source)
         imports = _get_imports(tree)
-        assert "Any" not in imports, "skill_manager.py still imports unused 'Any'"
+        # Any is used by SkillMetadata (config_schema: dict[str, Any])
         assert "Awaitable" not in imports, "skill_manager.py still imports unused 'Awaitable'"
 
     def test_skill_manager_still_imports_callable(self):

@@ -515,6 +515,26 @@ def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
             status=404 if is_error else 200,
         )
 
+    @routes.get("/api/skills/{name}")
+    async def get_skill_detail(request: web.Request) -> web.Response:
+        name = request.match_info["name"]
+        info = bot.skill_manager.get_skill_info(name)
+        if not info:
+            return web.json_response({"error": "skill not found"}, status=404)
+        return web.json_response(info)
+
+    @routes.post("/api/skills/validate")
+    async def validate_skill(request: web.Request) -> web.Response:
+        data = await request.json()
+        code = data.get("code", "").strip()
+        if not code:
+            return web.json_response({"error": "code is required"}, status=400)
+        err = _validate_string(code, "code", _MAX_CODE_LEN)
+        if err:
+            return web.json_response({"error": err}, status=400)
+        report = bot.skill_manager.validate_skill_code(code)
+        return web.json_response(report)
+
     # ------------------------------------------------------------------
     # Knowledge
     # ------------------------------------------------------------------
