@@ -3373,7 +3373,7 @@ class HeimdallBot(discord.Client):
                         timeout=_t,
                     )
                     # Skill CRUD invalidates caches
-                    if tool_name in ("create_skill", "edit_skill", "delete_skill", "enable_skill", "disable_skill"):
+                    if tool_name in ("create_skill", "edit_skill", "delete_skill", "enable_skill", "disable_skill", "install_skill"):
                         self._cached_merged_tools = None
                         self._cached_skills_text = None
                         system_prompt = self._build_system_prompt(

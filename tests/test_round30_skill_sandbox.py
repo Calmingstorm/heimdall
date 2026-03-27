@@ -15,6 +15,7 @@ import pytest
 from src.config.schema import ToolsConfig, ToolHost
 from src.tools.executor import ToolExecutor
 from src.tools.skill_context import (
+    MAX_SKILL_FILES,
     MAX_SKILL_HTTP_REQUESTS,
     MAX_SKILL_MESSAGES,
     MAX_SKILL_TOOL_CALLS,
@@ -143,7 +144,7 @@ class TestURLBlocked:
 
     def test_private_ips(self):
         assert is_url_blocked("http://10.0.0.1:3000") is True
-        assert is_url_blocked("http://192.168.1.1") is True
+        assert is_url_blocked("http://192.168.2.1") is True
         assert is_url_blocked("http://172.16.0.1") is True
 
     def test_cloud_metadata(self):
@@ -436,7 +437,7 @@ class TestMessageLimit:
 
     async def test_file_limit_enforced(self, tools_config: ToolsConfig):
         executor = ToolExecutor(tools_config)
-        tracker = ResourceTracker(files_sent=MAX_SKILL_MESSAGES)
+        tracker = ResourceTracker(files_sent=MAX_SKILL_FILES)
         callback = AsyncMock()
         ctx = SkillContext(
             executor, "test_skill",

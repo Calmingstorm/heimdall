@@ -54,6 +54,7 @@ MAX_SKILL_TOOL_CALLS = 50
 MAX_SKILL_HTTP_REQUESTS = 20
 # Maximum number of messages per skill execution.
 MAX_SKILL_MESSAGES = 10
+MAX_SKILL_FILES = 10
 
 # File path patterns that skills are NOT allowed to read.
 _DENIED_PATH_PATTERNS: list[re.Pattern[str]] = [
@@ -210,8 +211,8 @@ class SkillContext:
 
     async def post_file(self, data: bytes, filename: str, caption: str = "") -> None:
         """Send a binary file to the channel that invoked this skill."""
-        if self._tracker.files_sent >= MAX_SKILL_MESSAGES:
-            self._log.warning("Skill exceeded file send limit (%d)", MAX_SKILL_MESSAGES)
+        if self._tracker.files_sent >= MAX_SKILL_FILES:
+            self._log.warning("Skill exceeded file send limit (%d)", MAX_SKILL_FILES)
             return
         if self._file_callback:
             await self._file_callback(data, filename, caption)
