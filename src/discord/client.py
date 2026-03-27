@@ -23,6 +23,7 @@ from .background_task import (
 from ..tools.autonomous_loop import LoopManager
 from ..learning import ConversationReflector
 from ..llm import CircuitOpenError, CodexAuth, CodexChatClient
+from ..llm.codex_auth import CodexAuthPool
 from ..llm.secret_scrubber import scrub_output_secrets
 from ..llm.system_prompt import build_system_prompt, build_chat_system_prompt
 from ..logging import get_logger
@@ -586,7 +587,7 @@ class LokiBot(discord.Client):
         # Initialize Codex client if configured
         self.codex_client: CodexChatClient | None = None
         if config.openai_codex.enabled:
-            codex_auth = CodexAuth(config.openai_codex.credentials_path)
+            codex_auth = CodexAuthPool(config.openai_codex.credentials_path)
             if codex_auth.is_configured():
                 self.codex_client = CodexChatClient(
                     auth=codex_auth,

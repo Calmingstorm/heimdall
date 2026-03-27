@@ -7,7 +7,7 @@ import aiohttp
 
 from ..logging import get_logger
 from .circuit_breaker import CircuitBreaker
-from .codex_auth import CodexAuth
+from .codex_auth import CodexAuth, CodexAuthPool
 from .types import LLMResponse, ToolCall
 
 log = get_logger("codex")
@@ -20,7 +20,7 @@ RETRY_BACKOFF = [2, 5, 10]
 class CodexChatClient:
     """Chat client using OpenAI Codex backend API (ChatGPT subscription)."""
 
-    def __init__(self, auth: CodexAuth, model: str, max_tokens: int) -> None:
+    def __init__(self, auth: CodexAuth | CodexAuthPool, model: str, max_tokens: int) -> None:
         self.auth = auth
         self.model = model
         self.max_tokens = max_tokens
@@ -370,7 +370,29 @@ class CodexChatClient:
                             headers["ChatGPT-Account-Id"] = account_id
                         continue
 
-                    if resp.status in (429, 500, 502, 503, 504):
+                    if resp.status == 429:
+                        # Rate limited — rotate to next account if pool
+                        if hasattr(self.auth, "mark_current_limited"):
+                            self.auth.mark_current_limited()
+                        self.breaker.record_failure()
+                        last_error = f"HTTP 429: {error_body[:200]}"
+                        if attempt < MAX_RETRIES - 1:
+                            wait = RETRY_BACKOFF[attempt]
+                            log.warning(
+                                "Codex rate limited (attempt %d/%d): %s. Rotating + retry in %ds...",
+                                attempt + 1, MAX_RETRIES, last_error, wait,
+                            )
+                            await asyncio.sleep(wait)
+                            # Refresh token from (possibly new) account
+                            access_token = await self.auth.get_access_token()
+                            headers["Authorization"] = f"Bearer {access_token}"
+                            if hasattr(self.auth, "get_account_id"):
+                                aid = self.auth.get_account_id()
+                                if aid:
+                                    headers["ChatGPT-Account-Id"] = aid
+                            continue
+
+                    if resp.status in (500, 502, 503, 504):
                         self.breaker.record_failure()
                         last_error = f"HTTP {resp.status}: {error_body[:200]}"
                         if attempt < MAX_RETRIES - 1:
@@ -582,7 +604,27 @@ class CodexChatClient:
                             headers["ChatGPT-Account-Id"] = account_id
                         continue
 
-                    if resp.status in (429, 500, 502, 503, 504):
+                    if resp.status == 429:
+                        if hasattr(self.auth, "mark_current_limited"):
+                            self.auth.mark_current_limited()
+                        self.breaker.record_failure()
+                        last_error = f"HTTP 429: {error_body[:200]}"
+                        if attempt < MAX_RETRIES - 1:
+                            wait = RETRY_BACKOFF[attempt]
+                            log.warning(
+                                "Codex rate limited (attempt %d/%d): %s. Rotating + retry in %ds...",
+                                attempt + 1, MAX_RETRIES, last_error, wait,
+                            )
+                            await asyncio.sleep(wait)
+                            access_token = await self.auth.get_access_token()
+                            headers["Authorization"] = f"Bearer {access_token}"
+                            if hasattr(self.auth, "get_account_id"):
+                                aid = self.auth.get_account_id()
+                                if aid:
+                                    headers["ChatGPT-Account-Id"] = aid
+                            continue
+
+                    if resp.status in (500, 502, 503, 504):
                         self.breaker.record_failure()
                         last_error = f"HTTP {resp.status}: {error_body[:200]}"
                         if attempt < MAX_RETRIES - 1:

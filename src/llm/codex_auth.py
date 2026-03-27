@@ -158,6 +158,13 @@ class CodexAuth:
         self._save(new_creds)
         log.info("Codex tokens refreshed successfully")
 
+    def mark_rate_limited(self) -> None:
+        """Mark this credential set as rate-limited."""
+        self._rate_limited_until = time.time() + 60  # Back off 60s minimum
+
+    def is_rate_limited(self) -> bool:
+        return time.time() < getattr(self, "_rate_limited_until", 0)
+
     @staticmethod
     def build_auth_url() -> tuple[str, str]:
         """Build the authorization URL and return (url, code_verifier)."""
@@ -216,3 +223,98 @@ class CodexAuth:
             creds["email"] = payload["email"]
 
         return creds
+
+
+class CodexAuthPool:
+    """Manages multiple CodexAuth credential sets with automatic rotation.
+
+    Supports two file formats:
+    - Single object (backward compat): {"access_token": ..., ...}
+    - Array of objects: [{"access_token": ...}, {"access_token": ...}]
+
+    On 429/quota errors, call mark_current_limited() to rotate to the next
+    available credential set. Rotation is round-robin with backoff.
+    """
+
+    def __init__(self, credentials_path: str) -> None:
+        self._path = Path(credentials_path)
+        self._accounts: list[CodexAuth] = []
+        self._current_index = 0
+        self._init_accounts()
+
+    def _init_accounts(self) -> None:
+        """Load credentials and create CodexAuth instances."""
+        if not self._path.exists():
+            return
+        try:
+            raw = json.loads(self._path.read_text())
+        except Exception:
+            return
+
+        if isinstance(raw, list):
+            # Multi-account format — split into individual files
+            for i, creds in enumerate(raw):
+                if not isinstance(creds, dict) or not creds.get("access_token"):
+                    continue
+                individual_path = self._path.parent / f"codex_auth_{i}.json"
+                individual_path.write_text(json.dumps(creds, indent=2))
+                auth = CodexAuth(str(individual_path))
+                self._accounts.append(auth)
+            log.info("Codex auth pool: %d account(s) loaded", len(self._accounts))
+        elif isinstance(raw, dict) and raw.get("access_token"):
+            # Single account (backward compat) — use the file directly
+            self._accounts.append(CodexAuth(str(self._path)))
+            log.info("Codex auth pool: 1 account loaded (single format)")
+
+    def is_configured(self) -> bool:
+        return any(a.is_configured() for a in self._accounts)
+
+    @property
+    def account_count(self) -> int:
+        return len(self._accounts)
+
+    @property
+    def current(self) -> CodexAuth:
+        if not self._accounts:
+            raise RuntimeError("No Codex credentials configured.")
+        return self._accounts[self._current_index]
+
+    async def get_access_token(self) -> str:
+        """Get a token from the current account, rotating if rate-limited."""
+        if not self._accounts:
+            raise RuntimeError("No Codex credentials configured.")
+        # Try current first, then rotate through others
+        for _ in range(len(self._accounts)):
+            auth = self._accounts[self._current_index]
+            if not auth.is_rate_limited():
+                return await auth.get_access_token()
+            self._rotate()
+        # All limited — use current anyway
+        log.warning("All %d Codex accounts rate-limited, using current", len(self._accounts))
+        return await self._accounts[self._current_index].get_access_token()
+
+    def get_account_id(self) -> str | None:
+        if not self._accounts:
+            return None
+        return self.current.get_account_id()
+
+    def mark_current_limited(self) -> None:
+        """Mark the current account as rate-limited and rotate to the next."""
+        if not self._accounts:
+            return
+        current = self._accounts[self._current_index]
+        current.mark_rate_limited()
+        try:
+            email = current._load().get("email", f"account {self._current_index}")
+        except Exception:
+            email = f"account {self._current_index}"
+
+        if len(self._accounts) > 1:
+            self._rotate()
+            log.warning("Codex %s hit rate limit, rotated to account %d/%d",
+                        email, self._current_index + 1, len(self._accounts))
+        else:
+            log.warning("Codex %s hit rate limit (only account, no rotation)", email)
+
+    def _rotate(self) -> None:
+        self._current_index = (self._current_index + 1) % len(self._accounts)

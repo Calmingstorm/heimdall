@@ -87,6 +87,7 @@ _CORE_PATCHES = [
     "VoiceManager",
     "InfraWatcher",
     "CodexAuth",
+    "CodexAuthPool",
     "CodexChatClient",
 ]
 
@@ -395,11 +396,11 @@ class TestLokiBotInit:
                 credentials_path=str(tmp_path / "codex_auth.json"),
             ),
         )
-        overrides = {"CodexAuth": {"is_configured": MagicMock(return_value=True)}}
+        overrides = {"CodexAuthPool": {"is_configured": MagicMock(return_value=True)}}
         bot, mocks = _construct_bot(config, mock_overrides=overrides)
 
         assert bot.codex_client is not None
-        mocks["CodexAuth"].assert_called_once()
+        mocks["CodexAuthPool"].assert_called_once()
         mocks["CodexChatClient"].assert_called_once()
 
     def test_init_codex_enabled_not_configured(self, tmp_path):
@@ -411,7 +412,7 @@ class TestLokiBotInit:
                 credentials_path=str(tmp_path / "codex_auth.json"),
             ),
         )
-        overrides = {"CodexAuth": {"is_configured": MagicMock(return_value=False)}}
+        overrides = {"CodexAuthPool": {"is_configured": MagicMock(return_value=False)}}
         bot, mocks = _construct_bot(config, mock_overrides=overrides)
 
         assert bot.codex_client is None
