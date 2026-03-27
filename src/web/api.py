@@ -111,6 +111,72 @@ def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
     routes = web.RouteTableDef()
 
     # ------------------------------------------------------------------
+    # Auth (login / logout / session check)
+    # ------------------------------------------------------------------
+
+    @routes.post("/api/auth/login")
+    async def auth_login(request: web.Request) -> web.Response:
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid JSON"}, status=400)
+
+        token = (data.get("token") or "").strip()
+        if not token:
+            return web.json_response({"error": "token is required"}, status=400)
+
+        api_token = bot.config.web.api_token
+        if not api_token:
+            # No auth configured — dev mode, issue session anyway
+            sm = request.app.get("session_manager")
+            if sm:
+                sid, timeout = sm.create()
+                return web.json_response({
+                    "session_id": sid,
+                    "timeout_seconds": timeout,
+                })
+            return web.json_response({"error": "no session manager"}, status=500)
+
+        import hmac as _hmac
+        if not _hmac.compare_digest(token, api_token):
+            return web.json_response({"error": "invalid token"}, status=401)
+
+        sm = request.app.get("session_manager")
+        if not sm:
+            return web.json_response({"error": "no session manager"}, status=500)
+
+        sid, timeout = sm.create()
+        return web.json_response({
+            "session_id": sid,
+            "timeout_seconds": timeout,
+        })
+
+    @routes.post("/api/auth/logout")
+    async def auth_logout(request: web.Request) -> web.Response:
+        sm = request.app.get("session_manager")
+        if not sm:
+            return web.json_response({"status": "ok"})
+
+        # Extract session ID from Authorization header
+        auth_header = request.headers.get("Authorization", "")
+        bearer_prefix = "Bearer "
+        if auth_header.startswith(bearer_prefix):
+            sid = auth_header[len(bearer_prefix):]
+            sm.destroy(sid)
+
+        return web.json_response({"status": "logged_out"})
+
+    @routes.get("/api/auth/session")
+    async def auth_session(request: web.Request) -> web.Response:
+        sm = request.app.get("session_manager")
+        timeout = sm.timeout_seconds if sm else 0
+        return web.json_response({
+            "authenticated": True,
+            "timeout_seconds": timeout,
+            "active_sessions": sm.active_count if sm else 0,
+        })
+
+    # ------------------------------------------------------------------
     # Status & info
     # ------------------------------------------------------------------
 

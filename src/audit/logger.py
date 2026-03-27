@@ -63,6 +63,38 @@ class AuditLogger:
             except Exception:
                 pass  # Never let callback errors affect audit logging
 
+    async def log_web_action(
+        self,
+        *,
+        method: str,
+        path: str,
+        status: int,
+        ip: str = "",
+        execution_time_ms: int = 0,
+    ) -> None:
+        """Log a web UI API action (state-changing requests)."""
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "type": "web_action",
+            "method": method,
+            "path": path,
+            "status": status,
+            "ip": ip,
+            "execution_time_ms": execution_time_ms,
+        }
+        line = json.dumps(entry, default=str) + "\n"
+        try:
+            async with aiofiles.open(self.path, "a") as f:
+                await f.write(line)
+        except Exception as e:
+            log.error("Failed to write web audit log: %s", e)
+
+        if self._event_callback:
+            try:
+                await self._event_callback(entry)
+            except Exception:
+                pass
+
     async def count_by_tool(self) -> dict[str, int]:
         """Return execution counts per tool name (most used first)."""
         if not self.path.exists():

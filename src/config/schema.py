@@ -116,6 +116,7 @@ class PermissionsConfig(BaseModel):
 class WebConfig(BaseModel):
     enabled: bool = True
     api_token: str = ""  # Empty = no auth required (dev mode)
+    session_timeout_minutes: int = 0  # 0 = no timeout (sessions persist until logout)
 
 
 class ComfyUIConfig(BaseModel):

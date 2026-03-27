@@ -10,16 +10,48 @@
 class HeimdallAPI {
   constructor() {
     this._token = sessionStorage.getItem('heimdall_token') || '';
+    this._sessionTimeout = 0;
+    this._lastActivity = Date.now();
+    this._activityTimer = null;
+    this.onSessionExpired = null; // callback when session times out
   }
 
   get token() { return this._token; }
+  get sessionTimeout() { return this._sessionTimeout; }
 
-  setToken(token) {
+  setToken(token, timeoutSeconds = 0) {
     this._token = token;
+    this._sessionTimeout = timeoutSeconds;
+    this._lastActivity = Date.now();
     if (token) {
       sessionStorage.setItem('heimdall_token', token);
+      if (timeoutSeconds > 0) {
+        sessionStorage.setItem('heimdall_session_timeout', String(timeoutSeconds));
+      }
+      this._startActivityMonitor();
     } else {
       sessionStorage.removeItem('heimdall_token');
+      sessionStorage.removeItem('heimdall_session_timeout');
+      this._stopActivityMonitor();
+    }
+  }
+
+  _startActivityMonitor() {
+    this._stopActivityMonitor();
+    if (this._sessionTimeout <= 0) return;
+    this._activityTimer = setInterval(() => {
+      const elapsed = (Date.now() - this._lastActivity) / 1000;
+      if (elapsed >= this._sessionTimeout) {
+        this._stopActivityMonitor();
+        if (this.onSessionExpired) this.onSessionExpired();
+      }
+    }, 10000); // Check every 10s
+  }
+
+  _stopActivityMonitor() {
+    if (this._activityTimer) {
+      clearInterval(this._activityTimer);
+      this._activityTimer = null;
     }
   }
 
@@ -30,6 +62,7 @@ class HeimdallAPI {
   }
 
   async _request(method, path, body = null) {
+    this._lastActivity = Date.now();
     const opts = { method, headers: this._headers() };
     if (body !== null) opts.body = JSON.stringify(body);
     const resp = await fetch(path, opts);
@@ -48,6 +81,29 @@ class HeimdallAPI {
   post(path, data) { return this._request('POST', path, data); }
   put(path, data) { return this._request('PUT', path, data); }
   del(path) { return this._request('DELETE', path); }
+
+  /** Authenticate with the server. Returns session info or throws. */
+  async login(token) {
+    const resp = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+    });
+    const data = await resp.json().catch(() => null);
+    if (!resp.ok) {
+      throw new AuthError(data?.error || 'Login failed');
+    }
+    this.setToken(data.session_id, data.timeout_seconds || 0);
+    return data;
+  }
+
+  /** Logout — invalidate the server-side session. */
+  async logout() {
+    try {
+      await this.post('/api/auth/logout', {});
+    } catch { /* ignore errors during logout */ }
+    this.setToken('');
+  }
 
   /** Check if the server is reachable and auth is valid. */
   async check() {

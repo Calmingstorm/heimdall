@@ -16,6 +16,7 @@ from aiohttp.test_utils import TestClient, TestServer
 
 from src.config.schema import WebConfig
 from src.health.server import (
+    SessionManager,
     _make_auth_middleware,
     _make_rate_limit_middleware,
     _make_security_headers_middleware,
@@ -152,7 +153,7 @@ def _make_app(bot=None, *, api_token=""):
     app = web.Application(middlewares=[
         _make_security_headers_middleware(),
         _make_rate_limit_middleware(),
-        _make_auth_middleware(web_config),
+        _make_auth_middleware(web_config, SessionManager()),
     ])
     setup_api(app, bot)
     return app, bot

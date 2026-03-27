@@ -3,11 +3,13 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import secrets
 import time
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 from aiohttp import web
 
@@ -25,13 +27,92 @@ TriggerCallback = Callable[[str, dict], Awaitable[int]]
 # Paths that skip API token authentication
 _AUTH_SKIP_PREFIXES = ("/health", "/webhook/", "/ui")
 
+# Exact API paths that skip token auth (login must be accessible unauthenticated)
+_AUTH_SKIP_PATHS = frozenset({"/api/auth/login"})
+
 # Rate-limit: max requests per window per IP on /api/ routes
 _RATE_LIMIT_MAX = 120
 _RATE_LIMIT_WINDOW = 60  # seconds
 
+# Content-Security-Policy for the web UI
+_CSP_POLICY = "; ".join([
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com https://cdn.jsdelivr.net",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "connect-src 'self' ws: wss:",
+    "img-src 'self' data:",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+])
 
-def _make_auth_middleware(web_config: WebConfig) -> web.middleware:
-    """Create middleware that enforces Bearer token auth on /api/ routes."""
+
+# ---------------------------------------------------------------------------
+# Session manager
+# ---------------------------------------------------------------------------
+
+class SessionManager:
+    """Server-side session tracking with configurable timeout."""
+
+    def __init__(self, timeout_minutes: int = 0) -> None:
+        self._sessions: dict[str, float] = {}  # session_id -> last_activity (monotonic)
+        self._timeout = timeout_minutes * 60 if timeout_minutes > 0 else 0
+
+    @property
+    def active_count(self) -> int:
+        return len(self._sessions)
+
+    @property
+    def timeout_seconds(self) -> int:
+        return self._timeout
+
+    def create(self) -> tuple[str, int]:
+        """Create a new session. Returns (session_id, timeout_seconds)."""
+        self.cleanup()
+        sid = secrets.token_urlsafe(32)
+        self._sessions[sid] = time.monotonic()
+        return sid, self._timeout
+
+    def validate(self, sid: str) -> bool:
+        """Validate a session ID. Returns False if expired or unknown."""
+        ts = self._sessions.get(sid)
+        if ts is None:
+            return False
+        if self._timeout > 0 and (time.monotonic() - ts) > self._timeout:
+            del self._sessions[sid]
+            return False
+        # Refresh activity timestamp
+        self._sessions[sid] = time.monotonic()
+        return True
+
+    def destroy(self, sid: str) -> bool:
+        """Destroy a session. Returns True if it existed."""
+        return self._sessions.pop(sid, None) is not None
+
+    def cleanup(self) -> int:
+        """Remove expired sessions. Returns count removed."""
+        if self._timeout <= 0:
+            return 0
+        now = time.monotonic()
+        expired = [sid for sid, ts in self._sessions.items() if now - ts > self._timeout]
+        for sid in expired:
+            del self._sessions[sid]
+        return len(expired)
+
+
+# ---------------------------------------------------------------------------
+# Middleware factories
+# ---------------------------------------------------------------------------
+
+def _make_auth_middleware(
+    web_config: WebConfig,
+    session_manager: SessionManager,
+) -> web.middleware:
+    """Create middleware that enforces Bearer token auth on /api/ routes.
+
+    Accepts either the raw api_token or a valid session token.
+    """
 
     @web.middleware
     async def auth_middleware(
@@ -42,18 +123,34 @@ def _make_auth_middleware(web_config: WebConfig) -> web.middleware:
         # Skip auth for non-API routes
         if not path.startswith("/api/"):
             return await handler(request)
+        # Skip auth for login endpoint
+        if path in _AUTH_SKIP_PATHS:
+            return await handler(request)
         # Skip auth if no token configured (dev mode)
         token = web_config.api_token
         if not token:
             return await handler(request)
-        # Check Bearer token (header) or token query param (for downloads)
+
+        # Extract bearer value from Authorization header
         auth_header = request.headers.get("Authorization", "")
         expected_bearer = f"Bearer {token}"
         if hmac.compare_digest(auth_header, expected_bearer):
             return await handler(request)
+        # Check session tokens (Bearer <session_id>)
+        bearer_prefix = "Bearer "
+        if auth_header.startswith(bearer_prefix):
+            bearer_value = auth_header[len(bearer_prefix):]
+            if session_manager.validate(bearer_value):
+                return await handler(request)
+
+        # Check query param token (for downloads, WebSocket)
         query_token = request.query.get("token", "")
-        if query_token and hmac.compare_digest(query_token, token):
-            return await handler(request)
+        if query_token:
+            if hmac.compare_digest(query_token, token):
+                return await handler(request)
+            if session_manager.validate(query_token):
+                return await handler(request)
+
         return web.json_response({"error": "unauthorized"}, status=401)
 
     return auth_middleware
@@ -86,7 +183,7 @@ def _make_rate_limit_middleware() -> web.middleware:
 
 
 def _make_security_headers_middleware() -> web.middleware:
-    """Add security headers to all responses and catch malformed JSON."""
+    """Add security headers (CSP, X-Frame-Options, etc.) to all responses."""
 
     @web.middleware
     async def security_headers_middleware(
@@ -99,10 +196,101 @@ def _make_security_headers_middleware() -> web.middleware:
             return web.json_response({"error": "invalid JSON body"}, status=400)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Content-Security-Policy"] = _CSP_POLICY
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         return response
 
     return security_headers_middleware
 
+
+def _make_csrf_middleware() -> web.middleware:
+    """Validate Origin/Referer on state-changing requests (defense-in-depth).
+
+    Bearer tokens already prevent CSRF (not auto-sent by browsers), but this
+    adds an extra layer by rejecting cross-origin POST/PUT/DELETE requests.
+    """
+
+    @web.middleware
+    async def csrf_middleware(
+        request: web.Request,
+        handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
+    ) -> web.StreamResponse:
+        # Only check state-changing methods
+        if request.method not in ("POST", "PUT", "DELETE"):
+            return await handler(request)
+        # Only check API routes
+        if not request.path.startswith("/api/"):
+            return await handler(request)
+        # Skip for login endpoint
+        if request.path in _AUTH_SKIP_PATHS:
+            return await handler(request)
+        # Skip for webhook endpoints (they have their own auth)
+        if request.path.startswith("/webhook/"):
+            return await handler(request)
+
+        host = request.host  # includes port
+        origin = request.headers.get("Origin", "")
+        referer = request.headers.get("Referer", "")
+
+        if origin:
+            parsed = urlparse(origin)
+            if parsed.netloc and parsed.netloc != host:
+                log.warning("CSRF blocked: Origin %s != Host %s on %s %s",
+                            origin, host, request.method, request.path)
+                return web.json_response({"error": "cross-origin request blocked"}, status=403)
+        elif referer:
+            parsed = urlparse(referer)
+            if parsed.netloc and parsed.netloc != host:
+                log.warning("CSRF blocked: Referer %s != Host %s on %s %s",
+                            referer, host, request.method, request.path)
+                return web.json_response({"error": "cross-origin request blocked"}, status=403)
+        # If neither Origin nor Referer is present, allow — Bearer token
+        # already prevents CSRF since it's not auto-sent by browsers.
+
+        return await handler(request)
+
+    return csrf_middleware
+
+
+def _make_web_audit_middleware() -> web.middleware:
+    """Log state-changing API requests to the audit log."""
+
+    @web.middleware
+    async def web_audit_middleware(
+        request: web.Request,
+        handler: Callable[[web.Request], Awaitable[web.StreamResponse]],
+    ) -> web.StreamResponse:
+        # Only audit state-changing API requests
+        if request.method not in ("POST", "PUT", "DELETE") or not request.path.startswith("/api/"):
+            return await handler(request)
+
+        start = time.monotonic()
+        response = await handler(request)
+        elapsed_ms = int((time.monotonic() - start) * 1000)
+
+        # Fire-and-forget audit log (don't block the response)
+        audit = request.app.get("audit_logger")
+        if audit:
+            try:
+                await audit.log_web_action(
+                    method=request.method,
+                    path=request.path,
+                    status=response.status,
+                    ip=request.remote or "",
+                    execution_time_ms=elapsed_ms,
+                )
+            except Exception:
+                pass  # Never block the response for audit failures
+
+        return response
+
+    return web_audit_middleware
+
+
+# ---------------------------------------------------------------------------
+# Health server
+# ---------------------------------------------------------------------------
 
 class HealthServer:
     def __init__(
@@ -117,12 +305,22 @@ class HealthServer:
         self._web_config = web_config or WebConfig()
         self._send_message: SendMessageCallback | None = None
         self._trigger_callback: TriggerCallback | None = None
+
+        # Session management
+        self._session_manager = SessionManager(
+            timeout_minutes=self._web_config.session_timeout_minutes,
+        )
+
         middlewares = []
         if self._web_config.enabled:
             middlewares.append(_make_security_headers_middleware())
             middlewares.append(_make_rate_limit_middleware())
-            middlewares.append(_make_auth_middleware(self._web_config))
+            middlewares.append(_make_csrf_middleware())
+            middlewares.append(_make_auth_middleware(self._web_config, self._session_manager))
+            middlewares.append(_make_web_audit_middleware())
         self._app = web.Application(middlewares=middlewares)
+        # Store session_manager on app for access by API routes
+        self._app["session_manager"] = self._session_manager
         self._app.router.add_get("/health", self._health)
         if self._webhook_config.enabled:
             self._app.router.add_post("/webhook/gitea", self._webhook_gitea)
@@ -164,6 +362,8 @@ class HealthServer:
         # Wire audit events to WebSocket for live dashboard/log updates
         ws_mgr = self._ws_manager
         bot.audit.set_event_callback(ws_mgr.broadcast_event)
+        # Store audit logger on app for the web audit middleware
+        self._app["audit_logger"] = bot.audit
         log.info("Web management API enabled")
 
     async def _redirect_to_ui(self, _request: web.Request) -> web.Response:

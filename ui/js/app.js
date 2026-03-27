@@ -65,6 +65,7 @@ const LoginScreen = {
         <h1 id="login-title" class="text-xl font-semibold mb-1 text-center">Heimdall</h1>
         <p class="text-gray-400 text-sm text-center mb-4">Management Interface</p>
         <div v-if="error" class="mb-3 text-red-400 text-sm text-center" role="alert">{{ error }}</div>
+        <div v-if="sessionExpired" class="mb-3 text-amber-400 text-sm text-center" role="alert">Session expired. Please log in again.</div>
         <form @submit.prevent="login" aria-labelledby="login-title">
           <label for="login-token" class="sr-only">API Token</label>
           <input
@@ -83,7 +84,7 @@ const LoginScreen = {
         </form>
       </div>
     </div>`,
-  props: ['onLogin'],
+  props: ['onLogin', 'sessionExpired'],
   setup(props) {
     const token = ref('');
     const error = ref(null);
@@ -92,16 +93,13 @@ const LoginScreen = {
     async function login() {
       busy.value = true;
       error.value = null;
-      api.setToken(token.value);
-      const check = await api.check();
-      busy.value = false;
-      if (check.ok) {
+      try {
+        await api.login(token.value);
         props.onLogin();
-      } else if (check.needsAuth) {
-        error.value = 'Invalid token';
-        api.setToken('');
-      } else {
-        error.value = check.error || 'Cannot reach server';
+      } catch (e) {
+        error.value = e.message || 'Login failed';
+      } finally {
+        busy.value = false;
       }
     }
     return { token, error, busy, login };
@@ -117,7 +115,7 @@ const App = {
       <div class="spinner" aria-hidden="true"></div>
       <span class="sr-only">Loading application...</span>
     </div>
-    <login-screen v-else-if="authState === 'login'" :on-login="onLogin" />
+    <login-screen v-else-if="authState === 'login'" :on-login="onLogin" :session-expired="sessionExpired" />
     <div v-else class="flex min-h-screen">
       <!-- Sidebar -->
       <aside class="hm-sidebar" :class="{ collapsed: sidebarCollapsed, 'mobile-open': mobileOpen }" role="navigation" aria-label="Main navigation">
@@ -185,6 +183,7 @@ const App = {
     </div>`,
   setup() {
     const authState = ref('checking'); // 'checking' | 'login' | 'ready'
+    const sessionExpired = ref(false);
     const sidebarCollapsed = ref(false);
     const mobileOpen = ref(false);
     const wsConnected = ref(false);
@@ -196,6 +195,14 @@ const App = {
     const botUptime = ref('');
 
     const navRoutes = routes.filter(r => r.meta);
+
+    // Handle session expiry from the API client
+    api.onSessionExpired = () => {
+      sessionExpired.value = true;
+      ws.disconnect();
+      api.setToken('');
+      authState.value = 'login';
+    };
 
     // Global keyboard shortcuts
     function onKeydown(e) {
@@ -228,12 +235,13 @@ const App = {
     });
 
     function onLogin() {
+      sessionExpired.value = false;
       authState.value = 'ready';
       startLive();
     }
 
-    function logout() {
-      api.setToken('');
+    async function logout() {
+      await api.logout();
       ws.disconnect();
       authState.value = 'login';
     }
@@ -301,7 +309,7 @@ const App = {
     });
 
     return {
-      authState, sidebarCollapsed, mobileOpen, wsConnected,
+      authState, sessionExpired, sidebarCollapsed, mobileOpen, wsConnected,
       wsState, wsLatency, wsLabel, wsToast,
       botStatus, botUptime, navRoutes,
       onLogin, logout, toggleSidebar,
