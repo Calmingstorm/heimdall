@@ -624,6 +624,34 @@ TOOLS: list[dict] = [
             "properties": {},
         },
     },
+    {
+        "name": "enable_skill",
+        "description": "Re-enables a disabled skill.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Name of the skill to enable",
+                },
+            },
+            "required": ["name"],
+        },
+    },
+    {
+        "name": "disable_skill",
+        "description": "Disables a skill without deleting it. File preserved.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "Name of the skill to disable",
+                },
+            },
+            "required": ["name"],
+        },
+    },
     # --- Prometheus range query ---
     {
         "name": "query_prometheus_range",

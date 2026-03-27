@@ -352,6 +352,7 @@ class SkillManager:
         self.skills_dir.mkdir(parents=True, exist_ok=True)
         self._config_dir = self.skills_dir / "config"
         self._config_dir.mkdir(parents=True, exist_ok=True)
+        self._disabled_path = self.skills_dir / ".disabled.json"
         self._executor = tool_executor
         # Derive a separate skill memory file to avoid corrupting the
         # executor's scoped memory structure (global/user_* namespaces).
@@ -361,12 +362,29 @@ class SkillManager:
         else:
             self._memory_path = None
         self._skills: dict[str, LoadedSkill] = {}
+        self._disabled: set[str] = self._load_disabled_set()
         # Optional service references — set after construction via set_services()
         self._knowledge_store = None
         self._embedder = None
         self._session_manager = None
         self._scheduler = None
         self._load_all()
+
+    def _load_disabled_set(self) -> set[str]:
+        """Load the set of disabled skill names from disk."""
+        if not self._disabled_path.exists():
+            return set()
+        try:
+            data = json.loads(self._disabled_path.read_text())
+            if isinstance(data, list):
+                return {n for n in data if isinstance(n, str)}
+        except Exception:
+            pass
+        return set()
+
+    def _save_disabled_set(self) -> None:
+        """Persist the disabled skill names to disk."""
+        self._disabled_path.write_text(json.dumps(sorted(self._disabled)))
 
     def set_services(
         self,
@@ -386,6 +404,10 @@ class SkillManager:
             skill = self._load_skill(path)
             if skill:
                 self._skills[skill.name] = skill
+        # Apply persisted disabled state
+        for name in self._disabled:
+            if name in self._skills:
+                self._skills[name].status = SkillStatus.DISABLED
         if self._skills:
             log.info("Loaded %d skill(s): %s", len(self._skills), ", ".join(self._skills))
 
@@ -561,10 +583,42 @@ class SkillManager:
         path = self.skills_dir / f"{name}.py"
         self._unload_skill(name)
         path.unlink(missing_ok=True)
-        # Clean up config file
+        # Clean up config file and disabled state
         config_path = self._config_dir / f"{name}.json"
         config_path.unlink(missing_ok=True)
+        if name in self._disabled:
+            self._disabled.discard(name)
+            self._save_disabled_set()
         return f"Skill '{name}' deleted."
+
+    def enable_skill(self, name: str) -> str:
+        """Enable a previously disabled skill."""
+        if name not in self._skills:
+            return f"Skill '{name}' not found."
+        skill = self._skills[name]
+        if skill.status != SkillStatus.DISABLED:
+            return f"Skill '{name}' is already enabled."
+        skill.status = SkillStatus.LOADED
+        self._disabled.discard(name)
+        self._save_disabled_set()
+        return f"Skill '{name}' enabled."
+
+    def disable_skill(self, name: str) -> str:
+        """Disable a skill without deleting it. The file is preserved."""
+        if name not in self._skills:
+            return f"Skill '{name}' not found."
+        skill = self._skills[name]
+        if skill.status == SkillStatus.DISABLED:
+            return f"Skill '{name}' is already disabled."
+        skill.status = SkillStatus.DISABLED
+        self._disabled.add(name)
+        self._save_disabled_set()
+        return f"Skill '{name}' disabled. Use enable_skill to re-activate it."
+
+    def is_enabled(self, name: str) -> bool:
+        """Check if a skill is loaded and enabled (not disabled)."""
+        skill = self._skills.get(name)
+        return skill is not None and skill.status != SkillStatus.DISABLED
 
     # -- Config management --
 
@@ -665,7 +719,7 @@ class SkillManager:
         return bool(skill.definition.get("handoff_to_codex", False))
 
     def get_tool_definitions(self) -> list[dict]:
-        """Return tool definitions for all loaded skills."""
+        """Return tool definitions for enabled skills only."""
         return [
             {
                 "name": s.definition["name"],
@@ -673,6 +727,7 @@ class SkillManager:
                 "input_schema": s.definition["input_schema"],
             }
             for s in self._skills.values()
+            if s.status != SkillStatus.DISABLED
         ]
 
     def validate_skill_code(self, code: str, filename: str = "<string>") -> dict:
@@ -797,6 +852,8 @@ class SkillManager:
         skill = self._skills.get(tool_name)
         if not skill:
             return f"Skill '{tool_name}' not found."
+        if skill.status == SkillStatus.DISABLED:
+            return f"Skill '{tool_name}' is disabled. Use enable_skill to re-activate it."
 
         # Load config with defaults applied
         skill_config = self.get_skill_config(tool_name)

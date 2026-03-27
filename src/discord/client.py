@@ -2090,6 +2090,16 @@ class HeimdallBot(discord.Client):
                         self._cached_merged_tools = None  # invalidate tool cache
                         self._cached_skills_text = None  # invalidate skills text cache
                         system_prompt = self._build_system_prompt(channel=message.channel, user_id=user_id)
+                    elif tool_name == "enable_skill":
+                        result = self.skill_manager.enable_skill(tool_input["name"])
+                        self._cached_merged_tools = None
+                        self._cached_skills_text = None
+                        system_prompt = self._build_system_prompt(channel=message.channel, user_id=user_id)
+                    elif tool_name == "disable_skill":
+                        result = self.skill_manager.disable_skill(tool_input["name"])
+                        self._cached_merged_tools = None
+                        self._cached_skills_text = None
+                        system_prompt = self._build_system_prompt(channel=message.channel, user_id=user_id)
                     elif tool_name == "add_reaction":
                         result = await self._handle_add_reaction(message, tool_input)
                     elif tool_name == "create_poll":
@@ -3347,7 +3357,7 @@ class HeimdallBot(discord.Client):
                         timeout=_t,
                     )
                     # Skill CRUD invalidates caches
-                    if tool_name in ("create_skill", "edit_skill", "delete_skill"):
+                    if tool_name in ("create_skill", "edit_skill", "delete_skill", "enable_skill", "disable_skill"):
                         self._cached_merged_tools = None
                         self._cached_skills_text = None
                         system_prompt = self._build_system_prompt(
@@ -3506,6 +3516,10 @@ class HeimdallBot(discord.Client):
             return await asyncio.to_thread(
                 self.skill_manager.delete_skill, tool_input["name"],
             )
+        if tool_name == "enable_skill":
+            return self.skill_manager.enable_skill(tool_input["name"])
+        if tool_name == "disable_skill":
+            return self.skill_manager.disable_skill(tool_input["name"])
         if tool_name == "list_skills":
             skills = self.skill_manager.list_skills()
             if not skills:

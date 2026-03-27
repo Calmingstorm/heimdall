@@ -166,7 +166,7 @@ class TestToolSystem:
 
     def test_tool_count(self):
         from src.tools.registry import TOOLS
-        assert len(TOOLS) == 75
+        assert len(TOOLS) == 77
 
     def test_all_tools_have_required_keys(self):
         from src.tools.registry import TOOLS

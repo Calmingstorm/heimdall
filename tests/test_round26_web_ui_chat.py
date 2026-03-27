@@ -793,8 +793,8 @@ class TestToolsAndPacks:
             resp = await client.get("/api/tools")
             assert resp.status == 200
             body = await resp.json()
-            # Uses real get_tool_definitions(), returns all 75 tools (67 base + 6 agent + 2 loop-agent bridge)
-            assert len(body) == 75
+            # Uses real get_tool_definitions(), returns all 77 tools (67 base + 6 agent + 2 loop-agent bridge + 2 skill toggle)
+            assert len(body) == 77
             tool_names = [t["name"] for t in body]
             assert "run_command" in tool_names
 
@@ -1371,7 +1371,7 @@ class TestToolPackIntegrity:
 
     def test_total_tools(self):
         from src.tools.registry import TOOLS
-        assert len(TOOLS) == 75
+        assert len(TOOLS) == 77
 
     def test_all_pack_tools_exist_in_tools_list(self):
         from src.tools.registry import TOOLS, TOOL_PACKS

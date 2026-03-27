@@ -535,6 +535,26 @@ def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
         report = bot.skill_manager.validate_skill_code(code)
         return web.json_response(report)
 
+    @routes.post("/api/skills/{name}/enable")
+    async def enable_skill(request: web.Request) -> web.Response:
+        name = request.match_info["name"]
+        result = bot.skill_manager.enable_skill(name)
+        if "not found" in result.lower():
+            return web.json_response({"result": result}, status=404)
+        bot._cached_merged_tools = None
+        bot._cached_skills_text = None
+        return web.json_response({"result": result})
+
+    @routes.post("/api/skills/{name}/disable")
+    async def disable_skill_api(request: web.Request) -> web.Response:
+        name = request.match_info["name"]
+        result = bot.skill_manager.disable_skill(name)
+        if "not found" in result.lower():
+            return web.json_response({"result": result}, status=404)
+        bot._cached_merged_tools = None
+        bot._cached_skills_text = None
+        return web.json_response({"result": result})
+
     @routes.get("/api/skills/{name}/config")
     async def get_skill_config(request: web.Request) -> web.Response:
         name = request.match_info["name"]
