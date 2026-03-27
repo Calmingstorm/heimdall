@@ -81,11 +81,11 @@ class TestIncusDeployScript:
 
     def test_incus_deploy_creates_heimdall_user(self):
         content = Path("scripts/incus-deploy.sh").read_text()
-        assert "useradd" in content and "loki" in content
+        assert "useradd" in content and "heimdall" in content
 
     def test_incus_deploy_creates_systemd_service(self):
         content = Path("scripts/incus-deploy.sh").read_text()
-        assert "systemd" in content or "loki.service" in content
+        assert "systemd" in content or "heimdall.service" in content
 
     def test_incus_deploy_installs_dependencies(self):
         content = Path("scripts/incus-deploy.sh").read_text()
@@ -114,15 +114,15 @@ class TestMonitorScript:
     def test_monitor_script_supports_local(self):
         content = Path("scripts/monitor.sh").read_text()
         assert "local" in content.lower()
-        assert "LOKI_LOG_FILE" in content
+        assert "HEIMDALL_LOG_FILE" in content
 
     def test_monitor_script_auto_detects(self):
         content = Path("scripts/monitor.sh").read_text()
-        assert "detect_deploy" in content or "LOKI_DEPLOY" in content
+        assert "detect_deploy" in content or "HEIMDALL_DEPLOY" in content
 
     def test_monitor_script_configurable_deploy_type(self):
         content = Path("scripts/monitor.sh").read_text()
-        assert "LOKI_DEPLOY" in content
+        assert "HEIMDALL_DEPLOY" in content
 
 
 class TestEnvExample:

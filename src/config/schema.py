@@ -92,16 +92,16 @@ class SearchConfig(BaseModel):
 
 class VoiceConfig(BaseModel):
     enabled: bool = False
-    voice_service_url: str = "ws://loki-voice:3940/ws"
+    voice_service_url: str = "ws://heimdall-voice:3940/ws"
     auto_join: bool = False
     transcript_channel_id: str = ""
     default_voice: str = "en_US-lessac-medium"
-    wake_word: str = "loki"
+    wake_word: str = "heimdall"
 
 
 class BrowserConfig(BaseModel):
     enabled: bool = False
-    cdp_url: str = "ws://loki-browser:3000?token=loki-internal"  # Override token via BROWSER_TOKEN env var
+    cdp_url: str = "ws://heimdall-browser:3000?token=heimdall-internal"  # Override token via BROWSER_TOKEN env var
     default_timeout_ms: int = 30000
     viewport_width: int = 1280
     viewport_height: int = 720

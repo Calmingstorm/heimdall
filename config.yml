@@ -80,15 +80,15 @@ usage:
 
 voice:
   enabled: false
-  voice_service_url: "ws://loki-voice:3940/ws"
+  voice_service_url: "ws://heimdall-voice:3940/ws"
   auto_join: false
   transcript_channel_id: ""
   default_voice: "en-US-AvaMultilingualNeural"
-  wake_word: "loki"
+  wake_word: "heimdall"
 
 browser:
   enabled: false
-  cdp_url: "ws://loki-browser:3000?token=${BROWSER_TOKEN:-loki-internal}"
+  cdp_url: "ws://heimdall-browser:3000?token=${BROWSER_TOKEN:-heimdall-internal}"
 
 web:
   enabled: true

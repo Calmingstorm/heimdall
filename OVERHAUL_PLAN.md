@@ -1,4 +1,4 @@
-# Loki Overhaul Plan — Post Prompt Optimization
+# Heimdall Overhaul Plan — Post Prompt Optimization
 
 ## Context
 
@@ -58,7 +58,7 @@ tools:
 ## Workstream 2: Embedding Overhaul (6-8 sessions)
 
 ### Problem
-Loki requires Ollama (external server with nomic-embed-text model) for ALL
+Heimdall requires Ollama (external server with nomic-embed-text model) for ALL
 embedding operations. If Ollama is down or unavailable:
 - Knowledge base ingestion FAILS completely (BUG: FTS5 not written either)
 - Semantic search returns nothing
@@ -66,7 +66,7 @@ embedding operations. If Ollama is down or unavailable:
 - Session archive indexing fails
 
 OpenClaw uses SQLite + sqlite-vec (zero external deps) with local GGUF models
-and graceful FTS-only fallback. Loki should be fully self-contained too.
+and graceful FTS-only fallback. Heimdall should be fully self-contained too.
 
 ### Decision: Remove Ollama Entirely
 No external embedding server. All embeddings happen in-process using `fastembed`
@@ -131,7 +131,7 @@ Files: `src/knowledge/store.py`, `src/search/vectorstore.py`, new `src/search/sq
 - Bot initializes knowledge/vector stores even when embedder=None
 - Tool memory already has Jaccard fallback (no change needed)
 - This is the safety net: if fastembed model download fails (air-gapped, disk full, etc.),
-  Loki still has keyword search over everything
+  Heimdall still has keyword search over everything
 
 ---
 

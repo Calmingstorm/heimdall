@@ -69,13 +69,13 @@ class TestIdentityComplete:
 
     def test_dockerfile_user_is_heimdall(self):
         content = (ROOT / "Dockerfile").read_text()
-        assert "loki" in content.lower()
+        assert "heimdall" in content.lower()
 
     def test_docker_compose_services_are_heimdall(self):
         content = (ROOT / "docker-compose.yml").read_text()
-        assert "loki-bot" in content
-        assert "loki-browser" in content
-        assert "loki-voice" in content
+        assert "heimdall-bot" in content
+        assert "heimdall-browser" in content
+        assert "heimdall-voice" in content
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 services:
-  loki-bot:
+  heimdall-bot:
     build: .
-    container_name: loki-bot
+    container_name: heimdall-bot
     restart: unless-stopped
     env_file: .env
     environment:
@@ -19,9 +19,9 @@ services:
     networks:
       - default
 
-  loki-browser:
+  heimdall-browser:
     image: ghcr.io/browserless/chromium
-    container_name: loki-browser
+    container_name: heimdall-browser
     restart: unless-stopped
     profiles:
       - browser
@@ -30,7 +30,7 @@ services:
       - TIMEOUT=30000
       - QUEUED=5
       - HEALTH=true
-      - TOKEN=${BROWSER_TOKEN:-loki-internal}
+      - TOKEN=${BROWSER_TOKEN:-heimdall-internal}
     deploy:
       resources:
         limits:
@@ -38,9 +38,9 @@ services:
     networks:
       - default
 
-  loki-voice:
+  heimdall-voice:
     build: ./voice-service
-    container_name: loki-voice
+    container_name: heimdall-voice
     restart: unless-stopped
     profiles:
       - voice

@@ -154,14 +154,14 @@ class TestDeploymentFiles:
     def test_docker_compose_service_names(self):
         content = Path("docker-compose.yml").read_text()
         assert "ansiblex" not in content.lower()
-        assert "loki-bot" in content
-        assert "loki-browser" in content
-        assert "loki-voice" in content
+        assert "heimdall-bot" in content
+        assert "heimdall-browser" in content
+        assert "heimdall-voice" in content
 
     def test_dockerfile_uses_heimdall_user(self):
         content = Path("Dockerfile").read_text()
-        assert "useradd" in content and "loki" in content
-        assert "USER loki" in content
+        assert "useradd" in content and "heimdall" in content
+        assert "USER heimdall" in content
         assert "ansiblex" not in content.lower()
 
     def test_dockerfile_creates_ssh_dir(self):

@@ -406,7 +406,7 @@ docker compose --profile browser up -d
 docker compose --profile voice up -d
 
 # View logs
-docker compose logs -f loki-bot
+docker compose logs -f heimdall-bot
 ```
 
 Health check endpoint: `http://localhost:3939/health`
@@ -419,8 +419,8 @@ Web management UI: `http://localhost:3939/ui/`
 bash scripts/incus-deploy.sh
 
 # Manage
-incus exec loki -- systemctl status loki
-incus exec loki -- journalctl -u loki -f
+incus exec heimdall -- systemctl status heimdall
+incus exec heimdall -- journalctl -u heimdall -f
 ```
 
 ### Bare Metal
@@ -438,8 +438,8 @@ python -m src
 bash scripts/monitor.sh logs
 
 # Force a specific deployment type
-LOKI_DEPLOY=docker bash scripts/monitor.sh logs
-LOKI_DEPLOY=incus bash scripts/monitor.sh logs
+HEIMDALL_DEPLOY=docker bash scripts/monitor.sh logs
+HEIMDALL_DEPLOY=incus bash scripts/monitor.sh logs
 
 # View recent Discord messages
 bash scripts/monitor.sh messages

@@ -6,7 +6,7 @@ RUN apt-get update && \
         ffmpeg libffi-dev libsodium-dev libopus0 && \
     rm -rf /var/lib/apt/lists/*
 
-RUN useradd -m -s /bin/bash loki
+RUN useradd -m -s /bin/bash heimdall
 
 WORKDIR /app
 
@@ -17,10 +17,10 @@ COPY src/ src/
 COPY config.yml .
 
 RUN mkdir -p data/context data/sessions data/logs data/usage data/skills data/chromadb .ssh && \
-    chown -R loki:loki /app && \
+    chown -R heimdall:heimdall /app && \
     chmod 700 .ssh
 
-USER loki
+USER heimdall
 
 HEALTHCHECK --interval=3m --timeout=10s --start-period=15s \
     CMD curl -f http://localhost:3000/health || exit 1

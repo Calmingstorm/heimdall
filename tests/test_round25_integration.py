@@ -434,7 +434,7 @@ class TestComplexTaskChain:
 
 
 # =====================================================================
-# 2. BOT-TO-BOT: BOT SENDS CODE → LOKI RUNS IT
+# 2. BOT-TO-BOT: BOT SENDS CODE → HEIMDALL RUNS IT
 # =====================================================================
 
 class TestBotSendsCode:
@@ -636,7 +636,7 @@ class TestBotSendsCode:
 
 
 # =====================================================================
-# 3. MULTI-STEP WITH FAILURES → LOKI RECOVERS
+# 3. MULTI-STEP WITH FAILURES → HEIMDALL RECOVERS
 # =====================================================================
 
 class TestMultiStepFailureRecovery:

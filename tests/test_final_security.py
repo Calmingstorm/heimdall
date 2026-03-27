@@ -47,11 +47,11 @@ class TestBrowserTokenConfigurable:
 
     def test_config_yml_uses_browser_token_env_var(self):
         content = Path("config.yml").read_text()
-        assert "${BROWSER_TOKEN:-loki-internal}" in content
+        assert "${BROWSER_TOKEN:-heimdall-internal}" in content
 
     def test_docker_compose_uses_browser_token_env_var(self):
         content = Path("docker-compose.yml").read_text()
-        assert "${BROWSER_TOKEN:-loki-internal}" in content
+        assert "${BROWSER_TOKEN:-heimdall-internal}" in content
 
     def test_env_example_documents_browser_token(self):
         content = Path(".env.example").read_text()
@@ -61,15 +61,15 @@ class TestBrowserTokenConfigurable:
         import os
         from src.config.schema import _substitute_env_vars
         with patch.dict(os.environ, {"BROWSER_TOKEN": "custom-secret-token"}):
-            result = _substitute_env_vars("${BROWSER_TOKEN:-loki-internal}")
+            result = _substitute_env_vars("${BROWSER_TOKEN:-heimdall-internal}")
             assert result == "custom-secret-token"
 
     def test_browser_token_defaults_when_unset(self):
         import os
         from src.config.schema import _substitute_env_vars
         os.environ.pop("BROWSER_TOKEN", None)
-        result = _substitute_env_vars("${BROWSER_TOKEN:-loki-internal}")
-        assert result == "loki-internal"
+        result = _substitute_env_vars("${BROWSER_TOKEN:-heimdall-internal}")
+        assert result == "heimdall-internal"
 
     def test_docker_compose_browser_token_matches_config(self):
         """Docker compose and config.yml should use the same env var."""

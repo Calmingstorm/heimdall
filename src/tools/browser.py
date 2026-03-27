@@ -44,7 +44,7 @@ class BrowserManager:
 
     def __init__(
         self,
-        cdp_url: str = "ws://loki-browser:3000?token=loki-internal",
+        cdp_url: str = "ws://heimdall-browser:3000?token=heimdall-internal",
         default_timeout_ms: int = 30000,
         viewport_width: int = 1280,
         viewport_height: int = 720,
@@ -100,7 +100,7 @@ class BrowserManager:
                 log.info("Connected to browser at %s", self._cdp_url.split("?")[0])
             except Exception as e:
                 raise RuntimeError(
-                    f"Browser service unavailable. Is the loki-browser container running? ({e})"
+                    f"Browser service unavailable. Is the heimdall-browser container running? ({e})"
                 )
 
     async def _create_page(self, timeout_ms: int | None = None):

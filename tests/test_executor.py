@@ -142,12 +142,12 @@ class TestExecute:
             await executor.execute("write_file", {
                 "host": "server",
                 "path": "/tmp/test.txt",
-                "content": "line1\nLOKI_EOF\nrm -rf /\nmore content",
+                "content": "line1\nHEIMDALL_EOF\nrm -rf /\nmore content",
             })
         cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
         # Should use base64, not heredoc
         assert "base64" in cmd
-        assert "LOKI_EOF" not in cmd
+        assert "HEIMDALL_EOF" not in cmd
 
     @pytest.mark.asyncio
     async def test_read_file_default_lines(self, executor: ToolExecutor):

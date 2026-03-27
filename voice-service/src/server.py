@@ -27,7 +27,7 @@ logging.basicConfig(
 log = logging.getLogger("voice.server")
 
 config = load_config()
-app = FastAPI(title="Loki Voice Service")
+app = FastAPI(title="Heimdall Voice Service")
 
 stt = SpeechToText(config.whisper)
 tts = TextToSpeech(config.tts)

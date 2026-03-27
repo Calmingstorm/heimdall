@@ -1,7 +1,7 @@
 """
-Example Loki skill — rename this file to example_skill.py to activate it.
+Example Heimdall skill — rename this file to example_skill.py to activate it.
 
-Skills are Python files that add new tools to Loki at runtime.
+Skills are Python files that add new tools to Heimdall at runtime.
 Each skill must define:
   1. SKILL_DEFINITION — a dict describing the tool (name, description, input_schema)
   2. async def execute(inp, context) -> str — runs when the tool is called
@@ -65,4 +65,4 @@ async def execute(inp, context):
     """Called when the hello_world tool is invoked."""
     name = inp.get("name", "world")
     context.log(f"Greeting {name}")
-    return f"Hello, {name}! This is an example skill running on Loki."
+    return f"Hello, {name}! This is an example skill running on Heimdall."

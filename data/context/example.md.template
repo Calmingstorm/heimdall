@@ -1,7 +1,7 @@
 # Example Context File
 
 Context files provide operational guidance and environment-specific information
-to Loki's system prompt. Place `.md` files in this directory and they will be
+to Heimdall's system prompt. Place `.md` files in this directory and they will be
 loaded automatically. Use `/reload` in Discord to reload context files without
 restarting.
 
@@ -9,7 +9,7 @@ Rename this file to `example.md` (remove `.template`) to activate it.
 
 ## Three-Layer Architecture
 
-Loki's instructions are split into three layers:
+Heimdall's instructions are split into three layers:
 
 1. **System prompt** (~3000 chars) — Identity: personality, core behavior, rules
 2. **Context files** (this directory) — Architecture: how tools work, patterns, guidance
@@ -21,14 +21,14 @@ add additional context files for environment-specific information.
 
 ## Hosts
 
-Describe your infrastructure so Loki knows what's available:
+Describe your infrastructure so Heimdall knows what's available:
 
 - **webserver** (10.0.0.1): Ubuntu 24.04, runs nginx and the app stack
 - **dbserver** (10.0.0.2): PostgreSQL 16, Redis, runs backups at 2am
 
 ## Services
 
-Key services Loki should know about:
+Key services Heimdall should know about:
 
 - `nginx` — reverse proxy on webserver
 - `postgresql` — database on dbserver
@@ -36,7 +36,7 @@ Key services Loki should know about:
 
 ## Git Repos
 
-Repos Loki can interact with:
+Repos Heimdall can interact with:
 
 - `/home/deploy/myapp` on webserver — main application repo
 - `/home/deploy/infra` on webserver — infrastructure configs

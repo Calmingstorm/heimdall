@@ -9,7 +9,7 @@
 - Pure configuration-driven, no ML inference
 - WeakMap caching for performance
 - Session keys: `agentId:channelId:accountId:peerId[:sessionName]`
-- **Takeaway for Loki**: Remove classifier entirely. One path: Codex with tools, always.
+- **Takeaway for Heimdall**: Remove classifier entirely. One path: Codex with tools, always.
 
 ### Tool Execution: Three Tiers
 - **Sandbox**: Isolated container, restricted PATH, allowlist commands
@@ -17,13 +17,13 @@
 - **Node**: Remote service, structured request/response, security levels
 - NO SSH in codebase — local execution is direct subprocess
 - Pre-flight script validation: `validateScriptFileForShellBleed()` catches `$VARIABLE` injection
-- **Takeaway for Loki**: Use direct subprocess for localhost, keep SSH for remote only.
+- **Takeaway for Heimdall**: Use direct subprocess for localhost, keep SSH for remote only.
 
 ### No Approval System
 - Tools are capabilities, not suggestions
 - If tool is available in session, it's implicitly executable
 - Constraints are explicit in session config, not soft-requested in prompts
-- **Takeaway for Loki**: Delete approval.py entirely. Remove requires_approval from all tools.
+- **Takeaway for Heimdall**: Delete approval.py entirely. Remove requires_approval from all tools.
 
 ### System Prompt Strategy
 - Bootstrap files injected at runtime (not hardcoded monolith)
@@ -31,14 +31,14 @@
 - Configuration snapshot embedded in prompt
 - High assertiveness: no "I'll try" or "I can attempt"
 - Tools presented as available capabilities, not optional features
-- **Takeaway for Loki**: System prompt should declare capabilities assertively.
+- **Takeaway for Heimdall**: System prompt should declare capabilities assertively.
   "You have run_command. You have write_file. You have run_script." Not "you can use".
 
 ### Background Process Management
 - First-class tool with full lifecycle: list, poll, log, kill, write-input
 - Configurable yield windows (~10s default)
 - Commands can yield after timeout or execute fully backgrounded
-- **Takeaway for Loki**: Background tasks already exist, but consider yield pattern.
+- **Takeaway for Heimdall**: Background tasks already exist, but consider yield pattern.
 
 ### Session/History Management
 - Persistent sessions stored in `~/.acpx/`
@@ -46,21 +46,21 @@
 - Queue-based prompt serialization (preserves session state)
 - 5-second heartbeat maintains process lease
 - Recency-focused context — responds to latest message, earlier = history
-- **Takeaway for Loki**: Already implemented (session manager + compaction). Keep as-is.
+- **Takeaway for Heimdall**: Already implemented (session manager + compaction). Keep as-is.
 
 ### Message Handling
 - Bot messages treated as valid context (no special filtering)
 - Thread binding for parallel conversations in same channel
 - Provenance metadata separates system data from user text
 - Content normalization: arrays → strings safely
-- **Takeaway for Loki**: Bot buffer already handles this. Keep combine_bot_messages.
+- **Takeaway for Heimdall**: Bot buffer already handles this. Keep combine_bot_messages.
 
 ### Anti-Hesitation Patterns
 - VISION.md: "OpenClaw is the AI that actually does things."
 - No prompting language in tool descriptions
 - Scope-driven execution: available = executable
 - Direct action language in all system instructions
-- **Takeaway for Loki**: Already have detect_hedging + retry. Strengthen system prompt.
+- **Takeaway for Heimdall**: Already have detect_hedging + retry. Strengthen system prompt.
 
 ## ACPX Extension (https://github.com/openclaw/acpx)
 
@@ -82,9 +82,9 @@
 - Multiple prompts queued to single agent process
 - Configurable queue depth limits
 
-## Key Differences: OpenClaw vs Loki
+## Key Differences: OpenClaw vs Heimdall
 
-| Aspect | OpenClaw | Loki (current) | Loki (target) |
+| Aspect | OpenClaw | Heimdall (current) | Heimdall (target) |
 |--------|----------|----------------|---------------|
 | Routing | Scope matching | Haiku classifier | None — all → Codex |
 | Approval | None | Button-based | None |
@@ -95,7 +95,7 @@
 | Tools | Capabilities | Suggestions with approval | Capabilities |
 | Classifier cost | $0 | ~$0.0001/msg (Haiku) | $0 |
 
-## Loki Target Architecture: Two-Tier Execution
+## Heimdall Target Architecture: Two-Tier Execution
 
 ```
 Every Discord message
