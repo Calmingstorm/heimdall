@@ -376,8 +376,10 @@ class HealthServer:
         if not path or path == "/":
             return web.FileResponse(self._ui_dir / "index.html")
         file = (self._ui_dir / path).resolve()
-        # Prevent path traversal
-        if not str(file).startswith(str(self._ui_dir.resolve())):
+        # Prevent path traversal — use trailing separator to avoid
+        # sibling directory prefix attacks (e.g. ../ui_backup/secret)
+        ui_root = str(self._ui_dir.resolve()) + "/"
+        if not str(file).startswith(ui_root):
             raise web.HTTPForbidden()
         if file.is_file():
             return web.FileResponse(file)
