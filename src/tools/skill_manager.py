@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import ast
 import asyncio
 import importlib.util
 import json
 import re
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from collections.abc import Callable
 from typing import Any
@@ -31,6 +34,120 @@ _SEMVER_PATTERN = re.compile(r"^\d+\.\d+\.\d+(?:[-+].+)?$")
 
 # Supported types for config_schema fields.
 _CONFIG_FIELD_TYPES = frozenset({"string", "integer", "number", "boolean"})
+
+# Dependency resolution limits.
+MAX_SKILL_DEPENDENCIES = 10
+_PIP_INSTALL_TIMEOUT = 120  # seconds
+
+# PEP 508 simplified: package names start with letter/digit, may contain .-_
+_PACKAGE_NAME_RE = re.compile(r"^([A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9])?)")
+
+
+def _parse_package_name(spec: str) -> str:
+    """Extract base package name from a pip requirement specifier.
+
+    E.g. ``"requests>=2.0"`` → ``"requests"``, ``"Pillow[jpeg]"`` → ``"Pillow"``.
+    """
+    # Strip extras brackets first
+    base = spec.strip().split("[")[0]
+    m = _PACKAGE_NAME_RE.match(base)
+    return m.group(1) if m else ""
+
+
+def _is_package_installed(name: str) -> bool:
+    """Check if a pip package is installed via importlib.metadata."""
+    try:
+        distribution(name)
+        return True
+    except PackageNotFoundError:
+        return False
+
+
+def _install_packages(specs: list[str], timeout: int = _PIP_INSTALL_TIMEOUT) -> tuple[bool, str]:
+    """Install pip packages. Returns ``(success, output)``."""
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--quiet", "--disable-pip-version-check"]
+            + specs,
+            capture_output=True, text=True, timeout=timeout,
+        )
+        output = (result.stdout + result.stderr).strip()
+        return result.returncode == 0, output
+    except subprocess.TimeoutExpired:
+        return False, f"pip install timed out after {timeout}s"
+    except Exception as e:
+        return False, str(e)
+
+
+def _extract_dependencies_from_source(source: str) -> list[str]:
+    """Extract ``dependencies`` from ``SKILL_DEFINITION`` dict in source without executing.
+
+    Uses AST literal eval so only works for literal dict definitions.  Returns
+    empty list if the definition is dynamic or dependencies key is absent.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == "SKILL_DEFINITION":
+                    try:
+                        value = ast.literal_eval(node.value)
+                        if isinstance(value, dict):
+                            deps = value.get("dependencies", [])
+                            if isinstance(deps, list) and all(isinstance(d, str) for d in deps):
+                                return deps
+                    except (ValueError, TypeError):
+                        pass
+    return []
+
+
+def resolve_dependencies(deps: list[str]) -> tuple[list[str], list[str], list["SkillDiagnostic"]]:
+    """Resolve skill pip dependencies.
+
+    Returns ``(already_installed, newly_installed, diagnostics)``.
+    """
+    diagnostics: list[SkillDiagnostic] = []
+
+    if not deps:
+        return [], [], diagnostics
+
+    if len(deps) > MAX_SKILL_DEPENDENCIES:
+        diagnostics.append(SkillDiagnostic(
+            "error",
+            f"Too many dependencies ({len(deps)}). Maximum is {MAX_SKILL_DEPENDENCIES}.",
+        ))
+        return [], [], diagnostics
+
+    already_installed: list[str] = []
+    to_install: list[str] = []
+
+    for spec in deps:
+        name = _parse_package_name(spec)
+        if not name:
+            diagnostics.append(SkillDiagnostic("warn", f"Invalid dependency spec: {spec!r}"))
+            continue
+        if _is_package_installed(name):
+            already_installed.append(spec)
+        else:
+            to_install.append(spec)
+
+    newly_installed: list[str] = []
+    if to_install:
+        success, output = _install_packages(to_install)
+        if success:
+            newly_installed = to_install
+            diagnostics.append(SkillDiagnostic(
+                "warn", f"Auto-installed dependencies: {', '.join(to_install)}",
+            ))
+        else:
+            diagnostics.append(SkillDiagnostic(
+                "error", f"Failed to install dependencies [{', '.join(to_install)}]: {output}",
+            ))
+
+    return already_installed, newly_installed, diagnostics
 
 
 def validate_config_value(field_name: str, field_schema: dict, value: Any) -> str | None:
@@ -274,6 +391,23 @@ class SkillManager:
 
     def _load_skill(self, path: Path) -> LoadedSkill | None:
         module_name = f"heimdall_skill_{path.stem}"
+
+        # Pre-load: extract and resolve dependencies from source *before*
+        # executing the module, so that imports succeed.
+        dep_diagnostics: list[SkillDiagnostic] = []
+        try:
+            source = path.read_text()
+        except Exception as e:
+            log.error("Cannot read skill file %s: %s", path, e)
+            return None
+
+        pre_deps = _extract_dependencies_from_source(source)
+        if pre_deps:
+            _, _, dep_diagnostics = resolve_dependencies(pre_deps)
+            for d in dep_diagnostics:
+                lvl = log.warning if d.level == "warn" else log.error
+                lvl("Skill %s deps: %s", path.name, d.message)
+
         try:
             spec = importlib.util.spec_from_file_location(module_name, path)
             if not spec or not spec.loader:
@@ -305,10 +439,13 @@ class SkillManager:
                 return None
 
             # Parse rich metadata from definition
-            metadata, diagnostics = SkillMetadata.from_definition(definition)
-            if diagnostics:
-                for d in diagnostics:
+            metadata, meta_diagnostics = SkillMetadata.from_definition(definition)
+            if meta_diagnostics:
+                for d in meta_diagnostics:
                     log.warning("Skill %s metadata: %s", path.name, d.message)
+
+            # Merge dependency diagnostics with metadata diagnostics
+            all_diagnostics = dep_diagnostics + meta_diagnostics
 
             name = definition["name"]
             log.info("Loaded skill: %s from %s", name, path.name)
@@ -321,7 +458,7 @@ class SkillManager:
                 module_name=module_name,
                 status=SkillStatus.LOADED,
                 metadata=metadata,
-                diagnostics=diagnostics,
+                diagnostics=all_diagnostics,
             )
 
         except Exception as e:
@@ -494,6 +631,31 @@ class SkillManager:
 
     def has_skill(self, name: str) -> bool:
         return name in self._skills
+
+    def check_dependencies(self, name: str) -> dict:
+        """Check dependency status for a loaded skill.
+
+        Returns a dict with ``dependencies`` (list of status dicts) and
+        ``all_satisfied`` (bool).
+        """
+        skill = self._skills.get(name)
+        if not skill:
+            return {"error": f"Skill '{name}' not found"}
+        deps = skill.metadata.dependencies
+        if not deps:
+            return {"dependencies": [], "all_satisfied": True}
+        results = []
+        for spec in deps:
+            pkg_name = _parse_package_name(spec)
+            results.append({
+                "spec": spec,
+                "package": pkg_name,
+                "installed": _is_package_installed(pkg_name) if pkg_name else False,
+            })
+        return {
+            "dependencies": results,
+            "all_satisfied": all(r["installed"] for r in results),
+        }
 
     def should_handoff_to_codex(self, name: str) -> bool:
         """Check if a skill wants its result handed to Codex for the response."""
