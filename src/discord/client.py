@@ -22,6 +22,7 @@ from .background_task import (
     BackgroundTask, run_background_task, create_task_id, MAX_STEPS,
 )
 from ..agents import AgentManager
+from ..agents.manager import AGENT_BLOCKED_TOOLS, filter_agent_tools
 from ..tools.autonomous_loop import LoopManager
 from ..learning import ConversationReflector
 from ..llm import CircuitOpenError, CodexAuth, CodexChatClient
@@ -2986,8 +2987,10 @@ class HeimdallBot(discord.Client):
         user_name = str(author) if author else "agent"
 
         # Build system prompt and tools for the agent
+        # Filter out agent-management tools to prevent nesting
         system_prompt = self._build_system_prompt(channel=channel, user_id=user_id)
-        tools = self._merged_tool_definitions() if self.config.tools.enabled else []
+        all_tools = self._merged_tool_definitions() if self.config.tools.enabled else []
+        tools = filter_agent_tools(all_tools)
 
         # Iteration callback — wraps Codex chat_with_tools, returns dict
         async def _iteration_cb(
@@ -3009,6 +3012,9 @@ class HeimdallBot(discord.Client):
         msg_proxy = _LoopMessageProxy(channel, user_id, user_name)
 
         async def _tool_exec_cb(tool_name: str, tool_input: dict) -> str:
+            # Reject agent tools to enforce flat depth model (no nesting)
+            if tool_name in AGENT_BLOCKED_TOOLS:
+                return f"Error: Tool '{tool_name}' is not available inside agents."
             result = await self._dispatch_loop_tool(
                 tool_name, tool_input, msg_proxy, user_id,
             )

@@ -28,6 +28,21 @@ WAIT_POLL_INTERVAL = 2           # poll interval for wait_for_agents
 
 _TERMINAL_STATUSES = frozenset({"completed", "failed", "timeout", "killed"})
 
+# Tools agents are NOT allowed to call (prevents nesting and cross-agent interference)
+AGENT_BLOCKED_TOOLS = frozenset({
+    "spawn_agent",
+    "send_to_agent",
+    "list_agents",
+    "kill_agent",
+    "get_agent_results",
+    "wait_for_agents",
+})
+
+
+def filter_agent_tools(tools: list[dict]) -> list[dict]:
+    """Remove agent-management tools from a tool list for agent isolation."""
+    return [t for t in tools if t.get("name") not in AGENT_BLOCKED_TOOLS]
+
 # Callback types
 # iteration_callback: (messages, system_prompt, tools) → LLMResponse-like dict
 #   dict with keys: "text" (str), "tool_calls" (list[dict]), "stop_reason" (str)
