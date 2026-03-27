@@ -56,6 +56,7 @@ SECRET_SCRUB_PATTERNS = [
 DISCORD_MAX_LEN = 2000
 MAX_TOOL_ITERATIONS = 20
 TOOL_OUTPUT_MAX_CHARS = 12000  # ~3000 tokens; cap tool results to prevent context bloat
+_LONG_TIMEOUT_TOOL_SET = frozenset({"claude_code"})  # Tools that get extended timeout (3660s vs config default)
 SEND_MAX_RETRIES = 3
 
 
@@ -2109,7 +2110,7 @@ class LokiBot(discord.Client):
 
             # Run all tool calls concurrently with per-tool timeout
             tool_timeout = self.config.tools.tool_timeout_seconds
-            _LONG_TIMEOUT_TOOLS = {"claude_code"}
+            _LONG_TIMEOUT_TOOLS = _LONG_TIMEOUT_TOOL_SET
 
             async def _run_tool_with_timeout(block):
                 t = 3660 if block.name in _LONG_TIMEOUT_TOOLS else tool_timeout
@@ -2984,7 +2985,7 @@ class LokiBot(discord.Client):
                 t0 = time.monotonic()
                 error = None
                 try:
-                    _t = 3660 if tool_name in _LONG_TIMEOUT_TOOLS else tool_timeout
+                    _t = 3660 if tool_name in _LONG_TIMEOUT_TOOL_SET else tool_timeout
                     raw = await asyncio.wait_for(
                         self._dispatch_loop_tool(
                             tool_name, tool_input, msg_proxy, user_id,
