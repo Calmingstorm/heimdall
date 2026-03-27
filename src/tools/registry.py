@@ -1454,10 +1454,9 @@ TOOLS: list[dict] = [
     {
         "name": "spawn_agent",
         "description": (
-            "Spawns an autonomous agent for a complex sub-task. Agent runs in "
-            "background with full tool access and isolated context. Results posted to channel "
-            "on completion. Use for: parallel sub-tasks, long-running investigations, "
-            "independent work streams. Max 5 per channel, 1-hour lifetime, 30 LLM turns."
+            "Spawns an autonomous agent for a sub-task. Runs in background with "
+            "isolated context (cannot spawn sub-agents). Results posted on completion. "
+            "Max 5/channel, 1hr lifetime, 30 LLM turns."
         ),
         "input_schema": {
             "type": "object",

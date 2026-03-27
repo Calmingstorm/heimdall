@@ -25,6 +25,8 @@ STALE_WARN_SECONDS = 120         # 2 min no activity → log warning
 CLEANUP_DELAY = 300              # 5 min after terminal state → remove
 WAIT_DEFAULT_TIMEOUT = 300       # default timeout for wait_for_agents
 WAIT_POLL_INTERVAL = 2           # poll interval for wait_for_agents
+ITERATION_CB_TIMEOUT = 120       # 2 min timeout per LLM call
+TOOL_EXEC_TIMEOUT = 300          # 5 min timeout per tool execution
 
 _TERMINAL_STATUSES = frozenset({"completed", "failed", "timeout", "killed"})
 
@@ -436,9 +438,17 @@ async def _run_agent(
             agent.iteration_count = iteration + 1
 
             try:
-                response = await iteration_callback(
-                    agent.messages, system_prompt, tools,
+                response = await asyncio.wait_for(
+                    iteration_callback(agent.messages, system_prompt, tools),
+                    timeout=ITERATION_CB_TIMEOUT,
                 )
+            except asyncio.TimeoutError:
+                log.error("Agent %s LLM call timed out at iteration %d", agent.id, iteration)
+                agent.status = "failed"
+                agent.error = f"LLM call timed out after {ITERATION_CB_TIMEOUT}s"
+                agent.ended_at = time.time()
+                await _announce_formatted(agent, announce_callback, f"failed (LLM timeout) after {int(time.time() - agent.created_at)}s")
+                return
             except Exception as e:
                 log.error("Agent %s LLM call failed at iteration %d: %s", agent.id, iteration, e)
                 agent.status = "failed"
@@ -476,8 +486,14 @@ async def _run_agent(
                 agent.last_activity = time.time()
 
                 try:
-                    result = await tool_executor_callback(tool_name, tool_input)
+                    result = await asyncio.wait_for(
+                        tool_executor_callback(tool_name, tool_input),
+                        timeout=TOOL_EXEC_TIMEOUT,
+                    )
                     result = scrub_output_secrets(str(result))
+                except asyncio.TimeoutError:
+                    result = f"Error: Tool '{tool_name}' timed out after {TOOL_EXEC_TIMEOUT}s"
+                    log.warning("Agent %s tool %s timed out", agent.id, tool_name)
                 except Exception as e:
                     result = f"Error: {e}"
                     log.warning("Agent %s tool %s failed: %s", agent.id, tool_name, e)

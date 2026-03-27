@@ -259,12 +259,13 @@ class TestMessageHistoryIsolation:
 
         await gate.wait()
         mgr.send(id_a, "extra info for A only")
-        await asyncio.sleep(0.2)
+        # Wait for both agents to complete
+        await asyncio.sleep(0.3)
 
-        # Agent A should have inbox message, agent B should not
+        # Agent A should have inbox message in its iteration history, agent B should not
         a_has_parent_msg = any("[Message from parent]" in m.get("content", "") for m in a_messages)
         b_has_parent_msg = any("[Message from parent]" in m.get("content", "") for m in b_messages)
-        assert a_has_parent_msg or True  # May or may not have been consumed yet
+        assert a_has_parent_msg, "Agent A should have received the inbox message"
         assert not b_has_parent_msg
 
 
