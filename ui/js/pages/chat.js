@@ -191,7 +191,7 @@ export default {
         </div>
         <div class="chat-input-hint">
           <span class="text-gray-600 text-xs">Enter to send &middot; Shift+Enter for newline</span>
-          <span class="chat-connection-status" :class="ws.connected ? 'chat-ws-on' : 'chat-ws-off'">
+          <span class="chat-connection-status" :class="wsStatus === 'WebSocket' ? 'chat-ws-on' : 'chat-ws-off'">
             <span class="chat-status-dot"></span>
             {{ wsStatus }}
           </span>
