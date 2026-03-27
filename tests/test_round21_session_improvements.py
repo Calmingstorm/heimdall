@@ -250,7 +250,7 @@ class TestCompactionInstructions:
         await mgr.get_history_with_compaction(channel)
 
         assert "OMIT" in captured_system
-        assert "300 words" in captured_system
+        assert "500 characters" in captured_system
         assert "PRESERVE" in captured_system
 
     @pytest.mark.asyncio

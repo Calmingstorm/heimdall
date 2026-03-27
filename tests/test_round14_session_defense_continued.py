@@ -296,7 +296,7 @@ class TestPoisonedSummaryDoesNotLeak:
         assert session.summary, "Summary should exist even if poorly generated"
 
     async def test_summary_word_limit(self, tmp_path):
-        """Compaction instruction specifies under 300 words."""
+        """Compaction instruction specifies under 500 characters."""
         mgr = _make_manager(tmp_path, max_history=20)
         captured_system = []
 
@@ -308,7 +308,7 @@ class TestPoisonedSummaryDoesNotLeak:
         _fill_session(mgr, "ch1", COMPACTION_THRESHOLD // 2 + 5)
         await mgr.get_task_history("ch1")
 
-        assert "300 words" in captured_system[0]
+        assert "500 characters" in captured_system[0]
 
     async def test_message_content_truncated_for_compaction(self, tmp_path):
         """Messages sent to compaction LLM are truncated to 500 chars each."""

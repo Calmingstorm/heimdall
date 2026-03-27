@@ -23,6 +23,7 @@ CompactionFn = Callable[[list[dict], str], Awaitable[str]]
 log = get_logger("sessions")
 COMPACTION_THRESHOLD = 40  # compact when history exceeds this
 CONTINUITY_MAX_AGE = 48 * 3600  # carry forward summaries from archives < 48 hours old
+COMPACTION_MAX_CHARS = 500  # target max chars per compacted summary block
 
 # Relevance scoring constants
 RELEVANCE_KEEP_RECENT = 3  # always include the most recent N messages
@@ -302,15 +303,22 @@ class SessionManager:
         system_instruction = (
             "Summarize the following conversation into a concise context summary. "
             "If a previous summary is provided, merge it with the new messages.\n\n"
+            "FORMAT:\n"
+            "Line 1: [Topics: comma-separated topic tags, e.g. nginx, dns, server-a]\n"
+            "Line 2+: Bullet points of key facts.\n\n"
             "RULES:\n"
-            "1. PRESERVE: User preferences, names, topics discussed, decisions made, "
-            "successful task outcomes (what tools accomplished and on which hosts), "
-            "infrastructure state changes, and which tool names were used.\n"
-            "2. OMIT: Error messages, API failures, 'I can\\'t' or 'unable to' statements, "
-            "partial completion reports, and any response where the assistant said it could not do something.\n"
-            "3. OMIT: Any data not confirmed by actual tool results.\n"
-            "4. Keep under 300 words.\n"
-            "5. Start with a one-line topic summary, then bullet key facts."
+            "1. PRESERVE VERBATIM: Hostnames, IPs, UUIDs, file paths, container names, "
+            "service names, port numbers, usernames. Never paraphrase identifiers.\n"
+            "2. PRESERVE: User preferences, decisions made, successful task outcomes "
+            "(what tools accomplished and on which hosts), infrastructure state changes, "
+            "and which tool names were used.\n"
+            "3. OMIT: Intermediate steps, retries, tool iteration details, Error messages, "
+            "API failures, 'I can\\'t' or 'unable to' statements, partial completion reports, "
+            "and any response where the assistant could not do something.\n"
+            "4. OMIT: Any data not confirmed by actual tool results.\n"
+            "5. OMIT: Conversational filler, greetings, acknowledgments.\n"
+            "6. Keep the ENTIRE summary under 500 characters.\n"
+            "7. Each bullet: WHAT happened → OUTCOME (host/path/service if applicable)."
         )
 
         try:
@@ -320,7 +328,21 @@ class SessionManager:
                 [{"role": "user", "content": convo_text}],
                 system_instruction,
             )
-            session.summary = summary_text.strip()
+            summary_text = summary_text.strip()
+
+            # Enforce max summary length — truncate at last complete line
+            if len(summary_text) > COMPACTION_MAX_CHARS:
+                truncated = summary_text[:COMPACTION_MAX_CHARS]
+                last_newline = truncated.rfind("\n")
+                if last_newline > 0:
+                    truncated = truncated[:last_newline]
+                summary_text = truncated.rstrip()
+                log.info(
+                    "Compaction summary truncated to %d chars for channel %s",
+                    len(summary_text), session.channel_id,
+                )
+
+            session.summary = summary_text
 
             # Trigger reflection on discarded messages before replacing
             discarded = list(to_summarize)

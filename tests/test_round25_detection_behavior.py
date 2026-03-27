@@ -1042,7 +1042,7 @@ class TestCompactionInstructionsContent:
         assert "OMIT" in system
         assert "PRESERVE" in system
         assert "tool names" in system
-        assert "300 words" in system
+        assert "500 characters" in system
         assert "bullet" in system
 
 
