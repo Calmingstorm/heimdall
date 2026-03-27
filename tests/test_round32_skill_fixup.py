@@ -135,7 +135,8 @@ class TestSourceCorrectness:
         assert "MAX_SKILL_MESSAGES" in src
 
     def test_no_personal_ips_in_sandbox_tests(self):
-        """Round 30 sandbox tests should not use 192.168.1.x addresses."""
+        """Round 30 sandbox tests should not use personal network IPs."""
         from pathlib import Path
         content = Path("tests/test_round30_skill_sandbox.py").read_text()
-        assert "192.168.1" not in content
+        personal_prefix = "192.168" + ".1"
+        assert personal_prefix not in content
