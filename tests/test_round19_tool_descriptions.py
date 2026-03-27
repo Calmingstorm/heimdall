@@ -13,12 +13,12 @@ class TestDescriptionOptimization:
     """Verify description token savings and quality."""
 
     def test_total_description_chars_reduced(self):
-        """Total description chars should be under 10000 (was 12847)."""
+        """Total description chars should be under 11000 (base 10000 + agent tools)."""
         total = sum(len(t["description"]) for t in TOOLS)
-        assert total < 10000, f"Description chars {total} should be < 10000"
+        assert total < 11000, f"Description chars {total} should be < 11000"
 
     def test_total_json_chars_reduced(self):
-        """Total JSON payload should be under 36000 (was 38664)."""
+        """Total JSON payload should be under 38000 (base 36000 + agent tools)."""
         total = sum(
             len(json.dumps({
                 "name": t["name"],
@@ -27,7 +27,7 @@ class TestDescriptionOptimization:
             }))
             for t in TOOLS
         )
-        assert total < 36000, f"JSON chars {total} should be < 36000"
+        assert total < 38000, f"JSON chars {total} should be < 38000"
 
     def test_no_empty_descriptions(self):
         """Every tool must have a non-empty description."""
@@ -43,8 +43,8 @@ class TestDescriptionOptimization:
             )
 
     def test_tool_count_unchanged(self):
-        """Still 67 tools after optimization."""
-        assert len(TOOLS) == 67
+        """Still 72 tools (67 base + 5 agent tools)."""
+        assert len(TOOLS) == 72
 
 
 class TestCrossReferences:

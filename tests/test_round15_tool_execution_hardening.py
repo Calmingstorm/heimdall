@@ -98,6 +98,7 @@ class TestAllToolsHaveHandlers:
             "create_skill", "edit_skill", "delete_skill", "list_skills",
             "add_reaction", "create_poll", "broadcast", "analyze_image", "generate_image",
             "start_loop", "stop_loop", "list_loops",
+            "spawn_agent", "send_to_agent", "list_agents", "kill_agent", "get_agent_results",
         }
         executor = _make_executor()
         for tool in TOOLS:

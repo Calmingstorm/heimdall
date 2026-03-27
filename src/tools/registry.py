@@ -1450,6 +1450,72 @@ TOOLS: list[dict] = [
             "properties": {},
         },
     },
+    # --- Agent orchestration ---
+    {
+        "name": "spawn_agent",
+        "description": (
+            "Spawns an autonomous agent for a complex sub-task. Agent runs in "
+            "background with full tool access and isolated context. Results posted to channel "
+            "on completion. Use for: parallel sub-tasks, long-running investigations, "
+            "independent work streams. Max 5 per channel, 1-hour lifetime, 30 LLM turns."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "label": {"type": "string", "description": "Short name (e.g. 'disk-audit')"},
+                "goal": {"type": "string", "description": "Full task description for the agent"},
+            },
+            "required": ["label", "goal"],
+        },
+    },
+    {
+        "name": "send_to_agent",
+        "description": (
+            "Sends a message to a running agent, injected as context in its next "
+            "LLM turn. Use to provide additional instructions, data, or course corrections."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "agent_id": {"type": "string", "description": "Agent ID (from spawn_agent)"},
+                "message": {"type": "string", "description": "Message text to inject"},
+            },
+            "required": ["agent_id", "message"],
+        },
+    },
+    {
+        "name": "list_agents",
+        "description": (
+            "Lists all agents with status, iteration count, and runtime. "
+            "Shows running, completed, failed, and timed-out agents."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "kill_agent",
+        "description": "Terminates a running agent immediately. Agent status set to 'killed'.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "agent_id": {"type": "string", "description": "Agent ID to kill"},
+            },
+            "required": ["agent_id"],
+        },
+    },
+    {
+        "name": "get_agent_results",
+        "description": (
+            "Returns the final results of a completed/failed agent. Returns result "
+            "text, tools used, iteration count, and runtime. Returns 'still running' if active."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "agent_id": {"type": "string", "description": "Agent ID"},
+            },
+            "required": ["agent_id"],
+        },
+    },
     # --- Image generation (ComfyUI) ---
     {
         "name": "generate_image",

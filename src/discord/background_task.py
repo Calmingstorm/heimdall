@@ -38,6 +38,7 @@ BLOCKED_TOOLS = {
     "schedule_task", "delete_schedule", "create_digest",
     "create_skill", "edit_skill", "delete_skill",
     "start_loop", "stop_loop",  # need LoopManager from client
+    "spawn_agent", "send_to_agent", "kill_agent",  # no agent nesting
 }
 
 MAX_STEPS = 200
