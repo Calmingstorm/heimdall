@@ -176,6 +176,31 @@ def _make_bot():
     bot.tool_executor = MagicMock()
     bot.tool_executor._process_registry = registry
 
+    # Agents
+    agent_info = MagicMock()
+    agent_info.id = "abc12345"
+    agent_info.label = "disk-checker"
+    agent_info.goal = "Check disk usage on all hosts"
+    agent_info.status = "running"
+    agent_info.channel_id = "123456"
+    agent_info.requester_id = "u1"
+    agent_info.requester_name = "Alice"
+    agent_info.iteration_count = 3
+    agent_info.tools_used = ["run_command", "read_file"]
+    agent_info.created_at = time.time() - 60
+    agent_info.ended_at = None
+    agent_info.result = ""
+    agent_info.error = ""
+    bot.agent_manager = MagicMock()
+    bot.agent_manager._agents = {"abc12345": agent_info}
+    bot.agent_manager.kill = MagicMock(return_value="Kill signal sent to agent 'disk-checker'.")
+
+    # Monitoring
+    bot.infra_watcher = MagicMock()
+    bot.infra_watcher.get_status = MagicMock(return_value={
+        "enabled": True, "checks": 3, "running": 2, "active_alerts": 0,
+    })
+
     # Context / reload support
     bot.context_loader = MagicMock()
     bot._invalidate_prompt_caches = MagicMock()
@@ -1482,6 +1507,9 @@ class TestSensitiveFieldProtection:
                 "status", "uptime_seconds", "guilds", "guild_count",
                 "user_count", "tool_count", "skill_count", "session_count",
                 "loop_count", "schedule_count",
+                "agent_count", "agent_running",
+                "process_count", "process_running",
+                "monitoring",
             }
             assert set(body.keys()) == expected_keys
 

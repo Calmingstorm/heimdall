@@ -123,6 +123,46 @@ def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
         user_count = sum(g.member_count or 0 for g in bot.guilds)
         tools = bot._merged_tool_definitions()
         uptime = time.monotonic() - bot._start_time if hasattr(bot, "_start_time") else 0
+
+        # Agent counts
+        try:
+            agent_agents = bot.agent_manager._agents
+            if not isinstance(agent_agents, dict):
+                raise AttributeError
+            agent_count = len(agent_agents)
+            agent_running = sum(
+                1 for a in agent_agents.values() if a.status == "running"
+            )
+        except (AttributeError, TypeError):
+            agent_count = 0
+            agent_running = 0
+
+        # Process counts
+        try:
+            proc_procs = bot.tool_executor._process_registry._processes
+            if not isinstance(proc_procs, dict):
+                raise AttributeError
+            process_count = len(proc_procs)
+            process_running = sum(
+                1 for p in proc_procs.values() if p.status == "running"
+            )
+        except (AttributeError, TypeError):
+            process_count = 0
+            process_running = 0
+
+        # Monitoring status
+        _default_mon = {
+            "enabled": False, "checks": 0, "running": 0, "active_alerts": 0,
+        }
+        try:
+            watcher = bot.infra_watcher
+            if watcher is None:
+                raise AttributeError
+            result = watcher.get_status()
+            monitoring = result if isinstance(result, dict) else _default_mon
+        except (AttributeError, TypeError):
+            monitoring = _default_mon
+
         return web.json_response({
             "status": "online" if bot.is_ready() else "starting",
             "uptime_seconds": round(uptime, 1),
@@ -134,6 +174,11 @@ def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
             "session_count": len(bot.sessions._sessions),
             "loop_count": bot.loop_manager.active_count,
             "schedule_count": len(bot.scheduler.list_all()),
+            "agent_count": agent_count,
+            "agent_running": agent_running,
+            "process_count": process_count,
+            "process_running": process_running,
+            "monitoring": monitoring,
         })
 
     @routes.get("/api/config")
@@ -868,6 +913,51 @@ def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
         if new_id.startswith("Error"):
             return web.json_response({"error": new_id}, status=400)
         return web.json_response({"old_id": lid, "new_id": new_id}, status=201)
+
+    # ------------------------------------------------------------------
+    # Agents
+    # ------------------------------------------------------------------
+
+    @routes.get("/api/agents")
+    async def list_agents(_request: web.Request) -> web.Response:
+        try:
+            agent_agents = bot.agent_manager._agents
+            if not isinstance(agent_agents, dict):
+                return web.json_response([])
+        except (AttributeError, TypeError):
+            return web.json_response([])
+        agents = []
+        now = time.time()
+        for aid, info in agent_agents.items():
+            runtime = (info.ended_at or now) - info.created_at
+            agents.append({
+                "id": aid,
+                "label": info.label,
+                "goal": info.goal[:200],
+                "status": info.status,
+                "channel_id": info.channel_id,
+                "requester_name": info.requester_name,
+                "iteration_count": info.iteration_count,
+                "tools_used": info.tools_used[-10:],
+                "runtime_seconds": round(runtime, 1),
+                "created_at": info.created_at,
+                "result": (info.result[:200] if info.result else ""),
+                "error": (info.error[:200] if info.error else ""),
+            })
+        return web.json_response(agents)
+
+    @routes.delete("/api/agents/{agent_id}")
+    async def kill_agent(request: web.Request) -> web.Response:
+        try:
+            if not isinstance(bot.agent_manager._agents, dict):
+                raise AttributeError
+        except (AttributeError, TypeError):
+            return web.json_response({"error": "no agent manager"}, status=404)
+        agent_id = request.match_info["agent_id"]
+        result = bot.agent_manager.kill(agent_id)
+        return web.json_response(
+            {"result": result}, status=404 if "not found" in result.lower() else 200
+        )
 
     # ------------------------------------------------------------------
     # Processes
