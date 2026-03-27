@@ -14,6 +14,7 @@ class DiscordConfig(BaseModel):
     channels: list[str] = Field(default_factory=list)
     respond_to_bots: bool = False
     require_mention: bool = False
+    ignore_bot_ids: list[str] = Field(default_factory=list)  # Bot user IDs to never auto-respond to
 
 
 class ContextConfig(BaseModel):
