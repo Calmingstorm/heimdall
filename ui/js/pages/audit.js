@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — Audit Page
+ * Heimdall Management UI — Audit Page
  * Searchable tool execution audit log with filters and pagination
  */
 import { api } from '../api.js';
@@ -17,26 +17,26 @@ export default {
       </div>
 
       <!-- Filters -->
-      <div class="loki-card mb-4">
+      <div class="hm-card mb-4">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
             <label class="text-gray-400 text-xs block mb-1">Tool</label>
-            <input v-model="filters.tool" type="text" class="loki-input"
+            <input v-model="filters.tool" type="text" class="hm-input"
                    placeholder="e.g. run_command" @keyup.enter="fetchAudit" />
           </div>
           <div>
             <label class="text-gray-400 text-xs block mb-1">User</label>
-            <input v-model="filters.user" type="text" class="loki-input"
+            <input v-model="filters.user" type="text" class="hm-input"
                    placeholder="User ID or name" @keyup.enter="fetchAudit" />
           </div>
           <div>
             <label class="text-gray-400 text-xs block mb-1">Keyword</label>
-            <input v-model="filters.keyword" type="text" class="loki-input"
+            <input v-model="filters.keyword" type="text" class="hm-input"
                    placeholder="Search in output..." @keyup.enter="fetchAudit" />
           </div>
           <div>
             <label class="text-gray-400 text-xs block mb-1">Date</label>
-            <input v-model="filters.date" type="date" class="loki-input" @change="fetchAudit" />
+            <input v-model="filters.date" type="date" class="hm-input" @change="fetchAudit" />
           </div>
         </div>
         <div class="flex gap-2 mt-3">
@@ -45,7 +45,7 @@ export default {
           <div class="flex-1"></div>
           <div class="flex items-center gap-2">
             <label class="text-gray-400 text-xs">Limit:</label>
-            <select v-model="filters.limit" class="loki-input" style="width:auto;min-width:70px;" @change="fetchAudit">
+            <select v-model="filters.limit" class="hm-input" style="width:auto;min-width:70px;" @change="fetchAudit">
               <option :value="25">25</option>
               <option :value="50">50</option>
               <option :value="100">100</option>
@@ -59,12 +59,12 @@ export default {
       <div v-if="loading && entries.length === 0" class="space-y-2">
         <div v-for="n in 5" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900 error-state">
+      <div v-else-if="error" class="hm-card border-red-900 error-state">
         <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchAudit" class="btn btn-ghost text-xs">Retry</button>
       </div>
-      <div v-else-if="entries.length === 0" class="loki-card empty-state">
+      <div v-else-if="entries.length === 0" class="hm-card empty-state">
         <span class="empty-state-icon">\u{1F4DD}</span>
         <span class="empty-state-text">No audit entries found</span>
         <span class="empty-state-hint">Try adjusting your filters or wait for tool executions to appear</span>
@@ -72,7 +72,7 @@ export default {
       <div v-else>
         <div class="text-xs text-gray-500 mb-2">Showing {{ entries.length }} entries</div>
         <div class="table-responsive">
-        <table class="loki-table">
+        <table class="hm-table">
           <thead>
             <tr>
               <th>Timestamp</th>
@@ -104,7 +104,7 @@ export default {
         </div>
 
         <!-- Expanded detail -->
-        <div v-if="expandedIdx !== null && entries[expandedIdx]" class="mt-3 loki-card">
+        <div v-if="expandedIdx !== null && entries[expandedIdx]" class="mt-3 hm-card">
           <div class="flex items-center justify-between mb-2">
             <span class="text-sm font-medium font-mono">{{ entries[expandedIdx].tool || entries[expandedIdx].tool_name }}</span>
             <button @click="expandedIdx = null" class="btn btn-ghost text-xs">Close</button>

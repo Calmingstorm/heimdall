@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — Skills Page
+ * Heimdall Management UI — Skills Page
  * List, create, edit, delete, test skills with syntax highlighting
  */
 import { api } from '../api.js';
@@ -45,12 +45,12 @@ export default {
       <div v-if="loading && skills.length === 0" class="space-y-2">
         <div v-for="n in 4" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900 error-state">
+      <div v-else-if="error" class="hm-card border-red-900 error-state">
         <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchSkills" class="btn btn-ghost text-xs">Retry</button>
       </div>
-      <div v-else-if="skills.length === 0 && !editing" class="loki-card empty-state">
+      <div v-else-if="skills.length === 0 && !editing" class="hm-card empty-state">
         <span class="empty-state-icon">\u{1F9E9}</span>
         <span class="empty-state-text">No skills loaded</span>
         <span class="empty-state-hint">Click "New Skill" to create a custom tool</span>
@@ -58,7 +58,7 @@ export default {
       <div v-else-if="!editing">
         <!-- Skill cards -->
         <div class="space-y-3">
-          <div v-for="s in skills" :key="s.name" class="loki-card skill-card">
+          <div v-for="s in skills" :key="s.name" class="hm-card skill-card">
             <div class="flex items-center justify-between mb-2">
               <div class="flex items-center gap-2">
                 <span class="font-mono text-sm font-semibold">{{ s.name }}</span>
@@ -100,7 +100,7 @@ export default {
       </div>
 
       <!-- Create/Edit form -->
-      <div v-if="editing" class="loki-card mt-4">
+      <div v-if="editing" class="hm-card mt-4">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-sm font-medium">
             {{ editMode === 'create' ? 'Create Skill' : 'Edit Skill: ' + editName }}
@@ -110,14 +110,14 @@ export default {
 
         <div v-if="editMode === 'create'" class="mb-3">
           <label class="text-gray-400 text-xs block mb-1">Name</label>
-          <input v-model="editName" type="text" class="loki-input" placeholder="my_skill"
+          <input v-model="editName" type="text" class="hm-input" placeholder="my_skill"
                  style="max-width:300px" />
           <div class="text-gray-600 text-xs mt-1">Lowercase, alphanumeric + underscores, starts with letter</div>
         </div>
 
         <div class="mb-3">
           <label class="text-gray-400 text-xs block mb-1">Code</label>
-          <textarea v-model="editCode" class="loki-input skill-editor" rows="20"
+          <textarea v-model="editCode" class="hm-input skill-editor" rows="20"
                     placeholder="# Skill code here...&#10;&#10;SKILL_DEFINITION = {&#10;    'name': 'my_skill',&#10;    'description': 'What this skill does',&#10;    'input_schema': {&#10;        'type': 'object',&#10;        'properties': {},&#10;    },&#10;}&#10;&#10;async def execute(tool_input, context):&#10;    return 'result'"></textarea>
         </div>
 

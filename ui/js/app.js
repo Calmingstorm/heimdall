@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — Main App
+ * Heimdall Management UI — Main App
  * Vue 3 + Vue Router (CDN globals) + Tailwind CSS
  */
 import { api, ws } from './api.js';
@@ -50,7 +50,7 @@ const router = createRouter({
 // Update browser tab title on navigation
 router.afterEach((to) => {
   const label = to.meta?.label;
-  document.title = label ? `Loki \u2014 ${label}` : 'Loki \u2014 Management';
+  document.title = label ? `Heimdall \u2014 ${label}` : 'Heimdall \u2014 Management';
 });
 
 // ---------------------------------------------------------------------------
@@ -59,8 +59,8 @@ router.afterEach((to) => {
 const LoginScreen = {
   template: `
     <div class="min-h-screen flex items-center justify-center">
-      <div class="loki-card w-full max-w-sm">
-        <h1 class="text-xl font-semibold mb-1 text-center">Loki</h1>
+      <div class="hm-card w-full max-w-sm">
+        <h1 class="text-xl font-semibold mb-1 text-center">Heimdall</h1>
         <p class="text-gray-400 text-sm text-center mb-4">Management Interface</p>
         <div v-if="error" class="mb-3 text-red-400 text-sm text-center">{{ error }}</div>
         <form @submit.prevent="login">
@@ -68,7 +68,7 @@ const LoginScreen = {
             v-model="token"
             type="password"
             placeholder="API Token"
-            class="loki-input mb-3"
+            class="hm-input mb-3"
             autofocus
           />
           <button type="submit" class="btn btn-primary w-full justify-center" :disabled="busy">
@@ -114,12 +114,12 @@ const App = {
     <login-screen v-else-if="authState === 'login'" :on-login="onLogin" />
     <div v-else class="flex min-h-screen">
       <!-- Sidebar -->
-      <aside class="loki-sidebar" :class="{ collapsed: sidebarCollapsed, 'mobile-open': mobileOpen }">
+      <aside class="hm-sidebar" :class="{ collapsed: sidebarCollapsed, 'mobile-open': mobileOpen }">
         <div class="flex items-center gap-2 px-3 py-3 border-b border-gray-800">
           <button @click="toggleSidebar" class="btn-ghost p-1 rounded sidebar-toggle-btn" title="Toggle sidebar">
             <span style="font-size:1.1rem;">{{ sidebarCollapsed ? '\u{25B6}' : '\u{2630}' }}</span>
           </button>
-          <span class="sidebar-header-text font-semibold text-sm tracking-wide">LOKI</span>
+          <span class="sidebar-header-text font-semibold text-sm tracking-wide">HEIMDALL</span>
         </div>
         <nav class="flex-1 py-2 overflow-y-auto">
           <router-link
@@ -150,14 +150,14 @@ const App = {
       <div v-if="mobileOpen" class="fixed inset-0 bg-black/50 z-30 md:hidden" @click="mobileOpen = false"></div>
 
       <!-- Main content -->
-      <div class="loki-main">
-        <div class="loki-topbar">
+      <div class="hm-main">
+        <div class="hm-topbar">
           <button class="btn-ghost p-1 rounded md:hidden" @click="mobileOpen = !mobileOpen">
             <span style="font-size:1.1rem;">\u{2630}</span>
           </button>
           <div class="flex items-center gap-2">
             <span class="status-dot" :class="botStatus"></span>
-            <span class="text-sm font-medium">Loki</span>
+            <span class="text-sm font-medium">Heimdall</span>
           </div>
           <span v-if="botUptime" class="text-xs text-gray-500">{{ botUptime }}</span>
           <div class="flex-1"></div>
@@ -185,7 +185,7 @@ const App = {
       // / : focus first search input on page (unless already in an input)
       if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) {
         e.preventDefault();
-        const input = document.querySelector('.loki-main input[type="text"], .loki-main .loki-input:not(textarea):not(select)');
+        const input = document.querySelector('.hm-main input[type="text"], .hm-main .hm-input:not(textarea):not(select)');
         if (input) input.focus();
       }
     }

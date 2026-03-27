@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — Logs Page
+ * Heimdall Management UI — Logs Page
  * Live log tail via WebSocket with filtering and auto-scroll
  */
 import { api, ws } from '../api.js';
@@ -37,7 +37,7 @@ export default {
 
         <div class="flex-1" style="min-width:0;">
           <div class="flex gap-1.5 items-center">
-            <input v-model="textFilter" type="text" class="loki-input flex-1"
+            <input v-model="textFilter" type="text" class="hm-input flex-1"
                    :placeholder="useRegex ? 'Regex pattern...' : 'Filter logs...'"
                    :class="{ 'border-red-700': regexError }"
                    style="min-width:120px;" />
@@ -257,7 +257,7 @@ export default {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `loki-logs-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+      a.download = `heimdall-logs-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
       a.click();
       URL.revokeObjectURL(url);
     }

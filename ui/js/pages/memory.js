@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — Memory Page
+ * Heimdall Management UI — Memory Page
  * Table view of persistent memory with copy, scope badges, and bulk delete
  */
 import { api } from '../api.js';
@@ -23,19 +23,19 @@ export default {
 
       <!-- Summary stats -->
       <div v-if="!loading && scopes.length > 0" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <div class="loki-card text-center">
+        <div class="hm-card text-center">
           <div class="text-2xl font-bold">{{ totalEntries }}</div>
           <div class="text-gray-400 text-xs">Total Entries</div>
         </div>
-        <div class="loki-card text-center">
+        <div class="hm-card text-center">
           <div class="text-2xl font-bold">{{ scopes.length }}</div>
           <div class="text-gray-400 text-xs">Scopes</div>
         </div>
-        <div class="loki-card text-center">
+        <div class="hm-card text-center">
           <div class="text-2xl font-bold">{{ selectedCount }}</div>
           <div class="text-gray-400 text-xs">Selected</div>
         </div>
-        <div class="loki-card text-center">
+        <div class="hm-card text-center">
           <button v-if="selectedCount > 0" @click="confirmBulkDelete"
                   class="btn btn-danger text-xs">
             Delete Selected ({{ selectedCount }})
@@ -45,23 +45,23 @@ export default {
       </div>
 
       <!-- Add form -->
-      <div v-if="showAdd" class="loki-card mb-4">
+      <div v-if="showAdd" class="hm-card mb-4">
         <h2 class="text-sm font-medium mb-3">Add Memory Entry</h2>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
           <div>
             <label class="text-gray-400 text-xs block mb-1">Scope</label>
-            <input v-model="addForm.scope" type="text" class="loki-input"
+            <input v-model="addForm.scope" type="text" class="hm-input"
                    placeholder="e.g. global, user:12345" />
           </div>
           <div>
             <label class="text-gray-400 text-xs block mb-1">Key</label>
-            <input v-model="addForm.key" type="text" class="loki-input"
+            <input v-model="addForm.key" type="text" class="hm-input"
                    placeholder="e.g. preferred_language" />
           </div>
         </div>
         <div class="mb-3">
           <label class="text-gray-400 text-xs block mb-1">Value</label>
-          <textarea v-model="addForm.value" class="loki-input" rows="3"
+          <textarea v-model="addForm.value" class="hm-input" rows="3"
                     placeholder="Enter value..."></textarea>
         </div>
         <div v-if="addError" class="mb-3 text-red-400 text-sm">{{ addError }}</div>
@@ -72,7 +72,7 @@ export default {
       </div>
 
       <!-- Action error toast -->
-      <div v-if="actionError" class="loki-card border-red-900 mb-4">
+      <div v-if="actionError" class="hm-card border-red-900 mb-4">
         <div class="flex items-center justify-between">
           <p class="text-red-400 text-sm">{{ actionError }}</p>
           <button @click="actionError = null" class="btn btn-ghost text-xs">Dismiss</button>
@@ -83,20 +83,20 @@ export default {
       <div v-if="loading && scopes.length === 0" class="space-y-2">
         <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900 error-state">
+      <div v-else-if="error" class="hm-card border-red-900 error-state">
         <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchMemory" class="btn btn-ghost text-xs">Retry</button>
       </div>
-      <div v-else-if="scopes.length === 0 && !showAdd" class="loki-card empty-state">
+      <div v-else-if="scopes.length === 0 && !showAdd" class="hm-card empty-state">
         <span class="empty-state-icon">\u{1F9E0}</span>
         <span class="empty-state-text">No memory entries</span>
-        <span class="empty-state-hint">Click "Add Entry" or let Loki learn preferences through conversations</span>
+        <span class="empty-state-hint">Click "Add Entry" or let Heimdall learn preferences through conversations</span>
       </div>
 
       <!-- Memory table per scope -->
       <div v-else class="space-y-4">
-        <div v-for="scope in scopes" :key="scope.name" class="loki-card">
+        <div v-for="scope in scopes" :key="scope.name" class="hm-card">
           <div class="flex items-center gap-2 mb-3 cursor-pointer select-none"
                @click="toggleScope(scope.name)">
             <span class="text-xs text-gray-500 font-mono">{{ expanded[scope.name] ? '\u25BC' : '\u25B6' }}</span>
@@ -112,7 +112,7 @@ export default {
               <div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> Loading...
             </div>
             <div v-else-if="scopeEntries[scope.name]" class="table-responsive">
-              <table class="loki-table">
+              <table class="hm-table">
                 <thead>
                   <tr>
                     <th style="width:30px">
@@ -137,7 +137,7 @@ export default {
                     <td class="font-mono text-xs text-gray-400">{{ entry.key }}</td>
                     <td>
                       <div v-if="editingKey === scope.name + '/' + entry.key">
-                        <textarea v-model="editValue" class="loki-input text-sm" rows="2"></textarea>
+                        <textarea v-model="editValue" class="hm-input text-sm" rows="2"></textarea>
                         <div class="flex gap-1 mt-1">
                           <button @click="doEdit(scope.name, entry.key)" class="btn btn-primary text-xs" :disabled="saving">
                             {{ saving ? 'Saving...' : 'Save' }}

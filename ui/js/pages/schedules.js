@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — Schedules Page
+ * Heimdall Management UI — Schedules Page
  * View/create/delete scheduled tasks (cron, one-time, webhook)
  */
 import { api } from '../api.js';
@@ -22,19 +22,19 @@ export default {
       </div>
 
       <!-- Create form -->
-      <div v-if="showCreate" class="loki-card mb-4">
+      <div v-if="showCreate" class="hm-card mb-4">
         <h2 class="text-sm font-medium mb-3">Create Schedule</h2>
 
         <div class="mb-3">
           <label class="text-gray-400 text-xs block mb-1">Description</label>
-          <input v-model="form.description" type="text" class="loki-input"
+          <input v-model="form.description" type="text" class="hm-input"
                  placeholder="e.g. Daily disk check" />
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
           <div>
             <label class="text-gray-400 text-xs block mb-1">Action Type</label>
-            <select v-model="form.action" class="loki-input">
+            <select v-model="form.action" class="hm-input">
               <option value="reminder">Reminder</option>
               <option value="check">Check (tool call)</option>
               <option value="workflow">Workflow (multi-step)</option>
@@ -43,7 +43,7 @@ export default {
           </div>
           <div>
             <label class="text-gray-400 text-xs block mb-1">Channel ID</label>
-            <input v-model="form.channel_id" type="text" class="loki-input"
+            <input v-model="form.channel_id" type="text" class="hm-input"
                    placeholder="Discord channel ID" />
           </div>
         </div>
@@ -52,7 +52,7 @@ export default {
           <div>
             <label class="text-gray-400 text-xs block mb-1">Cron Expression</label>
             <div class="flex gap-2">
-              <input v-model="form.cron" type="text" class="loki-input"
+              <input v-model="form.cron" type="text" class="hm-input"
                      placeholder="e.g. 0 */6 * * *" @input="onCronInput" />
               <button @click="validateCron" class="btn btn-ghost text-xs whitespace-nowrap"
                       :disabled="!form.cron.trim() || validatingCron">
@@ -80,26 +80,26 @@ export default {
           </div>
           <div>
             <label class="text-gray-400 text-xs block mb-1">One-Time (ISO datetime)</label>
-            <input v-model="form.run_at" type="text" class="loki-input"
+            <input v-model="form.run_at" type="text" class="hm-input"
                    placeholder="e.g. 2026-04-01T09:00:00" />
           </div>
         </div>
 
         <div v-if="form.action === 'reminder'" class="mb-3">
           <label class="text-gray-400 text-xs block mb-1">Message</label>
-          <input v-model="form.message" type="text" class="loki-input"
+          <input v-model="form.message" type="text" class="hm-input"
                  placeholder="Reminder message..." />
         </div>
 
         <div v-if="form.action === 'check'" class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
           <div>
             <label class="text-gray-400 text-xs block mb-1">Tool Name</label>
-            <input v-model="form.tool_name" type="text" class="loki-input"
+            <input v-model="form.tool_name" type="text" class="hm-input"
                    placeholder="e.g. check_disk" />
           </div>
           <div>
             <label class="text-gray-400 text-xs block mb-1">Tool Input (JSON)</label>
-            <input v-model="form.tool_input_str" type="text" class="loki-input"
+            <input v-model="form.tool_input_str" type="text" class="hm-input"
                    placeholder='e.g. {"host":"server1"}' />
           </div>
         </div>
@@ -116,12 +116,12 @@ export default {
       <div v-if="loading && schedules.length === 0" class="space-y-2">
         <div v-for="n in 4" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900 error-state">
+      <div v-else-if="error" class="hm-card border-red-900 error-state">
         <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchSchedules" class="btn btn-ghost text-xs">Retry</button>
       </div>
-      <div v-else-if="schedules.length === 0 && !showCreate" class="loki-card empty-state">
+      <div v-else-if="schedules.length === 0 && !showCreate" class="hm-card empty-state">
         <span class="empty-state-icon">\u{23F0}</span>
         <span class="empty-state-text">No scheduled tasks</span>
         <span class="empty-state-hint">Click "New Schedule" to set up automated checks or reminders</span>
@@ -129,26 +129,26 @@ export default {
       <div v-else-if="schedules.length > 0">
         <!-- Summary cards -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <div class="loki-card text-center">
+          <div class="hm-card text-center">
             <div class="text-2xl font-bold">{{ schedules.length }}</div>
             <div class="text-gray-400 text-xs">Total</div>
           </div>
-          <div class="loki-card text-center">
+          <div class="hm-card text-center">
             <div class="text-2xl font-bold">{{ cronCount }}</div>
             <div class="text-gray-400 text-xs">Recurring</div>
           </div>
-          <div class="loki-card text-center">
+          <div class="hm-card text-center">
             <div class="text-2xl font-bold">{{ oneTimeCount }}</div>
             <div class="text-gray-400 text-xs">One-Time</div>
           </div>
-          <div class="loki-card text-center">
+          <div class="hm-card text-center">
             <div class="text-2xl font-bold">{{ webhookCount }}</div>
             <div class="text-gray-400 text-xs">Webhook</div>
           </div>
         </div>
 
         <div class="table-responsive">
-        <table class="loki-table">
+        <table class="hm-table">
           <thead>
             <tr>
               <th>Description</th>

@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — Processes Page
+ * Heimdall Management UI — Processes Page
  * View/kill background processes, poll output, auto-refresh
  */
 import { api, ws } from '../api.js';
@@ -31,28 +31,28 @@ export default {
       <div v-if="loading && processes.length === 0" class="space-y-2">
         <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900 error-state">
+      <div v-else-if="error" class="hm-card border-red-900 error-state">
         <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchProcesses" class="btn btn-ghost text-xs">Retry</button>
       </div>
-      <div v-else-if="processes.length === 0" class="loki-card empty-state">
+      <div v-else-if="processes.length === 0" class="hm-card empty-state">
         <span class="empty-state-icon">\u{2699}\u{FE0F}</span>
         <span class="empty-state-text">No background processes</span>
-        <span class="empty-state-hint">Processes appear when Loki runs long-running commands</span>
+        <span class="empty-state-hint">Processes appear when Heimdall runs long-running commands</span>
       </div>
       <div v-else>
         <!-- Summary -->
         <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-          <div class="loki-card text-center">
+          <div class="hm-card text-center">
             <div class="text-2xl font-bold">{{ processes.length }}</div>
             <div class="text-gray-400 text-xs">Total</div>
           </div>
-          <div class="loki-card text-center">
+          <div class="hm-card text-center">
             <div class="text-2xl font-bold" :class="runningCount > 0 ? 'text-green-400' : ''">{{ runningCount }}</div>
             <div class="text-gray-400 text-xs">Running</div>
           </div>
-          <div class="loki-card text-center">
+          <div class="hm-card text-center">
             <div class="text-2xl font-bold">{{ completedCount }}</div>
             <div class="text-gray-400 text-xs">Completed</div>
           </div>
@@ -60,7 +60,7 @@ export default {
 
         <!-- Process cards -->
         <div class="space-y-3">
-          <div v-for="p in processes" :key="p.pid" class="loki-card">
+          <div v-for="p in processes" :key="p.pid" class="hm-card">
             <div class="flex items-start justify-between mb-2">
               <div class="flex items-center gap-2">
                 <span class="loop-status-dot" :class="procStatusDot(p.status)"></span>

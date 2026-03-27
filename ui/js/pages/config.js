@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — Config Page
+ * Heimdall Management UI — Config Page
  * Form-based config editor with inline editing, toggle switches, and type-aware inputs.
  */
 import { api } from '../api.js';
@@ -91,14 +91,14 @@ export default {
 
       <!-- Loading skeleton -->
       <div v-if="loading && !config" class="space-y-3">
-        <div v-for="n in 4" :key="n" class="loki-card">
+        <div v-for="n in 4" :key="n" class="hm-card">
           <div class="skeleton skeleton-text" style="width:100px;"></div>
           <div class="skeleton skeleton-row mt-2"></div>
         </div>
       </div>
 
       <!-- Error state -->
-      <div v-else-if="error" class="loki-card border-red-900 error-state">
+      <div v-else-if="error" class="hm-card border-red-900 error-state">
         <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchConfig" class="btn btn-ghost text-xs">Retry</button>
@@ -106,7 +106,7 @@ export default {
 
       <!-- Config sections -->
       <div v-else-if="config" class="space-y-3">
-        <div v-for="(value, section) in displayConfig" :key="section" class="loki-card">
+        <div v-for="(value, section) in displayConfig" :key="section" class="hm-card">
           <!-- Section header -->
           <div class="flex items-center gap-2 mb-2 cursor-pointer select-none"
                @click="toggleSection(section)">
@@ -122,7 +122,7 @@ export default {
             <!-- Scalar top-level field (e.g. timezone) -->
             <div v-if="typeof value !== 'object' || value === null" class="pl-4">
               <template v-if="editing">
-                <input class="loki-input font-mono text-sm" style="max-width:300px"
+                <input class="hm-input font-mono text-sm" style="max-width:300px"
                        :value="getEdited(section)"
                        @input="setEdited(section, null, $event.target.value)" />
               </template>
@@ -133,7 +133,7 @@ export default {
 
             <!-- Object section -->
             <div v-else-if="!Array.isArray(value)">
-              <table class="loki-table">
+              <table class="hm-table">
                 <thead>
                   <tr>
                     <th class="config-key-col" style="width:30%">Key</th>
@@ -170,7 +170,7 @@ export default {
 
                       <!-- Enum field: dropdown -->
                       <template v-else-if="editing && getEnumOptions(section, k)">
-                        <select class="loki-select"
+                        <select class="hm-select"
                                 :value="getEditedField(section, k)"
                                 @change="setEdited(section, k, $event.target.value)">
                           <option v-for="opt in getEnumOptions(section, k)" :key="opt" :value="opt">{{ opt }}</option>
@@ -180,7 +180,7 @@ export default {
                       <!-- Number field -->
                       <template v-else-if="typeof v === 'number'">
                         <template v-if="editing">
-                          <input type="number" class="loki-input font-mono text-sm" style="max-width:200px"
+                          <input type="number" class="hm-input font-mono text-sm" style="max-width:200px"
                                  :value="getEditedField(section, k)"
                                  @input="setEdited(section, k, Number($event.target.value))" />
                         </template>
@@ -219,7 +219,7 @@ export default {
                           </button>
                           <div v-if="expandedNested[section + '.' + k]" class="mt-2">
                             <template v-if="editing">
-                              <textarea class="loki-input font-mono text-xs" rows="6"
+                              <textarea class="hm-input font-mono text-xs" rows="6"
                                         :value="formatJson(getEditedField(section, k))"
                                         @blur="setEditedJson(section, k, $event.target.value)"></textarea>
                               <p class="text-xs text-gray-500 mt-1">Edit as JSON</p>
@@ -233,7 +233,7 @@ export default {
                       <!-- String field: text input -->
                       <template v-else>
                         <template v-if="editing">
-                          <input class="loki-input font-mono text-sm"
+                          <input class="hm-input font-mono text-sm"
                                  :value="getEditedField(section, k)"
                                  @input="setEdited(section, k, $event.target.value)" />
                         </template>

@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — Loops Page
+ * Heimdall Management UI — Loops Page
  * View/start/stop autonomous loops, view iteration history
  */
 import { api, ws } from '../api.js';
@@ -22,24 +22,24 @@ export default {
       </div>
 
       <!-- Create form -->
-      <div v-if="showCreate" class="loki-card mb-4">
+      <div v-if="showCreate" class="hm-card mb-4">
         <h2 class="text-sm font-medium mb-3">Start New Loop</h2>
 
         <div class="mb-3">
           <label class="text-gray-400 text-xs block mb-1">Goal</label>
-          <textarea v-model="form.goal" class="loki-input" rows="3"
+          <textarea v-model="form.goal" class="hm-input" rows="3"
                     placeholder="What should this loop accomplish? e.g. Monitor disk usage and warn if above 80%"></textarea>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
           <div>
             <label class="text-gray-400 text-xs block mb-1">Interval (seconds)</label>
-            <input v-model.number="form.interval_seconds" type="number" class="loki-input"
+            <input v-model.number="form.interval_seconds" type="number" class="hm-input"
                    min="10" placeholder="60" />
           </div>
           <div>
             <label class="text-gray-400 text-xs block mb-1">Mode</label>
-            <select v-model="form.mode" class="loki-input">
+            <select v-model="form.mode" class="hm-input">
               <option value="notify">Notify (check + report)</option>
               <option value="act">Act (check + take actions + report)</option>
               <option value="silent">Silent (only report if notable)</option>
@@ -47,7 +47,7 @@ export default {
           </div>
           <div>
             <label class="text-gray-400 text-xs block mb-1">Max Iterations</label>
-            <input v-model.number="form.max_iterations" type="number" class="loki-input"
+            <input v-model.number="form.max_iterations" type="number" class="hm-input"
                    min="1" placeholder="50" />
           </div>
         </div>
@@ -55,12 +55,12 @@ export default {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
           <div>
             <label class="text-gray-400 text-xs block mb-1">Stop Condition (optional)</label>
-            <input v-model="form.stop_condition" type="text" class="loki-input"
+            <input v-model="form.stop_condition" type="text" class="hm-input"
                    placeholder="e.g. when disk is below 50%" />
           </div>
           <div>
             <label class="text-gray-400 text-xs block mb-1">Channel ID</label>
-            <input v-model="form.channel_id" type="text" class="loki-input"
+            <input v-model="form.channel_id" type="text" class="hm-input"
                    placeholder="Discord channel ID" />
           </div>
         </div>
@@ -77,12 +77,12 @@ export default {
       <div v-if="loading && loops.length === 0" class="space-y-2">
         <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900 error-state">
+      <div v-else-if="error" class="hm-card border-red-900 error-state">
         <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchLoops" class="btn btn-ghost text-xs">Retry</button>
       </div>
-      <div v-else-if="loops.length === 0 && !showCreate" class="loki-card empty-state">
+      <div v-else-if="loops.length === 0 && !showCreate" class="hm-card empty-state">
         <span class="empty-state-icon">\u{1F504}</span>
         <span class="empty-state-text">No active loops</span>
         <span class="empty-state-hint">Click "Start Loop" to create an autonomous recurring task</span>
@@ -90,15 +90,15 @@ export default {
       <div v-else-if="loops.length > 0">
         <!-- Summary -->
         <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-          <div class="loki-card text-center">
+          <div class="hm-card text-center">
             <div class="text-2xl font-bold">{{ loops.length }}</div>
             <div class="text-gray-400 text-xs">Total Loops</div>
           </div>
-          <div class="loki-card text-center">
+          <div class="hm-card text-center">
             <div class="text-2xl font-bold text-green-400">{{ runningCount }}</div>
             <div class="text-gray-400 text-xs">Running</div>
           </div>
-          <div class="loki-card text-center">
+          <div class="hm-card text-center">
             <div class="text-2xl font-bold">{{ totalIterations }}</div>
             <div class="text-gray-400 text-xs">Total Iterations</div>
           </div>
@@ -106,7 +106,7 @@ export default {
 
         <!-- Loop cards -->
         <div class="space-y-3">
-          <div v-for="loop in loops" :key="loop.id" class="loki-card">
+          <div v-for="loop in loops" :key="loop.id" class="hm-card">
             <div class="flex items-start justify-between mb-2">
               <div class="flex items-center gap-2">
                 <span class="loop-status-dot" :class="statusDotClass(loop.status)"></span>

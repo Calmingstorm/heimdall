@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — Sessions Page
+ * Heimdall Management UI — Sessions Page
  * View active sessions, conversation history, bulk manage, export
  * Auto-refreshes via debounced WebSocket events
  */
@@ -27,15 +27,15 @@ export default {
       <div v-if="loading && sessions.length === 0" class="space-y-2">
         <div v-for="n in 4" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900 error-state">
+      <div v-else-if="error" class="hm-card border-red-900 error-state">
         <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="retry" class="btn btn-ghost text-xs">Retry</button>
       </div>
-      <div v-else-if="sessions.length === 0" class="loki-card empty-state">
+      <div v-else-if="sessions.length === 0" class="hm-card empty-state">
         <span class="empty-state-icon">\u{1F4AC}</span>
         <span class="empty-state-text">No active sessions</span>
-        <span class="empty-state-hint">Sessions appear when users interact with Loki via Discord or the chat interface</span>
+        <span class="empty-state-hint">Sessions appear when users interact with Heimdall via Discord or the chat interface</span>
       </div>
       <div v-else>
         <!-- Select all -->
@@ -49,7 +49,7 @@ export default {
 
         <div class="space-y-2">
           <div v-for="s in sessions" :key="s.channel_id"
-               class="session-card loki-card"
+               class="session-card hm-card"
                :class="{ 'flash-new': s._updated, 'session-selected': selected.has(s.channel_id) }">
             <!-- Header row -->
             <div class="flex items-center gap-3 cursor-pointer" @click="toggleSession(s.channel_id)">
@@ -86,7 +86,7 @@ export default {
                  class="session-preview mt-2 pt-2 border-t border-gray-800">
               <div v-for="(p, i) in s.preview" :key="i" class="flex gap-2 text-xs mb-1 last:mb-0">
                 <span class="session-preview-role" :class="p.role === 'user' ? 'text-cyan-400' : 'text-indigo-400'">
-                  {{ p.role === 'user' ? 'USER' : 'LOKI' }}:
+                  {{ p.role === 'user' ? 'USER' : 'HEIMDALL' }}:
                 </span>
                 <span class="text-gray-400 truncate">{{ p.content || '(empty)' }}</span>
               </div>

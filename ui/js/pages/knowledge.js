@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — Knowledge Page
+ * Heimdall Management UI — Knowledge Page
  * Browse/search/ingest/delete knowledge documents with previews and search highlighting
  */
 import { api } from '../api.js';
@@ -39,7 +39,7 @@ export default {
 
       <!-- Search bar -->
       <div class="mb-4 flex gap-2">
-        <input v-model="searchQuery" type="text" class="loki-input"
+        <input v-model="searchQuery" type="text" class="hm-input"
                placeholder="Search knowledge base..."
                @keyup.enter="doSearch" />
         <button @click="doSearch" class="btn btn-primary text-xs whitespace-nowrap" :disabled="searching">
@@ -54,16 +54,16 @@ export default {
           Search Results <span class="badge badge-info">{{ searchResults.length }}</span>
           <span class="text-gray-500 text-xs ml-2">for "{{ lastQuery }}"</span>
         </div>
-        <div v-if="searchError" class="loki-card border-red-900">
+        <div v-if="searchError" class="hm-card border-red-900">
           <p class="text-red-400 text-sm">Search error: {{ searchError }}</p>
         </div>
-        <div v-else-if="searchResults.length === 0" class="loki-card empty-state">
+        <div v-else-if="searchResults.length === 0" class="hm-card empty-state">
           <span class="empty-state-icon">\u{1F50D}</span>
           <span class="empty-state-text">No results for "{{ lastQuery }}"</span>
           <span class="empty-state-hint">Try different search terms or ingest more documents</span>
         </div>
         <div v-else class="space-y-2">
-          <div v-for="(r, i) in searchResults" :key="i" class="loki-card">
+          <div v-for="(r, i) in searchResults" :key="i" class="hm-card">
             <div class="flex items-center gap-2 mb-1">
               <span class="badge badge-info">{{ r.source || 'unknown' }}</span>
               <span v-if="r.score" class="text-gray-500 text-xs font-mono">score: {{ r.score.toFixed(3) }}</span>
@@ -76,15 +76,15 @@ export default {
       </div>
 
       <!-- Ingest form -->
-      <div v-if="showIngest" class="loki-card mb-4">
+      <div v-if="showIngest" class="hm-card mb-4">
         <h2 class="text-sm font-medium mb-3">Ingest Document</h2>
         <div class="mb-3">
           <label class="text-gray-400 text-xs block mb-1">Source Name</label>
-          <input v-model="ingestSource" type="text" class="loki-input" placeholder="e.g. project-docs, api-reference" />
+          <input v-model="ingestSource" type="text" class="hm-input" placeholder="e.g. project-docs, api-reference" />
         </div>
         <div class="mb-3">
           <label class="text-gray-400 text-xs block mb-1">Content</label>
-          <textarea v-model="ingestContent" class="loki-input" rows="8"
+          <textarea v-model="ingestContent" class="hm-input" rows="8"
                     placeholder="Paste document content here..."></textarea>
         </div>
         <div v-if="ingestError" class="mb-3 text-red-400 text-sm">{{ ingestError }}</div>
@@ -98,22 +98,22 @@ export default {
       <div v-if="loading && sources.length === 0" class="space-y-2">
         <div v-for="n in 3" :key="n" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900 error-state">
+      <div v-else-if="error" class="hm-card border-red-900 error-state">
         <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="fetchSources" class="btn btn-ghost text-xs">Retry</button>
       </div>
-      <div v-else-if="sources.length === 0 && !showIngest" class="loki-card empty-state">
+      <div v-else-if="sources.length === 0 && !showIngest" class="hm-card empty-state">
         <span class="empty-state-icon">\u{1F4DA}</span>
         <span class="empty-state-text">No documents ingested</span>
-        <span class="empty-state-hint">Click "Ingest Document" to add knowledge for Loki to reference</span>
+        <span class="empty-state-hint">Click "Ingest Document" to add knowledge for Heimdall to reference</span>
       </div>
       <div v-else-if="sources.length > 0">
         <div class="text-sm font-medium text-gray-400 mb-2">
           Ingested Sources <span class="badge badge-info">{{ sources.length }}</span>
         </div>
         <div class="space-y-2">
-          <div v-for="s in sources" :key="s.source || s.name || s" class="loki-card">
+          <div v-for="s in sources" :key="s.source || s.name || s" class="hm-card">
             <div class="flex items-center justify-between mb-1">
               <div class="flex items-center gap-2">
                 <span class="font-mono text-sm font-semibold">{{ s.source || s.name || s }}</span>

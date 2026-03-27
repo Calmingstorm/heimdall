@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — Dashboard Page
+ * Heimdall Management UI — Dashboard Page
  * Bot status, guilds, quick stats, recent activity feed with live WebSocket updates
  */
 import { api, ws } from '../api.js';
@@ -13,12 +13,12 @@ export default {
 
       <!-- Skeleton loading -->
       <div v-if="loading" class="space-y-4">
-        <div class="loki-card flex items-center gap-3">
+        <div class="hm-card flex items-center gap-3">
           <div class="skeleton" style="width:12px;height:12px;border-radius:50%;flex-shrink:0;"></div>
           <div><div class="skeleton skeleton-text" style="width:120px;"></div><div class="skeleton skeleton-text" style="width:80px;margin-bottom:0;"></div></div>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div v-for="n in 6" :key="n" class="loki-card text-center">
+          <div v-for="n in 6" :key="n" class="hm-card text-center">
             <div class="skeleton skeleton-stat"></div>
             <div class="skeleton skeleton-text" style="width:60%;margin:0.25rem auto 0;"></div>
           </div>
@@ -26,7 +26,7 @@ export default {
       </div>
 
       <!-- Error state with retry -->
-      <div v-else-if="error" class="loki-card border-red-900 error-state">
+      <div v-else-if="error" class="hm-card border-red-900 error-state">
         <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="retry" class="btn btn-ghost text-xs">Retry</button>
@@ -34,17 +34,17 @@ export default {
 
       <div v-else>
         <!-- Bot status banner -->
-        <div class="loki-card mb-4 flex items-center gap-3">
+        <div class="hm-card mb-4 flex items-center gap-3">
           <span class="status-dot" :class="status.status === 'online' ? 'online' : 'starting'" style="width:12px;height:12px;"></span>
           <div>
-            <div class="font-semibold">Loki</div>
+            <div class="font-semibold">Heimdall</div>
             <div class="text-gray-400 text-sm">{{ status.status === 'online' ? 'Online' : 'Starting' }} &middot; {{ uptime }}</div>
           </div>
         </div>
 
         <!-- Quick stats -->
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
-          <div class="loki-card text-center stat-card" v-for="s in stats" :key="s.label">
+          <div class="hm-card text-center stat-card" v-for="s in stats" :key="s.label">
             <div class="stat-icon" :class="s.iconColor">{{ s.icon }}</div>
             <div class="text-2xl font-bold" :class="s.color || ''">{{ s.value }}</div>
             <div class="text-gray-400 text-xs mt-0.5">{{ s.label }}</div>
@@ -52,7 +52,7 @@ export default {
         </div>
 
         <!-- Quick actions -->
-        <div class="loki-card mb-4">
+        <div class="hm-card mb-4">
           <div class="text-gray-400 text-sm font-medium mb-2">Quick Actions</div>
           <div class="flex flex-wrap gap-2">
             <button @click="reloadConfig" class="btn btn-ghost text-xs" :disabled="actionLoading.reload">
@@ -71,7 +71,7 @@ export default {
         <!-- Three-column: Guilds + Recent Activity + Recent Errors -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <!-- Guilds -->
-          <div class="loki-card">
+          <div class="hm-card">
             <div class="text-gray-400 text-sm font-medium mb-2">Connected Guilds</div>
             <div v-if="!status.guilds || status.guilds.length === 0" class="text-gray-500 text-sm text-center py-2">No guilds connected</div>
             <div v-else class="space-y-1.5">
@@ -84,7 +84,7 @@ export default {
           </div>
 
           <!-- Recent Activity -->
-          <div class="loki-card">
+          <div class="hm-card">
             <div class="flex items-center justify-between mb-2">
               <div class="text-gray-400 text-sm font-medium">
                 Recent Activity
@@ -109,7 +109,7 @@ export default {
           </div>
 
           <!-- Recent Errors -->
-          <div class="loki-card">
+          <div class="hm-card">
             <div class="text-gray-400 text-sm font-medium mb-2">Recent Errors</div>
             <div v-if="errorsLoading && errors.length === 0" class="text-gray-500 text-sm">Loading...</div>
             <div v-else-if="errors.length === 0" class="text-gray-500 text-sm">No recent errors</div>

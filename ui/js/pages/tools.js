@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — Tools Page
+ * Heimdall Management UI — Tools Page
  * Tool list grouped by pack, toggle packs, search/filter, usage stats
  */
 import { api } from '../api.js';
@@ -18,14 +18,14 @@ export default {
 
       <div v-if="loading && tools.length === 0" class="space-y-3">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div v-for="n in 4" :key="n" class="loki-card text-center">
+          <div v-for="n in 4" :key="n" class="hm-card text-center">
             <div class="skeleton skeleton-stat"></div>
             <div class="skeleton skeleton-text" style="width:60%;margin:0.25rem auto 0;"></div>
           </div>
         </div>
         <div v-for="n in 5" :key="n + 4" class="skeleton skeleton-row"></div>
       </div>
-      <div v-else-if="error" class="loki-card border-red-900 error-state">
+      <div v-else-if="error" class="hm-card border-red-900 error-state">
         <span class="error-icon">\u26A0</span>
         <p class="text-red-400">{{ error }}</p>
         <button @click="refresh" class="btn btn-ghost text-xs">Retry</button>
@@ -33,26 +33,26 @@ export default {
       <div v-else>
         <!-- Summary -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <div class="loki-card text-center">
+          <div class="hm-card text-center">
             <div class="text-2xl font-bold">{{ tools.length }}</div>
             <div class="text-gray-400 text-xs">Total Tools</div>
           </div>
-          <div class="loki-card text-center">
+          <div class="hm-card text-center">
             <div class="text-2xl font-bold">{{ coreCount }}</div>
             <div class="text-gray-400 text-xs">Core Tools</div>
           </div>
-          <div class="loki-card text-center">
+          <div class="hm-card text-center">
             <div class="text-2xl font-bold">{{ packCount }}</div>
             <div class="text-gray-400 text-xs">Pack Tools</div>
           </div>
-          <div class="loki-card text-center">
+          <div class="hm-card text-center">
             <div class="text-2xl font-bold">{{ totalUsage.toLocaleString() }}</div>
             <div class="text-gray-400 text-xs">Total Executions</div>
           </div>
         </div>
 
         <!-- Tool Packs -->
-        <div class="loki-card mb-4">
+        <div class="hm-card mb-4">
           <div class="flex items-center justify-between mb-3">
             <div class="text-gray-400 text-sm font-medium">Tool Packs</div>
             <span v-if="packsAllLoaded" class="badge badge-success">All packs loaded</span>
@@ -90,7 +90,7 @@ export default {
 
         <!-- Search -->
         <div class="mb-4">
-          <input v-model="search" type="text" class="loki-input" placeholder="Search tools by name or description..." />
+          <input v-model="search" type="text" class="hm-input" placeholder="Search tools by name or description..." />
         </div>
 
         <!-- Tool list grouped -->
@@ -100,7 +100,7 @@ export default {
             <span class="badge badge-info">{{ group.tools.length }}</span>
           </div>
           <div class="table-responsive">
-          <table class="loki-table">
+          <table class="hm-table">
             <thead>
               <tr>
                 <th style="width:30%">Name</th>
@@ -137,7 +137,7 @@ export default {
           </div>
         </div>
 
-        <div v-if="filteredTools.length === 0 && search" class="loki-card empty-state">
+        <div v-if="filteredTools.length === 0 && search" class="hm-card empty-state">
           <span class="empty-state-icon">\u{1F50D}</span>
           <span class="empty-state-text">No tools match "{{ search }}"</span>
           <span class="empty-state-hint">Try a different search term</span>

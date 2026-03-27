@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — API Client + WebSocket Manager
+ * Heimdall Management UI — API Client + WebSocket Manager
  *
  * Usage:
  *   import { api, ws } from './api.js';
@@ -7,9 +7,9 @@
  *   ws.connect(); ws.subscribe('events', handler);
  */
 
-class LokiAPI {
+class HeimdallAPI {
   constructor() {
-    this._token = sessionStorage.getItem('loki_token') || '';
+    this._token = sessionStorage.getItem('heimdall_token') || '';
   }
 
   get token() { return this._token; }
@@ -17,9 +17,9 @@ class LokiAPI {
   setToken(token) {
     this._token = token;
     if (token) {
-      sessionStorage.setItem('loki_token', token);
+      sessionStorage.setItem('heimdall_token', token);
     } else {
-      sessionStorage.removeItem('loki_token');
+      sessionStorage.removeItem('heimdall_token');
     }
   }
 
@@ -74,7 +74,7 @@ class ApiError extends Error {
   }
 }
 
-class LokiWebSocket {
+class HeimdallWebSocket {
   constructor(api) {
     this._api = api;
     this._ws = null;
@@ -188,6 +188,6 @@ class LokiWebSocket {
 }
 
 // Singleton instances
-export const api = new LokiAPI();
-export const ws = new LokiWebSocket(api);
+export const api = new HeimdallAPI();
+export const ws = new HeimdallWebSocket(api);
 export { AuthError, ApiError };

@@ -1,5 +1,5 @@
 /**
- * Loki Management UI — Chat Page
+ * Heimdall Management UI — Chat Page
  * WebSocket-based chat with REST fallback, markdown rendering, tool call display
  */
 import { api, ws } from '../api.js';
@@ -29,7 +29,7 @@ export default {
           <div class="empty-state">
             <span class="empty-state-icon">\u{1F4AD}</span>
             <span class="empty-state-text">No messages yet</span>
-            <span class="empty-state-hint">Say something to Loki to start a conversation</span>
+            <span class="empty-state-hint">Say something to Heimdall to start a conversation</span>
           </div>
         </div>
         <div v-for="(msg, i) in messages" :key="i" class="chat-message" :class="'chat-' + msg.role">
@@ -37,9 +37,9 @@ export default {
           <div v-if="msg.role === 'user'" class="chat-bubble chat-bubble-user">
             <div class="chat-bubble-text">{{ msg.content }}</div>
           </div>
-          <!-- Loki response -->
+          <!-- Heimdall response -->
           <div v-else class="chat-bubble chat-bubble-bot">
-            <div class="chat-bubble-label">Loki</div>
+            <div class="chat-bubble-label">Heimdall</div>
             <div v-if="msg.tools_used && msg.tools_used.length > 0" class="chat-tools">
               <button class="chat-tools-toggle" @click="msg._showTools = !msg._showTools">
                 <span class="text-xs">{{ msg._showTools ? '\u25BC' : '\u25B6' }}</span>
@@ -58,7 +58,7 @@ export default {
         <!-- Typing indicator -->
         <div v-if="sending" class="chat-message chat-bot">
           <div class="chat-bubble chat-bubble-bot">
-            <div class="chat-bubble-label">Loki</div>
+            <div class="chat-bubble-label">Heimdall</div>
             <div class="chat-typing">
               <span></span><span></span><span></span>
             </div>
@@ -73,7 +73,7 @@ export default {
             ref="inputEl"
             v-model="input"
             class="chat-input"
-            placeholder="Message Loki..."
+            placeholder="Message Heimdall..."
             rows="1"
             :disabled="sending"
             @keydown.enter.exact.prevent="send"
