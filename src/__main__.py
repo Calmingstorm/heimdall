@@ -25,7 +25,7 @@ def main() -> None:
 
     log.info("Starting Heimdall")
 
-    health = HealthServer(webhook_config=config.webhook, web_config=config.web)
+    health = HealthServer(webhook_config=config.webhook, web_config=config.web, port=config.web.port)
     bot = HeimdallBot(config)
     health.set_bot(bot)
 

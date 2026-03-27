@@ -117,6 +117,7 @@ class WebConfig(BaseModel):
     enabled: bool = True
     api_token: str = ""  # Empty = no auth required (dev mode)
     session_timeout_minutes: int = 0  # 0 = no timeout (sessions persist until logout)
+    port: int = 3000  # HTTP server port for health checks + web UI
 
 
 class ComfyUIConfig(BaseModel):
