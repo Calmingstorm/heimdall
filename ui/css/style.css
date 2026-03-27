@@ -1388,6 +1388,138 @@ textarea.hm-input {
 }
 
 /* ================================================================
+   CONFIG EDITOR — Groups, Validation, Diff
+   ================================================================ */
+
+/* Group container */
+.cfg-group {
+  background: var(--hm-surface);
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--hm-shadow-sm);
+}
+
+/* Group header bar */
+.cfg-group-header {
+  display: flex;
+  align-items: center;
+  gap: var(--hm-space-3);
+  padding: var(--hm-space-4) var(--hm-space-5);
+  background: linear-gradient(135deg, var(--hm-surface), var(--hm-surface-elevated));
+  border-bottom: 1px solid var(--hm-border);
+  transition: background var(--hm-transition-base);
+}
+.cfg-group-header:hover { background: var(--hm-surface-hover); }
+.cfg-group-icon { font-size: var(--hm-text-lg); opacity: 0.8; }
+.cfg-group-label {
+  font-weight: 600;
+  font-size: var(--hm-text-md);
+  color: var(--hm-text);
+  flex: 1;
+}
+.cfg-group-arrow {
+  font-size: var(--hm-text-xs);
+  color: var(--hm-text-dim);
+  font-family: var(--hm-font-mono);
+}
+
+/* Group body */
+.cfg-group-body {
+  padding: var(--hm-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hm-space-3);
+}
+
+/* Section within a group */
+.cfg-section {
+  background: var(--hm-bg);
+  border: 1px solid rgba(31, 41, 55, 0.5);
+  border-radius: var(--hm-radius-md);
+  overflow: hidden;
+}
+.cfg-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--hm-space-2);
+  padding: var(--hm-space-3) var(--hm-space-4);
+  transition: background var(--hm-transition-base);
+}
+.cfg-section-header:hover { background: rgba(31, 41, 55, 0.3); }
+.cfg-section-name {
+  font-size: var(--hm-text-sm);
+  font-weight: 500;
+  color: var(--hm-text);
+}
+.cfg-section-body { padding: 0 var(--hm-space-3) var(--hm-space-3); }
+
+/* Validation error inline */
+.cfg-field-error {
+  font-size: var(--hm-text-xs);
+  color: #f87171;
+  margin-top: 2px;
+  font-family: var(--hm-font-sans);
+  font-weight: 400;
+}
+.cfg-input-error {
+  border-color: rgba(239, 68, 68, 0.5) !important;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15) !important;
+}
+
+/* Change counter badge */
+.cfg-change-count {
+  font-size: var(--hm-text-xs);
+  color: var(--hm-accent-hover);
+  background: var(--hm-accent-dim);
+  padding: 2px 8px;
+  border-radius: var(--hm-radius-full);
+  font-weight: 600;
+}
+
+/* Diff view */
+.cfg-diff-list {
+  max-height: 50vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hm-space-3);
+}
+.cfg-diff-entry {
+  border: 1px solid var(--hm-border);
+  border-radius: var(--hm-radius-md);
+  overflow: hidden;
+}
+.cfg-diff-path {
+  padding: var(--hm-space-2) var(--hm-space-3);
+  background: var(--hm-surface-hover);
+  border-bottom: 1px solid var(--hm-border);
+  color: var(--hm-accent-hover);
+}
+.cfg-diff-values { font-size: var(--hm-text-sm); }
+.cfg-diff-old {
+  padding: var(--hm-space-2) var(--hm-space-3);
+  background: rgba(239, 68, 68, 0.08);
+  border-bottom: 1px solid rgba(31, 41, 55, 0.3);
+  color: #f87171;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cfg-diff-new {
+  padding: var(--hm-space-2) var(--hm-space-3);
+  background: rgba(34, 197, 94, 0.08);
+  color: #4ade80;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cfg-diff-label {
+  display: inline-block;
+  width: 1.25rem;
+  font-weight: 700;
+  font-family: var(--hm-font-mono);
+}
+
+/* ================================================================
    KNOWLEDGE PAGE
    ================================================================ */
 .knowledge-highlight {
