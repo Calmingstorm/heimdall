@@ -1469,23 +1469,31 @@ class HeimdallBot(discord.Client):
             # both seeding the thread and to safely access parent session state.
             if isinstance(message.channel, discord.Thread) and message.channel.parent:
                 parent_id = str(message.channel.parent.id)
+                parent_name = getattr(message.channel.parent, "name", parent_id)
                 thread_session = self.sessions.get_or_create(channel_id)
                 if not thread_session.messages:
                     parent_session = self.sessions.get_or_create(parent_id)
                     if parent_session.messages or parent_session.summary:
                         # Copy the parent's summary and last few messages for context
-                        thread_session.summary = parent_session.summary or ""
+                        # Mark as inherited so the LLM distinguishes thread-native
+                        # context from parent-channel context
+                        _inherited_tag = f"[INHERITED FROM #{parent_name}]"
+                        if parent_session.summary:
+                            thread_session.summary = f"{_inherited_tag} {parent_session.summary}"
+                        else:
+                            thread_session.summary = ""
                         # Include recent parent messages as additional context
                         recent = parent_session.messages[-6:]
                         if recent:
                             parent_context = "\n".join(
                                 f"{m.role}: {m.content[:300]}" for m in recent
                             )
+                            _ctx_block = f"{_inherited_tag} Parent channel context:\n{parent_context}"
                             if thread_session.summary:
-                                thread_session.summary += f"\n[Parent channel context]:\n{parent_context}"
+                                thread_session.summary += f"\n{_ctx_block}"
                             else:
-                                thread_session.summary = f"[Parent channel context]:\n{parent_context}"
-                        log.info("Thread %s inherited context from parent %s", channel_id, parent_id)
+                                thread_session.summary = _ctx_block
+                        log.info("Thread %s inherited context from parent #%s (%s)", channel_id, parent_name, parent_id)
 
             await self._handle_message_inner(
                 message, content, channel_id,
@@ -1713,11 +1721,20 @@ class HeimdallBot(discord.Client):
         req_hash = hashlib.sha256(_content_str.encode()).hexdigest()[:8]
         req_time = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
         user_display = getattr(message.author, "display_name", str(message.author))
+        # Build channel context line for spatial awareness
+        _ch = message.channel
+        _ch_name = getattr(_ch, "name", None) or str(_ch.id)
+        _is_thread = isinstance(_ch, discord.Thread)
+        if _is_thread and getattr(_ch, "parent", None):
+            channel_ctx = f"Channel: #{_ch.parent.name} → thread: {_ch_name}"
+        else:
+            channel_ctx = f"Channel: #{_ch_name}"
         if len(messages) > 1:
             sep_text = (
                 f"=== CURRENT REQUEST [req-{req_hash}] ===\n"
                 f"Time: {req_time}\n"
                 f"From: {user_display} (ID: {message.author.id})\n"
+                f"{channel_ctx}\n"
                 f"{msg_id_note}\n"
                 "--- HISTORY ABOVE | REQUEST BELOW ---\n"
                 "Messages above are HISTORY — context only. "
@@ -1746,8 +1763,8 @@ class HeimdallBot(discord.Client):
             separator = {"role": "developer", "content": sep_text}
             messages.insert(-1, separator)
         else:
-            # No history — still provide message ID context
-            messages.insert(0, {"role": "developer", "content": msg_id_note})
+            # No history — still provide message ID + channel context
+            messages.insert(0, {"role": "developer", "content": f"{channel_ctx}\n{msg_id_note}"})
 
         # Track which tools are used during this loop for tool memory
         # Local variable (not instance attr) to avoid cross-channel contamination
