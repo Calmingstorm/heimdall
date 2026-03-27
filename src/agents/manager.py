@@ -156,6 +156,8 @@ class AgentManager:
             )
         )
         agent._task = task
+        # Schedule cleanup when the agent task finishes (any exit path)
+        task.add_done_callback(lambda _t: self._schedule_cleanup(agent_id))
         self._agents[agent_id] = agent
 
         log.info(
@@ -346,6 +348,35 @@ class AgentManager:
 
         task = asyncio.ensure_future(_delayed_cleanup())
         self._cleanup_tasks[agent_id] = task
+
+    def check_health(self) -> dict:
+        """Check agent health: force-kill stuck agents, log stale ones.
+
+        Safety net for agents stuck in long tool calls that bypass the
+        per-iteration lifetime check. Returns {"killed": N, "stale": N}.
+        """
+        now = time.time()
+        killed = 0
+        stale = 0
+        for agent in list(self._agents.values()):
+            if agent.status != "running":
+                continue
+            elapsed = now - agent.created_at
+            idle = now - agent.last_activity
+            if elapsed > MAX_AGENT_LIFETIME:
+                agent._cancel_event.set()
+                killed += 1
+                log.warning(
+                    "Force-killed stuck agent %s (%s): lifetime exceeded (%ds)",
+                    agent.id, agent.label, int(elapsed),
+                )
+            elif idle > STALE_WARN_SECONDS:
+                stale += 1
+                log.warning(
+                    "Agent %s (%s) appears stale: %ds idle",
+                    agent.id, agent.label, int(idle),
+                )
+        return {"killed": killed, "stale": stale}
 
     @property
     def active_count(self) -> int:

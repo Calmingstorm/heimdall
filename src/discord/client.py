@@ -930,6 +930,10 @@ class HeimdallBot(discord.Client):
             if now - v[0] < ttl
         }
 
+        # Agent lifecycle: kill stuck agents, log stale ones
+        if hasattr(self, "agent_manager"):
+            self.agent_manager.check_health()
+
     def _maybe_cleanup_caches(self) -> None:
         """Run cache cleanup if enough time has passed since the last run."""
         try:
