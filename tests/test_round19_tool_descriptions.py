@@ -43,8 +43,8 @@ class TestDescriptionOptimization:
             )
 
     def test_tool_count_unchanged(self):
-        """Still 72 tools (67 base + 5 agent tools)."""
-        assert len(TOOLS) == 72
+        """Still 73 tools (67 base + 6 agent tools)."""
+        assert len(TOOLS) == 73
 
 
 class TestCrossReferences:

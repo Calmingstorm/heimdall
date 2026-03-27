@@ -1516,6 +1516,30 @@ TOOLS: list[dict] = [
             "required": ["agent_id"],
         },
     },
+    {
+        "name": "wait_for_agents",
+        "description": (
+            "Waits for one or more agents to complete and returns their results. "
+            "Essential for fan-out (spawn N agents → wait → collect results) and "
+            "pipeline (spawn A → wait → spawn B with A's output) coordination patterns. "
+            "Returns results for each agent once all finish or timeout."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "agent_ids": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Agent IDs to wait for",
+                },
+                "timeout": {
+                    "type": "number",
+                    "description": "Max seconds to wait (default 300)",
+                },
+            },
+            "required": ["agent_ids"],
+        },
+    },
     # --- Image generation (ComfyUI) ---
     {
         "name": "generate_image",

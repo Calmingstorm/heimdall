@@ -23,6 +23,10 @@ MAX_AGENT_LIFETIME = 3600        # 1 hour
 MAX_AGENT_ITERATIONS = 30        # LLM turns per agent
 STALE_WARN_SECONDS = 120         # 2 min no activity → log warning
 CLEANUP_DELAY = 300              # 5 min after terminal state → remove
+WAIT_DEFAULT_TIMEOUT = 300       # default timeout for wait_for_agents
+WAIT_POLL_INTERVAL = 2           # poll interval for wait_for_agents
+
+_TERMINAL_STATUSES = frozenset({"completed", "failed", "timeout", "killed"})
 
 # Callback types
 # iteration_callback: (messages, system_prompt, tools) → LLMResponse-like dict
@@ -207,6 +211,94 @@ class AgentManager:
             "runtime_seconds": round(runtime, 1),
             "goal": agent.goal,
         }
+
+    async def wait_for_agents(
+        self,
+        agent_ids: list[str],
+        timeout: float = WAIT_DEFAULT_TIMEOUT,
+        poll_interval: float = WAIT_POLL_INTERVAL,
+    ) -> dict[str, dict]:
+        """Wait for all specified agents to reach terminal state.
+
+        Returns {agent_id: results_dict} for each agent. Agents not found
+        are reported as {"status": "not_found", "error": "..."}.
+        """
+        if not agent_ids:
+            return {}
+
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            all_done = True
+            for aid in agent_ids:
+                agent = self._agents.get(aid)
+                if agent and agent.status not in _TERMINAL_STATUSES:
+                    all_done = False
+                    break
+            if all_done:
+                break
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                break
+            await asyncio.sleep(min(poll_interval, remaining))
+
+        # Collect results
+        results: dict[str, dict] = {}
+        for aid in agent_ids:
+            r = self.get_results(aid)
+            if r:
+                results[aid] = r
+            else:
+                results[aid] = {
+                    "id": aid,
+                    "status": "not_found",
+                    "error": f"Agent '{aid}' not found.",
+                }
+
+        still_running = [
+            aid for aid, r in results.items() if r.get("status") == "running"
+        ]
+        if still_running:
+            log.warning(
+                "wait_for_agents timed out with %d still running: %s",
+                len(still_running), still_running,
+            )
+
+        return results
+
+    def spawn_group(
+        self,
+        tasks: list[dict],
+        channel_id: str,
+        requester_id: str,
+        requester_name: str,
+        iteration_callback: IterationCallback,
+        tool_executor_callback: ToolExecutorCallback,
+        announce_callback: AnnounceCallback,
+        tools: list[dict] | None = None,
+        system_prompt: str = "",
+    ) -> list[str]:
+        """Spawn multiple agents at once. Returns list of agent_ids (or error strings).
+
+        Each task dict must have 'label' and 'goal' keys.
+        """
+        ids: list[str] = []
+        for task in tasks:
+            label = task.get("label", "")
+            goal = task.get("goal", "")
+            aid = self.spawn(
+                label=label,
+                goal=goal,
+                channel_id=channel_id,
+                requester_id=requester_id,
+                requester_name=requester_name,
+                iteration_callback=iteration_callback,
+                tool_executor_callback=tool_executor_callback,
+                announce_callback=announce_callback,
+                tools=tools,
+                system_prompt=system_prompt,
+            )
+            ids.append(aid)
+        return ids
 
     async def cleanup(self) -> int:
         """Remove agents that have been in terminal state for > CLEANUP_DELAY. Returns count removed."""

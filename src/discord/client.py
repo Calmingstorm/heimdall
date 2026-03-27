@@ -2096,6 +2096,8 @@ class HeimdallBot(discord.Client):
                         result = self._handle_kill_agent(tool_input)
                     elif tool_name == "get_agent_results":
                         result = self._handle_get_agent_results(tool_input)
+                    elif tool_name == "wait_for_agents":
+                        result = await self._handle_wait_for_agents(tool_input)
                     elif tool_name == "list_skills":
                         skills = self.skill_manager.list_skills()
                         if not skills:
@@ -3100,6 +3102,33 @@ class HeimdallBot(discord.Client):
             parts.append(f"Error: {results['error']}")
         return "\n".join(parts)
 
+    async def _handle_wait_for_agents(self, inp: dict) -> str:
+        """Wait for agents to complete and return collected results."""
+        agent_ids = inp.get("agent_ids", [])
+        timeout = inp.get("timeout", 300)
+        if not agent_ids:
+            return "'agent_ids' list is required."
+        if not isinstance(agent_ids, list):
+            return "'agent_ids' must be a list of agent ID strings."
+
+        results = await self.agent_manager.wait_for_agents(
+            agent_ids, timeout=float(timeout),
+        )
+
+        lines: list[str] = []
+        for aid in agent_ids:
+            r = results.get(aid, {})
+            status = r.get("status", "unknown")
+            label = r.get("label", aid)
+            result_text = r.get("result", "")
+            error_text = r.get("error", "")
+            content = result_text or error_text or "(no output)"
+            if len(content) > 800:
+                content = content[:800] + "..."
+            lines.append(f"**{label}** (`{aid}`): {status}\n{content}")
+
+        return "\n\n".join(lines) if lines else "No results."
+
     async def _run_loop_iteration(
         self,
         prompt: str,
@@ -3326,6 +3355,8 @@ class HeimdallBot(discord.Client):
             return self._handle_kill_agent(tool_input)
         if tool_name == "get_agent_results":
             return self._handle_get_agent_results(tool_input)
+        if tool_name == "wait_for_agents":
+            return await self._handle_wait_for_agents(tool_input)
 
         # --- Skill CRUD ---
         if tool_name == "create_skill":
