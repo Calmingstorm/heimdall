@@ -39,6 +39,11 @@ RELEVANCE_MAX_OLDER = 7  # max older messages to include beyond recent window
 TOOL_SUMMARY_THRESHOLD = 10  # summarize when this many tool calls occurred
 TOOL_SUMMARY_MAX_CHARS = 500  # max chars for summarized tool response in history
 
+# Context budget constants
+CONTEXT_TOKEN_BUDGET = 8000  # max estimated tokens for history sent to LLM
+CHARS_PER_TOKEN = 4  # rough estimate: 1 token ≈ 4 chars
+BUDGET_KEEP_RECENT = 3  # always keep the most recent N messages regardless of budget
+
 # Common stop words to ignore when scoring relevance
 _STOP_WORDS = frozenset({
     "a", "an", "the", "is", "it", "in", "on", "to", "of", "and", "or",
@@ -137,6 +142,57 @@ def summarize_tool_response(
         len(response), len(result), len(tools_used),
     )
     return result
+
+
+def estimate_tokens(text: str) -> int:
+    """Estimate token count from text length (~4 chars per token)."""
+    return max(1, len(text) // CHARS_PER_TOKEN)
+
+
+def apply_token_budget(
+    messages: list[dict[str, str]],
+    budget: int = CONTEXT_TOKEN_BUDGET,
+) -> tuple[list[dict[str, str]], int]:
+    """Trim message list to fit within a token budget.
+
+    Drops oldest messages first, always keeping the most recent
+    ``BUDGET_KEEP_RECENT`` messages.  Returns the trimmed list and the
+    number of messages dropped.
+
+    The summary pair (if present at the start) is counted toward the
+    budget but is dropped last — after all non-recent messages are gone.
+    """
+    if not messages:
+        return messages, 0
+
+    # Calculate total tokens
+    total = sum(estimate_tokens(m["content"] if isinstance(m["content"], str) else str(m["content"])) for m in messages)
+    if total <= budget:
+        return messages, 0
+
+    # Identify protected recent messages (tail)
+    keep_n = min(BUDGET_KEEP_RECENT, len(messages))
+    recent = messages[-keep_n:]
+    older = messages[:-keep_n] if keep_n < len(messages) else []
+
+    # Token cost of protected recent messages
+    recent_tokens = sum(estimate_tokens(m["content"] if isinstance(m["content"], str) else str(m["content"])) for m in recent)
+
+    # Drop oldest non-recent messages until under budget
+    dropped = 0
+    while older and recent_tokens + sum(
+        estimate_tokens(m["content"] if isinstance(m["content"], str) else str(m["content"])) for m in older
+    ) > budget:
+        older.pop(0)
+        dropped += 1
+
+    if dropped > 0:
+        log.info(
+            "Context budget: trimmed %d older message(s) to fit %d-token budget",
+            dropped, budget,
+        )
+
+    return older + recent, dropped
 
 
 @dataclass
@@ -420,6 +476,14 @@ class SessionManager:
                 "role": "assistant",
                 "content": "Understood, I have context from our previous conversation.",
             })
+
+        # Enforce token budget — drop oldest first, keep recent 3
+        messages, budget_dropped = apply_token_budget(messages)
+        if budget_dropped > 0:
+            log.info(
+                "Token budget: dropped %d message(s) for channel %s",
+                budget_dropped, channel_id,
+            )
 
         return messages
 
