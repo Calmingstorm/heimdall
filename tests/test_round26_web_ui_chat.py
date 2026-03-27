@@ -1449,10 +1449,12 @@ class TestWebMessageDetails:
         assert author.name == "TestUser"
         assert author.mention == "@TestUser"
 
-    def test_webmessage_no_content_attribute(self):
-        """WebMessage doesn't have content — content is passed separately."""
-        msg = WebMessage("ch", "u", "User")
-        assert not hasattr(msg, "content")
+    def test_webmessage_has_content_attribute(self):
+        """WebMessage has content attribute for tool handler compatibility."""
+        msg = WebMessage("ch", "u", "User", content="hello")
+        assert msg.content == "hello"
+        msg2 = WebMessage("ch", "u", "User")
+        assert msg2.content == ""
 
     @pytest.mark.asyncio
     async def test_websent_message_edit_noop(self):

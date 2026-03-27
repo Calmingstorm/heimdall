@@ -47,12 +47,20 @@ class _WebChannel:
 
     def __init__(self, channel_id: str):
         self.id = channel_id
+        self.name = "web-chat"
+        self.guild = None
 
     def typing(self):
         return _NoOpContextManager()
 
     async def send(self, content=None, **kwargs) -> _WebSentMessage:
         return _WebSentMessage()
+
+    async def fetch_message(self, message_id: int):
+        raise Exception("Cannot fetch messages in web chat")
+
+    async def history(self, **kwargs):
+        return []
 
 
 class _WebAuthor:
@@ -76,14 +84,16 @@ class WebMessage:
     from a discord.Message object.
     """
 
-    def __init__(self, channel_id: str, user_id: str, username: str):
+    def __init__(self, channel_id: str, user_id: str, username: str, content: str = ""):
         global _next_msg_id
         _next_msg_id += 1
         self.id = _next_msg_id
+        self.content = content
         self.channel = _WebChannel(channel_id)
         self.author = _WebAuthor(user_id, username)
         self.webhook_id = None
         self.attachments = []
+        self.guild = None
 
 
 # Re-use the same scrubbing function applied to Discord responses.
@@ -109,7 +119,7 @@ async def process_web_chat(
       - tools_used: list[str] — tool names called during processing
       - is_error: bool — whether an error occurred
     """
-    msg = WebMessage(channel_id=channel_id, user_id=user_id, username=username)
+    msg = WebMessage(channel_id=channel_id, user_id=user_id, username=username, content=content)
     tagged = f"[{username}]: {content}"
     bot.sessions.add_message(channel_id, "user", tagged, user_id=user_id)
 
