@@ -1,74 +1,110 @@
-browser:
-  cdp_url: ''
-  default_timeout_ms: 30000
-  enabled: false
-  viewport_height: 720
-  viewport_width: 1280
-comfyui:
-  enabled: false
-  url: ''
-context:
-  directory: data/context
-  max_system_prompt_tokens: 4000
+timezone: "UTC"  # IANA timezone (e.g. "America/New_York", "Europe/London", "Asia/Tokyo")
+
 discord:
-  allowed_users:
-  - user1
-  channels:
-  - ch1
-  require_mention: true
-  respond_to_bots: false
-  token: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
-learning:
-  consolidation_target: 50
-  enabled: true
-  max_entries: 100
-logging:
-  directory: data/logs
-  level: INFO
-monitoring:
-  alert_channel_id: ''
-  checks: []
-  cooldown_minutes: 15
-  enabled: false
+  token: "${DISCORD_TOKEN}"
+  allowed_users: []  # Discord user IDs that can interact with the bot (empty = allow all)
+  channels: []  # Channel IDs the bot responds in (empty = all channels)
+  respond_to_bots: false  # Whether to respond to messages from other bots/webhooks
+  require_mention: false  # Only respond when the bot is @mentioned
+
 openai_codex:
-  credentials_path: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
   enabled: true
+  model: "gpt-4.1"
   max_tokens: 4096
-  model: gpt-4.1
-permissions:
-  default_tier: standard
-  overrides_path: ''
-  tiers: {}
+  credentials_path: "./data/codex_auth.json"
+
+context:
+  directory: "./data/context"
+  max_system_prompt_tokens: 32000
+
+sessions:
+  max_history: 50
+  max_age_hours: 24
+  persist_directory: "./data/sessions"
+
+tools:
+  enabled: true
+  ssh_key_path: "/app/.ssh/id_ed25519"       # Docker/Incus: /app/.ssh/  Bare metal: ~/.ssh/
+  ssh_known_hosts_path: "/app/.ssh/known_hosts"
+  hosts: {}
+  # Example host config:
+  #   myhost:
+  #     address: "10.0.0.1"
+  #     ssh_user: "root"
+  #   myserver:
+  #     address: "10.0.0.2"
+  #     ssh_user: "deploy"
+  #     os: "linux"
+  allowed_services: []
+  # Example services:
+  #   - nginx
+  #   - postgresql
+  #   - docker
+  #   - prometheus
+  allowed_playbooks: []
+  # Example playbooks:
+  #   - check-services.yml
+  #   - system-info.yml
+  ansible_directory: "/ansible"
+  command_timeout_seconds: 300
+  # prometheus_host: "myserver"   # Host alias to run Prometheus queries on
+  # ansible_host: "myhost"       # Host alias to run Ansible playbooks from
+  # claude_code_host: "myhost"   # Default host for claude -p
+  # claude_code_user: ""         # Non-root user for claude -p edits (e.g. "deploy")
+  # claude_code_dir: "/opt/project"  # Default working directory for claude -p
+  # incus_host: "myhost"         # Host alias where Incus runs
+  # tool_packs: [systemd, incus, prometheus]  # Empty or absent = all tools loaded
+
+webhook:
+  enabled: false
+  secret: "${WEBHOOK_SECRET:-}"
+  channel_id: ""        # Default channel for webhook notifications
+  gitea_channel_id: ""  # Channel for Gitea webhooks (falls back to channel_id)
+  grafana_channel_id: "" # Channel for Grafana alerts (falls back to channel_id)
+
+learning:
+  enabled: true
+  max_entries: 30
+  consolidation_target: 20
+
 search:
   enabled: true
-  search_db_path: data/search.db
-sessions:
-  max_age_hours: 24
-  max_history: 40
-  persist_directory: data/sessions
-timezone: US/Eastern
-tools:
-  allowed_services:
-  - nginx
-  ansible_directory: ''
-  enabled: true
-  hosts:
-    local:
-      address: localhost
-      os: linux
-  ssh_key_path: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
-  timeouts:
-    default: 300
-  tool_packs:
-  - systemd
+  search_db_path: "./data/chromadb"  # Directory for search SQLite DBs
+
+logging:
+  level: "INFO"
+  directory: "./data/logs"
+
 usage:
-  directory: data/usage
+  directory: "./data/usage"
+
 voice:
   enabled: false
-web:
-  api_token: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
-  enabled: true
-webhook:
-  channel_id: ''
+  voice_service_url: "ws://heimdall-voice:3940/ws"
+  auto_join: false
+  transcript_channel_id: ""
+  default_voice: "en_US-lessac-medium"
+  wake_word: "heimdall"
+
+browser:
   enabled: false
-  secret: "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+  cdp_url: "ws://heimdall-browser:3000?token=${BROWSER_TOKEN:-heimdall-internal}"
+
+monitoring:
+  enabled: false
+  checks: []
+  alert_channel_id: ""
+  cooldown_minutes: 60
+
+permissions:
+  tiers: {}
+  default_tier: "user"
+  overrides_path: "./data/permissions.json"
+
+comfyui:
+  enabled: false
+  url: "http://localhost:8188"
+
+web:
+  enabled: true
+  api_token: ""  # Empty = no auth (dev mode). Set a secret token for production.

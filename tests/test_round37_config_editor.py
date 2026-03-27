@@ -253,10 +253,11 @@ class TestConfigPutEndpoint:
         bot = _make_bot()
         app, _ = _make_app(bot)
         async with TestClient(TestServer(app)) as client:
-            resp = await client.put("/api/config", json={"timezone": "US/Eastern"})
-            # Should fail because bot.config is a mock (Pydantic validation)
-            # But we verify the endpoint accepts the request
-            assert resp.status in (200, 400)
+            with patch("src.web.api._write_config"):
+                resp = await client.put("/api/config", json={"timezone": "US/Eastern"})
+                # Should fail because bot.config is a mock (Pydantic validation)
+                # But we verify the endpoint accepts the request
+                assert resp.status in (200, 400)
 
     @pytest.mark.asyncio
     async def test_reject_sensitive_field_update(self):
