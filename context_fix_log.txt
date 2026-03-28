@@ -34,3 +34,19 @@ Round 1 complete. Here's what was done:
 [2026-03-28 00:04:08] Round 3 PASSED (ok) in 114s
 [2026-03-28 00:04:08] Pausing 10s...
 [2026-03-28 00:04:18] --- Round 4/6 ---
+**Round 4 complete.** 
+
+**Finding:** The Round 1 refactor introduced a regression where `if not is_guest:` was added as a guard around `add_message`. This prevented guest (chat-only) users from having Heimdall's responses saved to history. The original code intentionally saved guest responses — `not is_guest` being False caused the skip condition to be False, falling through to the save path. Without this fix, guest conversations would have all user messages but zero assistant messages, so Heimdall would have no memory of what he said to guests.
+
+**Fix:** Removed the `if not is_guest:` guard. All assistant responses are now saved unconditionally.
+
+**All four problems verified — complete flow trace:**
+1. User message saved → `add_message` at line 1541
+2. History assembled via `get_task_history` (20 msgs, relevance scoring, token budget)
+3. Context separator injected in `_process_with_tools`
+4. Response saved unconditionally — tools path through `summarize_tool_response`, chat path truncated to 1500 chars
+5. Compaction at 40 messages uses `COMPACTION_MAX_CHARS` (800) dynamically in the prompt
+[2026-03-28 00:08:32] TESTS: skipped (code round)
+[2026-03-28 00:08:32] Round 4 PASSED (ok) in 254s
+[2026-03-28 00:08:32] Pausing 10s...
+[2026-03-28 00:08:42] --- Round 5/6 ---
