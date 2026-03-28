@@ -670,7 +670,7 @@ class TestCrossRoundConsistency:
 
     def test_personality_present(self):
         from src.llm.system_prompt import SYSTEM_PROMPT_TEMPLATE
-        assert "Not okay" in SYSTEM_PROMPT_TEMPLATE
+        assert "Exhausted omniscience" in SYSTEM_PROMPT_TEMPLATE
 
     def test_local_execution_intact(self):
         from src.tools.ssh import is_local_address

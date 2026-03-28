@@ -65,7 +65,7 @@ class TestBuildSystemPrompt:
         )
         assert "Your Capabilities" in prompt
         assert "Rules" in prompt
-        assert "PromQL" in prompt
+        assert "infrastructure" in prompt.lower()
         assert "EXECUTOR" in prompt
 
     def test_context_injects_architecture(self):
@@ -212,12 +212,11 @@ class TestSystemPromptQuality:
             context="", hosts={}, services=[], playbooks=[],
         )
         # Must demand tool calls in first response
-        assert "FIRST response MUST include tool calls" in prompt
-        # Must forbid discussion-only responses
-        assert "Never respond with only text when tools" in prompt
+        assert "execute immediately" in prompt
         # Must forbid hedging phrases
-        for phrase in ["if you want", "shall I", "ready when you are"]:
-            assert phrase in prompt, f"Must forbid phrase: {phrase}"
+        assert "Never hedge" in prompt
+        for phrase in ["shall I", "would you like me to", "ready when you are"]:
+            assert phrase in prompt, f"Must list prohibited phrase: {phrase}"
         # Must identify as executor, not assistant
         assert "EXECUTOR" in prompt
         # run_script guidance is in architecture context file

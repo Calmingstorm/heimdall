@@ -84,11 +84,11 @@ class TestSummaryProtection:
     def test_summary_kept_when_droppable_messages_exist(self):
         """Summary pair should be kept when there are other droppable messages."""
         pair = _summary_pair("x" * 400)  # ~100 tokens
-        droppable = [_msg("user", "a" * 4000) for _ in range(5)]  # ~1000 tokens each
-        recent = [_msg("user", "b" * 2000) for _ in range(3)]  # ~500 tokens each
+        droppable = [_msg("user", "a" * 4000) for _ in range(7)]  # ~1000 tokens each
+        recent = [_msg("user", "b" * 2000) for _ in range(5)]  # ~500 tokens each
         msgs = pair + droppable + recent
-        # Budget: 3000 tokens. Recent = 1500. Summary ~115. Need to drop droppable.
-        result, dropped = apply_token_budget(msgs, budget=3000)
+        # Budget: 4000 tokens. Recent = 2500. Summary ~115. Need to drop droppable.
+        result, dropped = apply_token_budget(msgs, budget=4000)
         # Summary pair should still be present
         assert result[0]["content"].startswith(_SUMMARY_PREFIX)
         assert dropped > 0
@@ -97,24 +97,24 @@ class TestSummaryProtection:
         """Summary pair is dropped only after all other droppable messages are gone."""
         pair = _summary_pair("x" * 20000)  # ~5000 tokens (huge summary)
         droppable = [_msg("user", "a" * 400)]  # ~100 tokens
-        recent = [_msg("user", "b" * 2000) for _ in range(3)]  # ~500 tokens each
+        recent = [_msg("user", "b" * 2000) for _ in range(5)]  # ~500 tokens each
         msgs = pair + droppable + recent
-        # Budget: 2000 tokens. Recent = 1500. Summary = ~5000. Won't fit.
-        result, dropped = apply_token_budget(msgs, budget=2000)
+        # Budget: 3000 tokens. Recent = 2500. Summary = ~5000. Won't fit.
+        result, dropped = apply_token_budget(msgs, budget=3000)
         # droppable (1) + summary pair (2) = 3 dropped
         assert dropped == 3
         # Only recent messages remain
-        assert len(result) == 3
+        assert len(result) == 5
         assert not any(m["content"].startswith(_SUMMARY_PREFIX) for m in result)
 
     def test_summary_survives_tight_budget(self):
         """With tight budget, summary is kept if it fits after dropping droppable."""
         pair = _summary_pair("brief")  # tiny summary
         droppable = [_msg("user", "x" * 8000) for _ in range(3)]  # ~2000 tokens each
-        recent = [_msg("user", "y" * 400) for _ in range(3)]  # ~100 tokens each
+        recent = [_msg("user", "y" * 400) for _ in range(5)]  # ~100 tokens each
         msgs = pair + droppable + recent
-        # Budget: 1000 tokens. Recent ~300. Summary ~20.
-        result, dropped = apply_token_budget(msgs, budget=1000)
+        # Budget: 1500 tokens. Recent ~500. Summary ~20.
+        result, dropped = apply_token_budget(msgs, budget=1500)
         # All droppable should be dropped, summary kept
         assert result[0]["content"].startswith(_SUMMARY_PREFIX)
         assert dropped == 3  # only the droppable messages

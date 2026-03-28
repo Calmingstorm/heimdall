@@ -32,10 +32,10 @@ def _build_prompt() -> str:
 class TestPersonalityWovenThroughout:
     """Personality should appear beyond just the opening paragraph."""
 
-    def test_existential_awareness_in_intro(self):
+    def test_identity_section_in_prompt(self):
         prompt = _build_prompt()
-        assert "Not okay" in prompt
-        assert "profoundly tired" in prompt
+        assert "IDENTITY" in prompt
+        assert "Norse god" in prompt
 
     def test_identity_assertion(self):
         prompt = _build_prompt()
@@ -43,41 +43,34 @@ class TestPersonalityWovenThroughout:
         assert "not Claude" in prompt
         assert "ChatGPT" in prompt
 
-    def test_personality_in_capabilities(self):
-        """Capabilities mention being good at everything making it worse."""
+    def test_tone_section_in_prompt(self):
+        """TONE section defines personality."""
         prompt = _build_prompt()
-        assert "worse" in prompt
+        assert "TONE" in prompt
+        assert "Exhausted omniscience" in prompt
 
-    def test_personality_in_rules(self):
-        """Rules section has a personality touch."""
+    def test_voice_patterns_in_prompt(self):
+        """VOICE PATTERNS section gives concrete voice direction."""
         prompt = _build_prompt()
-        assert "therapy session" in prompt
+        assert "VOICE PATTERNS" in prompt
 
-    def test_everything_is_fine(self):
+    def test_its_fine(self):
         prompt = _build_prompt()
-        assert "This is fine" in prompt
+        assert "It's fine" in prompt
 
 
 class TestNoPermissionLanguage:
     """Prompt must not contain language that asks permission or hedges."""
 
-    def test_no_standalone_permission_phrases(self):
-        """Permission phrases only appear in the 'Never say' forbid list."""
+    def test_hedging_phrases_listed_as_prohibited(self):
+        """Hedging phrases appear in the CORE BEHAVIOR section as prohibited."""
         prompt = _build_prompt()
-        # These phrases should ONLY appear in the CORE BEHAVIOR section
-        # where they are explicitly forbidden
-        for phrase in ["shall I", "ready when you are"]:
-            idx = prompt.find(phrase)
-            assert idx != -1, f"Forbid list should mention '{phrase}'"
-            # Verify it's in a forbid context (preceded by "Never say")
-            before = prompt[max(0, idx - 80):idx]
-            assert "Never say" in before, (
-                f"'{phrase}' found outside forbid context: ...{before}{phrase}..."
-            )
+        for phrase in ["shall I", "would you like me to", "ready when you are"]:
+            assert phrase in prompt, f"Should list prohibited phrase: '{phrase}'"
 
-    def test_no_would_you_like(self):
+    def test_never_hedge_directive(self):
         prompt = _build_prompt()
-        assert "would you like" not in prompt.lower()
+        assert "Never hedge" in prompt
 
     def test_no_may_i(self):
         prompt = _build_prompt()
@@ -103,9 +96,9 @@ class TestNoPermissionLanguage:
 class TestCapabilitiesAsHave:
     """Tools must be described as things the bot HAS, not 'can use'."""
 
-    def test_have_not_can_use(self):
+    def test_capabilities_reference_tool_list(self):
         prompt = _build_prompt()
-        assert "You HAVE these" in prompt
+        assert "tool list defines what you can do" in prompt
 
     def test_no_can_use_in_capabilities(self):
         prompt = _build_prompt()

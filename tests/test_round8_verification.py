@@ -92,8 +92,9 @@ class TestPromptArchitectureCoherence:
         """Prompt forbids hedging phrases."""
         prompt = _build_prompt()
         core = prompt[prompt.find("CORE BEHAVIOR"):prompt.find("## Current Date")]
-        assert "if you want" in core.lower()  # it's in the forbid list
-        assert "Never say" in core  # the forbid instruction itself
+        assert "shall I" in core  # listed as prohibited hedging
+        assert "would you like me to" in core  # listed as prohibited hedging
+        assert "Never hedge" in core
 
     def test_host_injection_works(self):
         """Hosts passed to build_system_prompt appear in output."""

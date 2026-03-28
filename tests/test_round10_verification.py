@@ -205,15 +205,17 @@ class TestCrossRoundConsistency:
         assert not is_local_address("10.0.0.1")
 
     def test_personality_in_prompt(self):
-        """Round 1/7 personality still present."""
+        """Heimdall personality present in system prompt."""
         from src.llm.system_prompt import SYSTEM_PROMPT_TEMPLATE
-        assert "Not okay" in SYSTEM_PROMPT_TEMPLATE
-        assert "profoundly tired" in SYSTEM_PROMPT_TEMPLATE
+        assert "Heimdall" in SYSTEM_PROMPT_TEMPLATE
+        assert "Exhausted omniscience" in SYSTEM_PROMPT_TEMPLATE
 
-    def test_claude_code_broadened(self):
-        """Round 7 claude_code broadening still present."""
-        from src.llm.system_prompt import SYSTEM_PROMPT_TEMPLATE
-        assert "deep reasoning" in SYSTEM_PROMPT_TEMPLATE.lower()
+    def test_claude_code_in_architecture(self):
+        """claude_code delegation guidance present in architecture.md."""
+        from pathlib import Path
+        arch = Path("data/context/architecture.md").read_text()
+        assert "deep reasoning" in arch.lower()
+        assert "claude_code" in arch
 
     def test_tool_count_stable(self):
         """Tool count should be stable (no accidental removals)."""

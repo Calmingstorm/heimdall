@@ -206,9 +206,9 @@ class TestGenerateFileHandler:
         assert "output.py" in result
         assert "bytes" in result
         msg.channel.send.assert_called_once()
+        # Files are posted bare (no caption) — Heimdall's follow-up is the text
         call_kwargs = msg.channel.send.call_args
-        assert call_kwargs[1].get("content") == "Here's the file" or \
-               call_kwargs.kwargs.get("content") == "Here's the file"
+        assert call_kwargs.kwargs.get("file") is not None
 
     async def test_generate_file_default_filename(self):
         stub = _make_bot_stub()

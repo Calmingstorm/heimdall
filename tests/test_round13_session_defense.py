@@ -370,8 +370,8 @@ class TestSelectiveHistorySaving:
         # Response should be saved to history
         stub.sessions.add_message.assert_any_call("ch-1", "assistant", "Disk is 42% full")
 
-    async def test_toolless_response_not_saved(self):
-        """Response without any tools used should NOT be saved to history."""
+    async def test_toolless_response_is_saved(self):
+        """All responses including tool-less ones are saved to history."""
         stub = _make_handle_message_stub()
         msg = _make_msg(content="hello")
         stub._process_with_tools = AsyncMock(
@@ -379,10 +379,9 @@ class TestSelectiveHistorySaving:
         )
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
             await HeimdallBot._handle_message_inner(stub, msg, "hello", "ch-1")
-        # User message is saved (first add_message call), but assistant response is NOT
         add_calls = stub.sessions.add_message.call_args_list
         assistant_saves = [c for c in add_calls if c[0][1] == "assistant"]
-        assert len(assistant_saves) == 0, "Tool-less response should not be saved"
+        assert len(assistant_saves) == 1, "Tool-less response should be saved"
 
     async def test_toolless_response_still_sent_to_discord(self):
         """Even unsaved responses should be sent to the user on Discord."""
@@ -809,20 +808,18 @@ class TestPoisonedHistoryPrevention:
     """Verify the layers work together to prevent poisoned history
     from causing fabrication or hedging in future responses."""
 
-    async def test_poisoned_fabrication_not_saved(self):
-        """A fabricated response should not be saved to session history."""
+    async def test_toolless_response_saved_to_history(self):
+        """All responses are saved to history for context retention."""
         stub = _make_handle_message_stub()
         msg = _make_msg(content="check disk")
-        # Simulating a tool-less (potentially fabricated) response
         stub._process_with_tools = AsyncMock(
             return_value=("I ran df -h and it's 42% full.", False, False, [], False),
         )
         with patch("src.discord.client.scrub_response_secrets", side_effect=lambda x: x):
             await HeimdallBot._handle_message_inner(stub, msg, "check disk", "ch-1")
-        # Tool-less response should NOT be saved
         add_calls = stub.sessions.add_message.call_args_list
         assistant_saves = [c for c in add_calls if c[0][1] == "assistant"]
-        assert len(assistant_saves) == 0
+        assert len(assistant_saves) == 1
 
     async def test_error_sanitization_prevents_refusal_leak(self):
         """Error responses should save sanitized markers, not raw refusals."""
@@ -981,12 +978,12 @@ class TestSessionDefenseSourceStructure:
         assert 'role": "developer"' in src or "role\": \"developer\"" in src
         assert "insert(-1" in src
 
-    def test_selective_saving_in_handle_message_inner(self):
-        """_handle_message_inner should have the tool-less check."""
+    def test_response_saving_in_handle_message_inner(self):
+        """_handle_message_inner saves all responses to history."""
         import inspect
         src = inspect.getsource(HeimdallBot._handle_message_inner)
-        assert "not tools_used" in src
-        assert "pollute" in src or "poisoning" in src
+        assert "add_message" in src
+        assert "assistant" in src
 
     def test_error_sanitization_in_handle_message_inner(self):
         """_handle_message_inner should sanitize errors before saving."""
@@ -1048,8 +1045,8 @@ class TestSessionDefenseSourceStructure:
         compact_src = inspect.getsource(SessionManager._compact)
         # 1. Context separator
         assert "CURRENT REQUEST" in client_src
-        # 2. Selective saving (tool-less not saved)
-        assert "not tools_used" in inner_src
+        # 2. All responses saved to history
+        assert "add_message" in inner_src
         # 3. Abbreviated task history
         assert "get_task_history" in inner_src
         # 4. Compaction error omission

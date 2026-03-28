@@ -176,7 +176,7 @@ class TestSystemPromptInvariants:
 
     def test_template_contains_no_emojis_rule(self):
         """Prompt must contain the no-emojis rule."""
-        assert "NEVER use emojis" in SYSTEM_PROMPT_TEMPLATE
+        assert "Never use emojis" in SYSTEM_PROMPT_TEMPLATE
 
     def test_template_contains_secret_protection(self):
         """Prompt must contain the secret protection rule."""

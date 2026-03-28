@@ -53,14 +53,14 @@ class TestDefenseMechanismsDocumented:
     def test_defense_section_exists(self):
         assert "## Defense Mechanisms" in _ARCH_CONTENT
 
-    def test_fabrication_teaches_always_call_tool(self):
-        assert "call the tool" in _ARCH_CONTENT.lower()
+    def test_fabrication_detection_described(self):
+        assert "fabrication detection" in _ARCH_CONTENT.lower()
 
-    def test_hedging_teaches_execute_immediately(self):
-        assert "execute immediately" in _ARCH_CONTENT.lower()
+    def test_hedging_detection_described(self):
+        assert "hedging detection" in _ARCH_CONTENT.lower()
 
-    def test_premature_failure_references_rule_9(self):
-        assert "rule 9" in _ARCH_CONTENT.lower()
+    def test_premature_failure_detection_described(self):
+        assert "premature failure detection" in _ARCH_CONTENT.lower()
 
     def test_first_iteration_documented(self):
         assert "first" in _ARCH_CONTENT.lower() and "iteration" in _ARCH_CONTENT.lower()
@@ -139,18 +139,17 @@ class TestCrossReferenceBidirectionality:
 class TestRedundancyDedup:
     """Common Patterns section no longer duplicates Rule 9's failure guidance."""
 
-    def test_rule_9_in_system_prompt(self):
-        assert "exhaust ALL alternatives" in SYSTEM_PROMPT_TEMPLATE
+    def test_rule_7_exhaust_alternatives(self):
+        assert "exhaust all reasonable alternatives" in SYSTEM_PROMPT_TEMPLATE
 
     def test_common_patterns_no_duplicate_failure_guidance(self):
-        # architecture.md should NOT contain the same "exhaust ALL alternatives"
-        # phrasing as Rule 9 — defense section references Rule 9 instead
         common_section = _ARCH_CONTENT.split("## Common Patterns")[1].split("##")[0]
-        assert "exhaust ALL alternatives" not in common_section
+        assert "exhaust" not in common_section.lower()
 
-    def test_defense_section_references_rule_9(self):
+    def test_defense_section_no_rule_cross_reference(self):
         defense_section = _ARCH_CONTENT.split("## Defense Mechanisms")[1]
-        assert "Rule 9" in defense_section
+        # Defense section describes mechanics only, doesn't cross-reference rules
+        assert "Rule 9" not in defense_section
 
 
 # ---------------------------------------------------------------------------

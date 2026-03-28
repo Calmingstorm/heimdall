@@ -644,7 +644,7 @@ class TestCrossRoundConsistency:
     def test_personality_present(self):
         """Personality in system prompt (Round 1)."""
         from src.llm.system_prompt import SYSTEM_PROMPT_TEMPLATE
-        assert "not okay" in SYSTEM_PROMPT_TEMPLATE.lower()
+        assert "exhausted omniscience" in SYSTEM_PROMPT_TEMPLATE.lower()
 
     def test_65_plus_tools(self):
         """65+ tools in registry."""

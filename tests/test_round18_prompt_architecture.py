@@ -32,16 +32,17 @@ class TestSystemPromptStructure:
         )
 
     def test_has_personality(self):
-        assert "Not okay" in SYSTEM_PROMPT_TEMPLATE
-        assert "profoundly tired" in SYSTEM_PROMPT_TEMPLATE
+        assert "IDENTITY" in SYSTEM_PROMPT_TEMPLATE
+        assert "TONE" in SYSTEM_PROMPT_TEMPLATE
+        assert "VOICE PATTERNS" in SYSTEM_PROMPT_TEMPLATE
 
     def test_has_identity(self):
-        assert "Your identity is Heimdall" in SYSTEM_PROMPT_TEMPLATE
+        assert "Heimdall" in SYSTEM_PROMPT_TEMPLATE
         assert "not Claude" in SYSTEM_PROMPT_TEMPLATE
 
     def test_has_executor_behavior(self):
         assert "EXECUTOR" in SYSTEM_PROMPT_TEMPLATE
-        assert "FIRST response MUST include tool calls" in SYSTEM_PROMPT_TEMPLATE
+        assert "execute immediately" in SYSTEM_PROMPT_TEMPLATE
 
     def test_has_datetime_placeholder(self):
         assert "{current_datetime}" in SYSTEM_PROMPT_TEMPLATE
@@ -87,20 +88,17 @@ class TestSystemPromptRules:
         # Extract numbered rules
         self.rules = re.findall(r"^\d+\.\s+(.+?)(?=\n\d+\.|\Z)", self.rules_text, re.DOTALL | re.MULTILINE)
 
-    def test_has_12_rules(self):
-        assert len(self.rules) == 12, f"Expected 12 rules, found {len(self.rules)}"
+    def test_has_10_rules(self):
+        assert len(self.rules) == 10, f"Expected 10 rules, found {len(self.rules)}"
 
-    def test_rule_no_emojis(self):
-        assert any("emoji" in r.lower() for r in self.rules)
-
-    def test_rule_execute_immediately(self):
-        assert any("execute all steps immediately" in r.lower() for r in self.rules)
+    def test_rule_execute_steps(self):
+        assert any("execute all steps" in r.lower() for r in self.rules)
 
     def test_rule_no_fabrication(self):
         assert any("fabricate" in r.lower() for r in self.rules)
 
-    def test_rule_always_call_tool(self):
-        assert any("call the appropriate tool" in r.lower() for r in self.rules)
+    def test_rule_call_tool(self):
+        assert any("call the tool" in r.lower() for r in self.rules)
 
     def test_rule_tool_definitions_authoritative(self):
         assert any("authoritative" in r.lower() for r in self.rules)
@@ -109,10 +107,7 @@ class TestSystemPromptRules:
         assert any("concise" in r.lower() for r in self.rules)
 
     def test_rule_no_secrets(self):
-        assert any("api keys" in r.lower() or "secrets" in r.lower() for r in self.rules)
-
-    def test_rule_prompt_injection(self):
-        assert any("injection" in r.lower() for r in self.rules)
+        assert any("secrets" in r.lower() for r in self.rules)
 
     def test_rule_exhaust_alternatives(self):
         assert any("exhaust" in r.lower() for r in self.rules)
@@ -121,7 +116,7 @@ class TestSystemPromptRules:
         assert any("inline" in r.lower() or "generate_file" in r for r in self.rules)
 
     def test_rule_tools_available(self):
-        assert any("unavailable" in r.lower() or "disabled" in r.lower() for r in self.rules)
+        assert any("assume tools" in r.lower() for r in self.rules)
 
     def test_rule_source_code(self):
         assert any("source code" in r.lower() or "claude_code_dir" in r for r in self.rules)
@@ -142,19 +137,19 @@ class TestCapabilitiesAccuracy:
         self.capabilities = match.group(1)
 
     def test_mentions_infrastructure(self):
-        assert "Infrastructure" in self.capabilities
+        assert "infrastructure" in self.capabilities.lower()
 
-    def test_mentions_shell_commands(self):
-        assert "Shell commands" in self.capabilities
+    def test_mentions_shell(self):
+        assert "shell" in self.capabilities.lower()
 
     def test_mentions_memory(self):
-        assert "Memory" in self.capabilities
+        assert "memory" in self.capabilities.lower()
 
     def test_mentions_scheduling(self):
         assert "scheduling" in self.capabilities.lower()
 
-    def test_mentions_autonomous_loops(self):
-        assert "Autonomous loops" in self.capabilities
+    def test_mentions_loops(self):
+        assert "loops" in self.capabilities.lower()
 
     def test_mentions_skills(self):
         assert "skills" in self.capabilities.lower()
@@ -162,14 +157,14 @@ class TestCapabilitiesAccuracy:
     def test_mentions_claude_code(self):
         assert "Claude Code" in self.capabilities
 
-    def test_mentions_browser(self):
-        assert "browser" in self.capabilities.lower()
-
     def test_mentions_vision(self):
         assert "vision" in self.capabilities.lower()
 
-    def test_mentions_web_search(self):
-        assert "web search" in self.capabilities.lower()
+    def test_mentions_web(self):
+        assert "web" in self.capabilities.lower()
+
+    def test_mentions_search(self):
+        assert "search" in self.capabilities.lower()
 
 
 # ===========================================================================

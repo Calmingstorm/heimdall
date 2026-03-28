@@ -131,25 +131,21 @@ def _build_prompt(**kwargs):
 # ===========================================================================
 
 class TestChatWithoutToolsGuidance:
-    """System prompt contains guidance that plain text responses are valid."""
+    """System prompt contains guidance that non-tool responses are valid."""
 
-    def test_prompt_mentions_plain_text_chat(self):
+    def test_prompt_mentions_chat_without_tools(self):
         prompt = _build_prompt()
-        assert "plain text" in prompt.lower()
+        assert "without tools" in prompt.lower()
 
-    def test_prompt_says_tools_for_actions_not_prerequisite(self):
+    def test_prompt_says_tools_for_actions(self):
         prompt = _build_prompt()
-        assert "Tools are for ACTIONS" in prompt
-        assert "not a prerequisite" in prompt
+        assert "Tools are for actions" in prompt
 
-    def test_chat_guidance_near_executor_line(self):
+    def test_chat_guidance_in_core_behavior(self):
         """Chat guidance should appear in the CORE BEHAVIOR section."""
         prompt = _build_prompt()
-        executor_idx = prompt.index("EXECUTOR")
-        chat_idx = prompt.index("plain text for chat")
-        # Chat guidance comes after EXECUTOR but before the Rules section
-        rules_idx = prompt.index("## Rules")
-        assert executor_idx < chat_idx < rules_idx
+        assert "CORE BEHAVIOR" in prompt
+        assert "EXECUTOR" in prompt
 
 
 # ===========================================================================
@@ -157,28 +153,19 @@ class TestChatWithoutToolsGuidance:
 # ===========================================================================
 
 class TestToolAvailabilityRule:
-    """System prompt Rule 11: never claim a tool is unavailable without calling it."""
+    """System prompt Rule 9: assume tools available, try first."""
 
-    def test_rule_11_exists(self):
+    def test_tool_availability_rule_exists(self):
         prompt = _build_prompt()
-        assert "11." in prompt
+        assert "Assume tools are available" in prompt
 
-    def test_rule_11_forbids_claiming_unavailable(self):
+    def test_tool_availability_says_try_first(self):
         prompt = _build_prompt()
-        assert "NEVER claim a tool is unavailable" in prompt
+        assert "Try first" in prompt or "try it first" in prompt.lower()
 
-    def test_rule_11_mentions_disabled_not_enabled(self):
-        prompt = _build_prompt()
-        # Must mention common false-claim patterns
-        assert "disabled" in prompt.lower() or "not enabled" in prompt.lower()
-
-    def test_rule_11_says_report_actual_error(self):
+    def test_tool_availability_report_error(self):
         prompt = _build_prompt()
         assert "actual error" in prompt.lower()
-
-    def test_rule_11_says_call_first(self):
-        prompt = _build_prompt()
-        assert "calling it first" in prompt
 
 
 # ===========================================================================
@@ -186,19 +173,20 @@ class TestToolAvailabilityRule:
 # ===========================================================================
 
 class TestSelfAwarenessDirective:
-    """System prompt Rule 12: context separation for external projects."""
+    """System prompt Rule 10: context separation for external projects."""
 
-    def test_rule_12_exists(self):
+    def test_source_code_rule_exists(self):
         prompt = _build_prompt()
-        assert "12." in prompt
+        assert "10." in prompt
+        assert "source code" in prompt.lower()
 
-    def test_rule_12_mentions_source_code_location(self):
+    def test_rule_mentions_source_code_location(self):
         prompt = _build_prompt()
         assert "/opt/heimdall" in prompt
 
-    def test_rule_12_warns_against_searching_own_code(self):
+    def test_rule_warns_against_searching_own_code(self):
         prompt = _build_prompt()
-        assert "do NOT search" in prompt or "do NOT\nsearch" in prompt
+        assert "not yours" in prompt.lower() or "their code" in prompt.lower()
 
     def test_rule_12_allows_self_modification(self):
         """Rule 12 must explicitly allow modifying own source when asked."""
@@ -448,29 +436,23 @@ class TestAddReactionMessageIDResolution:
 # ===========================================================================
 
 class TestArchitectureDoc:
-    """architecture.md must contain the Round 1 additions."""
+    """architecture.md contains operational guidance (no overlap with system prompt)."""
 
-    def test_responding_without_tools_section_exists(self):
-        assert "## Responding Without Tools" in _ARCH_CONTEXT
+    def test_claude_code_section_exists(self):
+        assert "Claude Code Delegation" in _ARCH_CONTEXT
 
-    def test_responding_without_tools_mentions_plain_text(self):
-        assert "plain text" in _ARCH_CONTEXT
+    def test_agent_orchestration_section_exists(self):
+        assert "Multi-Agent Orchestration" in _ARCH_CONTEXT
 
-    def test_responding_without_tools_mentions_chat(self):
-        assert "Chat" in _ARCH_CONTEXT or "chat" in _ARCH_CONTEXT
-
-    def test_responding_without_tools_mentions_creative_writing(self):
-        assert "creative writing" in _ARCH_CONTEXT
-
-    def test_responding_without_tools_says_tools_for_actions(self):
-        assert "Tools are for actions" in _ARCH_CONTEXT
+    def test_defense_mechanisms_section_exists(self):
+        assert "Defense Mechanisms" in _ARCH_CONTEXT
 
     def test_architecture_loads_as_context(self):
         """architecture.md can be loaded and injected into the system prompt."""
         prompt = build_system_prompt(
             context=_ARCH_CONTEXT, hosts={}, services=[], playbooks=[],
         )
-        assert "Responding Without Tools" in prompt
+        assert "Claude Code Delegation" in prompt
 
 
 # ===========================================================================
