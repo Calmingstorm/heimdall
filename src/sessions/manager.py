@@ -23,7 +23,7 @@ CompactionFn = Callable[[list[dict], str], Awaitable[str]]
 log = get_logger("sessions")
 COMPACTION_THRESHOLD = 40  # compact when history exceeds this
 CONTINUITY_MAX_AGE = 48 * 3600  # carry forward summaries from archives < 48 hours old
-COMPACTION_MAX_CHARS = 500  # target max chars per compacted summary block
+COMPACTION_MAX_CHARS = 800  # target max chars per compacted summary block
 
 # Topic change detection constants
 TOPIC_CHANGE_SCORE_THRESHOLD = 0.05  # below this overlap = topic change
@@ -31,18 +31,18 @@ TOPIC_CHANGE_TIME_GAP = 300  # 5 minutes in seconds
 TOPIC_CHANGE_RECENT_WINDOW = 5  # check overlap against this many recent messages
 
 # Relevance scoring constants
-RELEVANCE_KEEP_RECENT = 3  # always include the most recent N messages
-RELEVANCE_MIN_SCORE = 0.15  # minimum overlap score to include an older message
-RELEVANCE_MAX_OLDER = 7  # max older messages to include beyond recent window
+RELEVANCE_KEEP_RECENT = 5  # always include the most recent N messages
+RELEVANCE_MIN_SCORE = 0.10  # minimum overlap score to include an older message
+RELEVANCE_MAX_OLDER = 10  # max older messages to include beyond recent window
 
 # Tool output summarization constants
 TOOL_SUMMARY_THRESHOLD = 10  # summarize when this many tool calls occurred
 TOOL_SUMMARY_MAX_CHARS = 500  # max chars for summarized tool response in history
 
 # Context budget constants
-CONTEXT_TOKEN_BUDGET = 8000  # max estimated tokens for history sent to LLM
+CONTEXT_TOKEN_BUDGET = 16000  # max estimated tokens for history sent to LLM
 CHARS_PER_TOKEN = 4  # rough estimate: 1 token ≈ 4 chars
-BUDGET_KEEP_RECENT = 3  # always keep the most recent N messages regardless of budget
+BUDGET_KEEP_RECENT = 5  # always keep the most recent N messages regardless of budget
 
 # Common stop words to ignore when scoring relevance
 _STOP_WORDS = frozenset({

@@ -1317,7 +1317,7 @@ class HeimdallBot(discord.Client):
                             "data": b64,
                         },
                     })
-                    text_parts.append(f"[Image attached: {att.filename}]")
+                    text_parts.append(f"[User shared image: {att.filename}]")
                     log.info("Processed image attachment: %s (%d KB)", att.filename, att.size // 1024)
                 except Exception as e:
                     text_parts.append(f"[Image: {att.filename} (failed to read: {e})]")
@@ -1658,15 +1658,15 @@ class HeimdallBot(discord.Client):
 
         log.info("Final response to send: %r", response[:200])
         if not is_error:
-            # If tools were available but not used (and no skill handoff),
-            # don't save the response — text-only replies pollute history
-            # and teach the model that answering without tools is acceptable.
-            if not is_guest and not tools_used and not handoff:
-                pass
-            else:
+            if tools_used:
                 # Summarize verbose tool-loop responses before persisting
                 # to prevent long multi-tool outputs from dominating history
                 history_response = summarize_tool_response(response, tools_used)
+            else:
+                # Save text-only (chat) responses too — the LLM needs to
+                # remember what it said.  Truncate to keep history lean.
+                history_response = response[:800] if len(response) > 800 else response
+            if not is_guest:
                 self.sessions.add_message(channel_id, "assistant", history_response)
             self.sessions.prune()
             self._maybe_cleanup_caches()
