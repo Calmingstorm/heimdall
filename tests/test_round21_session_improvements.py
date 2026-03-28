@@ -250,7 +250,7 @@ class TestCompactionInstructions:
         await mgr.get_history_with_compaction(channel)
 
         assert "OMIT" in captured_system
-        assert "500 characters" in captured_system
+        assert "800 characters" in captured_system
         assert "PRESERVE" in captured_system
 
     @pytest.mark.asyncio
@@ -550,21 +550,20 @@ class TestBotMessageCombining:
 # ---------------------------------------------------------------------------
 
 class TestSelectiveSaving:
-    """Verify that tool-less responses are NOT saved to session history."""
+    """Verify that ALL assistant responses are saved to session history."""
 
-    def test_tool_less_response_not_saved_explanation(self, session_mgr):
-        """The session saving logic should skip tool-less non-guest responses.
+    def test_text_only_response_is_saved(self, session_mgr):
+        """Text-only (no-tool) assistant responses ARE saved to history.
 
-        In client.py: `if not is_guest and not tools_used and not handoff: pass`
-        This means no add_message call for the assistant response.
+        In client.py, both tool-bearing and text-only responses are saved
+        so the LLM remembers what it said.
         """
-        # Verify the logic by checking that only user message exists
-        # after simulating a tool-less response
         session_mgr.add_message("ch1", "user", "what is the meaning of life?")
-        # Do NOT add assistant message (simulates the skip)
+        session_mgr.add_message("ch1", "assistant", "42, obviously.")
         history = session_mgr.get_history("ch1")
-        assert len(history) == 1
-        assert history[0]["role"] == "user"
+        assert len(history) == 2
+        assert history[1]["role"] == "assistant"
+        assert history[1]["content"] == "42, obviously."
 
     def test_tool_response_is_saved(self, session_mgr):
         """When tools are used, the assistant response IS saved."""

@@ -1059,8 +1059,8 @@ class TestSessionPoisoningDefense:
 
     # -- Layer 2: Selective Saving --
 
-    async def test_toolless_response_not_saved(self):
-        """Tool-less responses on the tool route are NOT saved to history."""
+    async def test_toolless_response_is_saved(self):
+        """Tool-less responses on the tool route ARE saved to history (context retention fix)."""
         stub = _make_bot_stub()
         msg = _make_message(content="hello")
         stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
@@ -1074,9 +1074,10 @@ class TestSessionPoisoningDefense:
         # User message IS saved
         user_saves = [c for c in stub.sessions.add_message.call_args_list if c[0][1] == "user"]
         assert len(user_saves) == 1
-        # Assistant response is NOT saved (no tools)
+        # Assistant response IS saved (text-only responses now saved for context retention)
         assistant_saves = [c for c in stub.sessions.add_message.call_args_list if c[0][1] == "assistant"]
-        assert len(assistant_saves) == 0
+        assert len(assistant_saves) == 1
+        assert assistant_saves[0][0][2] == "Hi there!"
         # Response IS still sent to Discord
         stub._send_chunked.assert_called_once()
 

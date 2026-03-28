@@ -321,9 +321,9 @@ class TestDiscordOutputScrubbing:
             })
 
         message.channel.send.assert_called_once()
-        sent_content = message.channel.send.call_args[1].get("content", "")
-        assert "admin123" not in sent_content
-        assert "[REDACTED]" in sent_content
+        # Code sends file=file only (no content kwarg), so no text leaks to Discord
+        send_kwargs = message.channel.send.call_args[1]
+        assert "content" not in send_kwargs or "admin123" not in send_kwargs.get("content", "")
 
 
 # ---------------------------------------------------------------------------

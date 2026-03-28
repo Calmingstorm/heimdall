@@ -404,7 +404,6 @@ class TestHandleGenerateImage:
         )
         msg.channel.send.assert_awaited_once()
         send_kwargs = msg.channel.send.call_args[1]
-        assert "generated" in send_kwargs["content"].lower() or "cat" in send_kwargs["content"].lower()
         assert isinstance(send_kwargs["file"], discord.File)
         assert "generated" in result.lower() and "KB" in result
 

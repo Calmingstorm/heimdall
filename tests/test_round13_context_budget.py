@@ -39,8 +39,8 @@ class TestConstants:
     def test_budget_positive(self):
         assert CONTEXT_TOKEN_BUDGET > 0
 
-    def test_budget_default_is_8000(self):
-        assert CONTEXT_TOKEN_BUDGET == 8000
+    def test_budget_default_is_16000(self):
+        assert CONTEXT_TOKEN_BUDGET == 16000
 
     def test_chars_per_token_positive(self):
         assert CHARS_PER_TOKEN > 0
@@ -51,8 +51,8 @@ class TestConstants:
     def test_keep_recent_positive(self):
         assert BUDGET_KEEP_RECENT > 0
 
-    def test_keep_recent_default_is_3(self):
-        assert BUDGET_KEEP_RECENT == 3
+    def test_keep_recent_default_is_5(self):
+        assert BUDGET_KEEP_RECENT == 5
 
     def test_budget_large_enough_for_recent(self):
         """Budget should be large enough to hold at least a few messages."""
@@ -134,14 +134,14 @@ class TestApplyTokenBudget:
         # Recent 3 are always kept
         assert result[-3:] == msgs[-3:]
 
-    def test_always_keeps_recent_3(self):
-        # 5 messages, each 2000 tokens, budget 4000
-        msgs = [_msg("user", "a" * 8000) for _ in range(5)]
+    def test_always_keeps_recent_5(self):
+        # 7 messages, each 2000 tokens, budget 4000
+        msgs = [_msg("user", "a" * 8000) for _ in range(7)]
         result, dropped = apply_token_budget(msgs, budget=4000)
-        # Recent 3 = 6000 tokens > budget, but they're protected
+        # Recent 5 = 10000 tokens > budget, but they're protected
         # Older 2 should be dropped
         assert dropped == 2
-        assert result == msgs[-3:]
+        assert result == msgs[-5:]
 
     def test_single_message(self):
         msgs = [_msg("user", "a" * 100000)]
@@ -287,15 +287,15 @@ class TestGetTaskHistoryBudget:
         """Summary should be counted toward budget."""
         ch = "summary_budget"
         session = manager.get_or_create(ch)
-        session.summary = "x" * 8000  # ~2000 tokens just for summary
-        for i in range(10):
+        session.summary = "x" * 16000  # ~4000 tokens just for summary
+        for i in range(15):
             role = "user" if i % 2 == 0 else "assistant"
-            manager.add_message(ch, role, f"msg_{i}_" + "x" * 4000)
+            manager.add_message(ch, role, f"msg_{i}_" + "x" * 8000)
         with patch("src.sessions.manager.log"):
-            history = await manager.get_task_history(ch, max_messages=10)
+            history = await manager.get_task_history(ch, max_messages=15)
         # Should have fewer messages due to summary consuming budget
         # Summary pair is 2 messages + whatever fits
-        assert len(history) < 12  # 10 msgs + 2 summary pair
+        assert len(history) < 17  # 15 msgs + 2 summary pair
 
     async def test_budget_logging_in_get_task_history(self, manager):
         """Should log when budget trimming occurs in get_task_history."""
@@ -362,7 +362,7 @@ class TestSourceVerification:
         assert "budget_dropped" in src
 
     def test_budget_keep_recent_matches(self):
-        """BUDGET_KEEP_RECENT and RELEVANCE_KEEP_RECENT should both be 3."""
+        """BUDGET_KEEP_RECENT and RELEVANCE_KEEP_RECENT should both be 5."""
         from src.sessions.manager import RELEVANCE_KEEP_RECENT
         assert BUDGET_KEEP_RECENT == RELEVANCE_KEEP_RECENT
 

@@ -1859,7 +1859,7 @@ class TestProcessAttachments:
         assert len(images) == 1
         assert images[0]["type"] == "image"
         assert images[0]["source"]["media_type"] == "image/png"
-        assert "Image attached" in text
+        assert "User shared image" in text
 
     async def test_oversized_image(self):
         """Should skip images over 5MB."""

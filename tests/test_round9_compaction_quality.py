@@ -68,7 +68,7 @@ def _fill_realistic_session(mgr: SessionManager, channel: str) -> None:
 
 class TestCompactionMaxChars:
     def test_constant_value(self):
-        assert COMPACTION_MAX_CHARS == 500
+        assert COMPACTION_MAX_CHARS == 800
 
     def test_constant_positive(self):
         assert COMPACTION_MAX_CHARS > 0
@@ -162,8 +162,8 @@ class TestCompactionPrompt:
         assert "WHAT" in system
         assert "OUTCOME" in system
 
-    async def test_prompt_requests_under_500_chars(self, tmp_dir):
-        """Prompt should instruct LLM to keep summary under 500 chars."""
+    async def test_prompt_requests_under_max_chars(self, tmp_dir):
+        """Prompt should instruct LLM to keep summary under COMPACTION_MAX_CHARS."""
         captured = {}
 
         async def capture_fn(messages, system):
@@ -178,7 +178,7 @@ class TestCompactionPrompt:
         _fill_session(mgr, "ch1", COMPACTION_THRESHOLD + 5)
         await mgr.get_history_with_compaction("ch1")
 
-        assert "500 characters" in captured["system"]
+        assert f"{COMPACTION_MAX_CHARS} characters" in captured["system"]
 
     async def test_prompt_omits_conversational_filler(self, tmp_dir):
         """Prompt should instruct to omit greetings and filler."""
@@ -283,8 +283,8 @@ class TestSummaryLengthEnforcement:
     async def test_truncation_at_line_boundary(self, tmp_dir):
         """Truncation happens at a line boundary, not mid-word."""
         lines = ["[Topics: infra]"]
-        # Build a summary that's well over 500 chars
-        for i in range(25):
+        # Build a summary that's well over COMPACTION_MAX_CHARS
+        for i in range(40):
             lines.append(f"- Checked host-{i:02d} status OK")
         long_summary = "\n".join(lines)
         assert len(long_summary) > COMPACTION_MAX_CHARS
@@ -488,9 +488,9 @@ class TestSourceVerification:
         source = Path("src/sessions/manager.py").read_text()
         assert "OUTCOME" in source
 
-    def test_manager_has_500_char_limit(self):
+    def test_manager_has_char_limit_in_prompt(self):
         source = Path("src/sessions/manager.py").read_text()
-        assert "500 characters" in source
+        assert "COMPACTION_MAX_CHARS" in source
 
     def test_manager_has_truncation_logic(self):
         source = Path("src/sessions/manager.py").read_text()
@@ -506,8 +506,8 @@ class TestSourceVerification:
         for identifier in ["Hostnames", "IPs", "UUIDs", "file paths", "container names"]:
             assert identifier in source, f"Missing identifier type: {identifier}"
 
-    def test_compaction_max_chars_is_500(self):
-        assert COMPACTION_MAX_CHARS == 500
+    def test_compaction_max_chars_is_800(self):
+        assert COMPACTION_MAX_CHARS == 800
 
     def test_compaction_max_chars_exported(self):
         from src.sessions import manager

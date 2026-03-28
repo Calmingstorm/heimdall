@@ -230,14 +230,10 @@ class TestBoundaryConditions:
     """Tests at exact threshold values to verify strict/non-strict comparisons."""
 
     def test_relevance_at_exact_threshold(self):
-        """Score exactly at RELEVANCE_MIN_SCORE (0.15) should be KEPT."""
+        """Score above RELEVANCE_MIN_SCORE (0.10) should be KEPT."""
         # score_relevance uses >= threshold in get_task_history
-        # Need a query/message pair that scores exactly 0.15
-        # 1 match out of ~6-7 tokens ≈ 0.15
-        # "alpha beta gamma delta epsilon zeta eta" → 7 tokens
-        # If message has "alpha" → 1/7 ≈ 0.143 (below)
         # "alpha beta gamma delta epsilon zeta" → 6 tokens
-        # 1 match → 1/6 ≈ 0.167 (above)
+        # 1 match → 1/6 ≈ 0.167 (above 0.10)
         score = score_relevance(
             "alpha beta gamma delta epsilon zeta",
             "alpha unrelated words",
@@ -246,12 +242,12 @@ class TestBoundaryConditions:
         assert score >= RELEVANCE_MIN_SCORE
 
     def test_relevance_below_threshold(self):
-        """Score below RELEVANCE_MIN_SCORE (0.15) should be dropped."""
+        """Score below RELEVANCE_MIN_SCORE (0.10) should be dropped."""
         score = score_relevance(
-            "alpha beta gamma delta epsilon zeta eta",
+            "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda",
             "alpha unrelated words",
         )
-        # 1 match out of 7 query tokens = 0.143
+        # 1 match out of 11 query tokens = 0.0909
         assert score < RELEVANCE_MIN_SCORE
 
     def test_topic_change_at_exact_threshold(self):
@@ -285,14 +281,9 @@ class TestBoundaryConditions:
 
     def test_budget_one_token_over(self):
         """Messages one token over budget should trigger trimming."""
-        # 2 messages: one older, one recent — both big
-        chars_each = (CONTEXT_TOKEN_BUDGET * CHARS_PER_TOKEN) // 2 + CHARS_PER_TOKEN
-        msgs = [
-            {"role": "user", "content": "a" * chars_each},
-            {"role": "user", "content": "b" * chars_each},
-            {"role": "user", "content": "c" * chars_each},
-            {"role": "user", "content": "d" * chars_each},
-        ]
+        # Need > BUDGET_KEEP_RECENT messages so some are in the "older" group
+        chars_each = (CONTEXT_TOKEN_BUDGET * CHARS_PER_TOKEN) // 4 + CHARS_PER_TOKEN
+        msgs = [{"role": "user", "content": chr(ord("a") + i) * chars_each} for i in range(8)]
         result, dropped = apply_token_budget(msgs)
         assert dropped > 0
 
@@ -434,11 +425,16 @@ class TestSummaryPairProtection:
         summary_ack = {"role": "assistant", "content": "Understood, I have context."}
         droppable1 = {"role": "user", "content": "d" * 4000}
         droppable2 = {"role": "user", "content": "e" * 4000}
+        droppable3 = {"role": "user", "content": "f" * 4000}
+        droppable4 = {"role": "user", "content": "g" * 4000}
         recent1 = {"role": "user", "content": "recent msg 1"}
         recent2 = {"role": "user", "content": "recent msg 2"}
         recent3 = {"role": "user", "content": "recent msg 3"}
+        recent4 = {"role": "user", "content": "recent msg 4"}
+        recent5 = {"role": "user", "content": "recent msg 5"}
 
-        msgs = [summary_user, summary_ack, droppable1, droppable2, recent1, recent2, recent3]
+        msgs = [summary_user, summary_ack, droppable1, droppable2, droppable3, droppable4,
+                recent1, recent2, recent3, recent4, recent5]
         result, dropped = apply_token_budget(msgs, budget=500)
 
         # Summary should survive, droppable messages removed
@@ -452,9 +448,11 @@ class TestSummaryPairProtection:
         recent1 = {"role": "user", "content": "r" * 4000}
         recent2 = {"role": "user", "content": "r" * 4000}
         recent3 = {"role": "user", "content": "r" * 4000}
+        recent4 = {"role": "user", "content": "r" * 4000}
+        recent5 = {"role": "user", "content": "r" * 4000}
 
-        # Budget so tight only recent 3 fit
-        msgs = [summary_user, summary_ack, recent1, recent2, recent3]
+        # Budget so tight only recent 5 fit
+        msgs = [summary_user, summary_ack, recent1, recent2, recent3, recent4, recent5]
         result, dropped = apply_token_budget(msgs, budget=100)
 
         # Summary should be dropped (no other droppable), dropped count includes +2
@@ -1061,19 +1059,18 @@ class TestGetTaskHistoryDetailed:
         assert "nginx proxy configuration" in contents
 
     async def test_exactly_one_older_irrelevant(self, tmp_path):
-        """Exactly one older message beyond recent 3 — dropped if irrelevant."""
+        """Exactly one older message beyond recent 5 — dropped if irrelevant."""
         sm = _make_manager(tmp_path)
         sm.add_message("ch1", "user", "banana smoothie recipe blender")
-        sm.add_message("ch1", "user", "nginx recent 1")
-        sm.add_message("ch1", "user", "nginx recent 2")
-        sm.add_message("ch1", "user", "nginx recent 3")
+        for i in range(RELEVANCE_KEEP_RECENT):
+            sm.add_message("ch1", "user", f"nginx recent {i}")
 
         result = await sm.get_task_history(
             "ch1", max_messages=10, current_query="nginx proxy server",
         )
         contents = [m["content"] for m in result]
         assert "banana smoothie recipe blender" not in contents
-        assert len(result) == 3  # only recent 3
+        assert len(result) == RELEVANCE_KEEP_RECENT  # only recent 5
 
     async def test_relevance_cap_at_max_older(self, tmp_path):
         """Even if all older messages are relevant, cap at RELEVANCE_MAX_OLDER."""
@@ -1090,7 +1087,7 @@ class TestGetTaskHistoryDetailed:
         )
         non_summary = [m for m in result if _SUMMARY_PREFIX not in m["content"]
                        and "Understood" not in m["content"]]
-        # Cap: RELEVANCE_MAX_OLDER + RELEVANCE_KEEP_RECENT = 7 + 3 = 10
+        # Cap: RELEVANCE_MAX_OLDER + RELEVANCE_KEEP_RECENT = 10 + 5 = 15
         assert len(non_summary) <= RELEVANCE_MAX_OLDER + RELEVANCE_KEEP_RECENT
 
     async def test_original_order_preserved(self, tmp_path):
@@ -1132,18 +1129,18 @@ class TestSourceVerification:
     def test_manager_has_all_constants(self):
         """All context-handling constants are defined."""
         assert COMPACTION_THRESHOLD == 40
-        assert COMPACTION_MAX_CHARS == 500
+        assert COMPACTION_MAX_CHARS == 800
         assert TOPIC_CHANGE_SCORE_THRESHOLD == 0.05
         assert TOPIC_CHANGE_TIME_GAP == 300
         assert TOPIC_CHANGE_RECENT_WINDOW == 5
-        assert RELEVANCE_KEEP_RECENT == 3
-        assert RELEVANCE_MIN_SCORE == 0.15
-        assert RELEVANCE_MAX_OLDER == 7
+        assert RELEVANCE_KEEP_RECENT == 5
+        assert RELEVANCE_MIN_SCORE == 0.10
+        assert RELEVANCE_MAX_OLDER == 10
         assert TOOL_SUMMARY_THRESHOLD == 10
         assert TOOL_SUMMARY_MAX_CHARS == 500
-        assert CONTEXT_TOKEN_BUDGET == 8000
+        assert CONTEXT_TOKEN_BUDGET == 16000
         assert CHARS_PER_TOKEN == 4
-        assert BUDGET_KEEP_RECENT == 3
+        assert BUDGET_KEEP_RECENT == 5
 
     def test_summary_prefix_constant(self):
         """_SUMMARY_PREFIX is the expected string."""
