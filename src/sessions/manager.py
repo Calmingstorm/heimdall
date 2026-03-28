@@ -38,6 +38,7 @@ RELEVANCE_MAX_OLDER = 10  # max older messages to include beyond recent window
 # Tool output summarization constants
 TOOL_SUMMARY_THRESHOLD = 10  # summarize when this many tool calls occurred
 TOOL_SUMMARY_MAX_CHARS = 500  # max chars for summarized tool response in history
+CHAT_RESPONSE_MAX_CHARS = 1500  # max chars for text-only (no-tool) response in history
 
 # Context budget constants
 CONTEXT_TOKEN_BUDGET = 16000  # max estimated tokens for history sent to LLM

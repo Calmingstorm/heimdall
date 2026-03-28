@@ -32,7 +32,7 @@ from ..llm.system_prompt import build_system_prompt, build_chat_system_prompt
 from ..logging import get_logger
 from ..scheduler import Scheduler
 from ..sessions import SessionManager
-from ..sessions.manager import summarize_tool_response
+from ..sessions.manager import CHAT_RESPONSE_MAX_CHARS, summarize_tool_response
 from ..tools import ToolExecutor, SkillManager, get_tool_definitions
 from ..tools.tool_memory import ToolMemory
 from ..search import LocalEmbedder, SessionVectorStore
@@ -1665,7 +1665,7 @@ class HeimdallBot(discord.Client):
             else:
                 # Save text-only (chat) responses too — the LLM needs to
                 # remember what it said.  Truncate to keep history lean.
-                history_response = response[:800] if len(response) > 800 else response
+                history_response = response[:CHAT_RESPONSE_MAX_CHARS] if len(response) > CHAT_RESPONSE_MAX_CHARS else response
             if not is_guest:
                 self.sessions.add_message(channel_id, "assistant", history_response)
             self.sessions.prune()
