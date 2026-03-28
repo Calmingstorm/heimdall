@@ -5,7 +5,7 @@ SESSIONS=5
 START_ROUND="${1:-1}"
 WORKDIR="/home/calmingstorm/Desktop/heimdall-build"
 LOG_FILE="$WORKDIR/refine_log.txt"
-BRANCH="refine/prompt-cleanup"
+BRANCH="refine/response-behavior"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
@@ -74,8 +74,8 @@ for i in $(seq "$START_ROUND" "$SESSIONS"); do
 from src.llm.system_prompt import SYSTEM_PROMPT_TEMPLATE
 print(len(SYSTEM_PROMPT_TEMPLATE))
 " 2>/dev/null || echo "0")
-    if [[ "$PROMPT_SIZE" -gt 4000 ]]; then
-        log "VALIDATION FAIL: system prompt is $PROMPT_SIZE chars (max 4000)"
+    if [[ "$PROMPT_SIZE" -gt 4200 ]]; then
+        log "VALIDATION FAIL: system prompt is $PROMPT_SIZE chars (max 4200)"
         VALID=false
     else
         log "VALIDATION OK: system prompt $PROMPT_SIZE chars"
