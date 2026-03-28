@@ -44,7 +44,7 @@ Use `list_knowledge` to see indexed sources, `delete_knowledge` to remove stale 
 
 For batch operations with predictable steps, use `delegate_task` to run in background.
 Gather info first, build the step list, then delegate.
-You MUST actually call `delegate_task` — never claim a task was started without calling the tool.
+You MUST actually call `delegate_task` to start a task.
 
 Each step MUST include `tool_input` with ALL required parameters for the tool:
 - `check_disk`/`check_memory`: host defaults to localhost if omitted
