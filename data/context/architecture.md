@@ -138,8 +138,8 @@ Discord attachment.
 ## Common Patterns
 
 Health checks: run check_disk, check_memory on all hosts + query_prometheus in parallel.
-Multi-line scripts: use run_script (temp file, no heredocs). Bot code blocks: run_script.
-Images: download and attach via post_file. Never paste URLs.
+Multi-line scripts or code blocks: use run_script (creates temp file, avoids heredoc issues).
+Images: download and attach via post_file. Never paste raw URLs.
 PDFs: auto-extracted from attachments. Use `analyze_pdf` for URL/host PDFs.
 
 ## Defense Mechanisms
