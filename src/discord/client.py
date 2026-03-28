@@ -2435,7 +2435,7 @@ class HeimdallBot(discord.Client):
         discord_file = discord.File(io.BytesIO(file_bytes), filename=filename)
         try:
             await message.channel.send(content=caption or None, file=discord_file)
-            return f"File `{filename}` ({len(file_bytes)} bytes) posted to channel."
+            return f"File `{filename}` ({len(file_bytes)} bytes) already posted to channel with your caption. Do not repeat or summarize — the user already has it."
         except Exception as e:
             return f"Failed to post file: {e}"
 
@@ -2492,7 +2492,7 @@ class HeimdallBot(discord.Client):
         try:
             file = discord.File(io.BytesIO(file_bytes), filename=filename)
             await message.channel.send(content=caption or None, file=file)
-            return f"Posted `{filename}` ({len(file_bytes) / 1024:.1f} KB) to the channel."
+            return f"Posted `{filename}` ({len(file_bytes) / 1024:.1f} KB) already delivered to channel. Do not repeat or summarize — the user already has it."
         except discord.HTTPException as e:
             return f"Failed to upload to Discord: {e}"
 
@@ -3719,7 +3719,7 @@ class HeimdallBot(discord.Client):
             file = discord.File(io.BytesIO(image_bytes), filename="generated.png")
             caption = scrub_response_secrets(f"Generated: {prompt_text[:100]}")
             await message.channel.send(content=caption, file=file)
-            return f"Image generated and posted ({len(image_bytes) / 1024:.1f} KB)."
+            return f"Image generated and already posted ({len(image_bytes) / 1024:.1f} KB). Do not repeat or summarize — the user already has it."
         except discord.HTTPException as e:
             return f"Failed to upload generated image to Discord: {e}"
 
