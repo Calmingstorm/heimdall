@@ -2,3 +2,20 @@
 [2026-03-27 23:55:43] Preflight: passed
 [2026-03-27 23:55:43] === Context Retention Fix Loop Starting (rounds 1-6) ===
 [2026-03-27 23:55:43] --- Round 1/6 ---
+Round 1 complete. Here's what was done:
+
+**Problem 1** (client.py:1660-1670): Removed the `pass` that silently dropped text-only responses. Now ALL non-error assistant responses are saved to history. Text-only responses are truncated to 800 chars; tool-bearing responses still go through `summarize_tool_response`.
+
+**Problem 2** (client.py:1320): Changed `"[Image attached: {filename}]"` to `"[User shared image: {filename}]"` for a more descriptive marker.
+
+**Problem 3** (manager.py:34-36): Loosened relevance scoring — keep 5 recent messages (was 3), lower min score to 0.10 (was 0.15), allow up to 10 older relevant messages (was 7).
+
+**Problem 4** (manager.py:26,43-45): Doubled token budget to 16000 (was 8000), protect 5 recent messages in budget (was 3), allow richer compaction summaries at 800 chars (was 500).
+[2026-03-27 23:57:20] TESTS: skipped (code round)
+[2026-03-27 23:57:20] Round 1 PASSED (ok) in 97s
+[2026-03-27 23:57:20] Pausing 10s...
+[2026-03-27 23:57:30] --- Round 2/6 ---
+[2026-03-28 00:02:04] TESTS: skipped (code round)
+[2026-03-28 00:02:04] Round 2 PASSED (ok) in 274s
+[2026-03-28 00:02:04] Pausing 10s...
+[2026-03-28 00:02:14] --- Round 3/6 ---

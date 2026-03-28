@@ -500,7 +500,7 @@ class SessionManager:
                 "content": "Understood, I have context from our previous conversation.",
             })
 
-        # Enforce token budget — drop oldest first, keep recent 3
+        # Enforce token budget — drop oldest first, keep recent BUDGET_KEEP_RECENT
         messages, budget_dropped = apply_token_budget(messages)
         if budget_dropped > 0:
             log.info(
@@ -550,7 +550,7 @@ class SessionManager:
             "and any response where the assistant could not do something.\n"
             "4. OMIT: Any data not confirmed by actual tool results.\n"
             "5. OMIT: Conversational filler, greetings, acknowledgments.\n"
-            "6. Keep the ENTIRE summary under 500 characters.\n"
+            f"6. Keep the ENTIRE summary under {COMPACTION_MAX_CHARS} characters.\n"
             "7. Each bullet: WHAT happened → OUTCOME (host/path/service if applicable)."
         )
 
