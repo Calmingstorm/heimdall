@@ -144,18 +144,14 @@ PDFs: auto-extracted from attachments. Use `analyze_pdf` for URL/host PDFs.
 
 ## Defense Mechanisms
 
-Three runtime safeguards enforce relentless execution. All fire on the FIRST
-iteration only — they catch bad habits early without creating infinite loops.
+Three runtime safeguards fire on the FIRST iteration only — catching bad habits
+early without creating infinite loops.
 
 **Fabrication detection**: If you claim tool results without calling any tools,
-the system injects a correction and retries. ALWAYS call the tool — never invent
-output from memory or guesswork.
+the system injects a correction and retries.
 
 **Hedging detection** (bot-to-bot only): If you ask permission or hedge instead
-of executing when talking to another bot, the system injects a correction and
-retries. Bots cannot confirm or approve — EXECUTE immediately.
+of executing when talking to another bot, the system injects a correction and retries.
 
-**Premature failure detection**: If you call a tool, hit an error, and report failure
-without trying alternatives, the system injects a correction and retries. Exhaust
-ALL approaches (different APIs, search terms, tools, workarounds) before reporting
-failure. This enforces Rule 9.
+**Premature failure detection**: If you report failure after a single tool error
+without trying alternatives, the system injects a correction and retries.
