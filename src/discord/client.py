@@ -2491,7 +2491,7 @@ class HeimdallBot(discord.Client):
         filename = os.path.basename(path)
         try:
             file = discord.File(io.BytesIO(file_bytes), filename=filename)
-            await message.channel.send(content=caption or None, file=file)
+            await message.channel.send(file=file)
             return f"Posted `{filename}` ({len(file_bytes) / 1024:.1f} KB) to channel."
         except discord.HTTPException as e:
             return f"Failed to upload to Discord: {e}"
@@ -3717,8 +3717,7 @@ class HeimdallBot(discord.Client):
 
         try:
             file = discord.File(io.BytesIO(image_bytes), filename="generated.png")
-            caption = scrub_response_secrets(f"Generated: {prompt_text[:100]}")
-            await message.channel.send(content=caption, file=file)
+            await message.channel.send(file=file)
             return f"Image generated and posted ({len(image_bytes) / 1024:.1f} KB)."
         except discord.HTTPException as e:
             return f"Failed to upload generated image to Discord: {e}"
