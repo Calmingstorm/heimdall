@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SESSIONS=5
+SESSIONS=6
 START_ROUND="${1:-1}"
 WORKDIR="/home/calmingstorm/Desktop/heimdall-build"
 LOG_FILE="$WORKDIR/context_fix_log.txt"
@@ -39,10 +39,9 @@ Read BUILD_STATUS.md — find "Round ROUND_NUM" and do EXACTLY what it says.
 
 CRITICAL RULES:
 - Primary files: src/discord/client.py and src/sessions/manager.py
-- You may also modify test files if YOUR changes break them
+- Rounds 1-5: Do NOT run tests. Do NOT modify test files. Code changes only.
+- Round 6: Tests ONLY. Do NOT modify src/ code. Fix tests to match new code + write new tests.
 - Do NOT modify system_prompt.py or architecture.md
-- Run tests after changes: python3 -m pytest tests/ -x -q --tb=short
-- Fix any test failures YOUR changes cause in the same round
 - Commit: git add -A && git commit -m "[Round ROUND_NUM]: description"
 
 If this is Round 2+, read the git diff from the previous round first:
@@ -74,13 +73,17 @@ for i in $(seq "$START_ROUND" "$SESSIONS"); do
     ELAPSED=$(( $(date +%s) - SESSION_START ))
     VALID=true
 
-    # Validate tests pass
-    TEST_OUTPUT=$(cd "$WORKDIR" && python3 -m pytest tests/ -x -q --tb=no 2>&1 | tail -3 || true)
-    if echo "$TEST_OUTPUT" | grep -q "passed"; then
-        log "TESTS: $TEST_OUTPUT"
+    # Validate tests pass (only on round 6)
+    if [[ $i -eq $SESSIONS ]]; then
+        TEST_OUTPUT=$(cd "$WORKDIR" && python3 -m pytest tests/ -x -q --tb=no 2>&1 | tail -3 || true)
+        if echo "$TEST_OUTPUT" | grep -q "passed"; then
+            log "TESTS: $TEST_OUTPUT"
+        else
+            log "TESTS FAILING: $TEST_OUTPUT"
+            VALID=false
+        fi
     else
-        log "TESTS FAILING: $TEST_OUTPUT"
-        VALID=false
+        log "TESTS: skipped (code round)"
     fi
 
     # Validate detection functions still present
