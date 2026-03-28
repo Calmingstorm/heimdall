@@ -436,8 +436,8 @@ class TestParentSessionProtection:
         assert "SessionManager" not in source
         assert "self.sessions" not in source
 
-    async def test_announce_bypasses_session(self):
-        """Announce callback posts to Discord, not to session history."""
+    async def test_agent_results_stored_not_announced(self):
+        """Agent results are stored internally, not announced to Discord."""
         mgr = AgentManager()
         announce_calls = []
         async def _announce(ch_id, text):
@@ -445,13 +445,15 @@ class TestParentSessionProtection:
 
         iter_cb = AsyncMock(return_value={
             "text": "Result here.", "tool_calls": [], "stop_reason": "end_turn"})
-        mgr.spawn("test", "goal", "100", "u1", "u1",
+        aid = mgr.spawn("test", "goal", "100", "u1", "u1",
                    iter_cb, AsyncMock(return_value="ok"), _announce)
         await asyncio.sleep(0.05)
 
-        assert len(announce_calls) == 1
-        assert "Result here." in announce_calls[0][1]
-        assert announce_calls[0][0] == "100"
+        # Agent should NOT announce — results stored internally
+        assert len(announce_calls) == 0
+        agent = mgr._agents[aid]
+        assert agent.status == "completed"
+        assert agent.result == "Result here."
 
     def test_manager_has_no_session_dependency(self):
         """AgentManager doesn't import or reference SessionManager."""
@@ -467,97 +469,75 @@ class TestParentSessionProtection:
 # Agent result labeling
 # ---------------------------------------------------------------------------
 
-class TestResultLabeling:
-    """Agent results are labeled with [Agent: {label}] format."""
+class TestResultStorage:
+    """Agent results stored internally for parent collection (no Discord posting)."""
 
-    async def test_completed_result_labeled(self):
-        """Completed agent result includes [Agent: label] tag."""
+    async def test_completed_result_stored(self):
+        """Completed agent stores result in agent.result."""
         mgr = AgentManager()
-        announced = []
-        async def _announce(ch_id, text):
-            announced.append(text)
-
         iter_cb = AsyncMock(return_value={
             "text": "All clear.", "tool_calls": [], "stop_reason": "end_turn"})
-        mgr.spawn("disk-check", "Check disk", "100", "u1", "u1",
-                   iter_cb, AsyncMock(return_value="ok"), _announce)
+        aid = mgr.spawn("disk-check", "Check disk", "100", "u1", "u1",
+                   iter_cb, AsyncMock(return_value="ok"))
         await asyncio.sleep(0.05)
 
-        assert len(announced) == 1
-        assert "**[Agent: disk-check]**" in announced[0]
-        assert "All clear." in announced[0]
+        agent = mgr._agents[aid]
+        assert agent.status == "completed"
+        assert agent.result == "All clear."
 
-    async def test_failed_result_labeled(self):
-        """Failed agent result includes [Agent: label] tag."""
+    async def test_failed_result_stored(self):
+        """Failed agent stores error in agent.error."""
         mgr = AgentManager()
-        announced = []
-        async def _announce(ch_id, text):
-            announced.append(text)
 
         async def _fail_iter(messages, sys, tools):
             raise RuntimeError("LLM down")
 
-        mgr.spawn("net-check", "Check network", "100", "u1", "u1",
-                   _fail_iter, AsyncMock(return_value="ok"), _announce)
+        aid = mgr.spawn("net-check", "Check network", "100", "u1", "u1",
+                   _fail_iter, AsyncMock(return_value="ok"))
         await asyncio.sleep(0.05)
 
-        assert len(announced) == 1
-        assert "**[Agent: net-check]**" in announced[0]
+        agent = mgr._agents[aid]
+        assert agent.status == "failed"
+        assert "LLM down" in agent.error
 
-    async def test_result_label_format(self):
-        """Result follows pattern: **[Agent: {label}]** ({status_text})"""
+    async def test_get_results_returns_stored_data(self):
+        """get_results returns the internally stored result."""
         mgr = AgentManager()
-        announced = []
-        async def _announce(ch_id, text):
-            announced.append(text)
-
         iter_cb = AsyncMock(return_value={
             "text": "Done.", "tool_calls": [], "stop_reason": "end_turn"})
-        mgr.spawn("my-task", "do it", "100", "u1", "u1",
-                   iter_cb, AsyncMock(return_value="ok"), _announce)
+        aid = mgr.spawn("my-task", "do it", "100", "u1", "u1",
+                   iter_cb, AsyncMock(return_value="ok"))
         await asyncio.sleep(0.05)
 
-        # Pattern: **[Agent: my-task]** (completed in Xs, N tool calls)
-        text = announced[0]
-        assert text.startswith("**[Agent: my-task]**")
-        assert "completed" in text
+        results = mgr.get_results(aid)
+        assert results["status"] == "completed"
+        assert results["result"] == "Done."
+        assert results["label"] == "my-task"
 
-    async def test_result_scrubbed_for_secrets(self):
-        """Agent results are scrubbed before announcement."""
+    async def test_no_discord_posting(self):
+        """Agents do NOT call announce callback."""
         mgr = AgentManager()
-        announced = []
-        async def _announce(ch_id, text):
-            announced.append(text)
-
-        # Return text with a secret pattern
+        announce = AsyncMock()
         iter_cb = AsyncMock(return_value={
-            "text": "Found password=s3cr3t123 in config.",
-            "tool_calls": [], "stop_reason": "end_turn"})
-        mgr.spawn("sec-check", "Check security", "100", "u1", "u1",
-                   iter_cb, AsyncMock(return_value="ok"), _announce)
+            "text": "Result.", "tool_calls": [], "stop_reason": "end_turn"})
+        mgr.spawn("silent-task", "work quietly", "100", "u1", "u1",
+                   iter_cb, AsyncMock(return_value="ok"), announce)
         await asyncio.sleep(0.05)
 
-        # Secret should be scrubbed in the announcement
-        text = announced[0]
-        assert "s3cr3t123" not in text
+        announce.assert_not_called()
 
-    async def test_long_result_truncated(self):
-        """Very long results are truncated in announcement."""
+    async def test_long_result_stored_in_full(self):
+        """Full result is stored internally (no truncation)."""
         mgr = AgentManager()
-        announced = []
-        async def _announce(ch_id, text):
-            announced.append(text)
-
         long_text = "x" * 5000
         iter_cb = AsyncMock(return_value={
             "text": long_text, "tool_calls": [], "stop_reason": "end_turn"})
-        mgr.spawn("big-task", "big work", "100", "u1", "u1",
-                   iter_cb, AsyncMock(return_value="ok"), _announce)
+        aid = mgr.spawn("big-task", "big work", "100", "u1", "u1",
+                   iter_cb, AsyncMock(return_value="ok"))
         await asyncio.sleep(0.05)
 
-        text = announced[0]
-        assert len(text) < 2500  # Well under Discord limit
-        assert "..." in text
+        agent = mgr._agents[aid]
+        assert len(agent.result) == 5000
 
 
 # ---------------------------------------------------------------------------
@@ -776,22 +756,17 @@ class TestErrorIsolation:
     async def test_llm_error_contained(self):
         """LLM failure in agent doesn't propagate to caller."""
         mgr = AgentManager()
-        announced = []
-        async def _announce(ch_id, text):
-            announced.append(text)
 
         async def _fail(messages, sys, tools):
             raise ConnectionError("API unreachable")
 
         aid = mgr.spawn("failing", "fail task", "100", "u1", "u1",
-                         _fail, AsyncMock(return_value="ok"), _announce)
+                         _fail, AsyncMock(return_value="ok"))
         await asyncio.sleep(0.05)
 
         agent = mgr._agents.get(aid)
         assert agent.status == "failed"
         assert "API unreachable" in agent.error or "LLM call failed" in agent.error
-        # Result was announced
-        assert len(announced) == 1
 
     async def test_tool_error_doesnt_kill_agent(self):
         """Tool execution error is captured and agent continues."""
@@ -817,21 +792,19 @@ class TestErrorIsolation:
         assert agent.status == "completed"
         assert agent.result == "Recovered."
 
-    async def test_announce_failure_doesnt_crash(self):
-        """If announce callback fails, agent still completes."""
+    async def test_agent_completes_without_announce_callback(self):
+        """Agent completes successfully without announce callback."""
         mgr = AgentManager()
-
-        async def _bad_announce(ch_id, text):
-            raise RuntimeError("Discord down")
 
         iter_cb = AsyncMock(return_value={
             "text": "Done.", "tool_calls": [], "stop_reason": "end_turn"})
         aid = mgr.spawn("test", "goal", "100", "u1", "u1",
-                         iter_cb, AsyncMock(return_value="ok"), _bad_announce)
+                         iter_cb, AsyncMock(return_value="ok"))
         await asyncio.sleep(0.05)
 
         agent = mgr._agents.get(aid)
         assert agent.status == "completed"
+        assert agent.result == "Done."
 
 
 # ---------------------------------------------------------------------------
@@ -870,10 +843,10 @@ class TestSecretScrubbing:
             content = tool_result_msgs[0]["content"]
             assert "sk-abc123secretkey" not in content
 
-    async def test_result_announcement_scrubbed(self):
-        """Final result text is scrubbed before channel announcement."""
+    async def test_tool_results_scrubbed_in_run_agent(self):
+        """Tool results are scrubbed during agent execution."""
         import src.agents.manager as mgr_mod
-        source = inspect.getsource(mgr_mod._announce_formatted)
+        source = inspect.getsource(mgr_mod._run_agent)
         assert "scrub_output_secrets" in source
 
 
@@ -921,9 +894,10 @@ class TestSourceVerification:
         source = inspect.getsource(mod)
         assert "SessionManager" not in source
 
-    def test_announce_formatted_scrubs_secrets(self):
+    def test_run_agent_scrubs_tool_results(self):
+        """Agent tool results are scrubbed of secrets."""
         import src.agents.manager as mod
-        source = inspect.getsource(mod._announce_formatted)
+        source = inspect.getsource(mod._run_agent)
         assert "scrub_output_secrets" in source
 
     def test_run_agent_scrubs_tool_results(self):
@@ -980,11 +954,11 @@ class TestClientIntegration:
         assert "agent_manager" in source
         assert "AgentManager" in source
 
-    def test_announce_callback_uses_scrub(self):
-        """Announce callback scrubs secrets before sending."""
-        import src.discord.client as mod
-        source = inspect.getsource(mod.HeimdallBot._handle_spawn_agent)
-        assert "scrub_response_secrets" in source
+    def test_agent_tool_results_scrubbed(self):
+        """Agent execution scrubs secrets from tool results."""
+        import src.agents.manager as mod
+        source = inspect.getsource(mod._run_agent)
+        assert "scrub_output_secrets" in source
 
 
 # ---------------------------------------------------------------------------

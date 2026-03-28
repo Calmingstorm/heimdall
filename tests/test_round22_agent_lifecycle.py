@@ -88,13 +88,10 @@ class TestAutoTerminateTimeout:
         assert agent.status == "timeout"
         assert agent.ended_at is not None
 
-    async def test_timeout_announces_result(self):
-        """Timed-out agent announces to channel."""
+    async def test_timeout_stores_result_silently(self):
+        """Timed-out agent stores result without announcing."""
         mgr = AgentManager()
-        announced = []
-
-        async def _announce(ch_id, text):
-            announced.append(text)
+        announce = AsyncMock()
 
         call_count = {"n": 0}
         async def _iter(messages, sys, tools):
@@ -106,13 +103,13 @@ class TestAutoTerminateTimeout:
                     "stop_reason": "end_turn"}
 
         aid = mgr.spawn("timeout-ann", "task", "100", "u1", "u1",
-                         _iter, AsyncMock(return_value="ok"), _announce)
+                         _iter, AsyncMock(return_value="ok"), announce)
         agent = mgr._agents[aid]
         agent.created_at = time.time() - MAX_AGENT_LIFETIME - 10
         await asyncio.sleep(0.2)
 
-        assert len(announced) >= 1
-        assert "timed out" in announced[0]
+        assert agent.status == "timeout"
+        announce.assert_not_called()
 
     async def test_timeout_preserves_last_progress(self):
         """Timed-out agent preserves last assistant message as result."""
@@ -534,21 +531,19 @@ class TestErrorIsolation:
         assert agent.status == "killed"
         assert agent.ended_at is not None
 
-    async def test_announce_failure_doesnt_crash_agent(self):
-        """If announce callback fails, agent still completes."""
+    async def test_agent_completes_without_announce(self):
+        """Agent completes with no announce callback (silent workers)."""
         mgr = AgentManager()
-
-        async def _bad_announce(ch_id, text):
-            raise RuntimeError("Discord is down")
 
         iter_cb = AsyncMock(return_value={
             "text": "Done.", "tool_calls": [], "stop_reason": "end_turn"})
-        aid = mgr.spawn("ann-fail", "goal", "100", "u1", "u1",
-                         iter_cb, AsyncMock(return_value="ok"), _bad_announce)
+        aid = mgr.spawn("silent", "goal", "100", "u1", "u1",
+                         iter_cb, AsyncMock(return_value="ok"))
         await asyncio.sleep(0.1)
 
         agent = mgr._agents.get(aid)
         assert agent.status == "completed"
+        assert agent.result == "Done."
 
     async def test_multiple_agents_one_fails(self):
         """One agent failing doesn't affect siblings."""

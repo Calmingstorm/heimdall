@@ -644,8 +644,8 @@ class TestAgentEndToEnd:
         assert "42%" in agent.result
         assert "run_command" in agent.tools_used
         assert agent.iteration_count == 2
-        # Announce should have been called with result
-        announce.assert_called()
+        # Agents are silent — announce should NOT be called
+        announce.assert_not_called()
 
     async def test_agent_receives_injected_message(self):
         """send_to_agent injects messages into the agent's context."""
@@ -719,7 +719,7 @@ class TestAgentEndToEnd:
 
         assert agent.status == "failed"
         assert "LLM" in agent.error or "exploded" in agent.error
-        announce.assert_called()
+        announce.assert_not_called()
 
     async def test_agent_kill_flow(self):
         """Kill signal should stop the agent."""
@@ -859,18 +859,18 @@ class TestContextIsolation:
 # Announce flow
 # ===========================================================================
 
-class TestAnnounceFlow:
-    """Tests for agent result announcement."""
+class TestSilentAgentFlow:
+    """Tests that agents are silent internal workers — no Discord posting."""
 
-    async def test_completed_agent_announces(self):
-        """Agent completion should trigger announce callback."""
+    async def test_completed_agent_does_not_announce(self):
+        """Agent completion should NOT trigger announce callback."""
         mgr = AgentManager()
         announce = AsyncMock()
 
         async def iteration_cb(messages, system, tools):
             return {"text": "Task complete.", "tool_calls": []}
 
-        mgr.spawn(
+        aid = mgr.spawn(
             label="announcer", goal="Do and announce",
             channel_id="999", requester_id="456", requester_name="Tester",
             iteration_callback=iteration_cb,
@@ -879,21 +879,21 @@ class TestAnnounceFlow:
         )
 
         await asyncio.sleep(0.3)
-        announce.assert_called()
-        call_args = announce.call_args
-        assert call_args[0][0] == "999"  # channel_id
-        assert "Agent: announcer" in call_args[0][1]
-        assert "completed" in call_args[0][1]
+        announce.assert_not_called()
+        # Results stored internally for collection
+        agent = mgr._agents[aid]
+        assert agent.status == "completed"
+        assert agent.result == "Task complete."
 
-    async def test_failed_agent_announces_error(self):
-        """Agent failure should announce error to channel."""
+    async def test_failed_agent_does_not_announce(self):
+        """Agent failure should NOT announce to channel."""
         mgr = AgentManager()
         announce = AsyncMock()
 
         async def iteration_cb(messages, system, tools):
             raise ValueError("Something broke")
 
-        mgr.spawn(
+        aid = mgr.spawn(
             label="broken", goal="Break things",
             channel_id="888", requester_id="456", requester_name="Tester",
             iteration_callback=iteration_cb,
@@ -902,10 +902,10 @@ class TestAnnounceFlow:
         )
 
         await asyncio.sleep(0.3)
-        announce.assert_called()
-        call_args = announce.call_args
-        assert "Agent: broken" in call_args[0][1]
-        assert "failed" in call_args[0][1]
+        announce.assert_not_called()
+        agent = mgr._agents[aid]
+        assert agent.status == "failed"
+        assert "Something broke" in agent.error
 
 
 # ===========================================================================
@@ -965,12 +965,12 @@ class TestSourceVerification:
                       "kill_agent", "get_agent_results"):
             assert name in source
 
-    def test_handler_uses_scrub_response_secrets(self):
-        """spawn_agent announce callback should scrub secrets."""
+    def test_agent_run_scrubs_secrets(self):
+        """Agent execution scrubs secrets from tool results."""
         import inspect
-        from src.discord.client import HeimdallBot
-        source = inspect.getsource(HeimdallBot._handle_spawn_agent)
-        assert "scrub_response_secrets" in source
+        from src.agents.manager import _run_agent
+        source = inspect.getsource(_run_agent)
+        assert "scrub_output_secrets" in source
 
     def test_handler_uses_loop_message_proxy(self):
         """spawn_agent should create a _LoopMessageProxy for tool dispatch."""

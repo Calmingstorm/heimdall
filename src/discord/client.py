@@ -3071,12 +3071,6 @@ class HeimdallBot(discord.Client):
             )
             return str(result) if result is not None else ""
 
-        # Announce callback — posts results to the parent channel
-        async def _announce_cb(ch_id: str, text: str) -> None:
-            target = self.get_channel(int(ch_id)) if ch_id.isdigit() else channel
-            if target:
-                await target.send(scrub_response_secrets(text))
-
         agent_id = self.agent_manager.spawn(
             label=label,
             goal=goal,
@@ -3085,7 +3079,6 @@ class HeimdallBot(discord.Client):
             requester_name=user_name,
             iteration_callback=_iteration_cb,
             tool_executor_callback=_tool_exec_cb,
-            announce_callback=_announce_cb,
             tools=tools,
             system_prompt=system_prompt,
         )
@@ -3238,11 +3231,6 @@ class HeimdallBot(discord.Client):
                 loop_info.requester_id,
             )
 
-        async def _announce_cb(ch_id, text):
-            ch = self.bot.get_channel(int(ch_id)) if hasattr(self, "bot") else channel
-            if ch:
-                await ch.send(text[:2000])
-
         agent_ids = self.loop_agent_bridge.spawn_agents_for_loop(
             loop_id=loop_id,
             iteration=loop_info.iteration_count,
@@ -3253,7 +3241,6 @@ class HeimdallBot(discord.Client):
             requester_name=loop_info.requester_name,
             iteration_callback=_iteration_cb,
             tool_executor_callback=_tool_cb,
-            announce_callback=_announce_cb,
             tools=tools,
             system_prompt=system_prompt,
         )

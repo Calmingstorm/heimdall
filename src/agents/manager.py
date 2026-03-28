@@ -59,7 +59,8 @@ ToolExecutorCallback = Callable[
     Awaitable[str],
 ]
 
-# announce_callback: (channel_id, text) → None
+# announce_callback: DEPRECATED — agents no longer post directly to Discord.
+# Kept as optional parameter for API compat (loop_bridge passes it through).
 AnnounceCallback = Callable[
     [str, str],
     Awaitable[None],
@@ -105,7 +106,7 @@ class AgentManager:
         requester_name: str,
         iteration_callback: IterationCallback,
         tool_executor_callback: ToolExecutorCallback,
-        announce_callback: AnnounceCallback,
+        announce_callback: AnnounceCallback | None = None,
         tools: list[dict] | None = None,
         system_prompt: str = "",
     ) -> str:
@@ -292,7 +293,7 @@ class AgentManager:
         requester_name: str,
         iteration_callback: IterationCallback,
         tool_executor_callback: ToolExecutorCallback,
-        announce_callback: AnnounceCallback,
+        announce_callback: AnnounceCallback | None = None,
         tools: list[dict] | None = None,
         system_prompt: str = "",
     ) -> list[str]:
@@ -395,10 +396,14 @@ async def _run_agent(
     tools: list[dict],
     iteration_callback: IterationCallback,
     tool_executor_callback: ToolExecutorCallback,
-    announce_callback: AnnounceCallback,
+    announce_callback: AnnounceCallback | None = None,
 ) -> None:
-    """Execute an agent's tool loop until completion, error, or timeout."""
-    manager = None  # Will be set by the caller's context if needed
+    """Execute an agent's tool loop until completion, error, or timeout.
+
+    Agents are silent internal workers — they do NOT post directly to Discord.
+    Results are stored in agent.result/agent.error for the parent to collect
+    via wait_for_agents or get_agent_results.
+    """
 
     try:
         for iteration in range(MAX_AGENT_ITERATIONS):
@@ -406,7 +411,7 @@ async def _run_agent(
             if agent._cancel_event.is_set():
                 agent.status = "killed"
                 agent.ended_at = time.time()
-                _announce_result(agent, announce_callback)
+                log.info("Agent %s (%s) killed after %ds", agent.id, agent.label, int(time.time() - agent.created_at))
                 return
 
             # Check lifetime
@@ -415,10 +420,7 @@ async def _run_agent(
                 agent.status = "timeout"
                 agent.result = _get_last_progress(agent)
                 agent.ended_at = time.time()
-                await _announce_formatted(
-                    agent, announce_callback,
-                    f"timed out after {int(elapsed)}s, {agent.iteration_count} iterations",
-                )
+                log.warning("Agent %s (%s) timed out after %ds, %d iterations", agent.id, agent.label, int(elapsed), agent.iteration_count)
                 return
 
             # Check inbox for injected messages
@@ -447,14 +449,12 @@ async def _run_agent(
                 agent.status = "failed"
                 agent.error = f"LLM call timed out after {ITERATION_CB_TIMEOUT}s"
                 agent.ended_at = time.time()
-                await _announce_formatted(agent, announce_callback, f"failed (LLM timeout) after {int(time.time() - agent.created_at)}s")
                 return
             except Exception as e:
                 log.error("Agent %s LLM call failed at iteration %d: %s", agent.id, iteration, e)
                 agent.status = "failed"
                 agent.error = f"LLM call failed: {e}"
                 agent.ended_at = time.time()
-                await _announce_formatted(agent, announce_callback, f"failed after {int(time.time() - agent.created_at)}s")
                 return
 
             text = response.get("text", "")
@@ -469,10 +469,7 @@ async def _run_agent(
                 agent.result = text
                 agent.ended_at = time.time()
                 elapsed = time.time() - agent.created_at
-                await _announce_formatted(
-                    agent, announce_callback,
-                    f"completed in {int(elapsed)}s, {len(agent.tools_used)} tool calls",
-                )
+                log.info("Agent %s (%s) completed in %ds, %d tool calls", agent.id, agent.label, int(elapsed), len(agent.tools_used))
                 return
 
             # Execute tool calls
@@ -516,10 +513,7 @@ async def _run_agent(
         agent.result = _get_last_progress(agent)
         agent.ended_at = time.time()
         elapsed = time.time() - agent.created_at
-        await _announce_formatted(
-            agent, announce_callback,
-            f"completed in {int(elapsed)}s after {MAX_AGENT_ITERATIONS} iterations, {len(agent.tools_used)} tool calls",
-        )
+        log.info("Agent %s (%s) completed in %ds after %d iterations (max reached), %d tool calls", agent.id, agent.label, int(elapsed), MAX_AGENT_ITERATIONS, len(agent.tools_used))
 
     except asyncio.CancelledError:
         agent.status = "killed"
@@ -531,13 +525,6 @@ async def _run_agent(
         agent.error = str(e)
         agent.ended_at = time.time()
         log.error("Agent %s (%s) crashed: %s", agent.id, agent.label, e)
-        try:
-            await _announce_formatted(
-                agent, announce_callback,
-                f"failed after {int(time.time() - agent.created_at)}s",
-            )
-        except Exception:
-            pass
 
 
 def _get_last_progress(agent: AgentInfo) -> str:
@@ -548,28 +535,3 @@ def _get_last_progress(agent: AgentInfo) -> str:
     return "(no output)"
 
 
-async def _announce_formatted(
-    agent: AgentInfo,
-    announce_callback: AnnounceCallback,
-    status_text: str,
-) -> None:
-    """Post formatted result to parent channel."""
-    content = agent.result or agent.error or "(no output)"
-    content = scrub_output_secrets(content)
-    # Truncate for Discord
-    if len(content) > 1800:
-        content = content[:1800] + "..."
-
-    text = f"**[Agent: {agent.label}]** ({status_text})\n{content}"
-    try:
-        await announce_callback(agent.channel_id, text)
-    except Exception as e:
-        log.warning("Failed to announce agent %s result: %s", agent.id, e)
-
-
-def _announce_result(agent: AgentInfo, announce_callback: AnnounceCallback) -> None:
-    """Fire-and-forget announcement for sync contexts (killed status)."""
-    status_text = f"killed after {int(time.time() - agent.created_at)}s"
-    asyncio.ensure_future(
-        _announce_formatted(agent, announce_callback, status_text)
-    )

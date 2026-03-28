@@ -181,10 +181,8 @@ class TestAgentFullLifecycle:
         assert r["iteration_count"] == 2
         assert r["runtime_seconds"] >= 0
 
-        # Announce callback should have been called
-        assert len(announce.calls) == 1
-        assert "completed" in announce.calls[0]["text"]
-        assert "disk-check" in announce.calls[0]["text"]
+        # Agents are silent — no announce callback
+        assert len(announce.calls) == 0
 
     async def test_agent_no_tools_completes_immediately(self):
         """Agent that returns text without tool calls completes in 1 iteration."""
@@ -1999,11 +1997,11 @@ class TestWebChatSessionDetectionIntegration:
 # 17. Agent + Secret Scrubbing + Announce Integration
 # ===========================================================================
 
-class TestAgentAnnounceIntegration:
-    """Test agent announcement formatting and secret scrubbing."""
+class TestAgentSilentBehaviorIntegration:
+    """Test agents are silent internal workers — no Discord posting."""
 
-    async def test_announce_on_completion_includes_result(self):
-        """Agent completion announcement includes result text."""
+    async def test_completed_agent_stores_result_no_announce(self):
+        """Completed agent stores result internally, does not announce."""
         mgr = AgentManager()
         announce = _make_announce_cb()
 
@@ -2022,40 +2020,39 @@ class TestAgentAnnounceIntegration:
 
         await mgr.wait_for_agents([agent_id], timeout=10)
 
-        assert len(announce.calls) == 1
-        text = announce.calls[0]["text"]
-        assert "health-report" in text
-        assert "All servers healthy" in text
-        assert "completed" in text
+        # Agent should NOT post to Discord
+        assert len(announce.calls) == 0
+        # Result stored internally
+        results = mgr.get_results(agent_id)
+        assert results["status"] == "completed"
+        assert "All servers healthy" in results["result"]
 
-    async def test_announce_scrubs_secrets(self):
-        """Agent announcement scrubs secrets from result."""
+    async def test_results_collected_via_wait_for_agents(self):
+        """Parent collects agent results via wait_for_agents."""
         mgr = AgentManager()
-        announce = _make_announce_cb()
 
         responses = [
-            _make_llm_response(text="Found password=SuperSecret in config."),
+            _make_llm_response(text="Disk at 42%, all good."),
         ]
 
         agent_id = mgr.spawn(
-            label="leaked",
-            goal="test",
+            label="disk-check",
+            goal="Check disk",
             channel_id="chan-1",
             requester_id="user-1",
             requester_name="Test",
             iteration_callback=_make_iteration_cb(responses),
             tool_executor_callback=_make_tool_exec_cb(),
-            announce_callback=announce,
         )
 
-        await mgr.wait_for_agents([agent_id], timeout=10)
-        text = announce.calls[0]["text"]
-        assert "SuperSecret" not in text
+        results = await mgr.wait_for_agents([agent_id], timeout=10)
+        assert agent_id in results
+        assert results[agent_id]["status"] == "completed"
+        assert "42%" in results[agent_id]["result"]
 
-    async def test_announce_truncates_long_results(self):
-        """Long results are truncated in announcements."""
+    async def test_long_result_stored_in_full(self):
+        """Long results are stored in full internally (no truncation)."""
         mgr = AgentManager()
-        announce = _make_announce_cb()
 
         responses = [_make_llm_response(text="x" * 3000)]
 
@@ -2067,12 +2064,10 @@ class TestAgentAnnounceIntegration:
             requester_name="Test",
             iteration_callback=_make_iteration_cb(responses),
             tool_executor_callback=_make_tool_exec_cb(),
-            announce_callback=announce,
         )
 
-        await mgr.wait_for_agents([agent_id], timeout=10)
-        text = announce.calls[0]["text"]
-        assert len(text) < 2200  # ~1800 content + label overhead
+        results = await mgr.wait_for_agents([agent_id], timeout=10)
+        assert len(results[agent_id]["result"]) == 3000
 
 
 # ===========================================================================

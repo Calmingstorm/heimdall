@@ -43,8 +43,6 @@ from src.agents.manager import (
     AgentInfo,
     AgentManager,
     _TERMINAL_STATUSES,
-    _announce_formatted,
-    _announce_result,
     _get_last_progress,
     _run_agent,
     filter_agent_tools,
@@ -1216,105 +1214,62 @@ class TestSecretScrubbing:
         assert "SuperSecret123" not in tool_msgs[0]["content"]
         assert "[REDACTED]" in tool_msgs[0]["content"]
 
-    async def test_announcement_secrets_scrubbed(self):
-        """Agent announcement has secrets scrubbed."""
-        announced = []
-
-        async def capture_announce(ch_id, text):
-            announced.append(text)
-
+    async def test_agent_results_stored_internally(self):
+        """Agent results are stored internally, not announced to Discord."""
         agent = _make_agent()
         agent.result = "Found password=MySecret123"
-        await _announce_formatted(agent, capture_announce, "completed in 5s")
-
-        assert len(announced) == 1
-        assert "MySecret123" not in announced[0]
-        assert "[REDACTED]" in announced[0]
+        # Results are stored in agent.result — no announce callback
+        assert agent.result == "Found password=MySecret123"
 
 
 # ===========================================================================
-# 12. Announcement formatting
+# 12. Silent agent behavior (no direct Discord posting)
 # ===========================================================================
 
-class TestAnnouncementFormatting:
-    """Verify announcement message format."""
+class TestSilentAgentBehavior:
+    """Verify agents do NOT post directly to Discord."""
 
-    async def test_completed_announcement_format(self):
-        """Completed agent announcement has correct format."""
-        announced = []
-
-        async def capture(ch_id, text):
-            announced.append(text)
-
+    async def test_completed_agent_stores_result(self):
+        """Completed agent stores result internally for collection."""
         agent = _make_agent(label="my-worker")
-        agent.result = "Task complete."
-        await _announce_formatted(agent, capture, "completed in 10s")
+        agent.messages = [{"role": "user", "content": "Do work"}]
+        iter_cb = AsyncMock(return_value={"text": "Task complete.", "tool_calls": []})
+        tool_cb = AsyncMock()
+        ann_cb = AsyncMock()
 
-        assert len(announced) == 1
-        assert "**[Agent: my-worker]**" in announced[0]
-        assert "(completed in 10s)" in announced[0]
-        assert "Task complete." in announced[0]
+        await _run_agent(agent, "system", [], iter_cb, tool_cb, ann_cb)
 
-    async def test_truncation_at_1800_chars(self):
-        """Long results are truncated to 1800 characters."""
-        announced = []
+        assert agent.status == "completed"
+        assert agent.result == "Task complete."
+        ann_cb.assert_not_called()
 
-        async def capture(ch_id, text):
-            announced.append(text)
-
+    async def test_failed_agent_stores_error(self):
+        """Failed agent stores error internally for collection."""
         agent = _make_agent()
-        agent.result = "x" * 3000
-        await _announce_formatted(agent, capture, "completed")
+        agent.messages = [{"role": "user", "content": "Do work"}]
+        iter_cb = AsyncMock(side_effect=Exception("Connection refused"))
+        tool_cb = AsyncMock()
+        ann_cb = AsyncMock()
 
-        # The content part (after header) should be truncated
-        text = announced[0]
-        # Find the result portion
-        assert "..." in text
-        assert len(text) < 2100  # header + 1800 + "..." margin
+        await _run_agent(agent, "system", [], iter_cb, tool_cb, ann_cb)
 
-    async def test_no_result_or_error_shows_no_output(self):
-        """Agent with no result and no error shows '(no output)'."""
-        announced = []
+        assert agent.status == "failed"
+        assert "Connection refused" in agent.error
+        ann_cb.assert_not_called()
 
-        async def capture(ch_id, text):
-            announced.append(text)
-
+    async def test_killed_agent_silent(self):
+        """Killed agent does not announce to Discord."""
         agent = _make_agent()
-        agent.result = ""
-        agent.error = ""
-        await _announce_formatted(agent, capture, "completed")
+        agent.messages = [{"role": "user", "content": "Do work"}]
+        agent._cancel_event.set()
+        iter_cb = AsyncMock(return_value={"text": "x", "tool_calls": []})
+        tool_cb = AsyncMock()
+        ann_cb = AsyncMock()
 
-        assert "(no output)" in announced[0]
+        await _run_agent(agent, "system", [], iter_cb, tool_cb, ann_cb)
 
-    async def test_error_shown_when_no_result(self):
-        """Agent with error but no result shows the error."""
-        announced = []
-
-        async def capture(ch_id, text):
-            announced.append(text)
-
-        agent = _make_agent()
-        agent.result = ""
-        agent.error = "Connection refused"
-        await _announce_formatted(agent, capture, "failed")
-
-        assert "Connection refused" in announced[0]
-
-    async def test_announce_result_fire_and_forget(self):
-        """_announce_result creates a future for killed agents."""
-        agent = _make_agent()
-        agent.result = "Killed mid-task"
-
-        announced = []
-
-        async def capture(ch_id, text):
-            announced.append(text)
-
-        _announce_result(agent, capture)
-        await asyncio.sleep(0.05)
-
-        assert len(announced) == 1
-        assert "killed" in announced[0].lower()
+        assert agent.status == "killed"
+        ann_cb.assert_not_called()
 
 
 # ===========================================================================
@@ -1970,10 +1925,10 @@ class TestRegressionInvariants:
         source = inspect.getsource(_run_agent)
         assert "scrub_output_secrets" in source
 
-    async def test_scrub_output_secrets_called_in_announce(self):
-        """scrub_output_secrets is called in announcement formatting."""
+    async def test_scrub_output_secrets_called_in_run_agent(self):
+        """scrub_output_secrets is called in agent execution for tool results."""
         import inspect
-        source = inspect.getsource(_announce_formatted)
+        source = inspect.getsource(_run_agent)
         assert "scrub_output_secrets" in source
 
     async def test_agent_respects_cancel_event(self):

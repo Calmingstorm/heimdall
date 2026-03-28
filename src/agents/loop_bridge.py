@@ -67,7 +67,7 @@ class LoopAgentBridge:
         requester_name: str,
         iteration_callback: object,
         tool_executor_callback: object,
-        announce_callback: object,
+        announce_callback: object = None,
         tools: list[dict] | None = None,
         system_prompt: str = "",
     ) -> list[str]:

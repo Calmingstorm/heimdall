@@ -22,7 +22,6 @@ from src.agents.manager import (
     CLEANUP_DELAY,
     _run_agent,
     _get_last_progress,
-    _announce_formatted,
 )
 
 
@@ -667,8 +666,8 @@ class TestRunAgent:
         assert agent.status == "completed"
         assert agent.iteration_count == MAX_AGENT_ITERATIONS
 
-    async def test_announcement_on_completion(self):
-        """Announce callback called on completion."""
+    async def test_no_announcement_on_completion(self):
+        """Agents are silent — no announce callback on completion."""
         agent = AgentInfo(
             id="test10", label="announce", goal="Quick task",
             channel_id="ch1", requester_id="u1", requester_name="User",
@@ -678,14 +677,13 @@ class TestRunAgent:
             responses=[{"text": "All done.", "tool_calls": []}]
         )
         await _run_agent(agent, "system", [], iter_cb, tool_cb, ann_cb)
-        ann_cb.assert_called()
-        call_args = ann_cb.call_args
-        assert call_args[0][0] == "ch1"
-        assert "[Agent: announce]" in call_args[0][1]
-        assert "All done." in call_args[0][1]
+        # Agent should NOT post directly — results stored internally
+        ann_cb.assert_not_called()
+        assert agent.status == "completed"
+        assert agent.result == "All done."
 
-    async def test_announcement_on_failure(self):
-        """Announce callback called on failure."""
+    async def test_no_announcement_on_failure(self):
+        """Agents are silent — no announce callback on failure."""
         agent = AgentInfo(
             id="test11", label="fail-ann", goal="Fail",
             channel_id="ch1", requester_id="u1", requester_name="User",
@@ -696,10 +694,10 @@ class TestRunAgent:
         ann_cb = AsyncMock()
 
         await _run_agent(agent, "system", [], iter_cb, tool_cb, ann_cb)
-        ann_cb.assert_called()
-        call_text = ann_cb.call_args[0][1]
-        assert "[Agent: fail-ann]" in call_text
-        assert "failed" in call_text
+        # Agent should NOT post directly — error stored internally
+        ann_cb.assert_not_called()
+        assert agent.status == "failed"
+        assert "boom" in agent.error
 
     async def test_tools_used_deduped(self):
         """tools_used doesn't contain duplicates."""
@@ -754,58 +752,6 @@ class TestGetLastProgress:
             messages=[],
         )
         assert _get_last_progress(agent) == "(no output)"
-
-
-# ===========================================================================
-# _announce_formatted
-# ===========================================================================
-
-class TestAnnounceFormatted:
-    async def test_basic_announcement(self):
-        agent = AgentInfo(
-            id="x", label="disk-audit", goal="g", channel_id="ch1",
-            requester_id="u", requester_name="U",
-        )
-        agent.result = "All disks healthy."
-        ann_cb = AsyncMock()
-        await _announce_formatted(agent, ann_cb, "completed in 5s")
-        ann_cb.assert_called_once()
-        text = ann_cb.call_args[0][1]
-        assert "[Agent: disk-audit]" in text
-        assert "completed in 5s" in text
-        assert "All disks healthy." in text
-
-    async def test_truncates_long_results(self):
-        agent = AgentInfo(
-            id="x", label="t", goal="g", channel_id="ch1",
-            requester_id="u", requester_name="U",
-        )
-        agent.result = "x" * 3000
-        ann_cb = AsyncMock()
-        await _announce_formatted(agent, ann_cb, "done")
-        text = ann_cb.call_args[0][1]
-        assert len(text) < 2100  # 1800 content + label overhead
-
-    async def test_error_result(self):
-        agent = AgentInfo(
-            id="x", label="t", goal="g", channel_id="ch1",
-            requester_id="u", requester_name="U",
-        )
-        agent.error = "SSH connection refused"
-        ann_cb = AsyncMock()
-        await _announce_formatted(agent, ann_cb, "failed")
-        text = ann_cb.call_args[0][1]
-        assert "SSH connection refused" in text
-
-    async def test_announce_callback_failure_handled(self):
-        agent = AgentInfo(
-            id="x", label="t", goal="g", channel_id="ch1",
-            requester_id="u", requester_name="U",
-        )
-        agent.result = "ok"
-        ann_cb = AsyncMock(side_effect=Exception("Discord down"))
-        # Should not raise
-        await _announce_formatted(agent, ann_cb, "done")
 
 
 # ===========================================================================

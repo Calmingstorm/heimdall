@@ -137,9 +137,10 @@ class TestIterationCallbackTimeout:
                 announce_callback=announce,
             )
 
-        assert announce.call_count >= 1
-        call_text = announce.call_args[0][1]
-        assert "timeout" in call_text.lower()
+        # Agent should NOT announce — stores error internally
+        announce.assert_not_called()
+        assert agent.status == "failed"
+        assert "timed out" in agent.error.lower()
 
 
 # ===========================================================================
@@ -903,10 +904,10 @@ class TestAgentSecretScrubbing:
 # 14. Announcement formatting
 # ===========================================================================
 
-class TestAnnouncementFormatting:
-    """Verify announcements are formatted and truncated correctly."""
+class TestSilentAgentResults:
+    """Verify agents store results silently (no Discord posting)."""
 
-    async def test_announcement_on_completion(self):
+    async def test_no_announce_on_completion(self):
         agent = _make_agent()
         ann = AsyncMock()
         iter_cb, tool_cb, _ = _make_callbacks(
@@ -914,12 +915,11 @@ class TestAnnouncementFormatting:
         )
         await _run_agent(agent, "sys", [], iter_cb, tool_cb, ann)
 
-        assert ann.call_count >= 1
-        text = ann.call_args[0][1]
-        assert "Agent: test-agent" in text
-        assert "completed" in text.lower()
+        ann.assert_not_called()
+        assert agent.status == "completed"
+        assert agent.result == "Task complete."
 
-    async def test_announcement_truncates_long_results(self):
+    async def test_long_result_stored_in_full(self):
         agent = _make_agent()
         ann = AsyncMock()
 
@@ -928,10 +928,10 @@ class TestAnnouncementFormatting:
 
         await _run_agent(agent, "sys", [], _iter_cb, AsyncMock(), ann)
 
-        text = ann.call_args[0][1]
-        assert len(text) < 2500  # Should be truncated around 1800 + header
+        ann.assert_not_called()
+        assert len(agent.result) == 5000
 
-    async def test_announcement_on_failure(self):
+    async def test_no_announce_on_failure(self):
         agent = _make_agent()
         ann = AsyncMock()
 
@@ -940,9 +940,9 @@ class TestAnnouncementFormatting:
 
         await _run_agent(agent, "sys", [], _fail, AsyncMock(), ann)
 
-        assert ann.call_count >= 1
-        text = ann.call_args[0][1]
-        assert "failed" in text.lower()
+        ann.assert_not_called()
+        assert agent.status == "failed"
+        assert "crash" in agent.error
 
 
 # ===========================================================================
