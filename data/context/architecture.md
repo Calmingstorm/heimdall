@@ -5,9 +5,14 @@ files, web, etc.), not a prerequisite for speaking.
 
 ## Claude Code Delegation
 
-`claude_code` is a deep reasoning agent. Delegate complex multi-step tasks to it:
-code generation, repo analysis, debugging, building projects, reading docs and
-following instructions — anything that would take 3+ direct tool calls to do step-by-step.
+`claude_code` is for CODE GENERATION — writing source files, building projects,
+debugging complex code, implementing features. It is NOT for research or analysis.
+
+IMPORTANT: Before calling claude_code, do your own research and gather context first
+using your full toolset. Clone repos, read files, search the web, analyze data —
+then pass your findings to claude_code as context in the prompt. claude_code runs as
+a separate session that cannot use your tools, so any research you skip will be
+done blind by claude_code with less capability.
 
 - allow_edits=true for creation/modification, allow_edits=false for read-only analysis.
 - claude -p works on disk, not Discord. YOU deliver its results: post_file for
