@@ -401,9 +401,15 @@ class SessionManager:
         max_overlap = max(scores) if scores else 0.0
         has_time_gap = time_gap > TOPIC_CHANGE_TIME_GAP
 
-        # Topic change: low overlap with all recent messages
-        # Time gap alone doesn't trigger — user might continue same topic after a break
-        is_topic_change = max_overlap < TOPIC_CHANGE_SCORE_THRESHOLD and len(recent) >= 2
+        # Topic change: low overlap with all recent messages AND a time gap.
+        # Both conditions required — prevents false triggers on casual follow-ups
+        # like "thanks" or "what about X" that have low keyword overlap but are
+        # clearly part of the same conversation.
+        is_topic_change = (
+            max_overlap < TOPIC_CHANGE_SCORE_THRESHOLD
+            and has_time_gap
+            and len(recent) >= 2
+        )
 
         if is_topic_change:
             log.info(

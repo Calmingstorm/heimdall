@@ -31,6 +31,13 @@ def session_mgr(tmp_dir: Path) -> SessionManager:
     )
 
 
+def _age_messages(messages, seconds=600):
+    """Set message timestamps to `seconds` ago so topic change time gap is met."""
+    old = time.time() - seconds
+    for m in messages:
+        m.timestamp = old
+
+
 # ---------------------------------------------------------------------------
 # Constants validation
 # ---------------------------------------------------------------------------
@@ -71,13 +78,14 @@ class TestDetectTopicChange:
         assert result["max_overlap"] > TOPIC_CHANGE_SCORE_THRESHOLD
 
     def test_different_topic_detected(self, session_mgr):
-        """Completely different topic → topic change detected."""
+        """Completely different topic + time gap → topic change detected."""
         session = session_mgr.get_or_create("ch1")
         session.messages = [
             Message(role="user", content="check nginx status on web-server"),
             Message(role="assistant", content="nginx is running on web-server"),
             Message(role="user", content="restart the nginx service"),
         ]
+        _age_messages(session.messages)
         result = session_mgr.detect_topic_change("ch1", "write me a haiku about cats")
         assert result["is_topic_change"] is True
         assert result["max_overlap"] < TOPIC_CHANGE_SCORE_THRESHOLD
@@ -190,11 +198,13 @@ class TestTopicChangeEdgeCases:
             Message(role="user", content="nginx deploy"),
             Message(role="assistant", content="deployed nginx"),
         ]
+        _age_messages(s1.messages)
         s2 = session_mgr.get_or_create("ch2")
         s2.messages = [
             Message(role="user", content="database backup"),
             Message(role="assistant", content="backed up database"),
         ]
+        _age_messages(s2.messages)
         # Query about nginx on ch2 (which discusses database) → topic change
         result = session_mgr.detect_topic_change("ch2", "deploy nginx")
         assert result["is_topic_change"] is True
@@ -206,6 +216,7 @@ class TestTopicChangeEdgeCases:
             Message(role="user", content="check nginx status on web-server"),
             Message(role="assistant", content="nginx is running on web-server"),
         ]
+        _age_messages(session.messages)
         with patch("src.sessions.manager.log") as mock_log:
             session_mgr.detect_topic_change("ch1", "write me a haiku about cats")
             mock_log.info.assert_called()
@@ -462,8 +473,9 @@ class TestTopicChangeIntegration:
         session_mgr.add_message(ch, "assistant", "deployed nginx to server-1")
         session_mgr.add_message(ch, "user", "check nginx status")
         session_mgr.add_message(ch, "assistant", "nginx running on server-1")
+        _age_messages(session_mgr.get_or_create(ch).messages)
 
-        # Detect topic change — new topic
+        # Detect topic change — new topic + time gap
         info = session_mgr.detect_topic_change(ch, "write me a poem about the ocean")
         assert info["is_topic_change"] is True
 

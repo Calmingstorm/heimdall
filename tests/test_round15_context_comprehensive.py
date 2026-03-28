@@ -43,6 +43,14 @@ from src.sessions.manager import (
 )
 
 
+def _age_session_messages(sm, channel_id, seconds=600):
+    """Age all messages in a session so topic change time gap is met."""
+    session = sm.get_or_create(channel_id)
+    old = time.time() - seconds
+    for m in session.messages:
+        m.timestamp = old
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -213,10 +221,11 @@ class TestTopicChangePipeline:
         assert result["max_overlap"] > TOPIC_CHANGE_SCORE_THRESHOLD
 
     def test_detect_topic_change_different_topic(self, tmp_path):
-        """Completely different topic triggers change."""
+        """Completely different topic + time gap triggers change."""
         sm = _make_manager(tmp_path)
         sm.add_message("ch1", "user", "nginx proxy configuration")
         sm.add_message("ch1", "user", "nginx reverse proxy setup")
+        _age_session_messages(sm, "ch1")
         result = sm.detect_topic_change("ch1", "banana smoothie recipe blender")
         assert result["is_topic_change"] is True
         assert result["max_overlap"] < TOPIC_CHANGE_SCORE_THRESHOLD
@@ -822,8 +831,10 @@ class TestChannelIsolation:
         sm.add_message("ch1", "user", "nginx proxy config")
         sm.add_message("ch2", "user", "cooking pasta recipe")
         sm.add_message("ch2", "user", "cooking risotto recipe")
+        _age_session_messages(sm, "ch1")
+        _age_session_messages(sm, "ch2")
 
-        # Query about banana (topic change for both)
+        # Query about banana (topic change for both — different topic + time gap)
         r1 = sm.detect_topic_change("ch1", "banana smoothie blender")
         r2 = sm.detect_topic_change("ch2", "banana smoothie blender")
 
@@ -922,6 +933,7 @@ class TestEndToEndPipeline:
         for i in range(5):
             sm.add_message("ch1", "user", f"server monitoring step {i}")
             sm.add_message("ch1", "assistant", f"monitoring output {i}")
+        _age_session_messages(sm, "ch1")
 
         topic_info = sm.detect_topic_change("ch1", "write haiku about cats")
         assert topic_info["is_topic_change"] is True
@@ -1222,8 +1234,8 @@ class TestTopicChangeTimeGap:
         assert result["has_time_gap"] is True  # > 5 min gap
         assert result["is_topic_change"] is False  # same topic, high overlap
 
-    def test_no_time_gap_with_topic_change(self, tmp_path):
-        """Recent messages + different topic: topic change without time gap."""
+    def test_no_time_gap_prevents_topic_change(self, tmp_path):
+        """Recent messages + different topic but no time gap: NOT a topic change."""
         sm = _make_manager(tmp_path)
         session = sm.get_or_create("ch1")
         now = time.time()
@@ -1232,7 +1244,7 @@ class TestTopicChangeTimeGap:
 
         result = sm.detect_topic_change("ch1", "banana smoothie recipe blender")
         assert result["has_time_gap"] is False  # < 5 min gap
-        assert result["is_topic_change"] is True  # different topic
+        assert result["is_topic_change"] is False  # no time gap = no topic change
 
     def test_time_gap_and_topic_change(self, tmp_path):
         """Both time gap and topic change: strongest signal."""
@@ -1321,6 +1333,7 @@ class TestSessionPersistenceContext:
         sm = _make_manager(tmp_path)
         sm.add_message("ch1", "user", "nginx proxy config")
         sm.add_message("ch1", "user", "nginx reverse proxy")
+        _age_session_messages(sm, "ch1")
         sm.save()
 
         sm2 = _make_manager(tmp_path)
