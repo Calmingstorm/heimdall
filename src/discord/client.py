@@ -1819,14 +1819,6 @@ class HeimdallBot(discord.Client):
         # Collect image blocks from analyze_image calls for vision injection
         pending_image_blocks: list[dict] = []
 
-        # Tools that post content directly to Discord (file attachments, images).
-        # If the last tool in the loop was one of these, the final LLM response
-        # is redundant — the user already received the content.
-        _DIRECT_DELIVERY_TOOLS = frozenset({
-            "generate_file", "post_file", "generate_image",
-        })
-        last_tool_was_delivery = False
-
         log.info("Tool loop starting: %d tools available, %d messages in history",
                  len(tools) if tools else 0, len(messages))
 
@@ -1987,10 +1979,7 @@ class HeimdallBot(discord.Client):
                         await progress_embed_msg.edit(embed=embed, view=cancel_view)
                     except Exception:
                         pass
-                # If the last tools posted directly to Discord (file/image),
-                # suppress the final LLM text — the user already has the content.
-                suppress = last_tool_was_delivery
-                return llm_resp.text or _EMPTY_RESPONSE_FALLBACK, suppress, False, tools_used_in_loop, False
+                return llm_resp.text or _EMPTY_RESPONSE_FALLBACK, False, False, tools_used_in_loop, False
 
             # Build internal-format assistant content from LLMResponse
             assistant_content: list[dict] = []
@@ -2274,12 +2263,6 @@ class HeimdallBot(discord.Client):
             )
             messages.append({"role": "user", "content": list(tool_results)})
 
-            # Track if this iteration's tools all posted directly to Discord
-            iter_tool_names = {tc.name for tc in tool_calls}
-            last_tool_was_delivery = bool(
-                iter_tool_names and iter_tool_names.issubset(_DIRECT_DELIVERY_TOOLS)
-            )
-
             # Inject pending image blocks as vision content for the next LLM call.
             # This reuses the same base64 image block format as _process_attachments.
             if pending_image_blocks:
@@ -2451,8 +2434,8 @@ class HeimdallBot(discord.Client):
         file_bytes = content.encode("utf-8")
         discord_file = discord.File(io.BytesIO(file_bytes), filename=filename)
         try:
-            await message.channel.send(content=caption or None, file=discord_file)
-            return f"File `{filename}` ({len(file_bytes)} bytes) already posted to channel with your caption. Do not repeat or summarize — the user already has it."
+            await message.channel.send(file=discord_file)
+            return f"File `{filename}` ({len(file_bytes)} bytes) attached to channel."
         except Exception as e:
             return f"Failed to post file: {e}"
 
@@ -2509,7 +2492,7 @@ class HeimdallBot(discord.Client):
         try:
             file = discord.File(io.BytesIO(file_bytes), filename=filename)
             await message.channel.send(content=caption or None, file=file)
-            return f"Posted `{filename}` ({len(file_bytes) / 1024:.1f} KB) already delivered to channel. Do not repeat or summarize — the user already has it."
+            return f"Posted `{filename}` ({len(file_bytes) / 1024:.1f} KB) to channel."
         except discord.HTTPException as e:
             return f"Failed to upload to Discord: {e}"
 
@@ -3736,7 +3719,7 @@ class HeimdallBot(discord.Client):
             file = discord.File(io.BytesIO(image_bytes), filename="generated.png")
             caption = scrub_response_secrets(f"Generated: {prompt_text[:100]}")
             await message.channel.send(content=caption, file=file)
-            return f"Image generated and already posted ({len(image_bytes) / 1024:.1f} KB). Do not repeat or summarize — the user already has it."
+            return f"Image generated and posted ({len(image_bytes) / 1024:.1f} KB)."
         except discord.HTTPException as e:
             return f"Failed to upload generated image to Discord: {e}"
 
