@@ -1819,6 +1819,14 @@ class HeimdallBot(discord.Client):
         # Collect image blocks from analyze_image calls for vision injection
         pending_image_blocks: list[dict] = []
 
+        # Tools that post content directly to Discord (file attachments, images).
+        # If the last tool in the loop was one of these, the final LLM response
+        # is redundant — the user already received the content.
+        _DIRECT_DELIVERY_TOOLS = frozenset({
+            "generate_file", "post_file", "generate_image",
+        })
+        last_tool_was_delivery = False
+
         log.info("Tool loop starting: %d tools available, %d messages in history",
                  len(tools) if tools else 0, len(messages))
 
@@ -1979,7 +1987,10 @@ class HeimdallBot(discord.Client):
                         await progress_embed_msg.edit(embed=embed, view=cancel_view)
                     except Exception:
                         pass
-                return llm_resp.text or _EMPTY_RESPONSE_FALLBACK, False, False, tools_used_in_loop, False
+                # If the last tools posted directly to Discord (file/image),
+                # suppress the final LLM text — the user already has the content.
+                suppress = last_tool_was_delivery
+                return llm_resp.text or _EMPTY_RESPONSE_FALLBACK, suppress, False, tools_used_in_loop, False
 
             # Build internal-format assistant content from LLMResponse
             assistant_content: list[dict] = []
@@ -2262,6 +2273,12 @@ class HeimdallBot(discord.Client):
                 *[_run_tool_with_timeout(b) for b in tool_calls],
             )
             messages.append({"role": "user", "content": list(tool_results)})
+
+            # Track if this iteration's tools all posted directly to Discord
+            iter_tool_names = {tc.name for tc in tool_calls}
+            last_tool_was_delivery = bool(
+                iter_tool_names and iter_tool_names.issubset(_DIRECT_DELIVERY_TOOLS)
+            )
 
             # Inject pending image blocks as vision content for the next LLM call.
             # This reuses the same base64 image block format as _process_attachments.
