@@ -1666,8 +1666,7 @@ class HeimdallBot(discord.Client):
                 # Save text-only (chat) responses too — the LLM needs to
                 # remember what it said.  Truncate to keep history lean.
                 history_response = response[:CHAT_RESPONSE_MAX_CHARS] if len(response) > CHAT_RESPONSE_MAX_CHARS else response
-            if not is_guest:
-                self.sessions.add_message(channel_id, "assistant", history_response)
+            self.sessions.add_message(channel_id, "assistant", history_response)
             self.sessions.prune()
             self._maybe_cleanup_caches()
             try:

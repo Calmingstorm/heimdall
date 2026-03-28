@@ -19,3 +19,18 @@ Round 1 complete. Here's what was done:
 [2026-03-28 00:02:04] Round 2 PASSED (ok) in 274s
 [2026-03-28 00:02:04] Pausing 10s...
 [2026-03-28 00:02:14] --- Round 3/6 ---
+**Round 3 complete.** Two fixes:
+
+1. **Compaction summary limit mismatch** (`manager.py:553`): The `_compact` method instructed the LLM to keep summaries "under 500 characters" but `COMPACTION_MAX_CHARS` was increased to 800 in Round 1. The LLM was unnecessarily compressing summaries, losing context. Now uses an f-string to reference the actual constant.
+
+2. **Stale comment** (`manager.py:503`): Comment said "keep recent 3" but `BUDGET_KEEP_RECENT` is 5. Updated to reference the constant name.
+
+**All four problems reviewed — no other edge cases found.** The fixes from Rounds 1-2 are solid:
+- Problem 1: Text-only responses saved with 1500-char limit via `CHAT_RESPONSE_MAX_CHARS` constant
+- Problem 2: Image marker is descriptive (`[User shared image: ...]`)
+- Problem 3: Relevance constants loosened (keep 5 recent, min score 0.10, max 10 older)
+- Problem 4: Token budget doubled to 16000, budget protects 5 recent messages
+[2026-03-28 00:04:08] TESTS: skipped (code round)
+[2026-03-28 00:04:08] Round 3 PASSED (ok) in 114s
+[2026-03-28 00:04:08] Pausing 10s...
+[2026-03-28 00:04:18] --- Round 4/6 ---
