@@ -46,6 +46,13 @@ class FullTextIndex:
                     chunk_index UNINDEXED,
                     tokenize='unicode61 remove_diacritics 2'
                 );
+                CREATE VIRTUAL TABLE IF NOT EXISTS channel_log_fts USING fts5(
+                    content,
+                    author UNINDEXED,
+                    channel_id UNINDEXED,
+                    timestamp UNINDEXED,
+                    tokenize='unicode61 remove_diacritics 2'
+                );
             """)
             self._conn = conn
             log.info("FTS5 index initialized at %s", db_path)
@@ -185,6 +192,85 @@ class FullTextIndex:
             "SELECT 1 FROM knowledge_fts WHERE chunk_id = ? LIMIT 1", (chunk_id,),
         ).fetchone()
         return row is not None
+
+    # --- Channel log methods ---
+
+    def index_channel_messages(self, messages: list[dict]) -> int:
+        """Batch-insert channel log messages into the FTS index.
+
+        Each dict should have: content, author, channel_id, timestamp (float).
+        Returns the number of rows inserted.
+        """
+        if not self._conn or not messages:
+            return 0
+        try:
+            rows = [
+                (
+                    m.get("content", ""),
+                    m.get("author", "Unknown"),
+                    str(m.get("channel_id", "")),
+                    str(m.get("ts", 0.0)),
+                )
+                for m in messages
+                if m.get("content")
+            ]
+            if not rows:
+                return 0
+            self._conn.executemany(
+                "INSERT INTO channel_log_fts (content, author, channel_id, timestamp) "
+                "VALUES (?, ?, ?, ?)",
+                rows,
+            )
+            self._conn.commit()
+            return len(rows)
+        except Exception as e:
+            log.error("FTS channel log index failed: %s", e)
+            return 0
+
+    def search_channel_logs(
+        self, query: str, limit: int = 20, channel_id: str | None = None,
+    ) -> list[dict]:
+        """Search the channel_log_fts table.
+
+        Returns dicts with content, author, channel_id, timestamp, type="channel".
+        """
+        if not self._conn:
+            return []
+        fts_query = _prepare_query(query)
+        if not fts_query:
+            return []
+        try:
+            if channel_id:
+                rows = self._conn.execute(
+                    "SELECT snippet(channel_log_fts, 0, '>>>', '<<<', '...', 64), "
+                    "author, channel_id, timestamp, bm25(channel_log_fts) as rank "
+                    "FROM channel_log_fts WHERE channel_log_fts MATCH ? "
+                    "AND channel_id = ? "
+                    "ORDER BY rank LIMIT ?",
+                    (fts_query, channel_id, limit),
+                ).fetchall()
+            else:
+                rows = self._conn.execute(
+                    "SELECT snippet(channel_log_fts, 0, '>>>', '<<<', '...', 64), "
+                    "author, channel_id, timestamp, bm25(channel_log_fts) as rank "
+                    "FROM channel_log_fts WHERE channel_log_fts MATCH ? "
+                    "ORDER BY rank LIMIT ?",
+                    (fts_query, limit),
+                ).fetchall()
+            return [
+                {
+                    "content": r[0],
+                    "author": r[1],
+                    "channel_id": r[2],
+                    "timestamp": float(r[3]) if r[3] else 0.0,
+                    "type": "channel",
+                    "rank": r[4],
+                }
+                for r in rows
+            ]
+        except Exception as e:
+            log.warning("FTS channel log search failed: %s", e)
+            return []
 
 
 def _prepare_query(raw: str) -> str:

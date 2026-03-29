@@ -580,6 +580,7 @@ class HeimdallBot(discord.Client):
 
         # Passive channel logger — writes ALL guild messages to JSONL (zero LLM tokens)
         self.channel_logger = ChannelLogger("./data/channel_logs")
+        self.sessions.set_channel_search(self.channel_logger, self._fts_index)
 
         # Browser automation
         self.browser_manager = None
@@ -951,6 +952,13 @@ class HeimdallBot(discord.Client):
                 loop_info = self.loop_manager._loops.get(loop_id)
                 if not loop_info or loop_info.status != "running":
                     self.loop_agent_bridge.cleanup_loop(loop_id)
+
+        # Batch-index channel logs into FTS (runs every ~5 min with cache cleanup)
+        if self._fts_index and hasattr(self, "channel_logger"):
+            try:
+                self.channel_logger.index_to_fts(self._fts_index)
+            except Exception:
+                pass
 
     def _maybe_cleanup_caches(self) -> None:
         """Run cache cleanup if enough time has passed since the last run."""

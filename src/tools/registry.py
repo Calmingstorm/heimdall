@@ -460,7 +460,7 @@ TOOLS: list[dict] = [
     # --- History and memory ---
     {
         "name": "search_history",
-        "description": "Searches past conversation history using keyword and semantic matching. Returns '[date] (role): content'. For ingested docs, use search_knowledge.",
+        "description": "Searches past conversation history and full channel message logs from all users. Uses keyword, semantic, and FTS matching. Returns '[date] (role): content'. For ingested docs, use search_knowledge.",
         "input_schema": {
             "type": "object",
             "properties": {

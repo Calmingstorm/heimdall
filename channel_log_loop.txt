@@ -3,3 +3,27 @@
 [2026-03-29 18:39:20] === Channel Logger Loop Starting (rounds 1-4) ===
 [2026-03-29 18:39:20] --- Round 1/4 ---
 {"level":"warn","message":"[BashTool] Pre-flight check is taking longer than expected. Run with ANTHROPIC_LOG=debug to check for failed or slow API requests."}
+**Round 1 complete.** Here's what was done:
+
+1. **Created `src/discord/channel_logger.py`** — `ChannelLogger` class with:
+   - `__init__(log_dir)` — creates `data/channel_logs/` directory
+   - `log_message(message)` — extracts fields (ts, author_id, author, bot, content, attachments, channel_id, guild_id) and appends one JSON line to `{channel_id}.jsonl`
+   - Skips DMs (no guild), handles missing attributes gracefully
+   - Synchronous file append — zero LLM tokens, no async, no DB
+   - `_last_indexed_ts` dict prepared for Round 2 FTS integration
+
+2. **Wired into `client.py`**:
+   - `self.channel_logger = ChannelLogger("./data/channel_logs")` in `__init__`
+   - `self.channel_logger.log_message(message)` as the **first line** in `on_message`, before any return/filter logic — logs ALL guild messages including the bot's own
+
+3. **All 9284 tests pass** — no regressions.
+[2026-03-29 18:51:37] TESTS: 
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+9284 passed, 170 warnings in 185.62s (0:03:05)
+[2026-03-29 18:51:37] VALIDATION FAIL: channel_logger.py contains LLM references
+[2026-03-29 18:51:37] Round 1 FAILED VALIDATION in 546s
+[2026-03-29 18:51:37] Pausing 10s...
+[2026-03-29 18:51:47] --- Round 2/4 ---
+{"level":"warn","message":"[BashTool] Pre-flight check is taking longer than expected. Run with ANTHROPIC_LOG=debug to check for failed or slow API requests."}
+{"level":"warn","message":"[BashTool] Pre-flight check is taking longer than expected. Run with ANTHROPIC_LOG=debug to check for failed or slow API requests."}
+{"level":"warn","message":"[BashTool] Pre-flight check is taking longer than expected. Run with ANTHROPIC_LOG=debug to check for failed or slow API requests."}

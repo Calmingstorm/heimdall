@@ -258,6 +258,13 @@ class SessionManager:
         self._embedder = embedder
         self._indexing_tasks: set[asyncio.Task] = set()
         self._compaction_fn: CompactionFn | None = None
+        self._channel_logger: object | None = None
+        self._fts_index: object | None = None
+
+    def set_channel_search(self, channel_logger: object, fts_index: object | None = None) -> None:
+        """Register channel logger and FTS index for search_history integration."""
+        self._channel_logger = channel_logger
+        self._fts_index = fts_index
 
     def set_compaction_fn(self, fn: CompactionFn) -> None:
         """Register an async callable for LLM-based compaction.
@@ -766,6 +773,30 @@ class SessionManager:
                             break
             except Exception as e:
                 log.warning("Hybrid search failed, returning keyword-only results: %s", e)
+
+        # Step 4: channel log search (full channel history from all users)
+        if len(results) < limit and self._channel_logger:
+            try:
+                remaining = limit - len(results)
+                fts = self._fts_index
+                channel_results = []
+                if fts and hasattr(fts, "search_channel_logs"):
+                    channel_results = fts.search_channel_logs(query, limit=remaining)
+                if not channel_results and hasattr(self._channel_logger, "search"):
+                    channel_results = await asyncio.to_thread(
+                        self._channel_logger.search, query, remaining,
+                    )
+                # De-duplicate against existing results
+                seen = {(r.get("channel_id", ""), r.get("timestamp", 0)) for r in results}
+                for cr in channel_results:
+                    key = (cr.get("channel_id", ""), cr.get("timestamp", 0))
+                    if key not in seen:
+                        results.append(cr)
+                        seen.add(key)
+                        if len(results) >= limit:
+                            break
+            except Exception as e:
+                log.warning("Channel log search failed: %s", e)
 
         return results
 

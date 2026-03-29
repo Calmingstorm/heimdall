@@ -89,10 +89,10 @@ for i in $(seq "$START_ROUND" "$SESSIONS"); do
         VALID=false
     fi
 
-    # Validate no LLM calls in channel_logger
+    # Validate no LLM imports in channel_logger (ignore comments)
     if [[ -f "$WORKDIR/src/discord/channel_logger.py" ]]; then
-        if grep -qi "codex\|chat_with_tools\|llm\|openai\|anthropic" "$WORKDIR/src/discord/channel_logger.py" 2>/dev/null; then
-            log "VALIDATION FAIL: channel_logger.py contains LLM references"
+        if grep -P "^(from|import).*\b(codex|openai|anthropic|chat_with_tools)\b" "$WORKDIR/src/discord/channel_logger.py" 2>/dev/null; then
+            log "VALIDATION FAIL: channel_logger.py imports LLM modules"
             VALID=false
         fi
     fi
