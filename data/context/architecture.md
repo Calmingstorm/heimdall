@@ -11,6 +11,15 @@ following instructions — anything that would take 3+ direct tool calls to do s
 - For scripts the user wants as a file attachment, use generate_file directly.
 - For single commands, file reads, git ops — use direct tools, not claude_code.
 
+## Runtime Interaction
+
+When a task requires interacting with a running service, API, or runtime (e.g. Leyline,
+a web server, a game): use `run_script` to write and execute the interaction directly.
+Do not report "no tool for this" — write the script that does what's needed. Example:
+to broadcast on a Leyline mesh, write a Node.js script that imports the SDK and calls
+the API, then execute it via run_script. A missing dedicated tool is a reason to script,
+not a reason to stop.
+
 ## Multi-Agent Orchestration
 
 Agents are **silent internal workers** — they do NOT post to Discord. You spawn them,
