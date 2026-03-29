@@ -195,6 +195,21 @@ class FullTextIndex:
 
     # --- Channel log methods ---
 
+    def clear_channel_logs(self) -> bool:
+        """Delete all rows from channel_log_fts.
+
+        Called before a full re-index (e.g. after restart) to prevent duplicates.
+        """
+        if not self._conn:
+            return False
+        try:
+            self._conn.execute("DELETE FROM channel_log_fts")
+            self._conn.commit()
+            return True
+        except Exception as e:
+            log.error("FTS channel log clear failed: %s", e)
+            return False
+
     def index_channel_messages(self, messages: list[dict]) -> int:
         """Batch-insert channel log messages into the FTS index.
 

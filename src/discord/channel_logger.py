@@ -79,6 +79,9 @@ class ChannelLogger:
 
         Reads JSONL files, finds lines newer than the last indexed timestamp
         per channel, and inserts them into FTS. Returns total rows indexed.
+
+        On first call (no channels indexed yet), clears the FTS table to
+        prevent duplicates after a restart.
         """
         if not fts or not fts.available:
             return 0
@@ -86,6 +89,9 @@ class ChannelLogger:
         try:
             if not self._log_dir.exists():
                 return 0
+            # On fresh start, clear stale FTS data to prevent duplicates
+            if not self._last_indexed_ts:
+                fts.clear_channel_logs()
             for path in self._log_dir.glob("*.jsonl"):
                 channel_id = path.stem
                 cutoff = self._last_indexed_ts.get(channel_id, 0.0)

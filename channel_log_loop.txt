@@ -27,3 +27,13 @@
 {"level":"warn","message":"[BashTool] Pre-flight check is taking longer than expected. Run with ANTHROPIC_LOG=debug to check for failed or slow API requests."}
 {"level":"warn","message":"[BashTool] Pre-flight check is taking longer than expected. Run with ANTHROPIC_LOG=debug to check for failed or slow API requests."}
 {"level":"warn","message":"[BashTool] Pre-flight check is taking longer than expected. Run with ANTHROPIC_LOG=debug to check for failed or slow API requests."}
+[2026-03-29 19:03:59] === Preflight ===
+[2026-03-29 19:03:59] Preflight: passed
+[2026-03-29 19:03:59] === Channel Logger Loop Starting (rounds 2-4) ===
+[2026-03-29 19:03:59] --- Round 2/4 ---
+--dangerously-skip-permissions cannot be used with root/sudo privileges for security reasons
+[2026-03-29 19:04:04] === Channel logger loop terminated ===
+[2026-03-29 19:04:30] === Preflight ===
+[2026-03-29 19:04:30] Preflight: passed
+[2026-03-29 19:04:30] === Channel Logger Loop Starting (rounds 2-4) ===
+[2026-03-29 19:04:30] --- Round 2/4 ---
