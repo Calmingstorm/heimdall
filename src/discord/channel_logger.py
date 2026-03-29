@@ -7,7 +7,7 @@ Zero LLM tokens. Pure file I/O. One JSON line per message, appended to
 from __future__ import annotations
 
 import json
-import os
+from collections import deque
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -29,9 +29,13 @@ class ChannelLogger:
         Created automatically if it does not exist.
     """
 
+    # Batch size cap for FTS indexing to limit memory on huge JSONL files
+    FTS_BATCH_LIMIT = 5000
+
     def __init__(self, log_dir: str | Path) -> None:
         self._log_dir = Path(log_dir)
         self._log_dir.mkdir(parents=True, exist_ok=True)
+        self._dir_exists = True  # track dir state to avoid per-message stat()
         # Track last indexed timestamp per channel (in-memory, reset on restart)
         self._last_indexed_ts: dict[str, float] = {}
 
@@ -65,11 +69,16 @@ class ChannelLogger:
             }
 
             path = self._log_dir / f"{channel_id}.jsonl"
-            # Ensure directory exists (handles deletion while running)
-            self._log_dir.mkdir(parents=True, exist_ok=True)
             line = json.dumps(record, separators=(",", ":")) + "\n"
-            with open(path, "a", encoding="utf-8") as f:
-                f.write(line)
+            try:
+                with open(path, "a", encoding="utf-8") as f:
+                    f.write(line)
+            except FileNotFoundError:
+                # Directory was deleted while running — recreate and retry once
+                self._log_dir.mkdir(parents=True, exist_ok=True)
+                self._dir_exists = True
+                with open(path, "a", encoding="utf-8") as f:
+                    f.write(line)
         except Exception:
             # Never let logging failures propagate — the message handler must not break
             log.debug("Failed to log channel message", exc_info=True)
@@ -112,6 +121,8 @@ class ChannelLogger:
                                 batch.append(record)
                                 if ts > max_ts:
                                     max_ts = ts
+                                if len(batch) >= self.FTS_BATCH_LIMIT:
+                                    break  # cap memory; remainder indexed next cycle
                 except Exception:
                     log.debug("Failed to read %s for indexing", path, exc_info=True)
                     continue
@@ -130,6 +141,7 @@ class ChannelLogger:
         """Keyword search on JSONL files (fallback when FTS is unavailable).
 
         Returns dicts with content, author, channel_id, timestamp, type="channel".
+        Reads files in reverse (newest messages first) for better relevance.
         """
         results: list[dict] = []
         query_lower = query.lower()
@@ -143,25 +155,27 @@ class ChannelLogger:
                     continue
                 try:
                     with open(path, "r", encoding="utf-8") as f:
-                        for line in f:
-                            line = line.strip()
-                            if not line:
-                                continue
-                            try:
-                                record = json.loads(line)
-                            except json.JSONDecodeError:
-                                continue
-                            content = record.get("content", "")
-                            if query_lower in content.lower():
-                                results.append({
-                                    "content": content[:500],
-                                    "author": record.get("author", "Unknown"),
-                                    "channel_id": record.get("channel_id", ""),
-                                    "timestamp": record.get("ts", 0.0),
-                                    "type": "channel",
-                                })
-                                if len(results) >= limit:
-                                    return results
+                        # Use deque to read lines newest-first without loading all into memory
+                        lines = deque(f, maxlen=50000)  # cap at 50K most recent lines
+                    for line in reversed(lines):
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            record = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        content = record.get("content", "")
+                        if query_lower in content.lower():
+                            results.append({
+                                "content": content[:500],
+                                "author": record.get("author", "Unknown"),
+                                "channel_id": record.get("channel_id", ""),
+                                "timestamp": record.get("ts", 0.0),
+                                "type": "channel",
+                            })
+                            if len(results) >= limit:
+                                return results
                 except Exception:
                     continue
         except Exception:

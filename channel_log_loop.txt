@@ -37,3 +37,22 @@
 [2026-03-29 19:04:30] Preflight: passed
 [2026-03-29 19:04:30] === Channel Logger Loop Starting (rounds 2-4) ===
 [2026-03-29 19:04:30] --- Round 2/4 ---
+Round 2 complete. Summary:
+
+**What was verified** — Round 1 already implemented all Round 2 items:
+- `channel_log_fts` FTS5 table in `src/search/fts.py`
+- `index_channel_messages()` and `search_channel_logs()` methods in fts.py
+- `index_to_fts()` batch indexer and `search()` keyword fallback in channel_logger.py
+- Periodic indexing wired into `_cleanup_stale_caches()` in client.py (every ~5 min)
+- `search_history` Step 4 integration in sessions/manager.py (FTS first, JSONL fallback)
+- Registry description updated
+
+**Bug fixed** — Duplicate-on-restart: when the bot restarts, `_last_indexed_ts` resets to `{}`, causing all JSONL messages to be re-indexed as duplicates in FTS. Added `clear_channel_logs()` to fts.py and a pre-clear on first indexing cycle in `index_to_fts()`.
+
+**Tests**: 9284 passed, 0 failures.
+[2026-03-29 19:17:01] TESTS: 
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+9284 passed, 170 warnings in 177.74s (0:02:57)
+[2026-03-29 19:17:01] Round 2 PASSED (ok) in 569s
+[2026-03-29 19:17:01] Pausing 10s...
+[2026-03-29 19:17:11] --- Round 3/4 ---
