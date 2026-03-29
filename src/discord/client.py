@@ -3580,11 +3580,11 @@ class HeimdallBot(discord.Client):
         Returns formatted channel history including messages from all users
         and bots — not just the bot's own session history.
         """
-        limit = min(int(inp.get("limit", 10)), 50)
+        limit = min(int(inp.get("limit", 10)), 100)
         channel_id = inp.get("channel_id")
 
-        # Resolve channel
-        if channel_id:
+        # Resolve channel — fall back to current if channel_id is missing or non-numeric
+        if channel_id and channel_id.isdigit():
             channel = self.get_channel(int(channel_id))
             if not channel:
                 return f"Channel {channel_id} not found or not accessible."

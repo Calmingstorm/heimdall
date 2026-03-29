@@ -1292,21 +1292,22 @@ TOOLS: list[dict] = [
     {
         "name": "read_channel",
         "description": (
-            "Reads recent messages from the current Discord channel into your context. "
-            "Returns channel history from ALL users and bots. The returned messages are "
-            "for YOUR eyes only — do NOT paste or echo them back to the user. Read them, "
-            "understand the context, then respond with your own summary, analysis, or action."
+            "Reads recent messages from the CURRENT Discord channel into your context. "
+            "Returns channel history from ALL users and bots. Do NOT pass channel_id — "
+            "omit it to read the channel the message came from. The returned messages are "
+            "for YOUR eyes only — do NOT paste or echo them. Read, understand, then respond "
+            "with your own summary, analysis, or action."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "limit": {
                     "type": "integer",
-                    "description": "Number of messages to read (default 10, max 50)",
+                    "description": "Number of messages to read (default 10, max 100)",
                 },
                 "channel_id": {
                     "type": "string",
-                    "description": "Channel ID to read from. Omit for current channel.",
+                    "description": "Numeric channel ID. Omit to use current channel (recommended).",
                 },
             },
         },
