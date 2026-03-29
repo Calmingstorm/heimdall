@@ -187,6 +187,48 @@ _FABRICATION_PATTERNS: list[re.Pattern[str]] = [
 ]
 
 
+_PROMISE_PATTERNS: list[re.Pattern[str]] = [
+    # "I'll do X now" / "I'm doing X" / "I will execute" / "executing now"
+    re.compile(
+        r"(?i)\b(?:I'(?:ll|m)\s+(?:do|make|execute|run|create|generate|start|"
+        r"check|read|pull|fetch|send|write|deploy|install|build|investigate|"
+        r"handle|process|replicate|mirror|join)|"
+        r"I will\s+(?:do|make|execute|run|create|generate|start|check)|"
+        r"(?:executing|running|doing|starting|creating|generating)\s+"
+        r"(?:that|this|it)\s+(?:now|immediately|right now))\b"
+    ),
+    # "Plan: X" followed by no tool calls
+    re.compile(
+        r"(?i)^Plan:\s+.{10,}",
+        re.MULTILINE,
+    ),
+]
+
+
+def detect_promise_without_action(text: str, tools_used: list[str]) -> bool:
+    """Detect if a response promises action but includes no tool calls.
+
+    Catches patterns like "I'll do X now" or "I'm executing that" when
+    no tools were actually called — the LLM described doing work without
+    doing it.
+    """
+    if tools_used:
+        return False
+    if not text or len(text) < 15:
+        return False
+    return any(p.search(text) for p in _PROMISE_PATTERNS)
+
+
+_PROMISE_RETRY_MSG = {
+    "role": "developer",
+    "content": (
+        "STOP. You said you would do something but you did NOT call any tools. "
+        "Saying 'I will do X' is NOT the same as doing X. Call the tools NOW — "
+        "do not describe the action, PERFORM it with tool calls in this response."
+    ),
+}
+
+
 def detect_fabrication(text: str, tools_used: list[str]) -> bool:
     """Detect if a text-only response fabricates tool results.
 
@@ -1927,6 +1969,20 @@ class HeimdallBot(discord.Client):
                     messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_FABRICATION_RETRY_MSG)
                     continue  # retry the loop — iteration increments
+
+                # Promise-without-action detection: Codex says "I'll do X"
+                # but doesn't call any tools.
+                if (
+                    iteration == 0
+                    and not tools_used_in_loop
+                    and detect_promise_without_action(llm_resp.text or "", tools_used_in_loop)
+                ):
+                    log.warning(
+                        "Promise without action detected — retrying with correction"
+                    )
+                    messages.append({"role": "assistant", "content": llm_resp.text})
+                    messages.append(_PROMISE_RETRY_MSG)
+                    continue
 
                 # Tool-unavailability fabrication: Codex claims a tool is
                 # "not enabled" / "not available" without trying it.

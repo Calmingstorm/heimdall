@@ -13,9 +13,9 @@ class TestDescriptionOptimization:
     """Verify description token savings and quality."""
 
     def test_total_description_chars_reduced(self):
-        """Total description chars should be under 11000 (base 10000 + agent tools)."""
+        """Total description chars should be under 12000 (base 10000 + agent + channel tools)."""
         total = sum(len(t["description"]) for t in TOOLS)
-        assert total < 11000, f"Description chars {total} should be < 11000"
+        assert total < 12000, f"Description chars {total} should be < 12000"
 
     def test_total_json_chars_reduced(self):
         """Total JSON payload should be under 41000 (base 36000 + agent + skill toggle + skill management tools)."""
