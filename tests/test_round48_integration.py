@@ -929,15 +929,18 @@ class TestSessionIntegration:
         assert "Previous context about nginx" in summaries_received[0]
 
     def test_topic_change_detection(self, tmp_path):
-        """Topic change detected when query has no overlap with recent messages."""
+        """Topic change detected when query has no overlap + time gap."""
+        import time as _time
         sm = SessionManager(50, 24, str(tmp_path / "sessions"))
 
         # Add messages about nginx
         sm.add_message("chan-1", "user", "Check nginx status on server-a")
         sm.add_message("chan-1", "assistant", "nginx is running on server-a")
         sm.add_message("chan-1", "user", "Restart nginx on server-a")
+        for m in sm.get_or_create("chan-1").messages:
+            m.timestamp = _time.time() - 600
 
-        # Query about completely different topic
+        # Query about completely different topic + time gap
         result = sm.detect_topic_change("chan-1", "What's the weather in Tokyo?")
         assert result["is_topic_change"] is True
         assert result["max_overlap"] < 0.05

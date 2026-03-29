@@ -795,7 +795,7 @@ class TestToolsAndPacks:
             assert resp.status == 200
             body = await resp.json()
             # Uses real get_tool_definitions(), returns all 80 tools (67 base + 6 agent + 2 loop-agent bridge + 2 skill toggle + 3 skill management)
-            assert len(body) == 79
+            assert len(body) == 80
             tool_names = [t["name"] for t in body]
             assert "run_command" in tool_names
 
@@ -1372,7 +1372,7 @@ class TestToolPackIntegrity:
 
     def test_total_tools(self):
         from src.tools.registry import TOOLS
-        assert len(TOOLS) == 79
+        assert len(TOOLS) == 80
 
     def test_all_pack_tools_exist_in_tools_list(self):
         from src.tools.registry import TOOLS, TOOL_PACKS

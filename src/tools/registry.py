@@ -1290,6 +1290,28 @@ TOOLS: list[dict] = [
     },
     # --- Rich Discord messaging ---
     {
+        "name": "read_channel",
+        "description": (
+            "Reads recent messages from the current Discord channel. Returns actual "
+            "channel history including messages from ALL users and bots — not just "
+            "your own conversations. Use this when asked to read, check, or look at "
+            "what's been said in the channel."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Number of messages to read (default 10, max 50)",
+                },
+                "channel_id": {
+                    "type": "string",
+                    "description": "Channel ID to read from. Omit for current channel.",
+                },
+            },
+        },
+    },
+    {
         "name": "add_reaction",
         "description": "Adds an emoji reaction to a message. Unicode emoji or custom format (<:name:id>).",
         "input_schema": {

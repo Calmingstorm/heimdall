@@ -2125,6 +2125,8 @@ class HeimdallBot(discord.Client):
                             result = f"Skill '{tool_input['name']}' exported as {filename}."
                     elif tool_name == "skill_status":
                         result = self.skill_manager.skill_status(tool_input["name"])
+                    elif tool_name == "read_channel":
+                        result = await self._handle_read_channel(message, tool_input)
                     elif tool_name == "add_reaction":
                         result = await self._handle_add_reaction(message, tool_input)
                     elif tool_name == "create_poll":
@@ -3450,6 +3452,8 @@ class HeimdallBot(discord.Client):
             return await self._handle_delegate_task(msg_proxy, tool_input)
         if tool_name == "start_loop":
             return self._handle_start_loop(msg_proxy, tool_input)
+        if tool_name == "read_channel":
+            return await self._handle_read_channel(msg_proxy, tool_input)
         if tool_name == "add_reaction":
             return await self._handle_add_reaction(msg_proxy, tool_input)
         if tool_name == "create_poll":
@@ -3554,6 +3558,72 @@ class HeimdallBot(discord.Client):
 
         # --- Executor-routed tools (run_command, check_disk, SSH, etc.) ---
         return await self.tool_executor.execute(tool_name, tool_input, user_id=user_id)
+
+    async def _handle_read_channel(self, message: discord.Message, inp: dict) -> str:
+        """Read recent messages from a Discord channel.
+
+        Returns formatted channel history including messages from all users
+        and bots — not just the bot's own session history.
+        """
+        limit = min(int(inp.get("limit", 10)), 50)
+        channel_id = inp.get("channel_id")
+
+        # Resolve channel
+        if channel_id:
+            channel = self.get_channel(int(channel_id))
+            if not channel:
+                return f"Channel {channel_id} not found or not accessible."
+        else:
+            channel = getattr(message, "channel", None)
+            if not channel:
+                return "No channel context available."
+
+        try:
+            messages = []
+            async for msg in channel.history(limit=limit):
+                parts = []
+                # Timestamp
+                ts = msg.created_at.strftime("%H:%M:%S")
+                # Author
+                author = msg.author.display_name if hasattr(msg.author, "display_name") else str(msg.author)
+                is_bot = getattr(msg.author, "bot", False)
+                bot_tag = " [BOT]" if is_bot else ""
+                # Content
+                content = msg.content or ""
+                if content:
+                    parts.append(content)
+                # Attachments
+                for att in msg.attachments:
+                    parts.append(f"[attachment: {att.filename}]")
+                # Embeds
+                for embed in msg.embeds:
+                    embed_parts = []
+                    if embed.title:
+                        embed_parts.append(f"title: {embed.title}")
+                    if embed.description:
+                        desc = embed.description[:200]
+                        embed_parts.append(desc)
+                    if embed_parts:
+                        parts.append(f"[embed: {'; '.join(embed_parts)}]")
+
+                body = " ".join(parts) if parts else "(empty message)"
+                messages.append(f"[{ts}] {author}{bot_tag}: {body}")
+
+            if not messages:
+                return "No messages found in channel."
+
+            # Reverse so oldest is first (channel.history returns newest first)
+            messages.reverse()
+            result = "\n".join(messages)
+
+            # Scrub secrets
+            from ..llm.secret_scrubber import scrub_output_secrets
+            return scrub_output_secrets(result)
+
+        except discord.Forbidden:
+            return "Permission denied — cannot read this channel."
+        except Exception as e:
+            return f"Failed to read channel: {e}"
 
     async def _handle_add_reaction(self, message: discord.Message, inp: dict) -> str:
         """Add an emoji reaction to a message."""

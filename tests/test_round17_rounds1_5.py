@@ -137,9 +137,9 @@ class TestChatWithoutToolsGuidance:
         prompt = _build_prompt()
         assert "without tools" in prompt.lower()
 
-    def test_prompt_says_tools_for_actions(self):
+    def test_prompt_says_respond_without_tools(self):
         prompt = _build_prompt()
-        assert "Tools are for actions" in prompt
+        assert "without tools" in prompt
 
     def test_chat_guidance_in_core_behavior(self):
         """Chat guidance should appear in the CORE BEHAVIOR section."""
