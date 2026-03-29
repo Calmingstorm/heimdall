@@ -1292,10 +1292,10 @@ TOOLS: list[dict] = [
     {
         "name": "read_channel",
         "description": (
-            "Reads recent messages from the current Discord channel. Returns actual "
-            "channel history including messages from ALL users and bots — not just "
-            "your own conversations. Use this when asked to read, check, or look at "
-            "what's been said in the channel."
+            "Reads recent messages from the current Discord channel into your context. "
+            "Returns channel history from ALL users and bots. The returned messages are "
+            "for YOUR eyes only — do NOT paste or echo them back to the user. Read them, "
+            "understand the context, then respond with your own summary, analysis, or action."
         ),
         "input_schema": {
             "type": "object",

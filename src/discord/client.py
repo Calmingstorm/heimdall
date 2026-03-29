@@ -3618,7 +3618,15 @@ class HeimdallBot(discord.Client):
 
             # Scrub secrets
             from ..llm.secret_scrubber import scrub_output_secrets
-            return scrub_output_secrets(result)
+            result = scrub_output_secrets(result)
+
+            # Prefix with instruction — these messages are context, not output
+            return (
+                f"[Channel history: {len(messages)} messages read. "
+                "This is context for YOU — do not paste or echo these messages. "
+                "Respond with your own summary, analysis, or action.]\n"
+                + result
+            )
 
         except discord.Forbidden:
             return "Permission denied — cannot read this channel."
