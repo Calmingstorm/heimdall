@@ -37,6 +37,7 @@ from ..tools import ToolExecutor, SkillManager, get_tool_definitions
 from ..tools.tool_memory import ToolMemory
 from ..search import LocalEmbedder, SessionVectorStore
 from ..permissions import PermissionManager
+from .channel_logger import ChannelLogger
 from .voice import VoiceManager, VoiceMessageProxy
 
 log = get_logger("discord")
@@ -576,6 +577,9 @@ class HeimdallBot(discord.Client):
         self.sessions.load()
 
         self._memory_path = "./data/memory.json"
+
+        # Passive channel logger — writes ALL guild messages to JSONL (zero LLM tokens)
+        self.channel_logger = ChannelLogger("./data/channel_logs")
 
         # Browser automation
         self.browser_manager = None
@@ -1135,6 +1139,9 @@ class HeimdallBot(discord.Client):
                     await self.voice_manager.leave_channel()
 
     async def on_message(self, message: discord.Message) -> None:
+        # Passive channel log — every guild message, including our own, before any filtering
+        self.channel_logger.log_message(message)
+
         # Never respond to our own messages
         if message.author == self.user:
             return
