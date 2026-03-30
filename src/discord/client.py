@@ -2372,7 +2372,7 @@ class HeimdallBot(discord.Client):
         file_bytes = content.encode("utf-8")
         discord_file = discord.File(io.BytesIO(file_bytes), filename=filename)
         try:
-            await message.channel.send(file=discord_file)
+            await message.channel.send(content=caption or None, file=discord_file)
             return f"File `{filename}` ({len(file_bytes)} bytes) attached to channel."
         except Exception as e:
             return f"Failed to post file: {e}"
@@ -2429,7 +2429,7 @@ class HeimdallBot(discord.Client):
         filename = os.path.basename(path)
         try:
             file = discord.File(io.BytesIO(file_bytes), filename=filename)
-            await message.channel.send(file=file)
+            await message.channel.send(content=caption or None, file=file)
             return f"Posted `{filename}` ({len(file_bytes) / 1024:.1f} KB) to channel."
         except discord.HTTPException as e:
             return f"Failed to upload to Discord: {e}"
@@ -3551,7 +3551,6 @@ class HeimdallBot(discord.Client):
             result = "\n".join(messages)
 
             # Scrub secrets
-            from ..llm.secret_scrubber import scrub_output_secrets
             result = scrub_output_secrets(result)
 
             # Prefix with instruction — these messages are context, not output

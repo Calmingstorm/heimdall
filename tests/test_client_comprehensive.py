@@ -584,7 +584,7 @@ class TestHandleGenerateFile:
     """Tests for _handle_generate_file tool handler."""
 
     async def test_generate_file_success(self):
-        """Should create and post a file to Discord."""
+        """Should create and post a file to Discord with caption."""
         stub = _make_bot_stub()
         stub._handle_generate_file = HeimdallBot._handle_generate_file.__get__(stub)
         msg = _make_message()
@@ -596,15 +596,21 @@ class TestHandleGenerateFile:
         })
         assert "test.txt" in result
         msg.channel.send.assert_awaited_once()
+        # Caption should be passed as content= to Discord send
+        call_kwargs = msg.channel.send.call_args
+        assert call_kwargs.kwargs.get("content") == "Here's the file"
 
     async def test_generate_file_defaults(self):
-        """Should use defaults when fields are missing."""
+        """Should use defaults when fields are missing (no caption)."""
         stub = _make_bot_stub()
         stub._handle_generate_file = HeimdallBot._handle_generate_file.__get__(stub)
         msg = _make_message()
 
         result = await stub._handle_generate_file(msg, {})
         assert "output.txt" in result
+        # No caption → content should be None
+        call_kwargs = msg.channel.send.call_args
+        assert call_kwargs.kwargs.get("content") is None
 
     async def test_generate_file_error(self):
         """Should handle send errors."""
