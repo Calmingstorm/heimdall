@@ -44,6 +44,7 @@ class ToolsConfig(BaseModel):
     claude_code_host: str = ""
     claude_code_user: str = ""
     claude_code_dir: str = "/opt/project"
+    skill_allowed_urls: list[str] = Field(default_factory=list)
 
 
 class LoggingConfig(BaseModel):

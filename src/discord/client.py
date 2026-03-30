@@ -676,6 +676,11 @@ class HeimdallBot(discord.Client):
             memory_path=self._memory_path,
         )
 
+        # Apply skill URL allowlist from config
+        if config.tools.skill_allowed_urls:
+            from ..tools.skill_context import set_skill_allowed_urls
+            set_skill_allowed_urls(config.tools.skill_allowed_urls)
+
         # Initialize Codex client if configured
         self.codex_client: CodexChatClient | None = None
         if config.openai_codex.enabled:

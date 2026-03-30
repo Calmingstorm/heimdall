@@ -76,6 +76,18 @@ def is_path_denied(path: str) -> bool:
     return False
 
 
+# Operator-configured URLs that skills are allowed to access despite being
+# local/private. Set via config: skills.allowed_urls: ["http://localhost:8188"]
+_SKILL_ALLOWED_URLS: set[str] = set()
+
+
+def set_skill_allowed_urls(urls: list[str]) -> None:
+    """Populate the skill URL allowlist from config."""
+    _SKILL_ALLOWED_URLS.clear()
+    for u in urls:
+        _SKILL_ALLOWED_URLS.add(u.rstrip("/"))
+
+
 def is_url_blocked(url: str) -> bool:
     """Return True if a URL targets localhost, private IPs, or metadata endpoints."""
     try:
@@ -87,6 +99,11 @@ def is_url_blocked(url: str) -> bool:
     # Block empty/missing hostname
     if not host:
         return True
+
+    # Check operator allowlist — matches if the URL starts with any allowed prefix
+    url_base = f"{parsed.scheme}://{host}:{parsed.port}" if parsed.port else f"{parsed.scheme}://{host}"
+    if any(url_base.rstrip("/") == allowed or url.startswith(allowed) for allowed in _SKILL_ALLOWED_URLS):
+        return False
 
     # Block common localhost names
     if host in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
