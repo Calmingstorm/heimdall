@@ -549,6 +549,17 @@ class TestLoopDispatchAgentTools:
                 f"Tool '{tool_name}' missing from _dispatch_loop_tool"
             )
 
+    def test_skill_crud_tools_in_loop_dispatch_source(self):
+        """Verify skill management tools appear in _dispatch_loop_tool."""
+        import inspect
+        from src.discord.client import HeimdallBot
+        source = inspect.getsource(HeimdallBot._dispatch_loop_tool)
+
+        for tool_name in ("install_skill", "export_skill", "skill_status"):
+            assert tool_name in source, (
+                f"Tool '{tool_name}' missing from _dispatch_loop_tool"
+            )
+
 
 # ===========================================================================
 # Agent manager integration

@@ -177,7 +177,6 @@ class ToolExecutor:
     # --- Multi-host tools ---
 
     async def _handle_run_command_multi(self, inp: dict) -> str:
-        import asyncio
         hosts = inp["hosts"]
         command = inp["command"]
 

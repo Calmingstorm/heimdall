@@ -200,37 +200,10 @@ List all available tools with definitions.
   {
     "name": "run_command",
     "description": "Execute a shell command on a host",
-    "input_schema": {...},
-    "pack": null
+    "input_schema": {...}
   }
 ]
 ```
-
-### GET /api/tools/packs
-
-List tool packs and their status.
-
-**Response**:
-```json
-{
-  "available": {
-    "systemd": {"tools": 3, "enabled": true},
-    "incus": {"tools": 11, "enabled": true},
-    "ansible": {"tools": 1, "enabled": false},
-    "prometheus": {"tools": 4, "enabled": true},
-    "comfyui": {"tools": 1, "enabled": false}
-  },
-  "enabled": ["systemd", "incus", "prometheus"]
-}
-```
-
-### PUT /api/tools/packs
-
-Enable or disable tool packs.
-
-**Body**: `{"enabled": ["systemd", "incus", "prometheus"]}`
-
-**Response**: `{"ok": true}`
 
 ### GET /api/tools/stats
 

@@ -3466,6 +3466,18 @@ class HeimdallBot(discord.Client):
             return self.skill_manager.enable_skill(tool_input["name"])
         if tool_name == "disable_skill":
             return self.skill_manager.disable_skill(tool_input["name"])
+        if tool_name == "install_skill":
+            return await self.skill_manager.install_from_url(tool_input["url"])
+        if tool_name == "export_skill":
+            export_result = self.skill_manager.export_skill(tool_input["name"])
+            if isinstance(export_result, str):
+                return export_result
+            file_bytes, filename = export_result
+            ch_id_key = str(getattr(msg_proxy.channel, "id", ""))
+            self._pending_files.setdefault(ch_id_key, []).append((file_bytes, filename))
+            return f"Skill '{tool_input['name']}' exported as {filename}."
+        if tool_name == "skill_status":
+            return self.skill_manager.skill_status(tool_input["name"])
         if tool_name == "list_skills":
             skills = self.skill_manager.list_skills()
             if not skills:
