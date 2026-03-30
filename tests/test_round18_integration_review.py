@@ -21,7 +21,6 @@ import pytest  # noqa: E402
 from src.discord.client import (  # noqa: E402
     HeimdallBot,
     MAX_TOOL_ITERATIONS,
-    ToolLoopCancelView,
 )
 from src.llm.circuit_breaker import CircuitOpenError  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
@@ -64,8 +63,6 @@ def _make_bot_stub():
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
-    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
     return stub
 
 
@@ -101,53 +98,6 @@ def _tool_resp(text="", tool_calls=None):
 
 class TestCircuitBreakerWithCancel:
     """Verify cancel button works during/after circuit breaker recovery."""
-
-    async def test_cancel_during_circuit_breaker_sleep(self):
-        """When user presses Cancel while circuit breaker is sleeping,
-        the sleep completes, retry is attempted, and then cancel is
-        detected at the NEXT iteration start."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-
-        call_count = 0
-
-        async def fake_chat_with_tools(**kw):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return _tool_resp("I'll check it.", [_tool_call("check_disk", "tc1")])
-            elif call_count == 2:
-                raise CircuitOpenError("codex", 0.01)
-            elif call_count == 3:
-                # Retry after recovery — returns another tool call
-                return _tool_resp("Continuing.", [_tool_call("check_disk", "tc2")])
-            else:
-                return _tool_resp("Done.")
-
-        stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat_with_tools)
-
-        original_send = msg.channel.send
-
-        async def intercept_send(**kwargs):
-            result = await original_send(**kwargs)
-            if "view" in kwargs:
-                view = kwargs["view"]
-                if isinstance(view, ToolLoopCancelView):
-                    async def delayed_cancel():
-                        await asyncio.sleep(0.005)
-                        view._cancel_event.set()
-                    asyncio.create_task(delayed_cancel())
-            return result
-
-        msg.channel.send = AsyncMock(side_effect=intercept_send)
-
-        text, _, is_error, tools_used, _ = await HeimdallBot._process_with_tools(
-            stub, msg, [], system_prompt_override="test",
-        )
-
-        assert is_error is True
-        assert "cancelled" in text.lower()
-        assert "check_disk" in " ".join(tools_used)
 
     async def test_circuit_breaker_recovery_then_normal_completion(self):
         """Circuit breaker opens, recovery succeeds, loop completes normally."""
@@ -231,9 +181,8 @@ class TestTimeoutWithProgressEmbed:
 class TestCheckpointContinuity:
     """Verify that error responses saved to history enable continuation."""
 
-    async def test_error_response_includes_partial_report(self):
-        """When tool loop fails after 2 steps, the error includes
-        the partial completion report."""
+    async def test_error_response_includes_error_details(self):
+        """When tool loop fails after 2 steps, the error includes the exception message."""
         stub = _make_bot_stub()
         msg = _make_message()
 
@@ -243,7 +192,7 @@ class TestCheckpointContinuity:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return _tool_resp("Step 1", [_tool_call("check_disk", "tc1")])
+                return _tool_resp("Step 1", [_tool_call("run_command", "tc1")])
             elif call_count == 2:
                 return _tool_resp("Step 2", [_tool_call("run_command", "tc2")])
             else:
@@ -256,9 +205,6 @@ class TestCheckpointContinuity:
         )
 
         assert is_error is True
-        assert "Partial completion" in text
-        assert "check_disk" in text
-        assert "run_command" in text
         assert "API crashed" in text
 
 
@@ -343,43 +289,7 @@ class TestAllTerminalPaths:
         assert "circuit breaker" in text.lower()
         assert handoff is False
 
-    async def test_path_5_cancelled_by_user(self):
-        """User presses cancel button → error with partial report."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-
-        call_count = 0
-
-        async def fake_chat(**kw):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return _tool_resp("Step 1", [_tool_call("check_disk", "tc1")])
-            return _tool_resp("Done.")
-
-        stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-
-        original_send = msg.channel.send
-
-        async def intercept_send(**kwargs):
-            result = await original_send(**kwargs)
-            if "view" in kwargs:
-                view = kwargs["view"]
-                if isinstance(view, ToolLoopCancelView):
-                    view._cancel_event.set()
-            return result
-
-        msg.channel.send = AsyncMock(side_effect=intercept_send)
-
-        text, _, is_error, _, handoff = await HeimdallBot._process_with_tools(
-            stub, msg, [], system_prompt_override="test",
-        )
-
-        assert is_error is True
-        assert "cancelled" in text.lower()
-        assert handoff is False
-
-    async def test_path_6_max_iterations(self):
+    async def test_path_5_max_iterations(self):
         """LLM keeps calling tools until MAX_TOOL_ITERATIONS → error."""
         stub = _make_bot_stub()
         msg = _make_message()

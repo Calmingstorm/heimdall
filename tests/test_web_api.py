@@ -65,10 +65,10 @@ def _make_bot():
     bot.config = MagicMock()
     bot.config.model_dump = MagicMock(return_value={
         "discord": {"token": "xyzzy-secret", "channels": ["general"]},
-        "tools": {"ssh_key_path": "/key", "tool_packs": []},
+        "tools": {"ssh_key_path": "/key"},
         "web": {"api_token": "tok", "enabled": True},
     })
-    bot.config.tools.tool_packs = []
+    bot.config.tools.command_timeout_seconds = 300
 
     # Tools
     bot._merged_tool_definitions = MagicMock(return_value=[
@@ -433,7 +433,7 @@ class TestConfigEndpoint:
     async def test_config_put_partial_update(self):
         """PUT /api/config with valid partial update succeeds."""
         from src.config.schema import Config
-        real_config = Config(discord={"token": "tok"}, tools={"tool_packs": []}, web={"enabled": True})
+        real_config = Config(discord={"token": "tok"}, tools={"command_timeout_seconds": 300}, web={"enabled": True})
         bot = _make_bot()
         bot.config = real_config
         app, _ = _make_app(bot, api_token="")
@@ -441,13 +441,13 @@ class TestConfigEndpoint:
             with patch("src.web.api._write_config"):
                 resp = await client.put(
                     "/api/config",
-                    json={"tools": {"tool_packs": ["docker", "git"]}},
+                    json={"tools": {"command_timeout_seconds": 600}},
                 )
             assert resp.status == 200
             body = await resp.json()
-            assert body["tools"]["tool_packs"] == ["docker", "git"]
+            assert body["tools"]["command_timeout_seconds"] == 600
             # Verify the bot's config was updated
-            assert bot.config.tools.tool_packs == ["docker", "git"]
+            assert bot.config.tools.command_timeout_seconds == 600
 
     @pytest.mark.asyncio
     async def test_config_put_blocks_sensitive_fields(self):
@@ -509,7 +509,7 @@ class TestConfigEndpoint:
         from src.config.schema import Config
         real_config = Config(
             discord={"token": "tok"},
-            tools={"tool_packs": ["docker"]},
+            tools={"command_timeout_seconds": 300},
             timezone="US/Eastern",
         )
         bot = _make_bot()
@@ -519,13 +519,13 @@ class TestConfigEndpoint:
             with patch("src.web.api._write_config"):
                 resp = await client.put(
                     "/api/config",
-                    json={"tools": {"tool_packs": ["git"]}},
+                    json={"tools": {"command_timeout_seconds": 600}},
                 )
             assert resp.status == 200
             # timezone should be preserved
             assert bot.config.timezone == "US/Eastern"
-            # tool_packs should be updated
-            assert bot.config.tools.tool_packs == ["git"]
+            # command_timeout_seconds should be updated
+            assert bot.config.tools.command_timeout_seconds == 600
 
     @pytest.mark.asyncio
     async def test_config_put_writes_to_disk(self):
@@ -646,41 +646,6 @@ class TestToolsEndpoint:
             for tool in body:
                 assert "name" in tool
                 assert "description" in tool
-                assert "is_core" in tool
-
-    @pytest.mark.asyncio
-    async def test_list_packs(self):
-        app, _ = _make_app(api_token="")
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/api/tools/packs")
-            body = await resp.json()
-            assert "packs" in body
-            assert "enabled_packs" in body
-            assert "all_packs_loaded" in body
-
-    @pytest.mark.asyncio
-    async def test_update_packs_valid(self):
-        app, bot = _make_app(api_token="")
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.put(
-                "/api/tools/packs",
-                json={"packs": ["systemd", "prometheus"]},
-            )
-            body = await resp.json()
-            assert body["status"] == "updated"
-            assert bot.config.tools.tool_packs == ["systemd", "prometheus"]
-
-    @pytest.mark.asyncio
-    async def test_update_packs_invalid(self):
-        app, _ = _make_app(api_token="")
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.put(
-                "/api/tools/packs",
-                json={"packs": ["nonexistent_pack"]},
-            )
-            assert resp.status == 400
-            body = await resp.json()
-            assert "unknown packs" in body["error"]
 
 
 # ===================================================================

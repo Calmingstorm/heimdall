@@ -24,7 +24,6 @@ from src.discord.client import (  # noqa: E402
     HeimdallBot,
     MAX_TOOL_ITERATIONS,
     TOOL_OUTPUT_MAX_CHARS,
-    ToolLoopCancelView,
     _EMPTY_RESPONSE_FALLBACK,
     _FABRICATION_RETRY_MSG,
     _HEDGING_RETRY_MSG,
@@ -98,8 +97,6 @@ def _make_bot_stub(*, respond_to_bots=False):
     stub.permissions.is_guest = MagicMock(return_value=False)
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
-    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
     stub._build_system_prompt = MagicMock(return_value="system prompt")
     stub._build_chat_system_prompt = MagicMock(return_value="chat system prompt")
     stub._inject_tool_hints = AsyncMock(side_effect=lambda sp, *a, **kw: sp)
@@ -110,6 +107,8 @@ def _make_bot_stub(*, respond_to_bots=False):
     stub.reflector = MagicMock()
     stub.reflector.get_prompt_section = MagicMock(return_value="")
     stub.voice_manager = None
+    # Use the real static method so continuation detection works correctly
+    stub._should_continue_task = HeimdallBot._should_continue_task
     return stub
 
 
@@ -311,44 +310,6 @@ class TestComplexTaskChain:
         assert len(tool_result_msgs) >= 1
         result_content = tool_result_msgs[0]["content"]
         assert any("42% used" in str(r.get("content", "")) for r in result_content)
-
-    async def test_progress_embed_tracks_all_steps(self):
-        """Progress embed is created on first tool call and updated for each step."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-        # Track embed sends and edits
-        sent_embeds = []
-        embed_msg = AsyncMock()
-        embed_msg.edit = AsyncMock()
-
-        async def track_send(**kwargs):
-            sent_embeds.append(kwargs)
-            return embed_msg
-
-        msg.channel.send = AsyncMock(side_effect=track_send)
-
-        call_count = 0
-        async def fake_chat(**kw):
-            nonlocal call_count
-            call_count += 1
-            if call_count <= 2:
-                return _tool_resp(f"Step {call_count}", [_tc(f"run_command", id_=f"tc-{call_count}")])
-            return _tool_resp("All done.")
-
-        stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
-
-        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
-             patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
-            text, _, is_error, tools_used, _ = await stub._process_with_tools(
-                msg, [{"role": "user", "content": "do stuff"}],
-            )
-
-        assert is_error is False
-        # Embed should have been sent once (first tool call)
-        assert len(sent_embeds) >= 1
-        # Embed should have been edited multiple times (step updates + completion)
-        assert embed_msg.edit.call_count >= 2
 
     async def test_audit_logged_for_every_tool_in_chain(self):
         """Every tool call in a chain gets an audit log entry."""
@@ -716,8 +677,7 @@ class TestMultiStepFailureRecovery:
         assert is_error is True
         assert "check_disk" in tools_used
         assert "run_command" in tools_used
-        # Partial completion report should mention completed steps
-        assert "check_disk" in text or "Step" in text
+        # Error message should mention the API error
         assert "API" in text or "rate limit" in text
 
     async def test_circuit_breaker_recovery_succeeds(self):
@@ -839,79 +799,6 @@ class TestMultiStepFailureRecovery:
         assert is_error is True
         assert len(tools_used) == MAX_TOOL_ITERATIONS
         assert "too many tool calls" in text.lower()
-
-    async def test_cancel_after_partial_completion(self):
-        """User presses Cancel mid-chain → partial report with completed steps."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-        call_count = 0
-
-        async def fake_chat(**kw):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return _tool_resp("Step 1", [_tc("check_disk")])
-            elif call_count == 2:
-                return _tool_resp("Step 2", [_tc("run_command")])
-            return _tool_resp("Step 3", [_tc("docker_ps")])
-
-        stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-
-        # Intercept embed send to press cancel after second step
-        embed_msg = AsyncMock()
-        embed_msg.edit = AsyncMock()
-
-        step_counter = 0
-        async def intercept_send(**kwargs):
-            nonlocal step_counter
-            step_counter += 1
-            if "view" in kwargs:
-                view = kwargs["view"]
-                if hasattr(view, "_cancel_event"):
-                    # Cancel after second tool step completes
-                    if step_counter >= 1:
-                        # We'll set cancel after first tool completes
-                        pass
-            return embed_msg
-
-        msg.channel.send = AsyncMock(side_effect=intercept_send)
-        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
-
-        # We simulate cancel by directly manipulating the cancel view
-        # after the first tool loop iteration
-        original_process = HeimdallBot._process_with_tools
-
-        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
-             patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
-            # We need to intercept after first tool call to set cancel
-            cancel_flag = False
-
-            async def timed_cancel():
-                await asyncio.sleep(0.05)
-                # Find and set the cancel view
-                for c in msg.channel.send.call_args_list:
-                    if c.kwargs and "view" in c.kwargs:
-                        view = c.kwargs["view"]
-                        if hasattr(view, "_cancel_event"):
-                            view._cancel_event.set()
-                            return
-
-            # Start the cancel task
-            cancel_task = asyncio.create_task(timed_cancel())
-
-            text, _, is_error, tools_used, _ = await stub._process_with_tools(
-                msg, [{"role": "user", "content": "long task"}],
-            )
-
-            cancel_task.cancel()
-            try:
-                await cancel_task
-            except asyncio.CancelledError:
-                pass
-
-        # Either cancelled or completed — check it handled gracefully
-        assert isinstance(text, str)
-        assert len(tools_used) >= 1
 
     async def test_error_in_handle_message_inner_saves_sanitized(self):
         """_handle_message_inner saves sanitized error marker, not raw error."""
@@ -1674,48 +1561,3 @@ class TestTruncateToolOutput:
         assert truncate_tool_output(text) == text
 
 
-# =====================================================================
-# 11. PROGRESS EMBED BUILDING
-# =====================================================================
-
-class TestProgressEmbed:
-    """Unit tests for progress embed construction."""
-
-    def test_single_running_step(self):
-        steps = [{"tools": ["check_disk"], "reasoning": "Checking...", "status": "running"}]
-        embed = HeimdallBot._build_tool_progress_embed(steps, "running")
-        assert isinstance(embed, discord.Embed)
-
-    def test_completed_steps_with_timing(self):
-        steps = [
-            {"tools": ["check_disk"], "reasoning": "Done.", "status": "done", "elapsed_ms": 1500},
-            {"tools": ["run_command"], "reasoning": "Running...", "status": "running"},
-        ]
-        embed = HeimdallBot._build_tool_progress_embed(steps, "running")
-        assert isinstance(embed, discord.Embed)
-
-    def test_error_status(self):
-        steps = [
-            {"tools": ["check_disk"], "reasoning": "Done.", "status": "done", "elapsed_ms": 500},
-        ]
-        embed = HeimdallBot._build_tool_progress_embed(steps, "error")
-        assert isinstance(embed, discord.Embed)
-
-    def test_partial_completion_report_with_steps(self):
-        steps = [
-            {"tools": ["check_disk"], "reasoning": None, "status": "done", "elapsed_ms": 500},
-            {"tools": ["run_command"], "reasoning": None, "status": "done", "elapsed_ms": 1200},
-            {"tools": ["docker_ps"], "reasoning": None, "status": "running"},
-        ]
-        report = HeimdallBot._build_partial_completion_report(steps)
-        assert "check_disk" in report
-        assert "run_command" in report
-
-    def test_partial_completion_report_no_done_steps(self):
-        steps = [{"tools": ["check_disk"], "reasoning": None, "status": "running"}]
-        report = HeimdallBot._build_partial_completion_report(steps)
-        assert report == ""  # No completed steps to report
-
-    def test_partial_completion_report_empty(self):
-        report = HeimdallBot._build_partial_completion_report([])
-        assert report == ""

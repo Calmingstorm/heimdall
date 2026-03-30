@@ -58,10 +58,6 @@ class TestSystemPromptStructure:
         assert "## Available Hosts" in SYSTEM_PROMPT_TEMPLATE
         assert "{hosts}" in SYSTEM_PROMPT_TEMPLATE
 
-    def test_has_services_section(self):
-        assert "## Allowed Services" in SYSTEM_PROMPT_TEMPLATE
-        assert "{services}" in SYSTEM_PROMPT_TEMPLATE
-
     def test_has_context_section(self):
         assert "## Infrastructure Context" in SYSTEM_PROMPT_TEMPLATE
         assert "{context}" in SYSTEM_PROMPT_TEMPLATE
@@ -183,33 +179,9 @@ class TestArchitectureAccuracy:
         else:
             pytest.skip("architecture.md not found")
 
-    def test_no_stale_docker_pack(self):
-        """Docker pack was removed in Round 2."""
-        # Should not reference docker as an available pack
-        assert "`docker`" not in self.content.split("## Tool Packs")[1].split("##")[0] if "## Tool Packs" in self.content else True
-
-    def test_no_stale_git_pack(self):
-        """Git pack was removed in Round 2."""
-        assert "`git`" not in self.content.split("## Tool Packs")[1].split("##")[0] if "## Tool Packs" in self.content else True
-
-    def test_has_systemd_pack(self):
-        assert "`systemd`" in self.content
-
-    def test_has_incus_pack(self):
-        assert "`incus`" in self.content
-
-    def test_has_ansible_pack(self):
-        assert "`ansible`" in self.content
-
-    def test_has_prometheus_pack(self):
-        assert "`prometheus`" in self.content
-
-    def test_has_comfyui_pack(self):
-        assert "`comfyui`" in self.content
-
-    def test_core_tools_count(self):
-        """Core tools should be 47."""
-        assert "Core tools (47)" in self.content
+    def test_no_tool_packs_section(self):
+        """Tool packs were removed — architecture.md should not have a Tool Packs section."""
+        assert "## Tool Packs" not in self.content
 
     def test_has_defense_mechanisms(self):
         assert "## Defense Mechanisms" in self.content
@@ -248,14 +220,9 @@ class TestArchitectureAccuracy:
         assert "chromadb" not in self.content.lower()
         assert "chroma" not in self.content.lower()
 
-    def test_tool_packs_example_valid(self):
-        """Example config should only reference existing packs."""
-        match = re.search(r"Example config:.*?`tool_packs:\s*\[(.*?)\]`", self.content)
-        if match:
-            packs = [p.strip() for p in match.group(1).split(",")]
-            valid_packs = {"systemd", "incus", "ansible", "prometheus", "comfyui"}
-            for pack in packs:
-                assert pack in valid_packs, f"Example references removed pack: {pack}"
+    def test_no_tool_packs_config_example(self):
+        """Tool packs were removed — architecture.md should not reference tool_packs config."""
+        assert "tool_packs:" not in self.content
 
 
 # ===========================================================================
@@ -308,8 +275,6 @@ class TestContextLoaderIntegration:
         prompt = build_system_prompt(
             context=context,
             hosts={"server1": "10.0.0.1"},
-            services=["nginx"],
-            playbooks=["deploy.yml"],
         )
         assert "Test architecture content" in prompt
         assert "## Infrastructure Context" in prompt
@@ -318,8 +283,6 @@ class TestContextLoaderIntegration:
         prompt = build_system_prompt(
             context="",
             hosts={},
-            services=[],
-            playbooks=[],
         )
         assert "No context files loaded." in prompt
 
@@ -336,36 +299,14 @@ class TestBuildPrompt:
         prompt = build_system_prompt(
             context="test",
             hosts={"web": "10.0.0.1", "db": "10.0.0.2"},
-            services=[],
-            playbooks=[],
         )
         assert "- `web`: 10.0.0.1" in prompt
         assert "- `db`: 10.0.0.2" in prompt
-
-    def test_services_formatted(self):
-        prompt = build_system_prompt(
-            context="test",
-            hosts={},
-            services=["nginx", "redis"],
-            playbooks=[],
-        )
-        assert "`nginx`, `redis`" in prompt
-
-    def test_playbooks_formatted(self):
-        prompt = build_system_prompt(
-            context="test",
-            hosts={},
-            services=[],
-            playbooks=["deploy.yml"],
-        )
-        assert "`deploy.yml`" in prompt
 
     def test_none_configured_fallbacks(self):
         prompt = build_system_prompt(
             context="",
             hosts={},
-            services=[],
-            playbooks=[],
         )
         assert "None configured" in prompt
 
@@ -373,8 +314,6 @@ class TestBuildPrompt:
         prompt = build_system_prompt(
             context="test",
             hosts={},
-            services=[],
-            playbooks=[],
         )
         assert "Voice support is not enabled." in prompt
 
@@ -382,8 +321,6 @@ class TestBuildPrompt:
         prompt = build_system_prompt(
             context="test",
             hosts={},
-            services=[],
-            playbooks=[],
             claude_code_dir="/custom/path",
         )
         assert "/custom/path" in prompt

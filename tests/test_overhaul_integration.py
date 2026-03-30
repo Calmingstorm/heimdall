@@ -7,19 +7,12 @@ system prompt size, and protected detection code.
 from __future__ import annotations
 
 import json
-import textwrap
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.tools.registry import (
-    TOOL_PACKS,
-    TOOLS,
-    _ALL_PACK_TOOLS,
-    get_pack_tool_names,
-    get_tool_definitions,
-)
+from src.tools.registry import TOOLS
 from src.knowledge.store import KnowledgeStore, VECTOR_DIM
 from src.search.vectorstore import SessionVectorStore
 from src.search.embedder import LocalEmbedder
@@ -147,66 +140,7 @@ def sample_archive(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# 1. Tool pack filtering with new tools
-# ---------------------------------------------------------------------------
-
-
-class TestToolPackFilteringWithNewTools:
-    """Verify tool packs interact correctly with new overhaul tools."""
-
-    def test_new_tools_available_when_no_packs(self):
-        """All new tools are returned when no pack filtering is applied."""
-        defs = get_tool_definitions(enabled_packs=[])
-        names = {t["name"] for t in defs}
-        for tool in NEW_TOOLS:
-            assert tool in names, f"New tool '{tool}' missing when packs=[]"
-
-    def test_new_tools_available_with_none_packs(self):
-        """All new tools returned with enabled_packs=None."""
-        defs = get_tool_definitions(enabled_packs=None)
-        names = {t["name"] for t in defs}
-        for tool in NEW_TOOLS:
-            assert tool in names
-
-    def test_comfyui_pack_filters_generate_image(self):
-        """generate_image is in comfyui pack — excluded when only docker enabled."""
-        defs = get_tool_definitions(enabled_packs=["docker"])
-        names = {t["name"] for t in defs}
-        assert "generate_image" not in names, "generate_image should be filtered out"
-
-    def test_comfyui_pack_includes_generate_image(self):
-        """generate_image is included when comfyui pack is enabled."""
-        defs = get_tool_definitions(enabled_packs=["docker", "comfyui"])
-        names = {t["name"] for t in defs}
-        assert "generate_image" in names
-
-    def test_non_pack_new_tools_always_available(self):
-        """New tools not in any pack are always returned, even with filtering."""
-        non_pack_new = NEW_TOOLS - _ALL_PACK_TOOLS
-        defs = get_tool_definitions(enabled_packs=["docker"])
-        names = {t["name"] for t in defs}
-        for tool in non_pack_new:
-            assert tool in names, f"Non-pack tool '{tool}' should always be available"
-
-    def test_pack_filtering_preserves_tool_structure(self):
-        """Filtered tools still have name, description, input_schema."""
-        defs = get_tool_definitions(enabled_packs=["git"])
-        for d in defs:
-            assert set(d.keys()) == {"name", "description", "input_schema"}
-            assert isinstance(d["name"], str) and d["name"]
-            assert isinstance(d["description"], str) and d["description"]
-            assert isinstance(d["input_schema"], dict)
-
-    def test_all_packs_combined_equals_all_tools(self):
-        """Enabling all packs returns the same tools as no filtering."""
-        all_packs = list(TOOL_PACKS.keys())
-        filtered = get_tool_definitions(enabled_packs=all_packs)
-        unfiltered = get_tool_definitions(enabled_packs=[])
-        assert {t["name"] for t in filtered} == {t["name"] for t in unfiltered}
-
-
-# ---------------------------------------------------------------------------
-# 2. Knowledge ingest with local embedder
+# 1. Knowledge ingest with local embedder
 # ---------------------------------------------------------------------------
 
 
@@ -419,11 +353,6 @@ class TestNewToolsInToolDefinitions:
         props = tool["input_schema"]["properties"]
         assert "action" in props
 
-    def test_generate_image_in_comfyui_pack(self):
-        """generate_image is in the comfyui tool pack."""
-        assert "comfyui" in TOOL_PACKS
-        assert "generate_image" in TOOL_PACKS["comfyui"]
-
     def test_analyze_image_has_url_or_host(self):
         """analyze_image supports URL and host+path input."""
         tool = next(t for t in TOOLS if t["name"] == "analyze_image")
@@ -504,8 +433,6 @@ class TestSystemPromptStillUnder5000:
         prompt = build_system_prompt(
             context="",
             hosts={},
-            services=[],
-            playbooks=[],
         )
         assert len(prompt) < 5000, (
             f"Rendered prompt is {len(prompt)} chars, limit is 5000"
@@ -516,8 +443,6 @@ class TestSystemPromptStillUnder5000:
         prompt = build_system_prompt(
             context="Production infrastructure: 3 hosts, 12 services.",
             hosts={"web1": "10.0.0.1", "db1": "10.0.0.2", "monitor": "10.0.0.3"},
-            services=["nginx", "postgres", "redis", "grafana"],
-            playbooks=["deploy-web", "rollback-db"],
             voice_info="",
             tz="UTC",
         )

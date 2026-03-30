@@ -45,7 +45,7 @@ def _make_bot_stub(**overrides):
     stub.config = MagicMock()
     stub.config.tools.enabled = True
     stub.config.tools.tool_timeout_seconds = 300
-    stub.config.tools.tool_packs = []
+    stub.config.tools.
     stub.config.discord.allowed_users = ["12345"]
     stub.config.discord.channels = ["67890"]
     stub.config.discord.respond_to_bots = False
@@ -684,7 +684,6 @@ class TestCrossRoundConsistency:
         from src.llm.system_prompt import build_system_prompt
         prompt = build_system_prompt(
             context="test", hosts={"server": "user@10.0.0.1"},
-            services=["nginx"], playbooks=["check.yml"],
         )
         assert len(prompt) < 5000
 

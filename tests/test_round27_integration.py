@@ -7,7 +7,7 @@ Covers:
 - Config save error handling (write failure resilience)
 - Web UI page routing completeness
 - Chat interface end-to-end flow
-- Tool pack integrity
+- Tool registry integrity
 - Session defense layers present
 - Critical invariants that must hold across all rounds
 """
@@ -43,7 +43,7 @@ from src.health.server import (
 )
 from src.llm.secret_scrubber import scrub_output_secrets
 from src.llm.system_prompt import SYSTEM_PROMPT_TEMPLATE, build_system_prompt
-from src.tools.registry import TOOLS, TOOL_PACKS, get_tool_definitions, get_pack_tool_names
+from src.tools.registry import TOOLS, get_tool_definitions
 from src.web.api import (
     _deep_merge,
     _redact_config,
@@ -76,7 +76,7 @@ def _make_bot(*, config_dump=None):
     }
     bot.config = MagicMock()
     bot.config.model_dump = MagicMock(return_value=dump)
-    bot.config.tools.tool_packs = []
+    bot.config.tools.
 
     bot._merged_tool_definitions = MagicMock(return_value=[
         {"name": "run_command", "description": "Run", "input_schema": {}},
@@ -156,7 +156,7 @@ class TestSystemPromptInvariants:
     def test_built_prompt_under_5000_chars_minimal(self):
         """Minimal config still produces a valid prompt under limit."""
         prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[]
+            context="", hosts={}
         )
         assert len(prompt) < 5000
 
@@ -165,8 +165,6 @@ class TestSystemPromptInvariants:
         prompt = build_system_prompt(
             context="Production cluster with 3 nodes.",
             hosts={"web1": "10.0.0.1", "web2": "10.0.0.2", "db1": "10.0.0.3"},
-            services=["nginx", "postgresql", "redis"],
-            playbooks=["deploy.yml", "backup.yml"],
         )
         assert len(prompt) < 5000
 
@@ -477,50 +475,12 @@ class TestChatEndToEnd:
 
 
 # ===================================================================
-# 7. Tool Pack Integrity
+# 7. Tool Registry Integrity
 # ===================================================================
 
 
-class TestToolPackIntegrity:
+class TestToolRegistryIntegrity:
     """Tool registry must be consistent and complete."""
-
-    def test_total_tool_count(self):
-        assert len(TOOLS) == 80
-
-    def test_five_packs(self):
-        assert len(TOOL_PACKS) == 5
-
-    def test_pack_names(self):
-        expected = {"systemd", "incus", "ansible", "prometheus", "comfyui"}
-        assert set(TOOL_PACKS.keys()) == expected
-
-    def test_pack_tool_counts(self):
-        assert len(TOOL_PACKS["systemd"]) == 3
-        assert len(TOOL_PACKS["incus"]) == 11
-        assert len(TOOL_PACKS["ansible"]) == 1
-        assert len(TOOL_PACKS["prometheus"]) == 4
-        assert len(TOOL_PACKS["comfyui"]) == 1
-
-    def test_all_pack_tools_exist_in_registry(self):
-        tool_names = {t["name"] for t in TOOLS}
-        for pack, names in TOOL_PACKS.items():
-            for name in names:
-                assert name in tool_names, f"Pack tool {name} ({pack}) not in TOOLS"
-
-    def test_empty_packs_returns_all_tools(self):
-        """Empty pack config = all tools loaded."""
-        defs = get_tool_definitions(enabled_packs=[])
-        assert len(defs) == 80
-
-    def test_single_pack_filters(self):
-        """Selecting a single pack returns core + pack tools."""
-        defs = get_tool_definitions(enabled_packs=["systemd"])
-        names = {d["name"] for d in defs}
-        for svc_tool in TOOL_PACKS["systemd"]:
-            assert svc_tool in names
-        # Incus tools should be excluded
-        for incus_tool in TOOL_PACKS["incus"]:
-            assert incus_tool not in names
 
     def test_all_tools_have_required_fields(self):
         for tool in TOOLS:
@@ -531,6 +491,11 @@ class TestToolPackIntegrity:
     def test_no_duplicate_tool_names(self):
         names = [t["name"] for t in TOOLS]
         assert len(names) == len(set(names)), "Duplicate tool names found"
+
+    def test_get_tool_definitions_returns_list(self):
+        defs = get_tool_definitions()
+        assert isinstance(defs, list)
+        assert len(defs) > 0
 
 
 # ===================================================================

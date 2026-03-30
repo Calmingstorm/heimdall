@@ -25,7 +25,6 @@ import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
     HeimdallBot,
-    ToolLoopCancelView,
     combine_bot_messages,
     detect_fabrication,
     detect_hedging,
@@ -1001,11 +1000,6 @@ class TestEdgeCaseSourceStructure:
     def test_detect_hedging_import(self):
         """detect_hedging is importable and callable."""
         assert callable(detect_hedging)
-
-    def test_cancel_view_timeout_default(self):
-        """ToolLoopCancelView has configurable timeout."""
-        view = ToolLoopCancelView(["123"], timeout=60)
-        assert not view.is_cancelled
 
     def test_voice_message_proxy_exists(self):
         """VoiceMessageProxy is importable."""

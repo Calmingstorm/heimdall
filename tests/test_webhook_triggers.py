@@ -55,8 +55,8 @@ class TestTriggerValidation:
             description="On push, run tests",
             action="check",
             channel_id="ch1",
-            tool_name="check_service",
-            tool_input={"host": "server", "service": "docker"},
+            tool_name="run_command",
+            tool_input={"host": "server", "command": "systemctl is-active docker"},
             trigger={"source": "gitea", "event": "push"},
         )
         assert schedule["trigger"] == {"source": "gitea", "event": "push"}
@@ -633,8 +633,8 @@ class TestEndToEnd:
             description="Run tests on push to myproject",
             action="check",
             channel_id="ch1",
-            tool_name="check_service",
-            tool_input={"host": "server", "service": "docker"},
+            tool_name="run_command",
+            tool_input={"host": "server", "command": "systemctl is-active docker"},
             trigger={"source": "gitea", "event": "push", "repo": "myproject"},
         )
 
@@ -647,7 +647,7 @@ class TestEndToEnd:
         assert fired == 1
         schedule_arg = callback.call_args[0][0]
         assert schedule_arg["action"] == "check"
-        assert schedule_arg["tool_name"] == "check_service"
+        assert schedule_arg["tool_name"] == "run_command"
 
     @pytest.mark.asyncio
     async def test_grafana_alert_fires_workflow(self, tmp_dir: Path):
@@ -661,8 +661,8 @@ class TestEndToEnd:
             action="workflow",
             channel_id="ch1",
             steps=[
-                {"tool_name": "check_memory", "tool_input": {"host": "server"}},
-                {"tool_name": "check_disk", "tool_input": {"host": "server"}},
+                {"tool_name": "run_command", "tool_input": {"host": "server", "command": "free -h"}},
+                {"tool_name": "run_script", "tool_input": {"host": "server", "interpreter": "bash", "script": "df -h"}},
             ],
             trigger={"source": "grafana", "alert_name": "HighCPU"},
         )

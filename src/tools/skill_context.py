@@ -110,22 +110,7 @@ def is_url_blocked(url: str) -> bool:
 # Tools that skills are allowed to call via execute_tool().
 # Only read-only / non-destructive tools are included.
 SKILL_SAFE_TOOLS: frozenset[str] = frozenset({
-    "check_service",
-    "check_docker",
-    "check_disk",
-    "check_memory",
-    "check_logs",
-    "query_prometheus",
-    "query_prometheus_range",
     "read_file",
-    "docker_logs",
-    "docker_compose_status",
-    "docker_compose_logs",
-    "docker_stats",
-    "git_status",
-    "git_log",
-    "git_diff",
-    "git_show",
     "search_history",
     "search_audit",
     "search_knowledge",
@@ -135,10 +120,6 @@ SKILL_SAFE_TOOLS: frozenset[str] = frozenset({
     "list_tasks",
     "memory_manage",
     "parse_time",
-    "incus_list",
-    "incus_info",
-    "incus_snapshot_list",
-    "incus_logs",
     "web_search",
     "fetch_url",
     "browser_screenshot",
@@ -238,8 +219,11 @@ class SkillContext:
         return list(self._executor.config.hosts.keys())
 
     def get_services(self) -> list[str]:
-        """List allowed systemd service names."""
-        return list(self._executor.config.allowed_services)
+        """List allowed systemd service names.
+
+        Returns an empty list since systemd tools were removed.
+        """
+        return []
 
     def get_config(self, key: str, default: Any = None) -> Any:
         """Get a single skill config value. Returns default if not set."""

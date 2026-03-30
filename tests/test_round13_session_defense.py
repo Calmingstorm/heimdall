@@ -119,8 +119,6 @@ def _make_handle_message_stub(**overrides):
     stub._inject_tool_hints = AsyncMock(side_effect=lambda sp, *a, **kw: sp)
     stub._memory_path = "/tmp/test_memory.json"
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
-    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
 
     for k, v in overrides.items():
         setattr(stub, k, v)
@@ -159,8 +157,8 @@ def _make_process_with_tools_stub(respond_to_bots=True):
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
-    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
+    # Use the real static method so continuation detection works correctly
+    stub._should_continue_task = HeimdallBot._should_continue_task
     return stub
 
 

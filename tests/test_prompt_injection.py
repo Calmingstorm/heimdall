@@ -38,8 +38,8 @@ def _make_bot_stub(**overrides):
     host_mock.ssh_user = "root"
     host_mock.address = "10.0.0.2"
     stub.config.tools.hosts = {"desktop": host_mock}
-    stub.config.tools.allowed_services = ["nginx", "docker"]
-    stub.config.tools.allowed_playbooks = ["update.yml"]
+    stub.config.tools.allowed_
+    stub.config.tools.allowed_
 
     # Context loader
     stub.context_loader.context = "Test infra context."

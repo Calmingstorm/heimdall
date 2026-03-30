@@ -1,10 +1,9 @@
 """Round 18: Edge cases (continued) — webhook bots, display name tagging, session persistence,
-background tasks, progress embeds, circuit breaker edge cases.
+background tasks, circuit breaker edge cases.
 
 Tests cover: allowed webhook bypass, attachment processing for webhooks, display name tagging
 with unicode/empty/special names, session save/load/corrupted files, background task lifecycle
-and limits, progress embed rendering and edit failures, circuit breaker state transitions and
-recovery timing.
+and limits, circuit breaker state transitions and recovery timing.
 """
 from __future__ import annotations
 
@@ -1003,154 +1002,7 @@ class TestBackgroundTaskSummary:
 
 
 # ============================================================================
-# 5. Progress Embed Edge Cases
-# ============================================================================
-
-class TestProgressEmbedRendering:
-    """_build_tool_progress_embed rendering edge cases."""
-
-    def _build(self, steps, status="running", footer=None):
-        """Helper — call static method directly."""
-        from src.discord.client import HeimdallBot
-        return HeimdallBot._build_tool_progress_embed(steps, status, footer)
-
-    def test_empty_steps(self):
-        """Empty steps list returns 'Starting...' embed."""
-        embed = self._build([], "running")
-        assert embed.description == "Starting..."
-        assert embed.color == discord.Color.blue()
-
-    def test_single_running_step(self):
-        """Single running step shows arrow icon."""
-        embed = self._build([
-            {"tools": ["run_command"], "status": "running", "reasoning": None},
-        ], "running")
-        assert "\u25b6" in embed.description  # ▶
-        assert "run_command" in embed.description
-
-    def test_done_step_shows_check(self):
-        """Done step shows check icon and timing."""
-        embed = self._build([
-            {"tools": ["run_command"], "status": "done", "elapsed_ms": 1500, "reasoning": None},
-        ], "running")
-        assert "\u2713" in embed.description  # ✓
-        assert "1.5s" in embed.description
-
-    def test_multiple_tools_per_step(self):
-        """Multiple tools in a step comma-separated."""
-        embed = self._build([
-            {"tools": ["check_disk", "check_memory"], "status": "running", "reasoning": None},
-        ], "running")
-        assert "check_disk" in embed.description
-        assert "check_memory" in embed.description
-
-    def test_reasoning_shown_for_running(self):
-        """Reasoning shown for the latest running step."""
-        embed = self._build([
-            {"tools": ["run_command"], "status": "running",
-             "reasoning": "Checking disk space on all servers"},
-        ], "running")
-        assert "Checking disk space" in embed.description
-
-    def test_reasoning_hidden_for_done(self):
-        """Reasoning NOT shown when step is done."""
-        embed = self._build([
-            {"tools": ["run_command"], "status": "done",
-             "elapsed_ms": 100, "reasoning": "Old reasoning"},
-        ], "running")
-        assert "Old reasoning" not in embed.description
-
-    def test_footer_appended(self):
-        """Footer text appended to embed."""
-        embed = self._build([
-            {"tools": ["run_command"], "status": "running", "reasoning": None},
-        ], "running", footer="API recovering... (30s)")
-        assert "API recovering" in embed.description
-
-    def test_color_running(self):
-        embed = self._build([], "running")
-        assert embed.color == discord.Color.blue()
-
-    def test_color_complete(self):
-        embed = self._build([], "complete")
-        assert embed.color == discord.Color.green()
-
-    def test_color_error(self):
-        embed = self._build([], "error")
-        assert embed.color == discord.Color.red()
-
-    def test_unknown_color_defaults_blue(self):
-        """Unknown status defaults to blue."""
-        embed = self._build([], "unknown")
-        assert embed.color == discord.Color.blue()
-
-    def test_truncation_at_4000_chars(self):
-        """Description > 4000 chars is truncated."""
-        steps = []
-        for i in range(100):
-            steps.append({
-                "tools": [f"tool_with_very_long_name_{i}_" + "x" * 30],
-                "status": "done", "elapsed_ms": 100, "reasoning": None,
-            })
-        embed = self._build(steps, "complete")
-        assert len(embed.description) <= 4020  # 4000 + "(truncated)" suffix
-        assert "truncated" in embed.description
-
-    def test_elapsed_ms_zero(self):
-        """0ms elapsed shows 0.0s."""
-        embed = self._build([
-            {"tools": ["fast_tool"], "status": "done", "elapsed_ms": 0, "reasoning": None},
-        ], "running")
-        assert "0.0s" in embed.description
-
-    def test_elapsed_ms_large(self):
-        """Very large elapsed_ms (300s) shows correctly."""
-        embed = self._build([
-            {"tools": ["slow_tool"], "status": "done", "elapsed_ms": 300000, "reasoning": None},
-        ], "running")
-        assert "300.0s" in embed.description
-
-
-class TestPartialCompletionReport:
-    """_build_partial_completion_report edge cases."""
-
-    def _build(self, steps):
-        from src.discord.client import HeimdallBot
-        return HeimdallBot._build_partial_completion_report(steps)
-
-    def test_no_done_steps(self):
-        """No done steps returns empty string."""
-        report = self._build([
-            {"tools": ["run_command"], "status": "running"},
-        ])
-        assert report == ""
-
-    def test_some_done_steps(self):
-        """Report shows only done steps."""
-        report = self._build([
-            {"tools": ["check_disk"], "status": "done", "elapsed_ms": 500},
-            {"tools": ["run_command"], "status": "running"},
-        ])
-        assert "Partial completion (1/2 steps)" in report
-        assert "check_disk" in report
-        assert "run_command" not in report
-
-    def test_all_done(self):
-        """All steps done."""
-        report = self._build([
-            {"tools": ["t1"], "status": "done", "elapsed_ms": 100},
-            {"tools": ["t2"], "status": "done", "elapsed_ms": 200},
-        ])
-        assert "2/2 steps" in report
-
-    def test_empty_steps(self):
-        """Empty steps list returns empty string."""
-        report = self._build([])
-        assert report == ""
-
-
-# ============================================================================
-# 6. Circuit Breaker Edge Cases
+# 5. Circuit Breaker Edge Cases
 # ============================================================================
 
 class TestCircuitBreakerBasicStates:
@@ -1465,11 +1317,6 @@ class TestRound18SourceStructure:
         assert hasattr(CircuitBreaker, "record_success")
         assert hasattr(CircuitBreaker, "record_failure")
         assert hasattr(CircuitBreaker, "state")
-
-    def test_progress_embed_method_exists(self):
-        from src.discord.client import HeimdallBot
-        assert hasattr(HeimdallBot, "_build_tool_progress_embed")
-        assert hasattr(HeimdallBot, "_build_partial_completion_report")
 
     def test_background_tasks_max_is_20(self):
         """client.py uses _background_tasks_max = 20."""

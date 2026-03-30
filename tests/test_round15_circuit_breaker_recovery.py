@@ -57,8 +57,7 @@ def _make_bot_stub():
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
-    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
+    stub._should_continue_task = HeimdallBot._should_continue_task
     return stub
 
 
@@ -77,36 +76,6 @@ def _make_message():
     msg.author.display_name = "TestUser"
     msg.reply = AsyncMock()
     return msg
-
-
-# ---------------------------------------------------------------------------
-# Unit tests: _build_tool_progress_embed footer
-# ---------------------------------------------------------------------------
-
-class TestProgressEmbedFooter:
-    """Test the footer parameter in _build_tool_progress_embed."""
-
-    def test_footer_appears_in_embed(self):
-        steps = [
-            {"tools": ["check_disk"], "status": "done", "elapsed_ms": 1200, "reasoning": None},
-        ]
-        embed = HeimdallBot._build_tool_progress_embed(steps, "running", footer="Waiting for recovery...")
-        assert "Waiting for recovery..." in embed.description
-
-    def test_no_footer_by_default(self):
-        steps = [
-            {"tools": ["check_disk"], "status": "done", "elapsed_ms": 1200, "reasoning": None},
-        ]
-        embed = HeimdallBot._build_tool_progress_embed(steps, "running")
-        assert "Waiting" not in embed.description
-
-    def test_footer_with_none(self):
-        steps = [
-            {"tools": ["check_disk"], "status": "done", "elapsed_ms": 1200, "reasoning": None},
-        ]
-        embed = HeimdallBot._build_tool_progress_embed(steps, "running", footer=None)
-        # Should be same as no footer
-        assert "recovery" not in embed.description.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -200,8 +169,8 @@ class TestCircuitBreakerRecoveryFailure:
         assert "Still down" in text
 
     @pytest.mark.asyncio
-    async def test_circuit_open_after_completed_steps_includes_report(self):
-        """Circuit breaker opens mid-task — partial report shows completed steps."""
+    async def test_circuit_open_after_completed_steps_returns_error(self):
+        """Circuit breaker opens mid-task — returns error with recovery info."""
         stub = _make_bot_stub()
         msg = _make_message()
 
@@ -227,9 +196,7 @@ class TestCircuitBreakerRecoveryFailure:
 
         assert is_error
         assert "circuit breaker recovery failed" in text
-        # Partial completion report should show the first completed step
-        assert "Partial completion" in text
-        assert "`check_disk`" in text
+        assert "API still down" in text
 
     @pytest.mark.asyncio
     async def test_circuit_open_retry_circuit_open_again(self):
@@ -277,88 +244,6 @@ class TestCircuitBreakerWaitCap:
         assert not is_error
         wait_arg = mock_sleep.call_args[0][0]
         assert wait_arg == 90.0  # capped, not 300
-
-
-class TestCircuitBreakerEmbedUpdates:
-    """Test that the progress embed is updated during circuit breaker recovery."""
-
-    @pytest.mark.asyncio
-    async def test_embed_shows_recovery_message(self):
-        """Progress embed is updated with recovery wait message."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-
-        # Step 1: tool call (embed is created)
-        # Step 2: circuit breaker opens (embed should show recovery)
-        # Retry: succeeds
-        stub.codex_client.chat_with_tools = AsyncMock(
-            side_effect=[
-                LLMResponse(
-                    text="Checking",
-                    tool_calls=[ToolCall(id="tc1", name="check_disk", input={})],
-                    stop_reason="tool_use",
-                ),
-                CircuitOpenError("codex_api", retry_after=0.01),
-                LLMResponse(text="Done!", tool_calls=[], stop_reason="end_turn"),
-            ]
-        )
-
-        embed_msg = AsyncMock()
-        msg.channel.send = AsyncMock(return_value=embed_msg)
-
-        with patch("src.discord.client.asyncio.sleep", new_callable=AsyncMock):
-            text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
-                stub, msg, [{"role": "user", "content": "check disk"}]
-            )
-
-        assert not is_error
-        assert text == "Done!"
-        # Check that embed was edited with recovery message
-        edit_calls = embed_msg.edit.call_args_list
-        # At least one edit should contain the recovery footer
-        recovery_edits = [
-            c for c in edit_calls
-            if "recovering" in str(c.kwargs.get("embed", {}).description).lower()
-            or "retrying" in str(c.kwargs.get("embed", {}).description).lower()
-        ]
-        assert len(recovery_edits) >= 1
-
-    @pytest.mark.asyncio
-    async def test_embed_turns_red_on_recovery_failure(self):
-        """Progress embed turns red when recovery fails."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-
-        # Step 1: tool call (embed is created)
-        # Step 2: circuit breaker opens
-        # Retry: fails
-        stub.codex_client.chat_with_tools = AsyncMock(
-            side_effect=[
-                LLMResponse(
-                    text="Checking",
-                    tool_calls=[ToolCall(id="tc1", name="check_disk", input={})],
-                    stop_reason="tool_use",
-                ),
-                CircuitOpenError("codex_api", retry_after=0.01),
-                RuntimeError("Still down"),
-            ]
-        )
-
-        embed_msg = AsyncMock()
-        msg.channel.send = AsyncMock(return_value=embed_msg)
-
-        with patch("src.discord.client.asyncio.sleep", new_callable=AsyncMock):
-            text, already_sent, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
-                stub, msg, [{"role": "user", "content": "check disk"}]
-            )
-
-        assert is_error
-        # Last embed edit should be error/red
-        last_edit = embed_msg.edit.call_args_list[-1]
-        last_embed = last_edit.kwargs.get("embed")
-        if last_embed:
-            import discord
-            assert last_embed.color == discord.Color.red()
 
 
 class TestCircuitBreakerNoRegression:

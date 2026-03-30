@@ -18,11 +18,11 @@ import pytest
 
 
 def _get_tracked_files() -> list[str]:
-    """Get list of git-tracked files."""
+    """Get list of git-tracked files that exist on disk."""
     result = subprocess.run(
         ["git", "ls-files"], capture_output=True, text=True, cwd="."
     )
-    return result.stdout.strip().split("\n")
+    return [f for f in result.stdout.strip().split("\n") if Path(f).exists()]
 
 
 def _get_tracked_source_files() -> list[str]:

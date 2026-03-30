@@ -20,40 +20,27 @@ _ARCH_CONTEXT = (Path(__file__).parent.parent / "data" / "context" / "architectu
 class TestBuildSystemPrompt:
     def test_includes_hosts(self):
         prompt = build_system_prompt(
-            context="", hosts={"server": "root@10.0.0.1"}, services=[], playbooks=[],
+            context="", hosts={"server": "root@10.0.0.1"},
         )
         assert "server" in prompt
         assert "10.0.0.1" in prompt
 
-    def test_includes_services(self):
-        prompt = build_system_prompt(
-            context="", hosts={}, services=["apache2", "prometheus"], playbooks=[],
-        )
-        assert "apache2" in prompt
-        assert "prometheus" in prompt
-
-    def test_includes_playbooks(self):
-        prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=["update-all.yml"],
-        )
-        assert "update-all.yml" in prompt
-
     def test_includes_context(self):
         prompt = build_system_prompt(
-            context="Custom infra context here", hosts={}, services=[], playbooks=[],
+            context="Custom infra context here", hosts={},
         )
         assert "Custom infra context here" in prompt
 
     def test_includes_datetime(self):
         prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
+            context="", hosts={},
         )
         assert "Current Date and Time" in prompt
         assert "UTC:" in prompt
 
     def test_includes_voice_info(self):
         prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
+            context="", hosts={},
             voice_info="Connected to General voice channel",
         )
         assert "Connected to General voice channel" in prompt
@@ -61,7 +48,7 @@ class TestBuildSystemPrompt:
     def test_includes_identity_sections(self):
         """Full prompt must include identity sections (operational guidance is in context files)."""
         prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
+            context="", hosts={},
         )
         assert "Your Capabilities" in prompt
         assert "Rules" in prompt
@@ -71,7 +58,7 @@ class TestBuildSystemPrompt:
     def test_context_injects_architecture(self):
         """When architecture context is loaded, operational sections appear in built prompt."""
         prompt = build_system_prompt(
-            context=_ARCH_CONTEXT, hosts={}, services=[], playbooks=[],
+            context=_ARCH_CONTEXT, hosts={},
         )
         assert "Claude Code Delegation" in prompt
         assert "Knowledge Base" in prompt
@@ -122,7 +109,6 @@ class TestBuildChatSystemPrompt:
         """Chat prompt should be much shorter than the full prompt."""
         full = build_system_prompt(
             context="Some context", hosts={"server": "root@1.2.3.4"},
-            services=["apache2"], playbooks=["deploy.yml"],
         )
         chat = build_chat_system_prompt()
         # Chat prompt should be less than half the length of the full prompt
@@ -141,7 +127,7 @@ class TestSystemPromptQuality:
         """Rules must have unique sequential numbering — no duplicate numbers."""
         import re
         prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
+            context="", hosts={},
         )
         # Extract the Rules section
         rules_match = re.search(r"## Rules\n(.*?)(?:\n## |\Z)", prompt, re.DOTALL)
@@ -169,7 +155,7 @@ class TestSystemPromptQuality:
     def test_key_behavioral_directives_present(self):
         """Critical directives must survive any optimization."""
         prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
+            context="", hosts={},
         )
         # Identity
         assert "Heimdall" in prompt
@@ -190,7 +176,7 @@ class TestSystemPromptQuality:
     def test_inline_code_rule_present(self):
         """System prompt must instruct Codex to never write code inline."""
         prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
+            context="", hosts={},
         )
         assert "generate_file" in prompt
         assert "NEVER write code inline" in prompt
@@ -199,7 +185,7 @@ class TestSystemPromptQuality:
         """Each ## section header should appear exactly once."""
         import re
         prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
+            context="", hosts={},
         )
         headers = re.findall(r"^## (.+)$", prompt, re.MULTILINE)
         assert len(headers) == len(set(headers)), (
@@ -209,7 +195,7 @@ class TestSystemPromptQuality:
     def test_autonomous_execution_directives(self):
         """System prompt must contain directives that force execution over discussion."""
         prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
+            context="", hosts={},
         )
         # Must demand tool calls in first response
         assert "execute immediately" in prompt
@@ -243,7 +229,7 @@ class TestTimezoneSupport:
             mock_dt.now.return_value = fixed_dt
             mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
             prompt = build_system_prompt(
-                context="", hosts={}, services=[], playbooks=[],
+                context="", hosts={},
                 tz="Asia/Tokyo",
             )
         assert "JST" in prompt or "Asia/Tokyo" in prompt or "9:00 PM" in prompt
@@ -251,7 +237,7 @@ class TestTimezoneSupport:
     def test_build_system_prompt_default_tz_utc(self):
         """Default tz is UTC."""
         prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
+            context="", hosts={},
         )
         assert "UTC" in prompt
 
@@ -279,14 +265,14 @@ class TestTimezoneSupport:
     def test_system_prompt_no_hardcoded_eastern(self):
         """System prompt should not contain hardcoded 'Eastern' timezone reference."""
         prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
+            context="", hosts={},
         )
         assert "All times Eastern" not in prompt
 
     def test_system_prompt_shows_configured_timezone(self):
         """System prompt shows the scheduling timezone."""
         prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
+            context="", hosts={},
             tz="America/Chicago",
         )
         # Should show CST or CDT depending on time of year

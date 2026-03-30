@@ -19,7 +19,7 @@ from croniter import croniter
 from ..config.schema import Config
 from ..llm.secret_scrubber import scrub_output_secrets
 from ..logging import get_logger
-from ..tools.registry import TOOL_PACKS, get_tool_definitions, get_pack_tool_names
+from ..tools.registry import get_tool_definitions
 from .chat import MAX_CHAT_CONTENT_LEN, process_web_chat
 
 if TYPE_CHECKING:
@@ -33,12 +33,6 @@ _SENSITIVE_FIELDS = frozenset({
     "api_key", "password",
 })
 
-# Pre-computed reverse mapping: tool name → pack name (O(1) lookup).
-_TOOL_TO_PACK: dict[str, str] = {
-    tool_name: pack_name
-    for pack_name, tool_names in TOOL_PACKS.items()
-    for tool_name in tool_names
-}
 
 # Input validation limits
 _MAX_NAME_LEN = 100
@@ -488,53 +482,19 @@ def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
     @routes.get("/api/tools")
     async def list_tools(_request: web.Request) -> web.Response:
         all_tools = get_tool_definitions()
-        pack_names = get_pack_tool_names(list(TOOL_PACKS.keys()))
         result = [
             {
                 "name": tool["name"],
                 "description": tool["description"],
-                "pack": _TOOL_TO_PACK.get(tool["name"]),
-                "is_core": tool["name"] not in pack_names,
             }
             for tool in all_tools
         ]
         return web.json_response(result)
 
-    @routes.get("/api/tools/packs")
-    async def list_packs(_request: web.Request) -> web.Response:
-        enabled = bot.config.tools.tool_packs
-        packs = {}
-        for pack_name, tool_names in TOOL_PACKS.items():
-            packs[pack_name] = {
-                "enabled": not enabled or pack_name in enabled,
-                "tools": tool_names,
-                "tool_count": len(tool_names),
-            }
-        return web.json_response({
-            "packs": packs,
-            "enabled_packs": enabled,
-            "all_packs_loaded": not enabled,
-        })
-
     @routes.get("/api/tools/stats")
     async def tool_stats(_request: web.Request) -> web.Response:
         counts = await bot.audit.count_by_tool()
         return web.json_response(counts)
-
-    @routes.put("/api/tools/packs")
-    async def update_packs(request: web.Request) -> web.Response:
-        data = await request.json()
-        packs = data.get("packs", [])
-        valid = set(TOOL_PACKS.keys())
-        invalid = [p for p in packs if p not in valid]
-        if invalid:
-            return web.json_response(
-                {"error": f"unknown packs: {invalid}", "valid": sorted(valid)},
-                status=400,
-            )
-        bot.config.tools.tool_packs = packs
-        bot._cached_merged_tools = None
-        return web.json_response({"status": "updated", "packs": packs})
 
     # ------------------------------------------------------------------
     # Skills

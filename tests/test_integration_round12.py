@@ -89,6 +89,8 @@ def _make_bot_stub():
     stub._inject_tool_hints = AsyncMock(side_effect=lambda sp, *a, **kw: sp)
     stub._pending_files = {}
     stub._track_recent_action = MagicMock()
+    # Use the real static method so continuation detection works correctly
+    stub._should_continue_task = HeimdallBot._should_continue_task
     return stub
 
 

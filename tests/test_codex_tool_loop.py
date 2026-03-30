@@ -160,7 +160,6 @@ class TestProcessWithToolsCodex:
         msg = _make_message()
         embed_msg = AsyncMock()
         msg.channel.send = AsyncMock(return_value=embed_msg)
-        stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=[
             LLMResponse(

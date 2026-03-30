@@ -56,7 +56,7 @@ class TestIdentityComplete:
 
     def test_system_prompt_says_heimdall(self):
         from src.llm.system_prompt import build_system_prompt, build_chat_system_prompt
-        sp = build_system_prompt("", {}, [], [])
+        sp = build_system_prompt("", {})
         assert "Heimdall" in sp
         assert "Ansiblex" not in sp
         cp = build_chat_system_prompt()
@@ -131,12 +131,9 @@ class TestConfigSystem:
     def test_config_defaults_tools(self):
         from src.config.schema import Config
         cfg = Config(discord={"token": "t"})
-        assert cfg.tools.prometheus_host == ""
-        assert cfg.tools.ansible_host == ""
         assert cfg.tools.claude_code_host == ""
         assert cfg.tools.claude_code_user == ""
         assert cfg.tools.claude_code_dir == "/opt/project"
-        assert cfg.tools.incus_host == ""
 
     def test_config_loads_actual_yml(self):
         """config.yml loads without error when env vars are set."""
@@ -166,7 +163,7 @@ class TestToolSystem:
 
     def test_tool_count(self):
         from src.tools.registry import TOOLS
-        assert len(TOOLS) == 80
+        assert len(TOOLS) == 61
 
     def test_all_tools_have_required_keys(self):
         from src.tools.registry import TOOLS
@@ -191,16 +188,10 @@ class TestToolSystem:
     def test_key_tool_categories_present(self):
         from src.tools.registry import TOOLS
         names = {t["name"] for t in TOOLS}
-        # SSH/infrastructure
-        assert "check_service" in names
-        assert "check_disk" in names
-        assert "check_memory" in names
+        # Shell execution
         assert "run_command" in names
         assert "run_command_multi" in names
-        # Incus
-        assert "incus_list" in names
-        assert "incus_exec" in names
-        assert "incus_launch" in names
+        assert "run_script" in names
         # Knowledge/search
         assert "search_knowledge" in names
         assert "ingest_document" in names
@@ -219,10 +210,11 @@ class TestToolSystem:
         assert "web_search" in names
         assert "fetch_url" in names
 
-    def test_incus_tools_count(self):
+    def test_no_incus_tools_in_core(self):
+        """Incus tools were moved to tool packs (now removed)."""
         from src.tools.registry import TOOLS
         incus_tools = [t for t in TOOLS if t["name"].startswith("incus_")]
-        assert len(incus_tools) >= 11
+        assert len(incus_tools) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -234,40 +226,33 @@ class TestSystemPrompt:
 
     def test_prompt_with_no_hosts(self):
         from src.llm.system_prompt import build_system_prompt
-        p = build_system_prompt("", {}, [], [])
+        p = build_system_prompt("", {})
         assert "None configured" in p
 
     def test_prompt_with_hosts(self):
         from src.llm.system_prompt import build_system_prompt
-        p = build_system_prompt("", {"web": "root@10.0.0.1"}, [], [])
+        p = build_system_prompt("", {"web": "root@10.0.0.1"})
         assert "web" in p
         assert "10.0.0.1" in p
 
     def test_prompt_with_context(self):
         from src.llm.system_prompt import build_system_prompt
-        p = build_system_prompt("Custom infrastructure notes", {}, [], [])
+        p = build_system_prompt("Custom infrastructure notes", {})
         assert "Custom infrastructure notes" in p
-
-    def test_prompt_with_services_and_playbooks(self):
-        from src.llm.system_prompt import build_system_prompt
-        p = build_system_prompt("", {}, ["nginx", "docker"], ["deploy.yml"])
-        assert "nginx" in p
-        assert "docker" in p
-        assert "deploy.yml" in p
 
     def test_prompt_timezone_utc(self):
         from src.llm.system_prompt import build_system_prompt
-        p = build_system_prompt("", {}, [], [], tz="UTC")
+        p = build_system_prompt("", {}, tz="UTC")
         assert "UTC" in p
 
     def test_prompt_timezone_custom(self):
         from src.llm.system_prompt import build_system_prompt
-        p = build_system_prompt("", {}, [], [], tz="Asia/Tokyo")
+        p = build_system_prompt("", {}, tz="Asia/Tokyo")
         assert "JST" in p or "Asia/Tokyo" in p or "+09" in p
 
     def test_chat_prompt_is_lightweight(self):
         from src.llm.system_prompt import build_system_prompt, build_chat_system_prompt
-        full = build_system_prompt("ctx", {"h": "a"}, ["s"], ["p"])
+        full = build_system_prompt("ctx", {"h": "a"})
         chat = build_chat_system_prompt()
         assert len(chat) < len(full)
 

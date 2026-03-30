@@ -39,19 +39,11 @@ class ToolsConfig(BaseModel):
     ssh_key_path: str = "/app/.ssh/id_ed25519"
     ssh_known_hosts_path: str = "/app/.ssh/known_hosts"
     hosts: dict[str, ToolHost] = Field(default_factory=dict)
-    allowed_services: list[str] = Field(default_factory=list)
-    allowed_playbooks: list[str] = Field(default_factory=list)
-    ansible_directory: str = "/ansible"
     command_timeout_seconds: int = 300
     tool_timeout_seconds: int = 300
-    prometheus_host: str = ""
-    ansible_host: str = ""
     claude_code_host: str = ""
     claude_code_user: str = ""
     claude_code_dir: str = "/opt/project"
-    incus_host: str = ""
-    # Empty = all tools. Options: docker, systemd, incus, ansible, prometheus, git, comfyui
-    tool_packs: list[str] = Field(default_factory=list)
 
 
 class LoggingConfig(BaseModel):

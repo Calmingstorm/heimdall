@@ -864,7 +864,8 @@ class TestSkillManagerCRUD:
         assert "Invalid skill name" in result
 
     def test_create_builtin_collision(self, skill_mgr: SkillManager):
-        result = skill_mgr.create_skill("check_disk", VALID_SKILL_CODE)
+        code = VALID_SKILL_CODE.replace('"test_skill"', '"run_command"')
+        result = skill_mgr.create_skill("run_command", code)
         assert "conflicts" in result
 
     def test_create_duplicate(self, skill_mgr: SkillManager):
@@ -1500,12 +1501,12 @@ class TestSkillContextExecuteTool:
 
     async def test_tool_call_limit(self, skill_context: SkillContext):
         skill_context._tracker.tool_calls = MAX_SKILL_TOOL_CALLS
-        result = await skill_context.execute_tool("check_disk")
+        result = await skill_context.execute_tool("search_knowledge")
         assert "limit" in result.lower()
 
     async def test_safe_tool_increments_tracker(self, skill_context: SkillContext):
         with patch.object(skill_context._executor, "execute", new_callable=AsyncMock, return_value="ok"):
-            result = await skill_context.execute_tool("check_disk", {"host": "server"})
+            result = await skill_context.execute_tool("search_knowledge", {"query": "test"})
             assert result == "ok"
             assert skill_context._tracker.tool_calls == 1
 
@@ -1603,8 +1604,8 @@ class TestSkillContextHosts:
 
     def test_get_services(self, skill_context: SkillContext):
         services = skill_context.get_services()
-        assert "apache2" in services
-        assert "prometheus" in services
+        # Systemd tools removed — get_services() returns empty list
+        assert services == []
 
 
 class TestSkillContextConfig:
@@ -1872,9 +1873,8 @@ class TestSafeToolsAllowlist:
 
     def test_read_only_tools_present(self):
         expected = {
-            "check_service", "check_disk", "check_memory",
-            "read_file", "git_status", "git_log",
-            "search_knowledge", "list_skills",
+            "read_file", "search_knowledge", "list_skills",
+            "web_search", "fetch_url", "browser_screenshot",
         }
         for tool in expected:
             assert tool in SKILL_SAFE_TOOLS, f"{tool} should be in SKILL_SAFE_TOOLS"
@@ -2038,7 +2038,7 @@ class TestBuiltinToolNames:
 
     def test_contains_core_tools(self):
         assert "run_command" in BUILTIN_TOOL_NAMES
-        assert "check_disk" in BUILTIN_TOOL_NAMES
+        assert "read_file" in BUILTIN_TOOL_NAMES
 
     def test_skill_names_not_in_builtins(self):
         assert "my_custom_skill" not in BUILTIN_TOOL_NAMES

@@ -45,7 +45,6 @@ def monitoring_config() -> MonitoringConfig:
                 name="services_up",
                 type="service",
                 hosts=["server"],
-                services=["apache2", "prometheus"],
                 interval_minutes=5,
             ),
             MonitorCheck(

@@ -92,8 +92,6 @@ class TestProcessWithToolsErrorFlag:
         """When codex_client.chat_with_tools raises, _process_with_tools catches it
         and returns an error message with is_error=True (Round 13: partial completion)."""
         stub = _make_bot_stub()
-        stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
-        stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
         msg = _make_message()
 
         stub.codex_client.chat_with_tools = AsyncMock(

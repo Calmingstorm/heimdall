@@ -43,7 +43,6 @@ def _make_mock_bot(codex_enabled=True):
     bot.agent_manager = AgentManager()
     bot.config = MagicMock()
     bot.config.tools.enabled = True
-    bot.config.tools.tool_packs = []
 
     if codex_enabled:
         bot.codex_client = MagicMock()

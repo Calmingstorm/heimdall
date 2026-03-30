@@ -44,11 +44,10 @@ def _make_bot():
     bot.config = MagicMock()
     bot.config.model_dump = MagicMock(return_value={
         "discord": {"token": "secret"},
-        "tools": {"ssh_key_path": "/key", "tool_packs": []},
+        "tools": {"ssh_key_path": "/key"},
         "web": {"api_token": "test-token", "enabled": True, "session_timeout_minutes": 0},
     })
     bot.config.web.api_token = "test-token"
-    bot.config.tools.tool_packs = []
     bot._merged_tool_definitions = MagicMock(return_value=[
         {"name": "run_command", "description": "Run a command", "input_schema": {}},
     ])

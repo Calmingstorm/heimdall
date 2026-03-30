@@ -70,7 +70,6 @@ def _make_bot():
     bot.tool_executor.run_tool = AsyncMock(return_value="ok")
     bot.config = MagicMock()
     bot.config.tools = MagicMock()
-    bot.config.tools.tool_packs = ["incus"]
     bot.config.monitoring = MagicMock()
     bot.config.monitoring.enabled = False
     bot._cached_merged_tools = None

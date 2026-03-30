@@ -60,7 +60,7 @@ def _make_chat_bot(*, codex_available=True, process_result=None):
         "tools": {"tool_packs": []},
         "web": {"api_token": "", "enabled": True},
     })
-    bot.config.tools.tool_packs = []
+    bot.config.tools.
     bot.config.tools.enabled = True
     bot.config.tools.tool_timeout_seconds = 60
     bot.config.discord.respond_to_bots = False

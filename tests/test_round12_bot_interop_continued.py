@@ -10,8 +10,7 @@ Tests areas not covered by Round 11:
 7. Bot mention stripping in flush handler
 8. Tool-less bot responses NOT saved to history (anti-poisoning)
 9. Bot display name tagging in session
-10. Cancel view authorization with bot-triggered loops
-11. Bot message dedup
+10. Bot message dedup
 """
 from __future__ import annotations
 
@@ -27,7 +26,6 @@ import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
     HeimdallBot,
-    ToolLoopCancelView,
     combine_bot_messages,
     detect_fabrication,
     detect_hedging,
@@ -151,8 +149,6 @@ def _make_process_with_tools_stub(respond_to_bots=True):
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
-    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
     return stub
 
 
@@ -736,60 +732,7 @@ class TestBotDisplayNameTagging:
 
 
 # ---------------------------------------------------------------------------
-# 10. ToolLoopCancelView authorization
-# ---------------------------------------------------------------------------
-
-class TestCancelViewAuthorization:
-    """Test cancel button authorization behavior."""
-
-    def test_allowed_user_can_cancel(self):
-        """User in allowed_users list can trigger cancel."""
-        view = ToolLoopCancelView(allowed_user_ids=["user-1", "user-2"])
-        assert not view.is_cancelled
-
-        # Simulate button press from allowed user
-        interaction = MagicMock()
-        interaction.user.id = "user-1"
-        interaction.response = MagicMock()
-        interaction.response.edit_message = AsyncMock()
-
-        # Can't easily test button callback without Discord, but verify state
-        assert "user-1" in view._allowed
-        assert "user-2" in view._allowed
-
-    def test_unauthorized_user_not_in_allowed(self):
-        """User NOT in allowed_users is not authorized."""
-        view = ToolLoopCancelView(allowed_user_ids=["user-1"])
-        assert "random-user" not in view._allowed
-
-    def test_empty_allowed_users_no_one_can_cancel(self):
-        """With empty allowed_users, no one can cancel."""
-        view = ToolLoopCancelView(allowed_user_ids=[])
-        assert len(view._allowed) == 0
-        # Bot's own ID won't be in the set either
-        assert "bot-id" not in view._allowed
-
-    def test_cancel_view_initial_state(self):
-        """Cancel view starts not cancelled."""
-        view = ToolLoopCancelView(allowed_user_ids=["user-1"])
-        assert not view.is_cancelled
-
-    def test_cancel_view_disable(self):
-        """Disable method disables all buttons."""
-        view = ToolLoopCancelView(allowed_user_ids=["user-1"])
-        view.disable()
-        # All buttons should be disabled after disable()
-        for item in view.children:
-            assert item.disabled
-
-    def test_cancel_view_timeout(self):
-        """Cancel view has configurable timeout."""
-        view = ToolLoopCancelView(allowed_user_ids=["user-1"], timeout=120)
-        assert view.timeout == 120
-
-
-# ---------------------------------------------------------------------------
-# 11. combine_bot_messages advanced edge cases
+# 10. combine_bot_messages advanced edge cases
 # ---------------------------------------------------------------------------
 
 class TestCombineBotMessagesAdvanced:

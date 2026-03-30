@@ -53,7 +53,7 @@ def _make_bot():
         "tools": {"ssh_key_path": "/key", "tool_packs": []},
         "web": {"api_token": "tok", "enabled": True},
     })
-    bot.config.tools.tool_packs = []
+    bot.config.tools.
     bot._merged_tool_definitions = MagicMock(return_value=[])
     bot._cached_merged_tools = None
     bot._cached_skills_text = None

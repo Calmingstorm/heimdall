@@ -59,11 +59,7 @@ class TestLoadConfig:
         assert cfg.discord.token == "test-token"
         # Round 2: hosts should be empty (no personal data)
         assert cfg.tools.hosts == {}
-        assert cfg.tools.allowed_services == []
-        assert cfg.tools.allowed_playbooks == []
         # Round 2: new config fields have sensible defaults
-        assert cfg.tools.prometheus_host == ""
-        assert cfg.tools.ansible_host == ""
         assert cfg.tools.claude_code_host == ""
         assert cfg.tools.claude_code_user == ""
         assert cfg.tools.claude_code_dir == "/opt/project"
@@ -196,34 +192,24 @@ class TestToolsConfig:
         tc = ToolsConfig()
         assert tc.enabled is True
         assert tc.command_timeout_seconds == 300
-        assert tc.allowed_services == []
 
     def test_new_config_fields_defaults(self):
         """Round 2 config fields have correct empty defaults."""
         tc = ToolsConfig()
-        assert tc.prometheus_host == ""
-        assert tc.ansible_host == ""
         assert tc.claude_code_host == ""
         assert tc.claude_code_user == ""
         assert tc.claude_code_dir == "/opt/project"
-        assert tc.incus_host == ""
 
     def test_new_config_fields_set(self):
         """Round 2 config fields accept custom values."""
         tc = ToolsConfig(
-            prometheus_host="monitor",
-            ansible_host="controller",
             claude_code_host="devbox",
             claude_code_user="deploy",
             claude_code_dir="/home/deploy/project",
-            incus_host="vmhost",
         )
-        assert tc.prometheus_host == "monitor"
-        assert tc.ansible_host == "controller"
         assert tc.claude_code_host == "devbox"
         assert tc.claude_code_user == "deploy"
         assert tc.claude_code_dir == "/home/deploy/project"
-        assert tc.incus_host == "vmhost"
 
 
 class TestTimezoneConfig:

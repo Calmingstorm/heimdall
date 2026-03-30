@@ -131,11 +131,6 @@ class TestInputSanitization:
         # Uses conn.execute with parameterized queries
         assert ".execute(" in content
 
-    def test_incus_name_validation(self):
-        """Incus instance names should be validated."""
-        content = Path("src/tools/executor.py").read_text()
-        assert "_validate_incus_name" in content
-
     def test_yaml_safe_load(self):
         """Config loading should use yaml.safe_load (not yaml.load)."""
         content = Path("src/config/schema.py").read_text()

@@ -64,6 +64,7 @@ def _make_bot_stub():
     # Bind real methods
     stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
     stub._track_recent_action = HeimdallBot._track_recent_action.__get__(stub)
+    stub._should_continue_task = HeimdallBot._should_continue_task
     return stub
 
 
@@ -71,6 +72,11 @@ def _make_message(channel_id="chan-1"):
     msg = AsyncMock()
     msg.channel = MagicMock()
     msg.channel.id = channel_id
+    msg.channel.typing = MagicMock(return_value=AsyncMock(
+        __aenter__=AsyncMock(return_value=None),
+        __aexit__=AsyncMock(return_value=None),
+    ))
+    msg.channel.send = AsyncMock(return_value=AsyncMock())
     msg.author = MagicMock()
     msg.author.id = "user-1"
     msg.reply = AsyncMock()
@@ -243,76 +249,6 @@ class TestParallelToolExecution:
         tool_results = captured[1][-1]["content"]
         ids = {r["tool_use_id"] for r in tool_results}
         assert ids == {"id-alpha", "id-beta"}
-
-
-# ---------------------------------------------------------------------------
-# Progress messages
-# ---------------------------------------------------------------------------
-
-class TestProgressMessages:
-    """Progress updates sent to Discord during tool execution via embed."""
-
-    async def test_progress_embed_sent_for_tool_call(self):
-        """A progress embed with tool names should be sent."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-        embed_msg = AsyncMock()
-        msg.channel.send = AsyncMock(return_value=embed_msg)
-        stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
-
-        tc = ToolCall(id="tool-1", name="check_disk", input={})
-        stub.codex_client.chat_with_tools = AsyncMock(
-            side_effect=_codex_tool_then_text([tc])
-        )
-
-        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
-            await stub._process_with_tools(msg, [])
-
-        # Check progress embed was sent via channel.send
-        msg.channel.send.assert_called()
-        embed = msg.channel.send.call_args[1]["embed"]
-        assert "`check_disk`" in embed.description
-
-    async def test_progress_embed_no_gear_emoji(self):
-        """Progress embeds must not contain gear emojis."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-        embed_msg = AsyncMock()
-        msg.channel.send = AsyncMock(return_value=embed_msg)
-        stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
-
-        tc = ToolCall(id="tool-1", name="run_command", input={})
-        stub.codex_client.chat_with_tools = AsyncMock(
-            side_effect=_codex_tool_then_text([tc])
-        )
-
-        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
-            await stub._process_with_tools(msg, [])
-
-        embed = msg.channel.send.call_args[1]["embed"]
-        assert "\u2699" not in embed.description  # no gear emoji
-        assert "\ufe0f" not in embed.description  # no variation selector
-
-    async def test_progress_embed_lists_multiple_tools(self):
-        """Progress embed should list all tool names when multiple called."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-        embed_msg = AsyncMock()
-        msg.channel.send = AsyncMock(return_value=embed_msg)
-        stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
-
-        tc1 = ToolCall(id="t1", name="check_disk", input={})
-        tc2 = ToolCall(id="t2", name="check_memory", input={})
-        stub.codex_client.chat_with_tools = AsyncMock(
-            side_effect=_codex_tool_then_text([tc1, tc2])
-        )
-
-        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
-            await stub._process_with_tools(msg, [])
-
-        embed = msg.channel.send.call_args[1]["embed"]
-        assert "`check_disk`" in embed.description
-        assert "`check_memory`" in embed.description
 
 
 # ---------------------------------------------------------------------------

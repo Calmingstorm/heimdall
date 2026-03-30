@@ -313,7 +313,7 @@ class TestSystemPromptReminders:
         from src.llm.system_prompt import build_system_prompt
 
         prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[]
+            context="", hosts={}
         )
         assert "Current Date and Time" in prompt
 

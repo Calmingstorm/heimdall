@@ -12,11 +12,7 @@ VALID_TIERS = ("admin", "user", "guest")
 # Tools available to the "user" tier — read-only monitoring and search.
 # Everything else is admin-only.
 USER_TIER_TOOLS = frozenset({
-    "check_disk",
-    "check_memory",
-    "check_service",
-    "check_logs",
-    "query_prometheus",
+    "run_command",
     "search_history",
     "search_knowledge",
     "web_search",

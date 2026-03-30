@@ -1,17 +1,13 @@
-"""Round 18 validation tests — full test pass + backward compatibility + FTS-only + tool packs.
+"""Round 18 validation tests — tool definitions + FTS-only + knowledge stores.
 
 Comprehensive tests verifying:
-1. Backward compatibility: no tool_packs config = all tools loaded
+1. Tool definitions have correct structure and required fields
 2. FTS-only mode works end-to-end for knowledge and session stores
-3. Tool pack filtering is correct and complete
-4. System invariants hold (prompt size, detection functions, tool_choice)
+3. System invariants hold (prompt size, detection functions, tool_choice)
 """
 from __future__ import annotations
 
-import asyncio
 import json
-import sqlite3
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,16 +16,9 @@ import pytest
 from src.knowledge.store import KnowledgeStore, CHUNK_SIZE, VECTOR_DIM
 from src.search.fts import FullTextIndex
 from src.search.vectorstore import SessionVectorStore
-from src.tools.registry import (
-    TOOL_PACKS,
-    TOOLS,
-    get_pack_tool_names,
-    get_tool_definitions,
-)
+from src.tools.registry import TOOLS, get_tool_definitions
 
 # ---------- helpers -------------------------------------------------------
-
-_ALL_PACK_TOOLS = {name for tools in TOOL_PACKS.values() for name in tools}
 
 
 def _patch_load_extension():
@@ -38,26 +27,18 @@ def _patch_load_extension():
 
 
 # ===========================================================================
-# Section 1: Backward Compatibility — no tool_packs = all tools
+# Section 1: Tool Definitions — all tools returned
 # ===========================================================================
 
 
-class TestBackwardCompatibility:
-    """Verify that empty/absent/None tool_packs returns ALL tools."""
+class TestToolDefinitions:
+    """Verify that get_tool_definitions returns all tools correctly."""
 
-    def test_no_packs_returns_all_tools(self):
+    def test_returns_all_tools(self):
         all_tools = get_tool_definitions()
         assert len(all_tools) == len(TOOLS)
 
-    def test_empty_list_returns_all_tools(self):
-        all_tools = get_tool_definitions(enabled_packs=[])
-        assert len(all_tools) == len(TOOLS)
-
-    def test_none_returns_all_tools(self):
-        all_tools = get_tool_definitions(enabled_packs=None)
-        assert len(all_tools) == len(TOOLS)
-
-    def test_all_tool_names_present_no_packs(self):
+    def test_all_tool_names_present(self):
         all_tools = get_tool_definitions()
         names = {t["name"] for t in all_tools}
         expected = {t["name"] for t in TOOLS}
@@ -72,114 +53,9 @@ class TestBackwardCompatibility:
             assert isinstance(tool["description"], str)
             assert isinstance(tool["input_schema"], dict)
 
-    def test_default_config_loads_all_tools(self):
-        """Config with default tool_packs (empty list) should load all tools."""
-        from src.config.schema import ToolsConfig
-        tc = ToolsConfig()
-        assert tc.tool_packs == []
-        # Empty list = all tools
-        tools = get_tool_definitions(enabled_packs=tc.tool_packs)
-        assert len(tools) == len(TOOLS)
-
 
 # ===========================================================================
-# Section 2: Tool Pack Filtering
-# ===========================================================================
-
-
-class TestToolPackFiltering:
-    """Verify tool pack filtering logic."""
-
-    def test_single_pack_filters_correctly(self):
-        """Enabling one pack returns core + that pack's tools."""
-        systemd_tools = get_tool_definitions(enabled_packs=["systemd"])
-        systemd_names = {t["name"] for t in systemd_tools}
-
-        # All systemd tools present
-        for name in TOOL_PACKS["systemd"]:
-            assert name in systemd_names, f"Systemd tool {name} missing"
-
-        # No tools from OTHER packs (except those in systemd)
-        for pack, tools in TOOL_PACKS.items():
-            if pack == "systemd":
-                continue
-            for name in tools:
-                assert name not in systemd_names, f"Non-systemd tool {name} found"
-
-    def test_multiple_packs_combine(self):
-        """Enabling multiple packs returns core + both packs' tools."""
-        combined = get_tool_definitions(enabled_packs=["systemd", "prometheus"])
-        names = {t["name"] for t in combined}
-
-        for name in TOOL_PACKS["systemd"]:
-            assert name in names
-        for name in TOOL_PACKS["prometheus"]:
-            assert name in names
-
-        # No incus/ansible/etc
-        for name in TOOL_PACKS["incus"]:
-            assert name not in names
-
-    def test_core_tools_always_present(self):
-        """Core tools (not in any pack) are always present regardless of packs."""
-        core_names = {t["name"] for t in TOOLS} - _ALL_PACK_TOOLS
-
-        # With single pack
-        filtered = get_tool_definitions(enabled_packs=["systemd"])
-        filtered_names = {t["name"] for t in filtered}
-
-        for name in core_names:
-            assert name in filtered_names, f"Core tool {name} missing with systemd pack"
-
-    def test_unknown_pack_silently_ignored(self):
-        """Unknown pack names don't cause errors."""
-        tools = get_tool_definitions(enabled_packs=["nonexistent"])
-        names = {t["name"] for t in tools}
-
-        # Only core tools — all pack tools filtered out
-        for pack_tool in _ALL_PACK_TOOLS:
-            assert pack_tool not in names
-
-    def test_all_packs_combined_equals_all_tools(self):
-        """Enabling all packs is equivalent to no packs."""
-        all_packs = list(TOOL_PACKS.keys())
-        with_all_packs = get_tool_definitions(enabled_packs=all_packs)
-        without_packs = get_tool_definitions()
-
-        assert len(with_all_packs) == len(without_packs)
-
-    def test_get_pack_tool_names_returns_set(self):
-        result = get_pack_tool_names(["systemd", "prometheus"])
-        assert isinstance(result, set)
-        expected = set(TOOL_PACKS["systemd"]) | set(TOOL_PACKS["prometheus"])
-        assert result == expected
-
-    def test_get_pack_tool_names_empty(self):
-        result = get_pack_tool_names([])
-        assert result == set()
-
-    def test_no_tool_in_multiple_packs(self):
-        """Each tool should be in at most one pack."""
-        seen: dict[str, str] = {}
-        for pack, tools in TOOL_PACKS.items():
-            for tool in tools:
-                assert tool not in seen, f"Tool {tool} in both {seen[tool]} and {pack}"
-                seen[tool] = pack
-
-    def test_comfyui_pack_contains_generate_image(self):
-        """ComfyUI pack should contain generate_image."""
-        assert "generate_image" in TOOL_PACKS["comfyui"]
-
-    def test_pack_tools_exist_in_registry(self):
-        """All tools named in TOOL_PACKS must exist in the TOOLS list."""
-        all_tool_names = {t["name"] for t in TOOLS}
-        for pack, tools in TOOL_PACKS.items():
-            for tool in tools:
-                assert tool in all_tool_names, f"Pack {pack} references nonexistent tool {tool}"
-
-
-# ===========================================================================
-# Section 3: FTS-Only Mode End-to-End (Knowledge Store)
+# Section 2: FTS-Only Mode End-to-End (Knowledge Store)
 # ===========================================================================
 
 
@@ -267,7 +143,7 @@ class TestFTSOnlyKnowledgeStore:
 
 
 # ===========================================================================
-# Section 4: FTS-Only Mode End-to-End (Session Vector Store)
+# Section 3: FTS-Only Mode End-to-End (Session Vector Store)
 # ===========================================================================
 
 
@@ -335,7 +211,7 @@ class TestFTSOnlySessionStore:
 
 
 # ===========================================================================
-# Section 5: No-FTS, No-Vec Mode (graceful degradation)
+# Section 4: No-FTS, No-Vec Mode (graceful degradation)
 # ===========================================================================
 
 
@@ -365,7 +241,7 @@ class TestNoSearchBackend:
 
 
 # ===========================================================================
-# Section 6: System Invariants
+# Section 5: System Invariants
 # ===========================================================================
 
 
@@ -416,28 +292,9 @@ class TestSystemInvariants:
         for tool in new_tools:
             assert tool in names, f"New tool {tool} not found in registry"
 
-    def test_tool_count_is_79(self):
-        """Total tool count should be 80 (67 base + 6 agent + 2 loop-agent bridge + 2 skill toggle + 3 skill management tools)."""
-        assert len(TOOLS) == 80
-
-    def test_five_tool_packs(self):
-        """There should be 5 tool packs (docker and git removed)."""
-        assert len(TOOL_PACKS) == 5
-        expected_packs = {"systemd", "incus", "ansible", "prometheus", "comfyui"}
-        assert set(TOOL_PACKS.keys()) == expected_packs
-
-    def test_pack_tool_count_is_20(self):
-        """20 tools total across all packs."""
-        all_pack = set()
-        for tools in TOOL_PACKS.values():
-            all_pack.update(tools)
-        assert len(all_pack) == 20
-
-    def test_core_tool_count_is_59(self):
-        """59 core tools always available (47 base + 6 agent + 2 loop-agent bridge + 2 skill toggle + 3 skill management tools)."""
-        all_names = {t["name"] for t in TOOLS}
-        core = all_names - _ALL_PACK_TOOLS
-        assert len(core) == 60
+    def test_tool_count(self):
+        """Tool count after consolidation (packs removed, tools merged)."""
+        assert len(TOOLS) == 61
 
     def test_no_chromadb_imports_in_source(self):
         """No chromadb import statements should remain in source code.
@@ -470,7 +327,7 @@ class TestSystemInvariants:
 
 
 # ===========================================================================
-# Section 7: Chunk Text Edge Cases
+# Section 6: Chunk Text Edge Cases
 # ===========================================================================
 
 
@@ -502,7 +359,7 @@ class TestChunkTextEdgeCases:
 
 
 # ===========================================================================
-# Section 8: Tool Definition Structure
+# Section 7: Tool Definition Structure
 # ===========================================================================
 
 

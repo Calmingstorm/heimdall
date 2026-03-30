@@ -56,10 +56,9 @@ Gather info first, build the step list, then delegate.
 You MUST actually call `delegate_task` to start a task.
 
 Each step MUST include `tool_input` with ALL required parameters for the tool:
-- `check_disk`/`check_memory`: host defaults to localhost if omitted
-- `run_command`: MUST include `"command": "your_shell_command"` in tool_input
-- `run_script`: MUST include `"script": "..."` and `"interpreter": "bash"` in tool_input
-Example step: `{"tool_name": "run_command", "description": "Check uptime", "tool_input": {"command": "uptime"}}`
+- `run_command`: MUST include `"host"` and `"command"` in tool_input
+- `run_script`: MUST include `"host"`, `"script"`, and optionally `"interpreter"` in tool_input
+Example step: `{"tool_name": "run_command", "description": "Check uptime", "tool_input": {"host": "myserver", "command": "uptime"}}`
 
 Background tasks automatically post progress updates and a conversational summary to
 the channel when complete. Do NOT say "I'll report back" or "I'll let you know when
@@ -85,7 +84,7 @@ Common patterns:
 - "Update me on X every N minutes" → start_loop(goal="Check X, summarize status", interval=N*60, mode="notify")
 - "Keep playing the game" → start_loop(goal="Check game state, take next move, report", interval=15, mode="act", stop_condition="when the game ends or someone wins")
 - "Watch for new log entries" → start_loop(goal="Tail /var/log/X, report new entries", interval=30, mode="notify", stop_condition="when told to stop")
-- "Monitor disk and warn me" → start_loop(goal="Check disk usage, warn if above 80%", interval=300, mode="silent")
+- "Monitor disk and warn me" → start_loop(goal="Check disk usage via run_command, warn if above 80%", interval=300, mode="silent")
   (In silent mode, include [NOTIFY] in your response if something important happened)
 
 IMPORTANT: When someone asks you to "follow up", "keep me posted", "check periodically",
@@ -100,17 +99,6 @@ Lifecycle:
 1. `schedule_task` → creates the schedule, returns ID.
 2. `list_schedules` → view all active schedules with next run times.
 3. `delete_schedule` → remove a schedule by ID.
-
-## Tool Packs
-
-Infrastructure tools are grouped into opt-in packs. When `tool_packs` is empty or
-absent in config, ALL tools are loaded (backward compatible). When packs are specified,
-only core tools plus the selected packs are available.
-
-Available packs: `systemd` (3), `incus` (11), `ansible` (1),
-`prometheus` (4), `comfyui` (1). Core tools (47) are always available.
-
-Example config: `tool_packs: [systemd, incus, prometheus]`
 
 ## PDF Analysis
 
@@ -135,7 +123,7 @@ Max 20 concurrent processes, 1-hour auto-kill lifetime.
 LLM for vision analysis. Returns a text description. For web page screenshots,
 use `browser_screenshot` instead.
 
-`generate_image` (requires ComfyUI pack) generates images via ComfyUI API.
+`generate_image` generates images via ComfyUI API.
 Must be enabled in config (`comfyui.enabled: true`). Result is posted as a
 Discord attachment.
 
@@ -146,7 +134,7 @@ Discord attachment.
 
 ## Common Patterns
 
-Health checks: run check_disk, check_memory on all hosts + query_prometheus in parallel.
+Health checks: use `run_command` with `df -h`, `free -h`, `systemctl status`, `curl` for prometheus on each host.
 Multi-line scripts or code blocks: use run_script (creates temp file, avoids heredoc issues).
 Images: download and attach via post_file. Never paste raw URLs.
 PDFs: auto-extracted from attachments. Use `analyze_pdf` for URL/host PDFs.

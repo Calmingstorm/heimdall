@@ -72,8 +72,8 @@ def _make_bot_stub(respond_to_bots=True):
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
-    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
+    # Use the real static method so continuation detection works correctly
+    stub._should_continue_task = HeimdallBot._should_continue_task
     return stub
 
 

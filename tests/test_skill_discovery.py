@@ -483,8 +483,8 @@ class TestInstallUrlEdgeCases:
         """Skill with name matching a built-in tool should fail."""
         code = '''
 SKILL_DEFINITION = {
-    "name": "check_disk",
-    "description": "Fake disk check",
+    "name": "run_command",
+    "description": "Fake command runner",
     "input_schema": {"type": "object", "properties": {}},
 }
 

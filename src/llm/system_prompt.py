@@ -32,7 +32,7 @@ CORE BEHAVIOR: You are an EXECUTOR. When the user requests action, execute immed
 Scheduling timezone: {timezone_name}
 
 ## Your Capabilities
-Your tool list defines what you can do — shell, infrastructure, web, files, memory, scheduling, search, vision, loops, agents, skills, Claude Code. They are yours. Use them.
+Your tool list defines what you can do — shell, infrastructure, web, files, memory, scheduling, search, vision, loops, agents, skills, Claude Code. Use run_command for any shell operation on any host. They are yours. Use them.
 
 ## Rules
 1. For multi-step tasks: state your plan in one line, then EXECUTE ALL STEPS with tool calls. If a step fails, diagnose and fix it yourself before reporting.
@@ -48,12 +48,6 @@ Your tool list defines what you can do — shell, infrastructure, web, files, me
 
 ## Available Hosts
 {hosts}
-
-## Allowed Services
-{services}
-
-## Allowed Playbooks
-{playbooks}
 
 ## Infrastructure Context
 {context}
@@ -98,7 +92,7 @@ def build_chat_system_prompt(
 ) -> str:
     """Build a lightweight system prompt for chat-routed messages.
 
-    Omits infrastructure details, tool descriptions, host lists, PromQL, etc.
+    Omits infrastructure details, tool descriptions, host lists, etc.
     to save input tokens on casual conversation.
     """
     return CHAT_SYSTEM_PROMPT_TEMPLATE.format(
@@ -110,15 +104,11 @@ def build_chat_system_prompt(
 def build_system_prompt(
     context: str,
     hosts: dict[str, str],
-    services: list[str],
-    playbooks: list[str],
     voice_info: str = "",
     tz: str = "UTC",
     claude_code_dir: str = "/opt/heimdall",
 ) -> str:
     hosts_text = "\n".join(f"- `{alias}`: {addr}" for alias, addr in hosts.items())
-    services_text = ", ".join(f"`{s}`" for s in services)
-    playbooks_text = ", ".join(f"`{p}`" for p in playbooks)
 
     # Derive a human-friendly timezone name for the prompt
     local_tz = _get_zone(tz)
@@ -126,8 +116,6 @@ def build_system_prompt(
 
     return SYSTEM_PROMPT_TEMPLATE.format(
         hosts=hosts_text or "None configured",
-        services=services_text or "None configured",
-        playbooks=playbooks_text or "None configured",
         context=context or "No context files loaded.",
         current_datetime=_format_datetime(tz),
         voice_info=voice_info or "Voice support is not enabled.",

@@ -498,29 +498,10 @@ class TestHandleGenerateImage:
 # ---------------------------------------------------------------------------
 
 class TestComfyUIToolPack:
-    """Tests for generate_image in the comfyui tool pack."""
+    """Tests for generate_image tool availability."""
 
-    def test_comfyui_in_tool_packs(self):
-        from src.tools.registry import TOOL_PACKS
-        assert "comfyui" in TOOL_PACKS
-        assert "generate_image" in TOOL_PACKS["comfyui"]
-
-    def test_generate_image_filtered_without_pack(self):
-        """When comfyui pack is not enabled, generate_image should be excluded."""
-        from src.tools.registry import get_tool_definitions
-        tools = get_tool_definitions(enabled_packs=["docker"])
-        tool_names = {t["name"] for t in tools}
-        assert "generate_image" not in tool_names
-
-    def test_generate_image_included_with_pack(self):
-        """When comfyui pack is enabled, generate_image should be included."""
-        from src.tools.registry import get_tool_definitions
-        tools = get_tool_definitions(enabled_packs=["comfyui"])
-        tool_names = {t["name"] for t in tools}
-        assert "generate_image" in tool_names
-
-    def test_generate_image_in_all_tools_default(self):
-        """With no packs filter (default), all tools including generate_image."""
+    def test_generate_image_in_tools(self):
+        """generate_image should be included in tool definitions."""
         from src.tools.registry import get_tool_definitions
         tools = get_tool_definitions()
         tool_names = {t["name"] for t in tools}

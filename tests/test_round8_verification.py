@@ -24,7 +24,7 @@ _ARCH_CONTEXT = (Path(__file__).parent.parent / "data" / "context" / "architectu
 
 def _build_prompt() -> str:
     return build_system_prompt(
-        context=_ARCH_CONTEXT, hosts={"web": "10.0.0.1"}, services=["nginx"], playbooks=["deploy"],
+        context=_ARCH_CONTEXT, hosts={"web": "10.0.0.1"},
     )
 
 
@@ -102,13 +102,11 @@ class TestPromptArchitectureCoherence:
         assert "web" in prompt
         assert "10.0.0.1" in prompt
 
-    def test_services_injection_works(self):
+    def test_context_injection_works(self):
+        """Context passed to build_system_prompt appears in output."""
         prompt = _build_prompt()
-        assert "nginx" in prompt
-
-    def test_playbooks_injection_works(self):
-        prompt = _build_prompt()
-        assert "deploy" in prompt
+        # architecture.md context should be injected
+        assert "Claude Code Delegation" in prompt
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +157,7 @@ class TestTemplateSafety:
     def test_all_format_fields_filled(self):
         """build_system_prompt fills all format fields without KeyError."""
         prompt = build_system_prompt(
-            context="ctx", hosts={"h": "1.2.3.4"}, services=["s"], playbooks=["p"],
+            context="ctx", hosts={"h": "1.2.3.4"},
         )
         unfilled = re.findall(r"\{[a-z_]+\}", prompt)
         unfilled = [m for m in unfilled if m not in ('{alertstate}',)]

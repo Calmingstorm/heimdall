@@ -6,7 +6,7 @@ Verifies descriptions are concise, cross-references valid, and no regressions.
 import json
 import re
 import pytest
-from src.tools.registry import TOOLS, get_tool_definitions, TOOL_PACKS
+from src.tools.registry import TOOLS, get_tool_definitions
 
 
 class TestDescriptionOptimization:
@@ -43,8 +43,8 @@ class TestDescriptionOptimization:
             )
 
     def test_tool_count_unchanged(self):
-        """Still 80 tools (67 base + 6 agent + 2 loop-agent bridge + 2 skill toggle + 3 skill management tools)."""
-        assert len(TOOLS) == 80
+        """61 tools after consolidation (removed 19 shell wrappers)."""
+        assert len(TOOLS) == 61
 
 
 class TestCrossReferences:

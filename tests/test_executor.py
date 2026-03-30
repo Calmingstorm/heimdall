@@ -1,7 +1,6 @@
 """Tests for tools/executor.py."""
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -29,89 +28,11 @@ class TestHostResolution:
         assert result[2] == "macos"
 
 
-class TestValidation:
-    def test_valid_service(self, executor: ToolExecutor):
-        assert executor._validate_service("apache2") is True
-
-    def test_invalid_service(self, executor: ToolExecutor):
-        assert executor._validate_service("evil_service") is False
-
-    def test_valid_playbook(self, executor: ToolExecutor):
-        assert executor._validate_playbook("check-services.yml") is True
-
-    def test_invalid_playbook(self, executor: ToolExecutor):
-        assert executor._validate_playbook("nuke-everything.yml") is False
-
-
 class TestExecute:
     @pytest.mark.asyncio
     async def test_unknown_tool(self, executor: ToolExecutor):
         result = await executor.execute("nonexistent_tool", {})
         assert "Unknown tool" in result
-
-    @pytest.mark.asyncio
-    async def test_check_service_allowed(self, executor: ToolExecutor):
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "active (running)")
-            result = await executor.execute("check_service", {
-                "host": "server",
-                "service": "apache2",
-            })
-        assert "active (running)" in result
-        mock_ssh.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_check_service_disallowed(self, executor: ToolExecutor):
-        result = await executor.execute("check_service", {
-            "host": "server",
-            "service": "evil_service",
-        })
-        assert "not in the allowlist" in result
-
-    @pytest.mark.asyncio
-    async def test_check_service_unknown_host(self, executor: ToolExecutor):
-        result = await executor.execute("check_service", {
-            "host": "nonexistent",
-            "service": "apache2",
-        })
-        assert "Unknown or disallowed host" in result
-
-    @pytest.mark.asyncio
-    async def test_check_disk_linux(self, executor: ToolExecutor):
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "Filesystem  Size  Used  Avail")
-            result = await executor.execute("check_disk", {"host": "server"})
-        assert "Filesystem" in result
-        cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
-        assert "tmpfs" in cmd  # excludes tmpfs on linux
-
-    @pytest.mark.asyncio
-    async def test_check_disk_macos(self, executor: ToolExecutor):
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "Filesystem  Size  Used  Avail")
-            await executor.execute("check_disk", {"host": "macbook"})
-        cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
-        assert cmd == "df -h"
-
-    @pytest.mark.asyncio
-    async def test_check_memory_macos(self, executor: ToolExecutor):
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "--- Memory ---")
-            await executor.execute("check_memory", {"host": "macbook"})
-        cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
-        assert "vm_stat" in cmd
-
-    @pytest.mark.asyncio
-    async def test_check_logs_line_limit(self, executor: ToolExecutor):
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "log output")
-            await executor.execute("check_logs", {
-                "host": "server",
-                "service": "apache2",
-                "lines": 999,
-            })
-        cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
-        assert "-n 50" in cmd  # capped at 50
 
     @pytest.mark.asyncio
     async def test_run_command(self, executor: ToolExecutor):
@@ -161,49 +82,13 @@ class TestExecute:
         assert "head -n 200" in cmd
 
     @pytest.mark.asyncio
-    async def test_ansible_playbook_check_mode_default(self, executor: ToolExecutor):
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "ok")
-            await executor.execute("run_ansible_playbook", {
-                "playbook": "check-services.yml",
-            })
-        cmd = mock_ssh.call_args[1]["command"] if mock_ssh.call_args[1] else mock_ssh.call_args[0][1]
-        assert "--check" in cmd
-
-    @pytest.mark.asyncio
-    async def test_ansible_playbook_disallowed(self, executor: ToolExecutor):
-        result = await executor.execute("run_ansible_playbook", {
-            "playbook": "nuke.yml",
-        })
-        assert "not in the allowlist" in result
-
-    @pytest.mark.asyncio
     async def test_handler_exception(self, executor: ToolExecutor):
         with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
             mock_ssh.side_effect = RuntimeError("boom")
-            result = await executor.execute("check_disk", {"host": "server"})
-        assert "Error executing" in result
-
-    @pytest.mark.asyncio
-    async def test_query_prometheus(self, executor: ToolExecutor):
-        raw = json.dumps({
-            "status": "success",
-            "data": {
-                "resultType": "vector",
-                "result": [
-                    {"metric": {"__name__": "up", "instance": "localhost:9090", "job": "prometheus"}, "value": [1645000000, "1"]},
-                ],
-            },
-        })
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, raw)
-            result = await executor.execute("query_prometheus", {
-                "query": "up",
+            result = await executor.execute("run_command", {
+                "host": "server", "command": "uptime",
             })
-        # Should be formatted, not raw JSON
-        assert "1 result" in result
-        assert "up{" in result
-        assert '"status"' not in result
+        assert "Error executing" in result
 
 
 class TestRunScript:

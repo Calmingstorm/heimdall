@@ -491,33 +491,12 @@ class TestToolOutputScrubbing:
 class TestExistingSecurityPatterns:
     """Verify existing security measures are not broken by new code."""
 
-    def test_incus_name_validation_still_works(self):
-        """Incus name regex should block injection attempts."""
-        from src.tools.executor import _INCUS_NAME_RE
-
-        assert _INCUS_NAME_RE.match("valid-name")
-        assert _INCUS_NAME_RE.match("container1")
-        assert not _INCUS_NAME_RE.match("$(whoami)")
-        assert not _INCUS_NAME_RE.match("name; rm -rf /")
-        assert not _INCUS_NAME_RE.match("")
-        assert not _INCUS_NAME_RE.match("-starts-with-dash")
-
     def test_interpreter_allowlist_still_works(self):
         """run_script interpreter must be in allowlist."""
         allowed = {"bash", "sh", "python3", "python", "node", "ruby", "perl"}
         dangerous = {"curl", "wget", "nc", "/bin/sh", "../../bin/sh"}
         for interp in dangerous:
             assert interp not in allowed
-
-    def test_service_validation_still_required(self):
-        """check_service/restart_service must validate against allowlist."""
-        from src.tools.executor import ToolExecutor
-        from src.config.schema import ToolsConfig
-
-        executor = ToolExecutor(ToolsConfig())
-        # No services in allowlist by default
-        assert not executor._validate_service("sshd")
-        assert not executor._validate_service("$(whoami)")
 
     def test_scrub_output_secrets_function_exists(self):
         """Secret scrubber module should be importable."""

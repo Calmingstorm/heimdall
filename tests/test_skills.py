@@ -54,7 +54,7 @@ class TestNameValidation:
         assert not SKILL_NAME_PATTERN.match("_leading")
 
     def test_builtin_collision(self, skill_mgr: SkillManager):
-        error = skill_mgr._validate_name("check_disk")
+        error = skill_mgr._validate_name("run_command")
         assert error is not None
         assert "conflicts" in error
 

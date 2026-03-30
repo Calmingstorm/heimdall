@@ -23,7 +23,7 @@ _ARCH_CONTENT = _ARCH_PATH.read_text()
 
 def _build_prompt() -> str:
     return build_system_prompt(
-        context=_ARCH_CONTENT, hosts={}, services=[], playbooks=[],
+        context=_ARCH_CONTENT, hosts={},
     )
 
 
@@ -121,15 +121,6 @@ class TestCrossReferenceBidirectionality:
 
     def test_read_file_to_claude_code(self):
         assert "claude_code" in _tool_desc("read_file")
-
-    def test_incus_info_to_incus_list(self):
-        assert "incus_list" in _tool_desc("incus_info")
-
-    def test_incus_exec_to_incus_logs(self):
-        assert "incus_logs" in _tool_desc("incus_exec")
-
-    def test_incus_delete_to_incus_launch(self):
-        assert "incus_launch" in _tool_desc("incus_delete")
 
 
 # ---------------------------------------------------------------------------

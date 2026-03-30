@@ -506,47 +506,12 @@ class TestFormatDatetime:
 # =====================================================================
 
 class TestGetToolDefinitions:
-    """Tests for get_tool_definitions() filtering behavior."""
+    """Tests for get_tool_definitions() behavior."""
 
-    def test_no_packs_returns_all(self):
+    def test_returns_all_tools(self):
         from src.tools.registry import get_tool_definitions, TOOLS
         result = get_tool_definitions()
         assert len(result) == len(TOOLS)
-
-    def test_empty_packs_returns_all(self):
-        from src.tools.registry import get_tool_definitions, TOOLS
-        result = get_tool_definitions([])
-        assert len(result) == len(TOOLS)
-
-    def test_systemd_pack_filtering(self):
-        from src.tools.registry import get_tool_definitions, TOOL_PACKS, _ALL_PACK_TOOLS
-        result = get_tool_definitions(["systemd"])
-        names = {t["name"] for t in result}
-        # Should include systemd tools
-        for tool_name in TOOL_PACKS["systemd"]:
-            assert tool_name in names
-        # Should NOT include tools from other packs
-        for pack_name, pack_tools in TOOL_PACKS.items():
-            if pack_name != "systemd":
-                for tool_name in pack_tools:
-                    assert tool_name not in names
-
-    def test_multi_pack_filtering(self):
-        from src.tools.registry import get_tool_definitions, TOOL_PACKS
-        result = get_tool_definitions(["systemd", "prometheus"])
-        names = {t["name"] for t in result}
-        for tool_name in TOOL_PACKS["systemd"]:
-            assert tool_name in names
-        for tool_name in TOOL_PACKS["prometheus"]:
-            assert tool_name in names
-
-    def test_unknown_pack_ignored(self):
-        """Unknown pack name returns only core tools."""
-        from src.tools.registry import get_tool_definitions, _ALL_PACK_TOOLS
-        result = get_tool_definitions(["nonexistent_pack"])
-        names = {t["name"] for t in result}
-        # Should have no pack tools
-        assert not names.intersection(_ALL_PACK_TOOLS)
 
     def test_returned_tools_have_required_keys(self):
         from src.tools.registry import get_tool_definitions
@@ -556,42 +521,8 @@ class TestGetToolDefinitions:
             assert "input_schema" in t
 
 
-class TestGetPackToolNames:
-    """Tests for get_pack_tool_names() function."""
-
-    def test_empty_packs(self):
-        from src.tools.registry import get_pack_tool_names
-        assert get_pack_tool_names([]) == set()
-
-    def test_single_pack(self):
-        from src.tools.registry import get_pack_tool_names, TOOL_PACKS
-        result = get_pack_tool_names(["systemd"])
-        assert result == set(TOOL_PACKS["systemd"])
-
-    def test_unknown_pack(self):
-        from src.tools.registry import get_pack_tool_names
-        assert get_pack_tool_names(["does_not_exist"]) == set()
-
-    def test_duplicate_packs(self):
-        from src.tools.registry import get_pack_tool_names, TOOL_PACKS
-        result = get_pack_tool_names(["systemd", "systemd"])
-        assert result == set(TOOL_PACKS["systemd"])
-
-
-class TestPackIntegrity:
-    """Tests for _ALL_PACK_TOOLS consistency."""
-
-    def test_all_pack_tools_count(self):
-        from src.tools.registry import _ALL_PACK_TOOLS, TOOL_PACKS
-        expected = sum(len(tools) for tools in TOOL_PACKS.values())
-        assert len(_ALL_PACK_TOOLS) == expected
-
-    def test_all_pack_tools_in_tools_list(self):
-        """Every name in _ALL_PACK_TOOLS must exist in TOOLS."""
-        from src.tools.registry import _ALL_PACK_TOOLS, TOOLS
-        tool_names = {t["name"] for t in TOOLS}
-        for pack_tool in _ALL_PACK_TOOLS:
-            assert pack_tool in tool_names, f"Pack tool {pack_tool!r} not in TOOLS"
+class TestToolIntegrity:
+    """Tests for TOOLS list consistency."""
 
     def test_tool_name_uniqueness(self):
         """All tool names must be unique."""

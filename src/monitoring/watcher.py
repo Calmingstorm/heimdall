@@ -102,7 +102,10 @@ class InfraWatcher:
 
     async def _check_disk(self, check: MonitorCheck) -> None:
         for host in check.hosts:
-            output = await self._executor.execute("check_disk", {"host": host})
+            output = await self._executor.execute("run_command", {
+                "host": host,
+                "command": "df -h --exclude-type=tmpfs --exclude-type=devtmpfs",
+            })
             # Parse df -h output for usage percentages
             for line in output.strip().split("\n"):
                 match = re.search(r"(\d+)%\s+(/\S*)", line)
@@ -120,7 +123,10 @@ class InfraWatcher:
 
     async def _check_memory(self, check: MonitorCheck) -> None:
         for host in check.hosts:
-            output = await self._executor.execute("check_memory", {"host": host})
+            output = await self._executor.execute("run_command", {
+                "host": host,
+                "command": "free -h",
+            })
             # Parse "free -h" output — look for Mem: line
             for line in output.strip().split("\n"):
                 if line.startswith("Mem:"):
@@ -142,16 +148,15 @@ class InfraWatcher:
     async def _check_service(self, check: MonitorCheck) -> None:
         for host in check.hosts:
             for service in check.services:
-                output = await self._executor.execute("check_service", {
+                output = await self._executor.execute("run_command", {
                     "host": host,
-                    "service": service,
+                    "command": f"systemctl status {service} --no-pager -l",
                 })
                 # Check if the service is not active
                 is_down = (
                     "could not be found" in output.lower()
                     or "inactive" in output.lower()
                     or "failed" in output.lower()
-                    or "not in the allowlist" in output.lower()
                 )
                 if is_down:
                     key = f"{check.name}:{host}:{service}"
@@ -165,11 +170,19 @@ class InfraWatcher:
                         self._alert_state.mark_alerted(key)
 
     async def _check_promql(self, check: MonitorCheck) -> None:
-        output = await self._executor.execute("query_prometheus", {
-            "query": check.query,
+        # PromQL checks require a prometheus host — use run_command with curl
+        # The user configures which host runs the prometheus query via check.hosts
+        host = check.hosts[0] if check.hosts else None
+        if not host:
+            log.warning("PromQL check '%s' has no hosts configured", check.name)
+            return
+        from urllib.parse import quote as url_quote
+        safe_query = url_quote(check.query)
+        output = await self._executor.execute("run_command", {
+            "host": host,
+            "command": f"curl -s 'http://127.0.0.1:9090/api/v1/query?query={safe_query}'",
         })
         # If the query returns results (non-empty result array), alert.
-        # Handles both formatted output ("No results.") and raw JSON fallback.
         if output.strip() != "No results." and '"result":[]' not in output and '"result": []' not in output:
             key = f"{check.name}:promql"
             if self._alert_state.should_alert(key, self.config.cooldown_minutes * 60):

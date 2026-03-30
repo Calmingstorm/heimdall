@@ -81,7 +81,6 @@ def _make_bot_stub():
     bot.config.tools = MagicMock()
     bot.config.tools.tool_timeout_seconds = 300
     bot.config.tools.enabled = True
-    bot.config.tools.tool_packs = []
     bot.config.comfyui = MagicMock()
     bot.config.comfyui.enabled = False
     bot.config.browser = MagicMock()

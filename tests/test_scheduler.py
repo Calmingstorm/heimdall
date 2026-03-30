@@ -46,10 +46,10 @@ class TestAdd:
             action="check",
             channel_id="ch1",
             cron="0 */6 * * *",
-            tool_name="check_disk",
-            tool_input={"host": "server"},
+            tool_name="run_command",
+            tool_input={"host": "server", "command": "df -h"},
         )
-        assert schedule["tool_name"] == "check_disk"
+        assert schedule["tool_name"] == "run_command"
 
     def test_add_check_with_invalid_tool(self, scheduler: Scheduler):
         with pytest.raises(ValueError, match="not allowed"):
@@ -58,7 +58,7 @@ class TestAdd:
                 action="check",
                 channel_id="ch1",
                 cron="0 * * * *",
-                tool_name="run_command",
+                tool_name="check_disk",
             )
 
     def test_add_check_without_tool_name(self, scheduler: Scheduler):

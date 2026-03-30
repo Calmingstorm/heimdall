@@ -116,8 +116,6 @@ def _make_bot_stub(*, respond_to_bots=False):
     stub.permissions.is_guest = MagicMock(return_value=False)
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
-    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
     stub._build_system_prompt = MagicMock(return_value="system prompt")
     stub._build_chat_system_prompt = MagicMock(return_value="chat system prompt")
     stub._inject_tool_hints = AsyncMock(side_effect=lambda sp, *a, **kw: sp)
@@ -1900,68 +1898,3 @@ class TestSecretScrubbingCrossFeature:
         assert "SuperSecret123" not in result_output
 
 
-# =====================================================================
-# 7. PROGRESS EMBED FORMATTING
-# =====================================================================
-
-class TestProgressEmbed:
-    """Progress embed construction for tool loop."""
-
-    def test_progress_embed_running_steps(self):
-        """Progress embed shows running steps."""
-        steps = [
-            {"tools": ["check_disk"], "reasoning": None, "status": "done", "elapsed_ms": 120},
-            {"tools": ["run_command"], "reasoning": "Checking uptime...", "status": "running"},
-        ]
-        embed = HeimdallBot._build_tool_progress_embed(steps)
-        assert embed is not None
-        assert "check_disk" in embed.description
-        assert "run_command" in embed.description
-
-    def test_progress_embed_all_done(self):
-        """Progress embed shows all completed."""
-        steps = [
-            {"tools": ["check_disk"], "reasoning": None, "status": "done", "elapsed_ms": 120},
-        ]
-        embed = HeimdallBot._build_tool_progress_embed(steps, "complete")
-        assert embed is not None
-        assert embed.color == discord.Color.green()
-
-    def test_progress_embed_with_error(self):
-        """Progress embed shows error status."""
-        steps = [
-            {"tools": ["run_command"], "reasoning": None, "status": "done", "elapsed_ms": 50},
-        ]
-        embed = HeimdallBot._build_tool_progress_embed(steps, "error")
-        assert embed is not None
-        assert embed.color == discord.Color.red()
-
-
-class TestPartialCompletionReport:
-    """Partial completion reports when tool loop is interrupted."""
-
-    def test_report_with_completed_steps(self):
-        """Report includes completed steps."""
-        steps = [
-            {"tools": ["check_disk"], "status": "done", "elapsed_ms": 120},
-            {"tools": ["docker_ps"], "status": "done", "elapsed_ms": 200},
-        ]
-        report = HeimdallBot._build_partial_completion_report(steps)
-        assert "check_disk" in report
-        assert "docker_ps" in report
-        assert "2/2" in report
-
-    def test_report_empty_steps(self):
-        """Report handles no completed steps."""
-        report = HeimdallBot._build_partial_completion_report([])
-        assert report == ""
-
-    def test_report_mixed_done_and_running(self):
-        """Report only includes done steps, not running ones."""
-        steps = [
-            {"tools": ["run_command"], "status": "done", "elapsed_ms": 50},
-            {"tools": ["check_disk"], "status": "running"},
-        ]
-        report = HeimdallBot._build_partial_completion_report(steps)
-        assert "run_command" in report
-        assert "1/2" in report

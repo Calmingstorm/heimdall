@@ -89,8 +89,6 @@ def _make_bot_stub():
     stub.permissions.is_guest = MagicMock(return_value=False)
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
-    stub._build_partial_completion_report = HeimdallBot._build_partial_completion_report
     stub._build_system_prompt = MagicMock(return_value="system prompt")
     stub._build_chat_system_prompt = MagicMock(return_value="chat system prompt")
     stub._inject_tool_hints = AsyncMock(side_effect=lambda sp, *a, **kw: sp)

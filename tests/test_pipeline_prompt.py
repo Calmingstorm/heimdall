@@ -11,7 +11,7 @@ _ARCH_CONTEXT = (Path(__file__).parent.parent / "data" / "context" / "architectu
 
 def _full_prompt() -> str:
     return build_system_prompt(
-        context=_ARCH_CONTEXT, hosts={}, services=[], playbooks=[],
+        context=_ARCH_CONTEXT, hosts={},
     )
 
 

@@ -65,8 +65,6 @@ def _make_bot_stub():
     stub._send_chunked = AsyncMock()
     stub._merged_tool_definitions = MagicMock(return_value=[{"name": "test"}])
     stub._build_system_prompt = MagicMock(return_value="You are a bot.")
-    stub._build_tool_progress_embed = MagicMock(return_value=MagicMock())
-    stub._build_partial_completion_report = MagicMock(return_value="")
     stub._pending_files = {}
     stub.sessions = MagicMock()
     stub.sessions.reset = MagicMock()
@@ -98,6 +96,7 @@ def _make_bot_stub():
     stub._handle_delegate_task = HeimdallBot._handle_delegate_task.__get__(stub)
     stub._handle_list_tasks = HeimdallBot._handle_list_tasks.__get__(stub)
     stub._handle_cancel_task = HeimdallBot._handle_cancel_task.__get__(stub)
+    stub._should_continue_task = HeimdallBot._should_continue_task
     return stub
 
 
@@ -1517,63 +1516,7 @@ class TestToolAuditLogging:
 
 
 # ===========================================================================
-# 8. Progress embed and cancel in tool loop
-# ===========================================================================
-
-
-class TestProgressEmbedInToolLoop:
-    """Progress embed tracks tool steps and cancel button works."""
-
-    async def test_progress_embed_created_on_first_tool_call(self):
-        """Progress embed is sent when the first tool call happens."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-
-        tc = ToolCall(id="tc-1", name="check_disk", input={})
-        stub.codex_client.chat_with_tools = AsyncMock(
-            side_effect=_codex_tool_then_text([tc])
-        )
-
-        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
-            await stub._process_with_tools(
-                msg, [{"role": "user", "content": "check disk"}]
-            )
-
-        # _build_tool_progress_embed should have been called
-        stub._build_tool_progress_embed.assert_called()
-
-    async def test_tools_tracked_in_progress_steps(self):
-        """Each iteration adds a step to progress_steps."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-
-        tc1 = ToolCall(id="tc-1", name="check_disk", input={})
-        tc2 = ToolCall(id="tc-2", name="check_memory", input={})
-
-        call_count = 0
-        async def _steps(messages, system, tools):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return _tool_response([tc1])
-            elif call_count == 2:
-                return _tool_response([tc2])
-            return _text_response("Done")
-
-        stub.codex_client.chat_with_tools = _steps
-
-        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x):
-            await stub._process_with_tools(
-                msg, [{"role": "user", "content": "check all"}]
-            )
-
-        # _build_tool_progress_embed called multiple times with accumulating steps
-        all_calls = stub._build_tool_progress_embed.call_args_list
-        assert len(all_calls) >= 2  # At least 2 iterations
-
-
-# ===========================================================================
-# 9. Skill handoff
+# 8. Skill handoff
 # ===========================================================================
 
 
@@ -1603,7 +1546,7 @@ class TestSkillHandoff:
 
 
 # ===========================================================================
-# 10. Source structure verification
+# 9. Source structure verification
 # ===========================================================================
 
 

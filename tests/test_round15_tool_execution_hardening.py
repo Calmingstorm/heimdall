@@ -14,11 +14,8 @@ from __future__ import annotations
 import ast
 import base64
 import inspect
-import json
 import sys
-import time
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
 sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
@@ -38,11 +35,8 @@ def _make_config(
     *,
     extra_hosts: dict | None = None,
     local_host: bool = False,
-    prom_host: str = "server",
-    ansible_host: str = "desktop",
     claude_code_host: str = "desktop",
     claude_code_user: str = "deploy",
-    incus_host: str = "desktop",
 ) -> ToolsConfig:
     """Build a ToolsConfig for testing."""
     hosts = {
@@ -59,16 +53,10 @@ def _make_config(
         ssh_key_path="/test/id_ed25519",
         ssh_known_hosts_path="/test/known_hosts",
         hosts=hosts,
-        allowed_services=["apache2", "prometheus", "grafana-server", "nginx"],
-        allowed_playbooks=["check-services.yml", "update-all.yml"],
-        ansible_directory="/ansible",
         command_timeout_seconds=5,
-        prometheus_host=prom_host,
-        ansible_host=ansible_host,
         claude_code_host=claude_code_host,
         claude_code_user=claude_code_user,
         claude_code_dir="/opt/project",
-        incus_host=incus_host,
     )
 
 
@@ -170,9 +158,9 @@ class TestToolDispatch:
 
     async def test_regular_tool_does_not_get_user_id(self):
         executor = _make_executor()
-        with patch.object(executor, "_handle_check_disk", new_callable=AsyncMock, return_value="ok") as mock:
-            await executor.execute("check_disk", {"host": "server"})
-            mock.assert_called_once_with({"host": "server"})
+        with patch.object(executor, "_handle_run_command", new_callable=AsyncMock, return_value="ok") as mock:
+            await executor.execute("run_command", {"host": "server", "command": "uptime"})
+            mock.assert_called_once_with({"host": "server", "command": "uptime"})
 
 
 # ===========================================================================
@@ -684,24 +672,6 @@ class TestLocalSubprocessExecution:
             mock_ssh.assert_not_called()
             assert "output" in result
 
-    async def test_check_disk_local(self):
-        """check_disk on localhost uses local execution."""
-        executor = _make_executor(local_host=True)
-        with patch("src.tools.executor.run_local_command", new_callable=AsyncMock, return_value=(0, "disk output")) as mock_local, \
-             patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            result = await executor.execute("check_disk", {"host": "local"})
-            mock_local.assert_called_once()
-            mock_ssh.assert_not_called()
-
-    async def test_check_memory_local(self):
-        """check_memory on localhost uses local execution."""
-        executor = _make_executor(local_host=True)
-        with patch("src.tools.executor.run_local_command", new_callable=AsyncMock, return_value=(0, "mem output")) as mock_local, \
-             patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            result = await executor.execute("check_memory", {"host": "local"})
-            mock_local.assert_called_once()
-            mock_ssh.assert_not_called()
-
     async def test_run_script_local(self):
         """run_script on localhost uses local execution."""
         executor = _make_executor(local_host=True)
@@ -793,227 +763,6 @@ class TestRemoteSSHExecution:
 # ===========================================================================
 # 6. Tool executor handler coverage (every tool category)
 # ===========================================================================
-
-
-class TestHostBasedToolHandlers:
-    """Test each category of host-based tool handlers."""
-
-    async def test_check_service_validates_allowlist(self):
-        """check_service rejects services not in allowlist."""
-        executor = _make_executor()
-        result = await executor.execute("check_service", {
-            "host": "server", "service": "evil_service"
-        })
-        assert "not in the allowlist" in result
-
-    async def test_check_service_allowed(self):
-        """check_service executes for allowed services."""
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock, return_value=(0, "active")):
-            result = await executor.execute("check_service", {
-                "host": "server", "service": "apache2"
-            })
-            assert result == "active"
-
-    async def test_check_logs_respects_line_limit(self):
-        """check_logs caps at 50 lines."""
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "logs")
-            await executor.execute("check_logs", {
-                "host": "server", "service": "apache2", "lines": 100
-            })
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "-n 50" in cmd
-
-    async def test_restart_service_validates_allowlist(self):
-        """restart_service rejects services not in allowlist."""
-        executor = _make_executor()
-        result = await executor.execute("restart_service", {
-            "host": "server", "service": "evil"
-        })
-        assert "not in the allowlist" in result
-
-    async def test_restart_service_runs_restart_then_status(self):
-        """restart_service runs restart && status."""
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "restarted")
-            await executor.execute("restart_service", {
-                "host": "server", "service": "nginx"
-            })
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "restart" in cmd
-            assert "status" in cmd
-
-    async def test_macos_check_memory(self):
-        """macOS hosts use sysctl/vm_stat instead of free."""
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "mem info")
-            await executor.execute("check_memory", {"host": "macbook"})
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "sysctl" in cmd or "vm_stat" in cmd
-
-    async def test_macos_check_disk(self):
-        """macOS hosts use df -h without exclude flags."""
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "disk info")
-            await executor.execute("check_disk", {"host": "macbook"})
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "df -h" in cmd
-            assert "--exclude" not in cmd
-
-
-class TestPrometheusToolHandlers:
-    """Prometheus tool handler tests."""
-
-    async def test_prometheus_instant_query(self):
-        executor = _make_executor()
-        prom_response = json.dumps({
-            "status": "success",
-            "data": {"resultType": "vector", "result": [
-                {"metric": {"__name__": "up"}, "value": [1234, "1"]}
-            ]}
-        })
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock, return_value=(0, prom_response)):
-            result = await executor.execute("query_prometheus", {
-                "query": "up"
-            })
-            assert "up" in result
-
-    async def test_prometheus_no_host_configured(self):
-        executor = _make_executor(prom_host="")
-        result = await executor.execute("query_prometheus", {"query": "up"})
-        assert "not configured" in result
-
-    async def test_prometheus_range_query(self):
-        executor = _make_executor()
-        prom_response = json.dumps({
-            "status": "success",
-            "data": {"resultType": "matrix", "result": [
-                {"metric": {"__name__": "up"}, "values": [[1, "1"], [2, "0"]]}
-            ]}
-        })
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock, return_value=(0, prom_response)):
-            result = await executor.execute("query_prometheus_range", {
-                "query": "up", "duration": "1h", "step": "5m"
-            })
-            assert "up" in result
-
-
-class TestIncusToolHandlers:
-    """Incus tool handler tests."""
-
-    async def test_incus_list(self):
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock, return_value=(0, "web,Running,CONTAINER,10.0.0.5")):
-            result = await executor.execute("incus_list", {})
-            assert "web" in result
-
-    async def test_incus_invalid_name(self):
-        """Invalid instance name is rejected."""
-        executor = _make_executor()
-        result = await executor.execute("incus_info", {"instance": "bad name!"})
-        assert "Invalid Incus name" in result
-
-    async def test_incus_exec(self):
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock, return_value=(0, "ok")):
-            result = await executor.execute("incus_exec", {
-                "instance": "web", "command": "apt update"
-            })
-            assert result == "ok"
-
-    async def test_incus_start(self):
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock, return_value=(0, "")):
-            result = await executor.execute("incus_start", {"instance": "web"})
-            assert "started" in result
-
-    async def test_incus_stop_force(self):
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "")
-            await executor.execute("incus_stop", {"instance": "web", "force": True})
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "--force" in cmd
-
-    async def test_incus_snapshot_create(self):
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock, return_value=(0, "")):
-            result = await executor.execute("incus_snapshot", {
-                "instance": "web", "action": "create", "snapshot": "pre-deploy"
-            })
-            assert "created" in result.lower()
-
-    async def test_incus_snapshot_restore_requires_name(self):
-        executor = _make_executor()
-        result = await executor.execute("incus_snapshot", {
-            "instance": "web", "action": "restore"
-        })
-        assert "required" in result.lower()
-
-    async def test_incus_launch_with_vm(self):
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "")
-            await executor.execute("incus_launch", {
-                "name": "test-vm", "image": "ubuntu:22.04", "type": "vm"
-            })
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "--vm" in cmd
-
-    async def test_incus_delete(self):
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock, return_value=(0, "")):
-            result = await executor.execute("incus_delete", {"instance": "web"})
-            assert "deleted" in result.lower()
-
-
-class TestAnsibleToolHandler:
-    """Ansible playbook handler tests."""
-
-    async def test_ansible_validates_playbook(self):
-        executor = _make_executor()
-        result = await executor.execute("run_ansible_playbook", {
-            "playbook": "evil.yml"
-        })
-        assert "not in the allowlist" in result
-
-    async def test_ansible_check_mode_default(self):
-        """Default check_mode=True adds --check."""
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "ok")
-            await executor.execute("run_ansible_playbook", {
-                "playbook": "check-services.yml"
-            })
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "--check" in cmd
-
-    async def test_ansible_no_host_configured(self):
-        executor = _make_executor(ansible_host="")
-        result = await executor.execute("run_ansible_playbook", {
-            "playbook": "check-services.yml"
-        })
-        assert "not configured" in result
-
-    async def test_ansible_with_limit_and_tags(self):
-        executor = _make_executor()
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "ok")
-            await executor.execute("run_ansible_playbook", {
-                "playbook": "check-services.yml",
-                "limit": "webservers",
-                "tags": "deploy",
-                "check_mode": False,
-            })
-            cmd = mock_ssh.call_args[1]["command"]
-            assert "--limit" in cmd
-            assert "--tags" in cmd
-            assert "--check" not in cmd
 
 
 class TestFileToolHandlers:

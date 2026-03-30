@@ -2,8 +2,8 @@
 script validation, secret scrubbing, and prompt injection resistance.
 
 Tests cover: no personal data in codebase, no hardcoded credentials, read_file lines
-parameter validation, incus_exec command quoting, secret scrubber pattern coverage
-(including new GitHub/AWS/Stripe/Slack patterns), error message scrubbing before Discord,
+parameter validation, secret scrubber pattern coverage (including new
+GitHub/AWS/Stripe/Slack patterns), error message scrubbing before Discord,
 monitor alert scrubbing, prompt injection resistance (role forgery, display name injection,
 tool output injection, context separator integrity), run_script security (base64 encoding,
 interpreter allowlist), and cross-cutting security verification.
@@ -50,7 +50,6 @@ def _make_config(**overrides):
             claude_code_host="server1",
             claude_code_user="",
             tool_timeout_seconds=300,
-            incus_host="server1",
         ),
         sessions=SimpleNamespace(max_history=50, max_age_hours=72, persist_dir="/tmp/test_sessions"),
     )
@@ -312,61 +311,7 @@ class TestReadFileLinesValidation:
 
 
 # ===========================================================================
-# 4. incus_exec Command Quoting (NEW FIX)
-# ===========================================================================
-
-
-class TestIncusExecCommandQuoting:
-    """Verify incus_exec handler quotes the command to prevent injection."""
-
-    @pytest.fixture
-    def executor(self, tools_config):
-        from src.tools.executor import ToolExecutor
-        ex = ToolExecutor(tools_config)
-        ex._exec_command = AsyncMock(return_value=(0, "ok"))
-        return ex
-
-    async def test_simple_command(self, executor):
-        """Simple command works via sh -c."""
-        await executor.execute("incus_exec", {"host": "desktop", "instance": "myvm", "command": "ls -la"})
-        cmd = executor._exec_command.call_args[0][1]
-        assert "sh -c" in cmd
-        assert shlex.quote("ls -la") in cmd
-
-    async def test_command_injection_quoted(self, executor):
-        """Shell metacharacters in command are quoted."""
-        evil_cmd = "ls; rm -rf /"
-        await executor.execute("incus_exec", {"host": "desktop", "instance": "myvm", "command": evil_cmd})
-        cmd = executor._exec_command.call_args[0][1]
-        assert shlex.quote(evil_cmd) in cmd
-        # The raw unquoted injection should NOT be in the command
-        assert "; rm -rf /" not in cmd.replace(shlex.quote(evil_cmd), "")
-
-    async def test_backtick_injection_quoted(self, executor):
-        """Backtick injection in command is quoted."""
-        evil_cmd = "echo `cat /etc/passwd`"
-        await executor.execute("incus_exec", {"host": "desktop", "instance": "myvm", "command": evil_cmd})
-        cmd = executor._exec_command.call_args[0][1]
-        assert shlex.quote(evil_cmd) in cmd
-
-    async def test_dollar_injection_quoted(self, executor):
-        """$() injection in command is quoted."""
-        evil_cmd = "echo $(cat /etc/shadow)"
-        await executor.execute("incus_exec", {"host": "desktop", "instance": "myvm", "command": evil_cmd})
-        cmd = executor._exec_command.call_args[0][1]
-        assert shlex.quote(evil_cmd) in cmd
-
-    async def test_instance_name_validated(self, executor):
-        """Instance name is validated before use."""
-        result = await executor.execute(
-            "incus_exec",
-            {"host": "desktop", "instance": "evil;rm -rf /", "command": "ls"},
-        )
-        assert "Invalid" in result or "error" in result.lower()
-
-
-# ===========================================================================
-# 5. Secret Scrubber Pattern Coverage
+# 4. Secret Scrubber Pattern Coverage
 # ===========================================================================
 
 
@@ -727,8 +672,8 @@ class TestSecretScrubberCoverage:
         )
 
 
-class TestReadFileAndIncusExecFixed:
-    """Verify the source code changes for read_file and incus_exec."""
+class TestReadFileFixed:
+    """Verify the source code changes for read_file."""
 
     def test_read_file_validates_lines(self):
         """read_file handler validates lines parameter."""
@@ -746,23 +691,6 @@ class TestReadFileAndIncusExecFixed:
             if in_method and line.strip().startswith("async def ") and "_handle_read_file" not in line:
                 break
         assert has_validation, "read_file must validate lines parameter with int() or min()"
-
-    def test_incus_exec_quotes_command(self):
-        """incus_exec handler quotes the command via sh -c."""
-        executor_path = SRC_DIR / "tools" / "executor.py"
-        content = executor_path.read_text()
-        # Find the _handle_incus_exec method
-        in_method = False
-        has_sh_c = False
-        for line in content.split("\n"):
-            if "_handle_incus_exec" in line:
-                in_method = True
-            if in_method and "sh -c" in line:
-                has_sh_c = True
-                break
-            if in_method and line.strip().startswith("async def ") and "_handle_incus_exec" not in line:
-                break
-        assert has_sh_c, "incus_exec must use sh -c with quoted command"
 
 
 class TestSecurityAuditTrail:
@@ -830,22 +758,6 @@ class TestRound19SourceStructure:
             if in_method and line.strip().startswith("async def ") and "_handle_read_file" not in line:
                 break
         assert has_try, "read_file must handle TypeError/ValueError for lines"
-
-    def test_incus_exec_has_shlex_quote_on_command(self):
-        """incus_exec uses shlex.quote on the command."""
-        executor_path = SRC_DIR / "tools" / "executor.py"
-        content = executor_path.read_text()
-        in_method = False
-        has_quote = False
-        for line in content.split("\n"):
-            if "_handle_incus_exec" in line:
-                in_method = True
-            if in_method and "shlex.quote(command)" in line:
-                has_quote = True
-                break
-            if in_method and line.strip().startswith("async def ") and "_handle_incus_exec" not in line:
-                break
-        assert has_quote, "incus_exec must use shlex.quote(command)"
 
     def test_error_message_scrubbed_before_discord(self):
         """Error 'Something went wrong' message is scrubbed."""

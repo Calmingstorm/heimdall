@@ -80,7 +80,6 @@ def ipv6_config(tmp_dir: Path) -> ToolsConfig:
             "ipv6local": ToolHost(address="::1", ssh_user="root", os="linux"),
             "remote": ToolHost(address="10.0.0.50", ssh_user="root", os="linux"),
         },
-        allowed_services=["nginx"],
         command_timeout_seconds=10,
     )
 
@@ -122,7 +121,7 @@ def local_claude_config(tmp_dir: Path) -> ToolsConfig:
         hosts={
             "localbox": ToolHost(address="127.0.0.1", ssh_user="root", os="linux"),
         },
-        allowed_services=[],
+        allowed_,
         command_timeout_seconds=30,
         claude_code_host="localbox",
         claude_code_user="claude",

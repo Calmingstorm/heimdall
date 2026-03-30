@@ -118,7 +118,6 @@ def _make_mock_bot(tmp_path, codex_responses=None):
 
     bot.config = MagicMock()
     bot.config.tools.enabled = True
-    bot.config.tools.tool_packs = []
 
     if codex_responses is not None:
         bot.codex_client = MagicMock()
@@ -1775,8 +1774,8 @@ class TestSkillContextIntegration:
 
         # Should include read-only tools
         assert "read_file" in SKILL_SAFE_TOOLS
-        assert "check_disk" in SKILL_SAFE_TOOLS
         assert "search_knowledge" in SKILL_SAFE_TOOLS
+        assert "web_search" in SKILL_SAFE_TOOLS
 
         # Should NOT include destructive tools
         assert "run_command" not in SKILL_SAFE_TOOLS
@@ -1839,10 +1838,6 @@ class TestConfigIntegration:
         assert restored.discord.token == config.discord.token
         assert len(restored.tools.hosts) == len(config.tools.hosts)
 
-    def test_config_tool_packs_default_empty(self, config):
-        """Empty tool_packs means all tools loaded."""
-        assert config.tools.tool_packs == []
-
     def test_config_hosts_accessible(self, config):
         """Tool hosts are accessible by alias."""
         assert "server" in config.tools.hosts
@@ -1872,22 +1867,6 @@ class TestToolRegistryIntegration:
             assert "name" in tool, f"Tool missing 'name': {tool}"
             assert "description" in tool, f"Tool {tool.get('name')} missing 'description'"
             assert "input_schema" in tool, f"Tool {tool.get('name')} missing 'input_schema'"
-
-    def test_tool_packs_filtering(self):
-        """enabled_packs parameter filters tool definitions."""
-        from src.tools.registry import get_tool_definitions, get_pack_tool_names
-
-        all_tools = get_tool_definitions()
-        systemd_tools = get_pack_tool_names("systemd")
-
-        if systemd_tools:
-            # With only systemd pack, should have core + systemd tools
-            filtered = get_tool_definitions(enabled_packs=["systemd"])
-            filtered_names = {t["name"] for t in filtered}
-
-            # Systemd tools should be present
-            for name in systemd_tools:
-                assert name in filtered_names
 
     def test_no_duplicate_tool_names(self):
         """All tool definitions have unique names."""

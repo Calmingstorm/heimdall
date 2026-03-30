@@ -135,19 +135,3 @@ class TestEnvExample:
         assert "localhost" in content
 
 
-class TestIncusToolsIntact:
-    """Verify existing Incus tool framework is intact after changes."""
-
-    def test_incus_host_config_field(self):
-        tc = ToolsConfig()
-        assert hasattr(tc, "incus_host")
-        assert tc.incus_host == ""
-
-    def test_incus_host_configurable(self):
-        tc = ToolsConfig(incus_host="myhost")
-        assert tc.incus_host == "myhost"
-
-    def test_incus_tools_in_registry(self):
-        from src.tools.registry import TOOLS
-        incus_tools = [t for t in TOOLS if t["name"].startswith("incus_")]
-        assert len(incus_tools) >= 10  # 11 Incus tools

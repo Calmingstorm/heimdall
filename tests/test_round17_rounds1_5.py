@@ -121,7 +121,7 @@ def _make_message(channel_id="67890", author_id="12345", content="test", msg_id=
 
 def _build_prompt(**kwargs):
     """Build a system prompt with defaults for brevity."""
-    defaults = dict(context="", hosts={}, services=[], playbooks=[])
+    defaults = dict(context="", hosts={})
     defaults.update(kwargs)
     return build_system_prompt(**defaults)
 
@@ -196,7 +196,7 @@ class TestSelfAwarenessDirective:
     def test_rule_12_uses_claude_code_dir_variable(self):
         """Rule 12 should use the claude_code_dir parameter, not hardcode."""
         prompt = build_system_prompt(
-            context="", hosts={}, services=[], playbooks=[],
+            context="", hosts={},
             claude_code_dir="/custom/heimdall/path",
         )
         assert "/custom/heimdall/path" in prompt
@@ -450,7 +450,7 @@ class TestArchitectureDoc:
     def test_architecture_loads_as_context(self):
         """architecture.md can be loaded and injected into the system prompt."""
         prompt = build_system_prompt(
-            context=_ARCH_CONTEXT, hosts={}, services=[], playbooks=[],
+            context=_ARCH_CONTEXT, hosts={},
         )
         assert "Claude Code Delegation" in prompt
 

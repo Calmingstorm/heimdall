@@ -14,10 +14,9 @@ from ..logging import get_logger
 
 log = get_logger("scheduler")
 
-# Only read-only monitoring tools can be scheduled
+# Tools that can be scheduled for "check" actions
 ALLOWED_CHECK_TOOLS = {
-    "check_service", "check_docker", "check_disk",
-    "check_memory", "check_logs", "query_prometheus",
+    "run_command", "run_command_multi", "run_script",
 }
 
 

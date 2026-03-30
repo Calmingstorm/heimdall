@@ -126,10 +126,7 @@ def local_tools_config(tmp_dir: Path) -> ToolsConfig:
             "local2": ToolHost(address="localhost", ssh_user="admin", os="linux"),
             "remote": ToolHost(address="10.0.0.5", ssh_user="root", os="linux"),
         },
-        allowed_services=["nginx"],
         command_timeout_seconds=5,
-        prometheus_host="local",
-        incus_host="local",
     )
 
 
@@ -232,22 +229,6 @@ class TestToolHandlersLocal:
         mock_local.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_check_disk_local(self, local_executor):
-        with patch("src.tools.executor.run_local_command", new_callable=AsyncMock) as mock_local:
-            mock_local.return_value = (0, "/dev/sda1  50G  30G  20G  60% /")
-            result = await local_executor.execute("check_disk", {"host": "local"})
-        assert "/dev/sda1" in result
-        mock_local.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_check_memory_local(self, local_executor):
-        with patch("src.tools.executor.run_local_command", new_callable=AsyncMock) as mock_local:
-            mock_local.return_value = (0, "              total    used\nMem:    16G     8G")
-            result = await local_executor.execute("check_memory", {"host": "local"})
-        assert "16G" in result
-        mock_local.assert_called_once()
-
-    @pytest.mark.asyncio
     async def test_run_script_local(self, local_executor):
         with patch("src.tools.executor.run_local_command", new_callable=AsyncMock) as mock_local:
             mock_local.return_value = (0, "script output")
@@ -259,26 +240,6 @@ class TestToolHandlersLocal:
         assert result == "script output"
         mock_local.assert_called_once()
 
-    @pytest.mark.asyncio
-    async def test_check_service_local(self, local_executor):
-        with patch("src.tools.executor.run_local_command", new_callable=AsyncMock) as mock_local:
-            mock_local.return_value = (0, "active (running)")
-            result = await local_executor.execute("check_service", {
-                "host": "local", "service": "nginx",
-            })
-        assert "active (running)" in result
-
-    @pytest.mark.asyncio
-    async def test_query_prometheus_local(self, local_executor):
-        """Prometheus on a local host uses subprocess, not SSH."""
-        prom_response = '{"status":"success","data":{"resultType":"scalar","result":[1234,"42"]}}'
-        with patch("src.tools.executor.run_local_command", new_callable=AsyncMock) as mock_local:
-            mock_local.return_value = (0, prom_response)
-            result = await local_executor.execute("query_prometheus", {
-                "query": "up",
-            })
-        assert "42" in result
-        mock_local.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

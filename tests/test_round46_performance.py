@@ -2,8 +2,7 @@
 
 Tests for:
 - O(n²) → O(n) fence counting fix in combine_bot_messages
-- Tool definitions caching by pack config
-- Pre-computed tool→pack mapping in web API
+- Tool definitions caching
 - ZoneInfo caching in system prompt
 - __slots__ on hot-path dataclasses (ToolCall, LLMResponse, Message, Session)
 - Pre-compiled regex in combine_bot_messages
@@ -105,14 +104,14 @@ class TestToolDefinitionsCache:
     def test_cache_different_packs(self):
         from src.tools.registry import get_tool_definitions
         all_tools = get_tool_definitions()
-        systemd_only = get_tool_definitions(enabled_packs=["systemd"])
+        systemd_only = get_tool_definitions()
         # Different results for different pack configs
         assert len(all_tools) >= len(systemd_only)
 
     def test_cache_same_packs_returns_same_object(self):
         from src.tools.registry import get_tool_definitions
-        r1 = get_tool_definitions(enabled_packs=["systemd"])
-        r2 = get_tool_definitions(enabled_packs=["systemd"])
+        r1 = get_tool_definitions()
+        r2 = get_tool_definitions()
         assert r1 is r2
 
     def test_invalidate_clears_cache(self):
@@ -126,14 +125,14 @@ class TestToolDefinitionsCache:
     def test_frozenset_order_independence(self):
         """Pack order shouldn't matter for cache key."""
         from src.tools.registry import get_tool_definitions
-        r1 = get_tool_definitions(enabled_packs=["systemd", "incus"])
-        r2 = get_tool_definitions(enabled_packs=["incus", "systemd"])
+        r1 = get_tool_definitions()
+        r2 = get_tool_definitions()
         assert r1 is r2  # frozenset makes order irrelevant
 
     def test_empty_list_treated_as_no_packs(self):
         from src.tools.registry import get_tool_definitions
         r1 = get_tool_definitions()
-        r2 = get_tool_definitions(enabled_packs=[])
+        r2 = get_tool_definitions()
         assert r1 is r2  # Both use frozenset() as key
 
     def test_cache_preserves_correct_count(self):
@@ -144,46 +143,6 @@ class TestToolDefinitionsCache:
     def test_invalidate_function_exported(self):
         from src.tools.registry import invalidate_tool_defs_cache
         assert callable(invalidate_tool_defs_cache)
-
-
-# ---------------------------------------------------------------------------
-# 3. Pre-computed tool→pack mapping in web API
-# ---------------------------------------------------------------------------
-
-class TestToolToPackMapping:
-    """Test the _TOOL_TO_PACK pre-computed mapping."""
-
-    def test_mapping_exists(self):
-        from src.web.api import _TOOL_TO_PACK
-        assert isinstance(_TOOL_TO_PACK, dict)
-        assert len(_TOOL_TO_PACK) > 0
-
-    def test_mapping_covers_all_pack_tools(self):
-        from src.web.api import _TOOL_TO_PACK
-        from src.tools.registry import TOOL_PACKS
-        for pack_name, tool_names in TOOL_PACKS.items():
-            for tool_name in tool_names:
-                assert tool_name in _TOOL_TO_PACK
-                assert _TOOL_TO_PACK[tool_name] == pack_name
-
-    def test_core_tools_not_in_mapping(self):
-        """Core tools (not in any pack) should not appear in _TOOL_TO_PACK."""
-        from src.web.api import _TOOL_TO_PACK
-        from src.tools.registry import TOOLS, _ALL_PACK_TOOLS
-        for tool in TOOLS:
-            if tool["name"] not in _ALL_PACK_TOOLS:
-                assert tool["name"] not in _TOOL_TO_PACK
-
-    def test_mapping_is_dict_constant_time(self):
-        """Mapping lookup is O(1) — no nested loop."""
-        from src.web.api import _TOOL_TO_PACK
-        # Just verify it's a plain dict (O(1) lookup)
-        assert type(_TOOL_TO_PACK) is dict
-
-    def test_systemd_tools_mapped_correctly(self):
-        from src.web.api import _TOOL_TO_PACK
-        for tool in ["check_service", "restart_service", "check_logs"]:
-            assert _TOOL_TO_PACK.get(tool) == "systemd"
 
 
 # ---------------------------------------------------------------------------
@@ -222,8 +181,6 @@ class TestZoneInfoCaching:
         result = build_system_prompt(
             context="Test context",
             hosts={"server": "root@10.0.0.1"},
-            services=["nginx"],
-            playbooks=["deploy.yml"],
             tz="America/Chicago",
         )
         assert "Heimdall" in result
@@ -363,8 +320,6 @@ class TestPerformanceIntegration:
         prompt = build_system_prompt(
             context="Test context",
             hosts={"server": "root@10.0.0.1", "backup": "root@10.0.0.2"},
-            services=["nginx", "postgres", "redis"],
-            playbooks=["deploy.yml", "backup.yml"],
             tz="America/New_York",
         )
         assert len(prompt) < 5000

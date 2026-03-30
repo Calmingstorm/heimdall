@@ -53,16 +53,10 @@ def tools_config(tmp_dir: Path) -> ToolsConfig:
             "desktop": ToolHost(address="10.0.0.2", ssh_user="root", os="linux"),
             "macbook": ToolHost(address="10.0.0.3", ssh_user="deploy", os="macos"),
         },
-        allowed_services=["apache2", "prometheus", "grafana-server"],
-        allowed_playbooks=["check-services.yml", "update-all.yml"],
-        ansible_directory="/ansible",
         command_timeout_seconds=5,
-        prometheus_host="server",
-        ansible_host="desktop",
         claude_code_host="desktop",
         claude_code_user="deploy",
         claude_code_dir="/opt/project",
-        incus_host="desktop",
     )
 
 

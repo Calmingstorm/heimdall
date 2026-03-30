@@ -1,5 +1,5 @@
-"""Tests for tools/skill_context.py — covering run_on_host, query_prometheus, read_file,
-post_message, remember/recall, get_hosts, get_services, http_get, http_post, log,
+"""Tests for tools/skill_context.py — covering run_on_host, read_file,
+post_message, remember/recall, get_hosts, http_get, http_post, log,
 execute_tool allowlist, and memory isolation."""
 from __future__ import annotations
 
@@ -52,26 +52,6 @@ class TestRunOnHost:
         """run_on_host with unknown host returns error."""
         result = await ctx_with_memory.run_on_host("nonexistent", "uptime")
         assert "Unknown" in result or "disallowed" in result.lower()
-
-
-# ---------------------------------------------------------------------------
-# query_prometheus (line 53)
-# ---------------------------------------------------------------------------
-
-class TestQueryPrometheus:
-    @pytest.mark.asyncio
-    async def test_query_prometheus_delegates(self, ctx_with_memory):
-        """query_prometheus delegates to executor.execute."""
-        raw = json.dumps({
-            "status": "success",
-            "data": {"resultType": "vector", "result": [
-                {"metric": {"__name__": "up"}, "value": [1, "1"]},
-            ]},
-        })
-        with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, raw)
-            result = await ctx_with_memory.query_prometheus("up")
-        assert "up" in result.lower() or "1 result" in result
 
 
 # ---------------------------------------------------------------------------
@@ -172,22 +152,6 @@ class TestGetHosts:
     def test_get_hosts_type(self, ctx_with_memory):
         """get_hosts returns a list."""
         assert isinstance(ctx_with_memory.get_hosts(), list)
-
-
-# ---------------------------------------------------------------------------
-# get_services (line 87)
-# ---------------------------------------------------------------------------
-
-class TestGetServices:
-    def test_get_services_returns_allowlist(self, ctx_with_memory):
-        """get_services returns the allowed services list."""
-        services = ctx_with_memory.get_services()
-        assert "apache2" in services
-        assert "prometheus" in services
-
-    def test_get_services_type(self, ctx_with_memory):
-        """get_services returns a list."""
-        assert isinstance(ctx_with_memory.get_services(), list)
 
 
 # ---------------------------------------------------------------------------
@@ -420,11 +384,11 @@ class TestExecuteToolAllowlist:
     async def test_safe_tool_allowed(self, ctx_with_memory):
         """execute_tool allows tools in SKILL_SAFE_TOOLS."""
         with patch("src.tools.executor.run_ssh_command", new_callable=AsyncMock) as mock_ssh:
-            mock_ssh.return_value = (0, "active (running)")
+            mock_ssh.return_value = (0, "file content here")
             result = await ctx_with_memory.execute_tool(
-                "check_service", {"host": "server", "service": "apache2"},
+                "read_file", {"host": "server", "path": "/etc/hostname"},
             )
-        assert "active" in result or "running" in result
+        assert "file content" in result
 
     @pytest.mark.asyncio
     async def test_run_command_blocked(self, ctx_with_memory):

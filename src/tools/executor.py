@@ -3,10 +3,8 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
-import re
 import shlex
 from pathlib import Path
-from urllib.parse import quote as url_quote
 
 
 from ..config.schema import ToolsConfig
@@ -15,18 +13,10 @@ from .ssh import is_local_address, run_local_command, run_ssh_command
 
 log = get_logger("tools")
 
-# Maximum number of result series to display in formatted Prometheus output.
-# Beyond this, a count-only summary is shown to avoid blowing up token usage.
-_PROM_MAX_RESULTS = 50
-
 # Maximum lines of output from run_command / run_command_multi before
-# truncation.  Matches the cap used by docker_logs, read_file, and
-# incus_logs.  The LLM can always re-run with head/tail/grep to see
+# truncation.  The LLM can always re-run with head/tail/grep to see
 # specific portions.
 _RUN_COMMAND_MAX_LINES = 200
-
-# Incus instance/snapshot names: alphanumeric, hyphens, max 63 chars.
-_INCUS_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$")
 
 
 def _truncate_lines(text: str, max_lines: int = _RUN_COMMAND_MAX_LINES) -> str:
@@ -49,104 +39,6 @@ def _truncate_lines(text: str, max_lines: int = _RUN_COMMAND_MAX_LINES) -> str:
     )
 
 
-def format_prometheus_response(raw: str) -> str:
-    """Format raw Prometheus API JSON into a concise, LLM-friendly string.
-
-    For instant (vector/scalar) queries, formats each result as:
-        metric_name{label=value, ...}: value
-
-    For range (matrix) queries, summarises each series as:
-        metric_name{labels}: N points [oldest_val → newest_val]
-
-    Falls back to the raw string if parsing fails, so tool output is never lost.
-    """
-    try:
-        data = json.loads(raw)
-    except (json.JSONDecodeError, TypeError):
-        return raw
-
-    status = data.get("status")
-    if status != "success":
-        # Error responses — include the error message if present
-        error = data.get("error", raw)
-        return f"Prometheus error: {error}"
-
-    result_type = data.get("data", {}).get("resultType", "")
-    results = data.get("data", {}).get("result", [])
-
-    if result_type == "scalar":
-        # Scalar: data.result is [timestamp, "value"]
-        val = results[1] if isinstance(results, list) and len(results) >= 2 else str(results)
-        return f"Result: {val}"
-
-    if result_type == "string":
-        val = results[1] if isinstance(results, list) and len(results) >= 2 else str(results)
-        return f"Result: {val}"
-
-    if result_type == "vector":
-        return _format_vector(results)
-
-    if result_type == "matrix":
-        return _format_matrix(results)
-
-    # Unknown result type — return raw
-    return raw
-
-
-def _format_metric_labels(metric: dict) -> str:
-    """Format a Prometheus metric dict as metric_name{label=val, ...}."""
-    name = metric.get("__name__", "")
-    label_items = {k: v for k, v in metric.items() if k != "__name__"}
-    if not label_items:
-        return name
-    labels = ", ".join(f'{k}="{v}"' for k, v in sorted(label_items.items()))
-    return f"{name}{{{labels}}}" if name else f"{{{labels}}}"
-
-
-def _format_vector(results: list) -> str:
-    """Format an instant vector query result."""
-    if not results:
-        return "No results."
-    lines = []
-    total = len(results)
-    for item in results[:_PROM_MAX_RESULTS]:
-        metric = dict(item.get("metric", {}))
-        label = _format_metric_labels(metric)
-        # value is [timestamp, "string_value"]
-        value = item.get("value", [None, "?"])
-        val = value[1] if isinstance(value, list) and len(value) >= 2 else str(value)
-        lines.append(f"{label}: {val}")
-    if total > _PROM_MAX_RESULTS:
-        lines.append(f"... and {total - _PROM_MAX_RESULTS} more results (total: {total})")
-    header = f"{total} result{'s' if total != 1 else ''}:"
-    return header + "\n" + "\n".join(lines)
-
-
-def _format_matrix(results: list) -> str:
-    """Format a range (matrix) query result."""
-    if not results:
-        return "No results."
-    lines = []
-    total = len(results)
-    for item in results[:_PROM_MAX_RESULTS]:
-        metric = dict(item.get("metric", {}))
-        label = _format_metric_labels(metric)
-        values = item.get("values", [])
-        n = len(values)
-        if n == 0:
-            lines.append(f"{label}: 0 points")
-        elif n == 1:
-            lines.append(f"{label}: 1 point, value={values[0][1]}")
-        else:
-            first_val = values[0][1]
-            last_val = values[-1][1]
-            lines.append(f"{label}: {n} points [{first_val} \u2192 {last_val}]")
-    if total > _PROM_MAX_RESULTS:
-        lines.append(f"... and {total - _PROM_MAX_RESULTS} more series (total: {total})")
-    header = f"{total} series:"
-    return header + "\n" + "\n".join(lines)
-
-
 class ToolExecutor:
     def __init__(
         self, config: ToolsConfig, memory_path: str | None = None,
@@ -162,12 +54,6 @@ class ToolExecutor:
         if not host:
             return None
         return host.address, host.ssh_user, host.os
-
-    def _validate_service(self, service: str) -> bool:
-        return service in self.config.allowed_services
-
-    def _validate_playbook(self, playbook: str) -> bool:
-        return playbook in self.config.allowed_playbooks
 
     async def execute(self, tool_name: str, tool_input: dict, *, user_id: str | None = None) -> str:
         handler = getattr(self, f"_handle_{tool_name}", None)
@@ -219,106 +105,6 @@ class ToolExecutor:
         code, output = await self._exec_command(address, command, ssh_user)
         if code != 0:
             return f"Command failed (exit {code}):\n{output}"
-        return output
-
-    async def _handle_check_service(self, inp: dict) -> str:
-        service = inp["service"]
-        if not self._validate_service(service):
-            return f"Service '{service}' is not in the allowlist"
-        safe_service = shlex.quote(service)
-        return await self._run_on_host(
-            inp["host"],
-            f"systemctl status {safe_service} --no-pager -l",
-        )
-
-    async def _handle_check_disk(self, inp: dict) -> str:
-        if self._host_os(inp["host"]) == "macos":
-            cmd = "df -h"
-        else:
-            cmd = "df -h --exclude-type=tmpfs --exclude-type=devtmpfs"
-        return await self._run_on_host(inp["host"], cmd)
-
-    async def _handle_check_memory(self, inp: dict) -> str:
-        if self._host_os(inp["host"]) == "macos":
-            # macOS has no free command; use vm_stat and sysctl
-            cmd = "echo '--- Memory ---' && sysctl -n hw.memsize | awk '{printf \"Total: %.1f GB\\n\", $1/1073741824}' && vm_stat | head -10"
-        else:
-            cmd = "free -h"
-        return await self._run_on_host(inp["host"], cmd)
-
-    async def _handle_check_logs(self, inp: dict) -> str:
-        service = inp["service"]
-        if not self._validate_service(service):
-            return f"Service '{service}' is not in the allowlist"
-        lines = min(inp.get("lines", 20), 50)
-        safe_service = shlex.quote(service)
-        return await self._run_on_host(
-            inp["host"],
-            f"journalctl -u {safe_service} -n {lines} --no-pager -l",
-        )
-
-    async def _handle_query_prometheus(self, inp: dict) -> str:
-        query = inp["query"]
-        safe_query = url_quote(query)
-        prom_host = self.config.prometheus_host
-        if not prom_host:
-            return "prometheus_host not configured in tools config"
-        resolved = self._resolve_host(prom_host)
-        if not resolved:
-            return f"Prometheus host '{prom_host}' not found in configured hosts"
-        address, ssh_user, _os = resolved
-        code, output = await self._exec_command(
-            address,
-            f"curl -s 'http://127.0.0.1:9090/api/v1/query?query={safe_query}'",
-            ssh_user,
-        )
-        if code != 0:
-            return f"Prometheus query failed:\n{output}"
-        return format_prometheus_response(output)
-
-    async def _handle_restart_service(self, inp: dict) -> str:
-        service = inp["service"]
-        if not self._validate_service(service):
-            return f"Service '{service}' is not in the allowlist"
-        safe_service = shlex.quote(service)
-        return await self._run_on_host(
-            inp["host"],
-            f"systemctl restart {safe_service} && systemctl status {safe_service} --no-pager -l",
-        )
-
-    async def _handle_run_ansible_playbook(self, inp: dict) -> str:
-        playbook = inp["playbook"]
-        if not self._validate_playbook(playbook):
-            return f"Playbook '{playbook}' is not in the allowlist"
-
-        check_mode = inp.get("check_mode", True)
-        safe_playbook = shlex.quote(playbook)
-
-        cmd_parts = [f"cd {shlex.quote(self.config.ansible_directory)}"]
-        cmd_parts.append(f"ansible-playbook {safe_playbook}")
-
-        if inp.get("limit"):
-            cmd_parts[-1] += f" --limit {shlex.quote(inp['limit'])}"
-        if inp.get("tags"):
-            cmd_parts[-1] += f" --tags {shlex.quote(inp['tags'])}"
-        if check_mode:
-            cmd_parts[-1] += " --check"
-
-        cmd = " && ".join(cmd_parts)
-
-        # Ansible runs from the configured ansible_host
-        ansible_host = self.config.ansible_host
-        if not ansible_host:
-            return "ansible_host not configured in tools config"
-        resolved = self._resolve_host(ansible_host)
-        if not resolved:
-            return f"Ansible host '{ansible_host}' not found in configured hosts"
-        address, ssh_user, _os = resolved
-        code, output = await self._exec_command(
-            address, cmd, ssh_user, timeout=600,  # Ansible playbooks can take a while
-        )
-        if code != 0:
-            return f"Ansible playbook failed (exit {code}):\n{output}"
         return output
 
     async def _handle_run_command(self, inp: dict) -> str:
@@ -413,36 +199,6 @@ class ToolExecutor:
             else:
                 parts.append(r)
         return "\n\n".join(parts)
-
-    # --- Prometheus range query ---
-
-    async def _handle_query_prometheus_range(self, inp: dict) -> str:
-        query = inp["query"]
-        duration = inp.get("duration", "1h")
-        step = inp.get("step", "5m")
-        safe_query = url_quote(query)
-        safe_step = url_quote(step)
-
-        prom_host = self.config.prometheus_host
-        if not prom_host:
-            return "prometheus_host not configured in tools config"
-        resolved = self._resolve_host(prom_host)
-        if not resolved:
-            return f"Prometheus host '{prom_host}' not found in configured hosts"
-        address, ssh_user, _os = resolved
-
-        # Calculate start/end times
-        cmd = (
-            f"curl -s 'http://127.0.0.1:9090/api/v1/query_range"
-            f"?query={safe_query}"
-            f"&start='$(date -d '-{shlex.quote(duration)}' -u +%Y-%m-%dT%H:%M:%SZ)'"
-            f"&end='$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
-            f"&step={safe_step}'"
-        )
-        code, output = await self._exec_command(address, cmd, ssh_user)
-        if code != 0:
-            return f"Prometheus range query failed:\n{output}"
-        return format_prometheus_response(output)
 
     # --- Browser tools (text-returning, screenshot handled in client.py) ---
 
@@ -648,13 +404,8 @@ class ToolExecutor:
             return f"Unknown or disallowed host: {host}"
         address, ssh_user, _os = resolved
 
-        # When allow_edits is true, claude -p runs as a non-root user in a temp
-        # dir (no permission issues). Files are then copied to the real target
-        # as root. The prompt is rewritten to use relative paths so claude -p
-        # writes into the temp dir, not to absolute paths it can't access.
         claude_user = self.config.claude_code_user
         tmpdir = ""
-        # Check if we're already running as the claude_code_user (skip su if so)
         import os
         _already_claude_user = (os.getenv("USER", "") == claude_user) if claude_user else False
         if allow_edits:
@@ -671,8 +422,6 @@ class ToolExecutor:
             tmpdir = tmpdir.strip()
             if not tmpdir or not tmpdir.startswith("/tmp/claude_code_"):
                 return f"Failed to create temp directory: {tmpdir}"
-            # Rewrite prompt: replace absolute target paths with relative,
-            # and prepend instruction to write relative to cwd
             prompt = prompt.replace(working_dir + "/", "./")
             prompt = prompt.replace(working_dir, ".")
             prompt = (
@@ -716,7 +465,6 @@ class ToolExecutor:
 
         if allow_edits:
             if code == 0:
-                # Check what claude -p wrote in the temp dir
                 _, file_list = await self._exec_command(
                     address,
                     f"find {safe_tmpdir} -type f -not -path '*/.git/*' -not -name '*.pyc' | sort",
@@ -724,7 +472,6 @@ class ToolExecutor:
                 )
                 files_found = file_list.strip()
                 if files_found:
-                    # Copy files to target as root, preserving structure
                     safe_target = shlex.quote(working_dir)
                     cp_code, cp_output = await self._exec_command(
                         address,
@@ -737,7 +484,6 @@ class ToolExecutor:
                             f"(exit {cp_code}): {cp_output[:300]}"
                         )
                     else:
-                        # Build manifest with target paths
                         target_files = files_found.replace(tmpdir, working_dir)
                         file_manifest = (
                             "\n\n--- FILES ON DISK ---\n"
@@ -753,187 +499,11 @@ class ToolExecutor:
         if code != 0:
             return f"Claude Code failed (exit {code}):\n{output[-2000:]}"
 
-        # Truncate very long output.
         max_output = inp.get("max_output_chars", 3000)
         if len(output) > max_output:
             half = max_output // 2
             output = output[:half] + "[... truncated ...]" + output[-half:]
         return output + file_manifest
-
-    # --- Incus tools ---
-
-    def _incus_host(self) -> str:
-        return self.config.incus_host
-
-    @staticmethod
-    def _validate_incus_name(name: str) -> str | None:
-        """Validate an Incus instance/snapshot name.
-
-        Returns None if valid, or an error message if invalid.
-        """
-        if not _INCUS_NAME_RE.match(name):
-            return (
-                f"Invalid Incus name '{name}': must be 1-63 alphanumeric "
-                "characters or hyphens, starting with an alphanumeric character."
-            )
-        return None
-
-    async def _handle_incus_list(self, inp: dict) -> str:
-        cmd = "incus list --format csv --columns nsdt4"
-        raw = await self._run_on_host(self._incus_host(), cmd)
-        if raw.startswith("Command failed") or raw.startswith("Unknown"):
-            return raw
-        if not raw.strip():
-            return "No Incus instances found."
-        lines = ["**Incus Instances:**", "```"]
-        lines.append(f"{'NAME':<20} {'STATUS':<10} {'TYPE':<12} {'IPV4':<16}")
-        lines.append("-" * 60)
-        for row in raw.strip().splitlines():
-            parts = row.split(",")
-            if len(parts) >= 4:
-                name, status, dtype, ipv4 = parts[0], parts[1], parts[2], parts[3]
-                lines.append(f"{name:<20} {status:<10} {dtype:<12} {ipv4:<16}")
-            elif len(parts) >= 3:
-                name, status, dtype = parts[0], parts[1], parts[2]
-                lines.append(f"{name:<20} {status:<10} {dtype:<12}")
-        lines.append("```")
-        return "\n".join(lines)
-
-    async def _handle_incus_info(self, inp: dict) -> str:
-        if err := self._validate_incus_name(inp["instance"]):
-            return err
-        instance = shlex.quote(inp["instance"])
-        return await self._run_on_host(self._incus_host(), f"incus info {instance}")
-
-    async def _handle_incus_exec(self, inp: dict) -> str:
-        if err := self._validate_incus_name(inp["instance"]):
-            return err
-        instance = shlex.quote(inp["instance"])
-        command = inp["command"]
-        user = inp.get("user")
-        cmd = f"incus exec {instance}"
-        if user:
-            cmd += f" --user {shlex.quote(user)}"
-        cmd += f" -- sh -c {shlex.quote(command)}"
-        return await self._run_on_host(self._incus_host(), cmd)
-
-    async def _handle_incus_start(self, inp: dict) -> str:
-        if err := self._validate_incus_name(inp["instance"]):
-            return err
-        instance = shlex.quote(inp["instance"])
-        result = await self._run_on_host(self._incus_host(), f"incus start {instance}")
-        if result.startswith("Command failed"):
-            return result
-        return f"Instance '{inp['instance']}' started." if not result.strip() else result
-
-    async def _handle_incus_stop(self, inp: dict) -> str:
-        if err := self._validate_incus_name(inp["instance"]):
-            return err
-        instance = shlex.quote(inp["instance"])
-        force = "--force" if inp.get("force") else ""
-        result = await self._run_on_host(self._incus_host(), f"incus stop {instance} {force}".strip())
-        if result.startswith("Command failed"):
-            return result
-        return f"Instance '{inp['instance']}' stopped." if not result.strip() else result
-
-    async def _handle_incus_restart(self, inp: dict) -> str:
-        if err := self._validate_incus_name(inp["instance"]):
-            return err
-        instance = shlex.quote(inp["instance"])
-        force = "--force" if inp.get("force") else ""
-        result = await self._run_on_host(self._incus_host(), f"incus restart {instance} {force}".strip())
-        if result.startswith("Command failed"):
-            return result
-        return f"Instance '{inp['instance']}' restarted." if not result.strip() else result
-
-    async def _handle_incus_snapshot_list(self, inp: dict) -> str:
-        if err := self._validate_incus_name(inp["instance"]):
-            return err
-        instance = shlex.quote(inp["instance"])
-        result = await self._run_on_host(self._incus_host(), f"incus snapshot list {instance}")
-        if not result.strip() or "No snapshots" in result:
-            return f"No snapshots for instance '{inp['instance']}'."
-        return result
-
-    async def _handle_incus_snapshot(self, inp: dict) -> str:
-        if err := self._validate_incus_name(inp["instance"]):
-            return err
-        instance = shlex.quote(inp["instance"])
-        action = inp["action"]
-        if inp.get("snapshot"):
-            if err := self._validate_incus_name(inp["snapshot"]):
-                return err
-        snapshot = shlex.quote(inp["snapshot"]) if inp.get("snapshot") else None
-
-        if action == "create":
-            cmd = f"incus snapshot create {instance}"
-            if snapshot:
-                cmd += f" {snapshot}"
-            result = await self._run_on_host(self._incus_host(), cmd)
-            if result.startswith("Command failed"):
-                return result
-            name = inp.get("snapshot", "auto")
-            return f"Snapshot '{name}' created for instance '{inp['instance']}'." if not result.strip() else result
-
-        elif action == "restore":
-            if not snapshot:
-                return "Snapshot name is required for restore."
-            result = await self._run_on_host(self._incus_host(), f"incus snapshot restore {instance} {snapshot}")
-            if result.startswith("Command failed"):
-                return result
-            return f"Instance '{inp['instance']}' restored to snapshot '{inp['snapshot']}'." if not result.strip() else result
-
-        elif action == "delete":
-            if not snapshot:
-                return "Snapshot name is required for delete."
-            result = await self._run_on_host(self._incus_host(), f"incus snapshot delete {instance} {snapshot}")
-            if result.startswith("Command failed"):
-                return result
-            return f"Snapshot '{inp['snapshot']}' deleted from instance '{inp['instance']}'." if not result.strip() else result
-
-        return f"Unknown snapshot action: {action}"
-
-    async def _handle_incus_launch(self, inp: dict) -> str:
-        if err := self._validate_incus_name(inp["name"]):
-            return err
-        image = shlex.quote(inp["image"])
-        name = shlex.quote(inp["name"])
-        instance_type = inp.get("type", "container")
-        profile = inp.get("profile")
-
-        cmd = f"incus launch {image} {name}"
-        if instance_type == "vm":
-            cmd += " --vm"
-        if profile:
-            cmd += f" --profile {shlex.quote(profile)}"
-
-        # Launching can take longer (image download)
-        resolved = self._resolve_host(self._incus_host())
-        if not resolved:
-            return f"Unknown or disallowed host: {self._incus_host()}"
-        address, ssh_user, _os = resolved
-        code, output = await self._exec_command(address, cmd, ssh_user, timeout=300)
-        if code != 0:
-            return f"Launch failed (exit {code}):\n{output}"
-        return output if output.strip() else f"Instance '{inp['name']}' launched from {inp['image']}."
-
-    async def _handle_incus_delete(self, inp: dict) -> str:
-        if err := self._validate_incus_name(inp["instance"]):
-            return err
-        instance = shlex.quote(inp["instance"])
-        force = "--force" if inp.get("force") else ""
-        result = await self._run_on_host(self._incus_host(), f"incus delete {instance} {force}".strip())
-        if result.startswith("Command failed"):
-            return result
-        return f"Instance '{inp['instance']}' deleted." if not result.strip() else result
-
-    async def _handle_incus_logs(self, inp: dict) -> str:
-        if err := self._validate_incus_name(inp["instance"]):
-            return err
-        instance = shlex.quote(inp["instance"])
-        lines = min(inp.get("lines", 50), 200)
-        cmd = f"incus console {instance} --show-log | tail -n {lines}"
-        return await self._run_on_host(self._incus_host(), cmd)
 
     def set_user_context(self, user_id: str | None) -> None:
         """Deprecated: user_id is now passed directly to execute().

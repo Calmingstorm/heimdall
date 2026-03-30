@@ -1,6 +1,6 @@
 # Heimdall
 
-Autonomous executor Discord bot with infrastructure management, 79 tools, and the burden of seeing everything.
+Autonomous executor Discord bot with infrastructure management, 61 tools, and the burden of seeing everything.
 
 Heimdall manages servers, containers, services, and code through natural language in Discord.
 Every message goes to Codex (ChatGPT) with full tool access. Complex tasks are delegated
@@ -110,7 +110,7 @@ python -m src
 
 ```
 Every Discord message
-  → Codex (with 79 tools + personality in system prompt)
+  → Codex (with 61 tools + personality in system prompt)
       ├── CHAT: Codex responds directly with personality
       ├── SIMPLE TASK: Codex calls tools directly (run_command, check_disk, web_search, etc.)
       ├── COMPLEX TASK: Codex delegates to claude -p via claude_code tool
@@ -121,7 +121,7 @@ Every Discord message
 
 Tool packs (opt-in infrastructure tools):
   systemd(3), incus(11), ansible(1), prometheus(4), comfyui(1)
-  Empty config = all 79 tools loaded (backward compatible)
+  Empty config = all 61 tools loaded (backward compatible)
 ```
 
 No classifier. No routing. No approval buttons. Tools are capabilities, not suggestions.
@@ -236,7 +236,7 @@ Heimdall includes a browser-based management interface at `http://host:3939/ui/`
 - **Dashboard** — bot status, uptime, connected guilds, quick stats, recent activity
 - **Chat** — web-based chat interface with real-time WebSocket communication
 - **Sessions** — view active conversations, message history, clear sessions
-- **Tools** — browse all 79 tools, toggle tool packs on/off
+- **Tools** — browse all 61 tools, toggle tool packs on/off
 - **Skills** — create, edit, delete runtime skills with a code editor
 - **Knowledge** — browse, search, ingest, and delete knowledge base documents
 - **Schedules** — manage cron jobs, one-time tasks, and webhook-triggered tasks

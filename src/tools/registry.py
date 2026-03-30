@@ -1,167 +1,7 @@
 from __future__ import annotations
 
-# Tool packs: infrastructure tools that are opt-in via config.
-# Empty/absent tool_packs in config = ALL tools loaded (backward compatible).
-TOOL_PACKS: dict[str, list[str]] = {
-    "systemd": ["check_service", "restart_service", "check_logs"],
-    "incus": [
-        "incus_list", "incus_info", "incus_exec", "incus_start", "incus_stop",
-        "incus_restart", "incus_snapshot_list", "incus_snapshot",
-        "incus_launch", "incus_delete", "incus_logs",
-    ],
-    "ansible": ["run_ansible_playbook"],
-    "prometheus": [
-        "query_prometheus", "query_prometheus_range",
-        "check_disk", "check_memory",
-    ],
-    "comfyui": ["generate_image"],
-}
-
-# All tool names that belong to any pack
-_ALL_PACK_TOOLS: set[str] = {
-    name for tools in TOOL_PACKS.values() for name in tools
-}
-
-
-def get_pack_tool_names(packs: list[str]) -> set[str]:
-    """Return the set of tool names enabled by the given packs."""
-    result: set[str] = set()
-    for pack in packs:
-        if pack in TOOL_PACKS:
-            result.update(TOOL_PACKS[pack])
-    return result
-
 
 TOOLS: list[dict] = [
-    # --- Host monitoring ---
-    {
-        "name": "check_service",
-        "description": "Returns systemd service status on a managed host (active state, PID, memory, recent journal). For logs only, use check_logs. To restart, use restart_service.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "service": {
-                    "type": "string",
-                    "description": "Systemd service name (e.g. 'apache2', 'prometheus')",
-                },
-            },
-            "required": ["host", "service"],
-        },
-    },
-    {
-        "name": "check_disk",
-        "description": "Returns disk usage (df -h) on a managed host.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-            },
-            "required": ["host"],
-        },
-    },
-    {
-        "name": "check_memory",
-        "description": "Returns memory usage (free -h) on a managed host.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-            },
-            "required": ["host"],
-        },
-    },
-    {
-        "name": "check_logs",
-        "description": "Returns recent journalctl lines from a systemd service. Max 50 lines. For full service status, use check_service.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "service": {
-                    "type": "string",
-                    "description": "Systemd service name",
-                },
-                "lines": {
-                    "type": "integer",
-                    "description": "Number of recent lines to fetch (max 50, default 20)",
-                },
-            },
-            "required": ["host", "service"],
-        },
-    },
-    # --- Prometheus ---
-    {
-        "name": "query_prometheus",
-        "description": "Runs a PromQL instant query. Returns formatted 'N result(s): metric{labels}: value'. For trends, use query_prometheus_range.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "PromQL query string",
-                },
-            },
-            "required": ["query"],
-        },
-    },
-    # --- Service management ---
-    {
-        "name": "restart_service",
-        "description": "Restarts a systemd service on a managed host and returns new status. To check without restarting, use check_service.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string",
-                    "description": "Host alias from config",
-                },
-                "service": {
-                    "type": "string",
-                    "description": "Systemd service name to restart",
-                },
-            },
-            "required": ["host", "service"],
-        },
-    },
-    {
-        "name": "run_ansible_playbook",
-        "description": "Runs an Ansible playbook from the configured playbook directory. Defaults to check mode (dry run) — set check_mode=false for real execution.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "playbook": {
-                    "type": "string",
-                    "description": "Playbook filename (e.g. 'check-services.yml')",
-                },
-                "limit": {
-                    "type": "string",
-                    "description": "Limit to specific host(s)",
-                },
-                "tags": {
-                    "type": "string",
-                    "description": "Comma-separated Ansible tags",
-                },
-                "check_mode": {
-                    "type": "boolean",
-                    "description": "Run in check/dry-run mode (default true)",
-                },
-            },
-            "required": ["playbook"],
-        },
-    },
     # --- Shell execution ---
     {
         "name": "run_command",
@@ -340,7 +180,7 @@ TOOLS: list[dict] = [
         "description": (
             "Schedules a recurring (cron), one-time (run_at), or webhook-triggered task. "
             "Use parse_time to convert natural language to run_at. "
-            "Actions: 'reminder' = post message, 'check' = monitoring tool, 'digest' = infrastructure digest, "
+            "Actions: 'reminder' = post message, 'check' = run_command check, 'digest' = infrastructure digest, "
             "'workflow' = multi-step tool chain."
         ),
         "input_schema": {
@@ -384,7 +224,7 @@ TOOLS: list[dict] = [
                 "action": {
                     "type": "string",
                     "enum": ["reminder", "check", "digest", "workflow"],
-                    "description": "'reminder' = post message, 'check' = monitoring tool, 'digest' = infrastructure digest, 'workflow' = multi-step tool chain",
+                    "description": "'reminder' = post message, 'check' = run_command check, 'digest' = infrastructure digest, 'workflow' = multi-step tool chain",
                 },
                 "message": {
                     "type": "string",
@@ -513,7 +353,7 @@ TOOLS: list[dict] = [
             "properties": {
                 "tool_name": {
                     "type": "string",
-                    "description": "Filter by tool name (e.g. 'check_disk', 'restart_service')",
+                    "description": "Filter by tool name",
                 },
                 "user": {
                     "type": "string",
@@ -562,7 +402,7 @@ TOOLS: list[dict] = [
             "Creates a skill (custom tool) from Python code. Available immediately.\n"
             "Define: async def execute(inp: dict, context: SkillContext) -> str\n\n"
             "SkillContext methods (all async):\n"
-            "- run_on_host(alias, cmd), query_prometheus(query), read_file(host, path)\n"
+            "- run_on_host(alias, cmd), read_file(host, path)\n"
             "- execute_tool(name, input), http_get(url), http_post(url, json=)\n"
             "- post_message(text), post_file(data, filename, caption)\n"
             "- search_knowledge(query), ingest_document(content, source), search_history(query)\n"
@@ -692,29 +532,6 @@ TOOLS: list[dict] = [
                 },
             },
             "required": ["name"],
-        },
-    },
-    # --- Prometheus range query ---
-    {
-        "name": "query_prometheus_range",
-        "description": "Runs a PromQL range query over a time window. Returns 'metric{labels}: N points [first → last]'. For current values, use query_prometheus.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "PromQL query string",
-                },
-                "duration": {
-                    "type": "string",
-                    "description": "Time window (e.g. '1h', '6h', '24h', '7d'). Default '1h'.",
-                },
-                "step": {
-                    "type": "string",
-                    "description": "Resolution step (e.g. '1m', '5m', '15m'). Default '5m'.",
-                },
-            },
-            "required": ["query"],
         },
     },
     # --- Background task delegation ---
@@ -1021,201 +838,6 @@ TOOLS: list[dict] = [
                 },
             },
             "required": ["url"],
-        },
-    },
-    # --- Incus tools ---
-    {
-        "name": "incus_list",
-        "description": "Lists all Incus instances as a table (name, status, type, IPv4). For details, use incus_info.",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-        },
-    },
-    {
-        "name": "incus_info",
-        "description": "Returns detailed Incus instance info (config, devices, snapshots, resources). For all instances, use incus_list.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "instance": {
-                    "type": "string",
-                    "description": "Instance name",
-                },
-            },
-            "required": ["instance"],
-        },
-    },
-    {
-        "name": "incus_exec",
-        "description": "Runs a command inside an Incus instance. For host-level commands, use run_command. For logs, use incus_logs.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "instance": {
-                    "type": "string",
-                    "description": "Instance name",
-                },
-                "command": {
-                    "type": "string",
-                    "description": "Command to execute inside the instance",
-                },
-                "user": {
-                    "type": "string",
-                    "description": "Run as this user (default: root)",
-                },
-            },
-            "required": ["instance", "command"],
-        },
-    },
-    {
-        "name": "incus_start",
-        "description": "Starts an Incus instance.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "instance": {
-                    "type": "string",
-                    "description": "Instance name",
-                },
-            },
-            "required": ["instance"],
-        },
-    },
-    {
-        "name": "incus_stop",
-        "description": "Stops an Incus instance. With force=true, kills immediately.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "instance": {
-                    "type": "string",
-                    "description": "Instance name",
-                },
-                "force": {
-                    "type": "boolean",
-                    "description": "Force stop (default: false)",
-                },
-            },
-            "required": ["instance"],
-        },
-    },
-    {
-        "name": "incus_restart",
-        "description": "Restarts an Incus instance.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "instance": {
-                    "type": "string",
-                    "description": "Instance name",
-                },
-                "force": {
-                    "type": "boolean",
-                    "description": "Force restart (default: false)",
-                },
-            },
-            "required": ["instance"],
-        },
-    },
-    {
-        "name": "incus_snapshot_list",
-        "description": "Returns all snapshots for an Incus instance with names and creation times.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "instance": {
-                    "type": "string",
-                    "description": "Instance name",
-                },
-            },
-            "required": ["instance"],
-        },
-    },
-    {
-        "name": "incus_snapshot",
-        "description": "Creates, restores, or deletes a snapshot for an Incus instance.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "instance": {
-                    "type": "string",
-                    "description": "Instance name",
-                },
-                "action": {
-                    "type": "string",
-                    "enum": ["create", "restore", "delete"],
-                    "description": "Snapshot action",
-                },
-                "snapshot": {
-                    "type": "string",
-                    "description": "Snapshot name (required for restore/delete, auto-generated for create if omitted)",
-                },
-            },
-            "required": ["instance", "action"],
-        },
-    },
-    {
-        "name": "incus_launch",
-        "description": "Launches a new Incus instance from an image. Supports containers and VMs. To remove, use incus_delete.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "image": {
-                    "type": "string",
-                    "description": "Image (e.g. 'images:ubuntu/24.04', 'images:debian/12')",
-                },
-                "name": {
-                    "type": "string",
-                    "description": "Instance name",
-                },
-                "type": {
-                    "type": "string",
-                    "enum": ["container", "vm"],
-                    "description": "Instance type (default: container)",
-                },
-                "profile": {
-                    "type": "string",
-                    "description": "Profile to apply (default: 'default')",
-                },
-            },
-            "required": ["image", "name"],
-        },
-    },
-    {
-        "name": "incus_delete",
-        "description": "Deletes an Incus instance. With force=true, deletes even if running. To create, use incus_launch.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "instance": {
-                    "type": "string",
-                    "description": "Instance name",
-                },
-                "force": {
-                    "type": "boolean",
-                    "description": "Force delete even if running (default: false)",
-                },
-            },
-            "required": ["instance"],
-        },
-    },
-    {
-        "name": "incus_logs",
-        "description": "Returns console log from an Incus instance (max 200 lines). To run commands inside, use incus_exec.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "instance": {
-                    "type": "string",
-                    "description": "Instance name",
-                },
-                "lines": {
-                    "type": "integer",
-                    "description": "Lines to show (default 50, max 200)",
-                },
-            },
-            "required": ["instance"],
         },
     },
     # --- Claude Code ---
@@ -1678,54 +1300,35 @@ TOOLS: list[dict] = [
 ]
 
 
-# Cache for get_tool_definitions — keyed by frozenset of enabled packs.
-# Pack config rarely changes at runtime, so this avoids rebuilding dicts
-# for 80+ tools on every message.
-_tool_defs_cache: dict[frozenset[str], list[dict]] = {}
+# Cache for get_tool_definitions — avoids rebuilding dicts on every message.
+_tool_defs_cache: list[dict] | None = None
 
 
-def get_tool_definitions(enabled_packs: list[str] | None = None) -> list[dict]:
-    """Return tool definitions filtered by enabled packs.
+def get_tool_definitions() -> list[dict]:
+    """Return tool definitions.
 
-    When enabled_packs is None or empty: returns ALL tools (backward compatible).
-    When packs specified: returns core tools (not in any pack) + tools from enabled packs.
-
-    Results are cached by pack configuration. Call invalidate_tool_defs_cache()
+    Results are cached. Call invalidate_tool_defs_cache()
     if TOOLS list is modified at runtime (e.g. by tests).
     """
-    cache_key = frozenset(enabled_packs) if enabled_packs else frozenset()
-    cached = _tool_defs_cache.get(cache_key)
-    if cached is not None:
-        return cached
-
-    if enabled_packs:
-        allowed = get_pack_tool_names(enabled_packs)
-        result = [
-            {
-                "name": t["name"],
-                "description": t["description"],
-                "input_schema": t["input_schema"],
-            }
-            for t in TOOLS
-            if t["name"] not in _ALL_PACK_TOOLS or t["name"] in allowed
-        ]
-    else:
-        result = [
-            {
-                "name": t["name"],
-                "description": t["description"],
-                "input_schema": t["input_schema"],
-            }
-            for t in TOOLS
-        ]
-    _tool_defs_cache[cache_key] = result
-    return result
+    global _tool_defs_cache
+    if _tool_defs_cache is not None:
+        return _tool_defs_cache
+    _tool_defs_cache = [
+        {
+            "name": t["name"],
+            "description": t["description"],
+            "input_schema": t["input_schema"],
+        }
+        for t in TOOLS
+    ]
+    return _tool_defs_cache
 
 
 def invalidate_tool_defs_cache() -> None:
     """Clear the tool definitions cache.
 
     Call after modifying TOOLS at runtime (e.g. in tests) or after
-    config changes that affect pack membership.
+    config changes that affect tool availability.
     """
-    _tool_defs_cache.clear()
+    global _tool_defs_cache
+    _tool_defs_cache = None

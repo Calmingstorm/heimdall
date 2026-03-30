@@ -62,7 +62,6 @@ class TestToolsUsedLocalVariable:
         stub._send_with_retry = AsyncMock()
         stub._merged_tool_definitions = MagicMock(return_value=[])
         stub.skill_manager = MagicMock()
-        stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
 
         msg = MagicMock()
         msg.author.id = 100000000000000001

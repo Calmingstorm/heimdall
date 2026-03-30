@@ -188,12 +188,12 @@ class TestToolFiltering:
     def test_user_gets_only_whitelisted(self, pm: PermissionManager, sample_tools: list):
         result = pm.filter_tools("999999", sample_tools)
         names = {t["name"] for t in result}
-        assert names == {"check_disk", "check_memory", "web_search"}
+        assert names == {"run_command", "web_search"}
 
     def test_user_excludes_admin_tools(self, pm: PermissionManager, sample_tools: list):
         result = pm.filter_tools("999999", sample_tools)
         names = {t["name"] for t in result}
-        assert "run_command" not in names
+        assert "check_disk" not in names
         assert "write_file" not in names
         assert "set_permission" not in names
 
@@ -217,8 +217,8 @@ class TestToolFiltering:
     def test_filter_preserves_order(self, pm: PermissionManager, sample_tools: list):
         result = pm.filter_tools("999999", sample_tools)
         names = [t["name"] for t in result]
-        # check_disk comes before check_memory comes before web_search
-        assert names == ["check_disk", "check_memory", "web_search"]
+        # run_command comes before web_search (preserves original order)
+        assert names == ["run_command", "web_search"]
 
 
 # ---------------------------------------------------------------------------

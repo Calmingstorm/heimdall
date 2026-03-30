@@ -68,44 +68,6 @@ SEND_MAX_RETRIES = 3
 _ADJACENT_FENCE_RE = re.compile(r"\n```[ \t]*\n\n```(\w*)[ \t]*\n")
 
 
-class ToolLoopCancelView(discord.ui.View):
-    """Cancel button attached to the tool loop progress embed.
-
-    When pressed by an allowed user, sets an asyncio.Event that the tool loop
-    checks between iterations.  This bypasses the per-channel message lock
-    because Discord button interactions are handled out-of-band.
-    """
-
-    def __init__(self, allowed_user_ids: list[str], timeout: float = 600) -> None:
-        super().__init__(timeout=timeout)
-        self._allowed = set(allowed_user_ids)
-        self._cancel_event = asyncio.Event()
-
-    @property
-    def is_cancelled(self) -> bool:
-        return self._cancel_event.is_set()
-
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.grey, emoji="\u274c")
-    async def cancel_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button,
-    ) -> None:
-        if str(interaction.user.id) not in self._allowed:
-            await interaction.response.send_message(
-                "You are not authorized to cancel this task.", ephemeral=True,
-            )
-            return
-        self._cancel_event.set()
-        button.disabled = True
-        button.label = "Cancelled"
-        self.stop()
-        await interaction.response.edit_message(view=self)
-
-    def disable(self) -> None:
-        for item in self.children:
-            if isinstance(item, discord.ui.Button):
-                item.disabled = True
-        self.stop()  # Unregister from discord.py event listener
-
 class _LoopMessageProxy:
     """Lightweight proxy providing a discord.Message-like interface for loop iterations.
 
@@ -266,10 +228,8 @@ def _is_mid_task_checkpoint(text: str) -> bool:
 _CONTINUATION_MSG = {
     "role": "developer",
     "content": (
-        "You are mid-task. Do not stop to report progress — CONTINUE EXECUTING. "
-        "Call the next tool(s) needed to complete the task. Do not describe what "
-        "you will do next — just do it. The user is waiting for a COMPLETED result, "
-        "not a status update."
+        "Continue executing. Call the next tool(s) to complete the task. "
+        "The user wants the finished result, not a progress update."
     ),
 }
 
@@ -858,8 +818,6 @@ class HeimdallBot(discord.Client):
         prompt = build_system_prompt(
             context=self.context_loader.context,
             hosts=self._get_cached_hosts(),
-            services=self.config.tools.allowed_services,
-            playbooks=self.config.tools.allowed_playbooks,
             voice_info=voice_info,
             tz=self.config.timezone,
             claude_code_dir=self.config.tools.claude_code_dir,
@@ -985,7 +943,7 @@ class HeimdallBot(discord.Client):
         """
         if self._cached_merged_tools is not None:
             return self._cached_merged_tools
-        builtin = get_tool_definitions(enabled_packs=self.config.tools.tool_packs)
+        builtin = get_tool_definitions()
         builtin_names = {t["name"] for t in builtin}
         skill_defs = [
             t for t in self.skill_manager.get_tool_definitions()
@@ -1842,7 +1800,6 @@ class HeimdallBot(discord.Client):
         system_prompt = system_prompt_override or self._system_prompt
         tools = self._merged_tool_definitions() if self.config.tools.enabled else None
         messages = list(history)
-        continuation_injected = False  # Track if we already continued once (prevent infinite loops)
 
         # Insert context separator between history and the current user request
         # so Codex evaluates tools fresh instead of repeating patterns from history
@@ -1903,10 +1860,10 @@ class HeimdallBot(discord.Client):
         # Local variable (not instance attr) to avoid cross-channel contamination
         tools_used_in_loop: list[str] = []
 
-        # Progress embed tracking — single editable embed replaces scattered messages
-        progress_embed_msg: discord.Message | None = None
-        progress_steps: list[dict] = []
-        cancel_view: ToolLoopCancelView | None = None
+        # Continuation tracking: how many times we've injected continuation prompts
+        # Allow up to 3 continuations to support multi-step tasks
+        continuation_count = 0
+        max_continuations = 3
 
         user_id = str(message.author.id)
 
@@ -1925,21 +1882,6 @@ class HeimdallBot(discord.Client):
                  len(tools) if tools else 0, len(messages))
 
         for iteration in range(MAX_TOOL_ITERATIONS):
-            # Check if user pressed the cancel button on the progress embed
-            if cancel_view is not None and cancel_view.is_cancelled:
-                if progress_embed_msg and progress_steps:
-                    try:
-                        cancel_view.disable()
-                        embed = self._build_tool_progress_embed(progress_steps, "error",
-                                                                footer="Cancelled by user.")
-                        await progress_embed_msg.edit(embed=embed, view=cancel_view)
-                    except Exception:
-                        pass
-                report = self._build_partial_completion_report(progress_steps)
-                error_msg = "Task cancelled by user."
-                if report:
-                    error_msg = f"{report}\n\n{error_msg}"
-                return error_msg, False, True, tools_used_in_loop, False
             # Show typing indicator while waiting for LLM response
             try:
                 async with message.channel.typing():
@@ -1952,15 +1894,6 @@ class HeimdallBot(discord.Client):
                 # Circuit breaker open — wait for recovery, then retry once
                 wait_secs = min(coe.retry_after, 90.0)
                 log.info("Circuit breaker open for %s, waiting %.0fs for recovery", coe.provider, wait_secs)
-                try:
-                    if progress_embed_msg:
-                        embed = self._build_tool_progress_embed(
-                            progress_steps, "running",
-                            footer=f"API recovering — retrying in {wait_secs:.0f}s...",
-                        )
-                        await progress_embed_msg.edit(embed=embed, view=cancel_view)
-                except Exception:
-                    pass
                 await asyncio.sleep(wait_secs)
                 try:
                     async with message.channel.typing():
@@ -1970,35 +1903,9 @@ class HeimdallBot(discord.Client):
                             tools=tools or [],
                         )
                 except Exception as retry_err:
-                    # Recovery failed — fall through to error reporting
-                    if progress_embed_msg and progress_steps:
-                        try:
-                            if cancel_view:
-                                cancel_view.disable()
-                            embed = self._build_tool_progress_embed(progress_steps, "error")
-                            await progress_embed_msg.edit(embed=embed, view=cancel_view)
-                        except Exception:
-                            pass
-                    report = self._build_partial_completion_report(progress_steps)
-                    error_msg = f"LLM API error (circuit breaker recovery failed): {retry_err}"
-                    if report:
-                        error_msg = f"{report}\n\n{error_msg}"
-                    return error_msg, False, True, tools_used_in_loop, False
+                    return f"LLM API error (circuit breaker recovery failed): {retry_err}", False, True, tools_used_in_loop, False
             except Exception as api_err:
-                # LLM API failed — report what was already completed
-                if progress_embed_msg and progress_steps:
-                    try:
-                        if cancel_view:
-                            cancel_view.disable()
-                        embed = self._build_tool_progress_embed(progress_steps, "error")
-                        await progress_embed_msg.edit(embed=embed, view=cancel_view)
-                    except Exception:
-                        pass
-                report = self._build_partial_completion_report(progress_steps)
-                error_msg = f"LLM API error: {api_err}"
-                if report:
-                    error_msg = f"{report}\n\n{error_msg}"
-                return error_msg, False, True, tools_used_in_loop, False
+                return f"LLM API error: {api_err}", False, True, tools_used_in_loop, False
             if not llm_resp.is_tool_use:
                 # Fabrication detection: if no tools were called on the FIRST
                 # iteration and the response looks like it fabricated results,
@@ -2086,36 +1993,26 @@ class HeimdallBot(discord.Client):
                     messages.append(_FAILURE_RETRY_MSG)
                     continue
 
-                # Continuation: if tools were already used in this loop and
-                # the model gave a text-only response that looks like a mid-task
-                # checkpoint (not a final answer), inject a continuation prompt
-                # and keep the loop going. This prevents the "I did step 1,
-                # now I'll do step 2" pattern from exiting the loop early.
-                # Only continue once to avoid infinite loops.
+                # Structural continuation: if tools were already used in this
+                # loop and the model responds with text instead of more tool
+                # calls, decide whether to continue based on structural signals
+                # rather than just regex patterns.
                 if (
                     tools_used_in_loop
-                    and not continuation_injected
-                    and _is_mid_task_checkpoint(llm_resp.text or "")
+                    and continuation_count < max_continuations
+                    and self._should_continue_task(llm_resp.text or "", tools_used_in_loop, iteration)
                 ):
                     log.info(
-                        "Mid-task checkpoint detected after %d tool calls — "
+                        "Mid-task continuation (%d/%d) after %d tool calls — "
                         "injecting continuation",
+                        continuation_count + 1, max_continuations,
                         len(tools_used_in_loop),
                     )
                     messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_CONTINUATION_MSG)
-                    continuation_injected = True
+                    continuation_count += 1
                     continue
 
-                # Update progress embed to show completion and disable cancel button
-                if progress_embed_msg and progress_steps:
-                    try:
-                        if cancel_view:
-                            cancel_view.disable()
-                        embed = self._build_tool_progress_embed(progress_steps, "complete")
-                        await progress_embed_msg.edit(embed=embed, view=cancel_view)
-                    except Exception:
-                        pass
                 return llm_resp.text or _EMPTY_RESPONSE_FALLBACK, False, False, tools_used_in_loop, False
 
             # Build internal-format assistant content from LLMResponse
@@ -2134,30 +2031,9 @@ class HeimdallBot(discord.Client):
             # Execute tools
             tool_calls = tool_calls_this_iter
 
-            # Build progress step and send/update progress embed
+            # Track tool names used in this iteration
             tool_names = [t.name for t in tool_calls]
             tools_used_in_loop.extend(tool_names)
-            reasoning = None
-            if llm_resp.text:
-                reasoning = llm_resp.text if len(llm_resp.text) <= 200 else llm_resp.text[:200] + "..."
-            progress_steps.append({
-                "tools": tool_names,
-                "reasoning": reasoning,
-                "status": "running",
-            })
-            try:
-                embed = self._build_tool_progress_embed(progress_steps, "running")
-                if progress_embed_msg is None:
-                    cancel_view = ToolLoopCancelView(
-                        allowed_user_ids=self.config.discord.allowed_users,
-                    )
-                    progress_embed_msg = await message.channel.send(
-                        embed=embed, view=cancel_view,
-                    )
-                else:
-                    await progress_embed_msg.edit(embed=embed)
-            except Exception:
-                pass
 
             # Execute tools in parallel
             async def _run_tool(block):
@@ -2414,17 +2290,6 @@ class HeimdallBot(discord.Client):
                 log.info("Injected %d image block(s) into tool loop messages", len(pending_image_blocks))
                 pending_image_blocks.clear()
 
-            # Update progress step to done with elapsed time
-            step_elapsed_ms = int((time.monotonic() - step_t0) * 1000)
-            progress_steps[-1]["status"] = "done"
-            progress_steps[-1]["elapsed_ms"] = step_elapsed_ms
-            if progress_embed_msg:
-                try:
-                    embed = self._build_tool_progress_embed(progress_steps, "running")
-                    await progress_embed_msg.edit(embed=embed)
-                except Exception:
-                    pass
-
             # Check if all tool calls in this iteration are skills that want
             # Codex to handle the response instead of another tool-loop iteration.
             tool_names_this_round = [b.name for b in tool_calls]
@@ -2432,98 +2297,32 @@ class HeimdallBot(discord.Client):
                 getattr(self, "codex_client", None)
                 and all(self.skill_manager.should_handoff_to_codex(n) is True for n in tool_names_this_round)
             ):
-                # Update progress embed to complete on handoff
-                if progress_embed_msg and progress_steps:
-                    try:
-                        if cancel_view:
-                            cancel_view.disable()
-                        embed = self._build_tool_progress_embed(progress_steps, "complete")
-                        await progress_embed_msg.edit(embed=embed, view=cancel_view)
-                    except Exception:
-                        pass
                 # Collect skill results as context for Codex
                 skill_output = "\n".join(
                     r["content"] for r in tool_results if isinstance(r, dict)
                 )
                 return skill_output, False, False, tools_used_in_loop, True  # handoff=True
 
-        # Update progress embed to error on max iterations
-        if progress_embed_msg and progress_steps:
-            try:
-                if cancel_view:
-                    cancel_view.disable()
-                embed = self._build_tool_progress_embed(progress_steps, "error")
-                await progress_embed_msg.edit(embed=embed, view=cancel_view)
-            except Exception:
-                pass
-        report = self._build_partial_completion_report(progress_steps)
-        error_msg = "Too many tool calls in sequence. Please try a simpler request."
-        if report:
-            error_msg = f"{report}\n\n{error_msg}"
-        return error_msg, False, True, tools_used_in_loop, False
+        return "Too many tool calls in sequence. Please try a simpler request.", False, True, tools_used_in_loop, False
 
     @staticmethod
-    def _build_tool_progress_embed(
-        steps: list[dict],
-        status: str = "running",
-        footer: str | None = None,
-    ) -> discord.Embed:
-        """Build a Discord embed showing tool loop progress.
+    def _should_continue_task(text: str, tools_used: list[str], iteration: int) -> bool:
+        """Decide if a text-only response is a mid-task checkpoint that should continue.
 
-        Args:
-            steps: list of dicts with keys: tools (list[str]), reasoning (str|None),
-                   status ("running"|"done"), elapsed_ms (int|None)
-            status: overall status — "running", "complete", or "error"
-            footer: optional footer text (e.g. recovery wait message)
+        Uses structural signals rather than pure regex: the text should be short
+        (status update, not a complete answer), tools should have been called,
+        and the text should reference future actions or incomplete work.
+
+        Returns True if the loop should inject a continuation prompt instead of
+        exiting with this text as the final response.
         """
-        colors = {
-            "running": discord.Color.blue(),
-            "complete": discord.Color.green(),
-            "error": discord.Color.red(),
-        }
-
-        lines = []
-        for i, step in enumerate(steps, 1):
-            tool_str = ", ".join(f"`{t}`" for t in step["tools"])
-            if step["status"] == "done":
-                secs = step.get("elapsed_ms", 0) / 1000
-                lines.append(f"\u2713 Step {i}: {tool_str} ({secs:.1f}s)")
-            else:
-                lines.append(f"\u25b6 Step {i}: {tool_str}...")
-
-        # Show reasoning from the latest running step
-        latest = steps[-1] if steps else None
-        if latest and latest.get("reasoning") and latest["status"] == "running":
-            lines.append(f"\n*{latest['reasoning']}*")
-
-        if footer:
-            lines.append(f"\n{footer}")
-
-        description = "\n".join(lines)
-        if len(description) > 4000:
-            description = description[:4000] + "\n*(truncated)*"
-
-        return discord.Embed(
-            description=description or "Starting...",
-            color=colors.get(status, discord.Color.blue()),
-        )
-
-    @staticmethod
-    def _build_partial_completion_report(steps: list[dict]) -> str:
-        """Build a human-readable summary of completed steps for partial failure.
-
-        Used when the tool loop exits early (API error, max iterations) so the
-        user can see what was already accomplished before the failure.
-        """
-        done = [s for s in steps if s.get("status") == "done"]
-        if not done:
-            return ""
-        lines = [f"**Partial completion ({len(done)}/{len(steps)} steps):**"]
-        for i, step in enumerate(done, 1):
-            tool_str = ", ".join(f"`{t}`" for t in step["tools"])
-            secs = step.get("elapsed_ms", 0) / 1000
-            lines.append(f"\u2713 Step {i}: {tool_str} ({secs:.1f}s)")
-        return "\n".join(lines)
+        if not text or not tools_used:
+            return False
+        # Long responses (>500 chars) are likely complete answers, not checkpoints
+        if len(text) > 500:
+            return False
+        # If no checkpoint patterns match, this is a genuine final answer
+        return _is_mid_task_checkpoint(text)
 
     @staticmethod
     def _detect_image_type(data: bytes) -> str | None:

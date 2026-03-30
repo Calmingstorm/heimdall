@@ -59,7 +59,7 @@ def _make_bot_stub(tool_timeout: int = 300):
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._build_tool_progress_embed = HeimdallBot._build_tool_progress_embed
+    stub._should_continue_task = HeimdallBot._should_continue_task
     return stub
 
 

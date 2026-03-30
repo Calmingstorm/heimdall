@@ -85,7 +85,7 @@ def _make_bot():
     bot.tool_executor._save_all_memory = MagicMock()
     bot.config = MagicMock()
     bot.config.tools = MagicMock()
-    bot.config.tools.tool_packs = []
+    bot.config.tools.
     bot.config.monitoring = MagicMock()
     bot.config.monitoring.enabled = False
     bot._cached_merged_tools = None

@@ -75,10 +75,9 @@ def _make_chat_bot(*, codex_available=True, process_result=None):
     bot.config = MagicMock()
     bot.config.model_dump = MagicMock(return_value={
         "discord": {"token": "secret"},
-        "tools": {"tool_packs": []},
+        "tools": {},
         "web": {"api_token": "", "enabled": True},
     })
-    bot.config.tools.tool_packs = []
 
     bot._merged_tool_definitions = MagicMock(return_value=[
         {"name": "run_command", "description": "Run", "input_schema": {}},
@@ -794,48 +793,10 @@ class TestToolsAndPacks:
             resp = await client.get("/api/tools")
             assert resp.status == 200
             body = await resp.json()
-            # Uses real get_tool_definitions(), returns all 80 tools (67 base + 6 agent + 2 loop-agent bridge + 2 skill toggle + 3 skill management)
-            assert len(body) == 80
+            # Uses real get_tool_definitions(), returns all 61 tools
+            assert len(body) == 61
             tool_names = [t["name"] for t in body]
             assert "run_command" in tool_names
-
-    @pytest.mark.asyncio
-    async def test_list_packs(self):
-        app, _ = _make_app()
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.get("/api/tools/packs")
-            assert resp.status == 200
-            body = await resp.json()
-            assert "packs" in body
-            assert "all_packs_loaded" in body
-
-    @pytest.mark.asyncio
-    async def test_update_packs_valid(self):
-        from src.tools.registry import TOOL_PACKS
-        bot = _make_chat_bot()
-        app, _ = _make_app(bot)
-        valid_pack = list(TOOL_PACKS.keys())[0]
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.put(
-                "/api/tools/packs",
-                json={"packs": [valid_pack]},
-            )
-            assert resp.status == 200
-            body = await resp.json()
-            assert body["packs"] == [valid_pack]
-            assert bot._cached_merged_tools is None
-
-    @pytest.mark.asyncio
-    async def test_update_packs_invalid(self):
-        app, _ = _make_app()
-        async with TestClient(TestServer(app)) as client:
-            resp = await client.put(
-                "/api/tools/packs",
-                json={"packs": ["nonexistent_pack"]},
-            )
-            assert resp.status == 400
-            body = await resp.json()
-            assert "unknown" in body["error"].lower()
 
     @pytest.mark.asyncio
     async def test_tool_stats(self):
@@ -1339,47 +1300,6 @@ class TestQuickActionsAPI:
             resp = await client.post("/api/loops/stop-all")
             assert resp.status == 200
         bot.loop_manager.stop_loop.assert_called_with("all")
-
-
-# ===================================================================
-# Tool pack integrity
-# ===================================================================
-
-
-class TestToolPackIntegrity:
-    """Verify tool pack configuration matches current state."""
-
-    def test_current_packs(self):
-        from src.tools.registry import TOOL_PACKS
-        # After Round 2: docker and git removed
-        assert "docker" not in TOOL_PACKS
-        assert "git" not in TOOL_PACKS
-        # Remaining 5 packs
-        expected = {"systemd", "incus", "ansible", "prometheus", "comfyui"}
-        assert set(TOOL_PACKS.keys()) == expected
-
-    def test_pack_count(self):
-        from src.tools.registry import TOOL_PACKS
-        assert len(TOOL_PACKS) == 5
-
-    def test_pack_tool_counts(self):
-        from src.tools.registry import TOOL_PACKS
-        assert len(TOOL_PACKS["systemd"]) == 3
-        assert len(TOOL_PACKS["incus"]) == 11
-        assert len(TOOL_PACKS["ansible"]) == 1
-        assert len(TOOL_PACKS["prometheus"]) == 4
-        assert len(TOOL_PACKS["comfyui"]) == 1
-
-    def test_total_tools(self):
-        from src.tools.registry import TOOLS
-        assert len(TOOLS) == 80
-
-    def test_all_pack_tools_exist_in_tools_list(self):
-        from src.tools.registry import TOOLS, TOOL_PACKS
-        tool_names = {t["name"] for t in TOOLS}
-        for pack_name, pack_tools in TOOL_PACKS.items():
-            for tool_name in pack_tools:
-                assert tool_name in tool_names, f"{tool_name} from {pack_name} not in TOOLS"
 
 
 # ===================================================================
