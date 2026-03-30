@@ -234,7 +234,7 @@ _CONTINUATION_MSG = {
 }
 
 
-def _should_continue_task(text: str, tools_used: list[str], iteration: int) -> bool:
+def _should_continue_task(text: str, tools_used: list[str]) -> bool:
     """Decide if a text-only response is a mid-task checkpoint that should continue.
 
     Uses structural signals rather than pure regex: the text should be short
@@ -2015,7 +2015,7 @@ class HeimdallBot(discord.Client):
                 if (
                     tools_used_in_loop
                     and continuation_count < max_continuations
-                    and _should_continue_task(llm_resp.text or "", tools_used_in_loop, iteration)
+                    and _should_continue_task(llm_resp.text or "", tools_used_in_loop)
                 ):
                     log.info(
                         "Mid-task continuation (%d/%d) after %d tool calls — "
@@ -3487,7 +3487,7 @@ class HeimdallBot(discord.Client):
                 file_callback=_skill_file,
             )
 
-        # --- Executor-routed tools (run_command, check_disk, SSH, etc.) ---
+        # --- Executor-routed tools (run_command, run_script, SSH, etc.) ---
         return await self.tool_executor.execute(tool_name, tool_input, user_id=user_id)
 
     async def _handle_read_channel(self, message: discord.Message, inp: dict) -> str:

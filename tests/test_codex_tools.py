@@ -161,13 +161,13 @@ class TestConvertTools:
     def test_multiple_tools(self):
         """Converts multiple tools."""
         tools = [
-            {"name": "check_disk", "description": "Disk", "input_schema": {"type": "object", "properties": {}}},
-            {"name": "check_memory", "description": "Memory", "input_schema": {"type": "object", "properties": {}}},
-            {"name": "restart_service", "description": "Restart", "input_schema": {"type": "object", "properties": {}}},
+            {"name": "run_command", "description": "Run command", "input_schema": {"type": "object", "properties": {}}},
+            {"name": "read_file", "description": "Read file", "input_schema": {"type": "object", "properties": {}}},
+            {"name": "web_search", "description": "Search", "input_schema": {"type": "object", "properties": {}}},
         ]
         result = CodexChatClient._convert_tools(tools)
         assert len(result) == 3
-        assert [t["name"] for t in result] == ["check_disk", "check_memory", "restart_service"]
+        assert [t["name"] for t in result] == ["run_command", "read_file", "web_search"]
         assert all(t["type"] == "function" for t in result)
 
     def test_missing_description(self):

@@ -78,9 +78,9 @@ def _make_bot_stub():
     )
     # Tool definitions for testing
     stub._merged_tool_definitions = MagicMock(return_value=[
-        {"name": "check_disk", "description": "Check disk usage", "input_schema": {"type": "object", "properties": {"host": {"type": "string"}}}},
-        {"name": "check_service", "description": "Check service status", "input_schema": {"type": "object", "properties": {"host": {"type": "string"}, "service": {"type": "string"}}}},
-        {"name": "check_docker", "description": "Check Docker containers", "input_schema": {"type": "object", "properties": {"host": {"type": "string"}}}},
+        {"name": "run_command", "description": "Run a command on a host", "input_schema": {"type": "object", "properties": {"host": {"type": "string"}, "command": {"type": "string"}}}},
+        {"name": "read_file", "description": "Read a file on a host", "input_schema": {"type": "object", "properties": {"host": {"type": "string"}, "path": {"type": "string"}}}},
+        {"name": "web_search", "description": "Search the web", "input_schema": {"type": "object", "properties": {"query": {"type": "string"}}}},
     ])
     stub.permissions = MagicMock()
     stub.permissions.is_guest = MagicMock(return_value=False)

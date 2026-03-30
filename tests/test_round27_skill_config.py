@@ -427,7 +427,6 @@ class TestSkillContextConfig:
         executor = MagicMock()
         executor.config = MagicMock()
         executor.config.hosts = {}
-        executor.config.allowed_
         return SkillContext(
             executor, "test_skill",
             skill_config=config,

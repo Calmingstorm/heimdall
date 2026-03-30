@@ -585,8 +585,6 @@ class TestSystemPromptPerUserMemory:
         host_mock.ssh_user = "root"
         host_mock.address = "10.0.0.2"
         stub.config.tools.hosts = {"desktop": host_mock}
-        stub.config.tools.allowed_
-        stub.config.tools.allowed_
         stub.context_loader.context = "Context."
         stub.voice_manager = None
         stub.tool_executor._load_memory_for_user = MagicMock(

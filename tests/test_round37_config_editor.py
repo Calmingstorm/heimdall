@@ -137,10 +137,7 @@ def _make_bot(config_dict=None):
                 "enabled": True,
                 "ssh_key_path": "••••••••",
                 "hosts": {"local": {"address": "localhost", "os": "linux"}},
-                "allowed_services": ["nginx"],
-                "ansible_directory": "",
-                "timeouts": {"default": 300},
-                "tool_packs": ["systemd"],
+                "command_timeout_seconds": 300,
             },
             "logging": {"level": "INFO", "directory": "data/logs"},
             "usage": {"directory": "data/usage"},
@@ -242,7 +239,7 @@ class TestConfigGetEndpoint:
             resp = await client.get("/api/config")
             body = await resp.json()
             assert "hosts" in body["tools"]
-            assert "timeouts" in body["tools"]
+            assert "command_timeout_seconds" in body["tools"]
 
 
 class TestConfigPutEndpoint:
@@ -1179,10 +1176,10 @@ class TestEdgeCases:
 
     def test_compute_diff_array_change(self):
         diff = computeDiff(
-            {"tools": {"tool_packs": ["systemd"]}},
-            {"tools": {"tool_packs": ["systemd", "incus"]}},
+            {"discord": {"channels": ["general"]}},
+            {"discord": {"channels": ["general", "ops"]}},
         )
-        assert diff == {"tools": {"tool_packs": ["systemd", "incus"]}}
+        assert diff == {"discord": {"channels": ["general", "ops"]}}
 
     def test_validate_field_no_max(self):
         """Rule with min but no max should pass large values."""

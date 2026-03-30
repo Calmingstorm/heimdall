@@ -176,11 +176,11 @@ class SkillContext:
         if not hosts:
             return "No hosts configured to reach Prometheus."
         host = hosts[0]
-        import shlex
-        safe_query = shlex.quote(query)
+        from urllib.parse import quote as url_quote
+        encoded_query = url_quote(query)
         return await self._executor.execute("run_command", {
             "host": host,
-            "command": f"curl -sf 'http://localhost:9090/api/v1/query?query={safe_query}'",
+            "command": f"curl -sf 'http://localhost:9090/api/v1/query?query={encoded_query}'",
         })
 
     async def read_file(self, host: str, path: str, lines: int = 200) -> str:

@@ -215,8 +215,8 @@ class TestAgentFullLifecycle:
             _make_llm_response(
                 text="Checking multiple things...",
                 tool_calls=[
-                    {"name": "run_command", "input": {"command": "df -h"}},
-                    {"name": "check_service", "input": {"service": "nginx"}},
+                    {"name": "run_command", "input": {"host": "server", "command": "df -h"}},
+                    {"name": "read_file", "input": {"host": "server", "path": "/etc/hostname"}},
                 ],
             ),
             _make_llm_response(text="Disk is fine and nginx is running."),
@@ -231,7 +231,7 @@ class TestAgentFullLifecycle:
             iteration_callback=_make_iteration_cb(responses),
             tool_executor_callback=_make_tool_exec_cb({
                 "run_command": "50% used",
-                "check_service": "active (running)",
+                "read_file": "server-01",
             }),
             announce_callback=announce,
         )
@@ -240,7 +240,7 @@ class TestAgentFullLifecycle:
         r = results[agent_id]
         assert r["status"] == "completed"
         assert "run_command" in r["tools_used"]
-        assert "check_service" in r["tools_used"]
+        assert "read_file" in r["tools_used"]
 
     async def test_agent_tool_error_continues(self):
         """Agent continues iterating even when a tool raises an error."""
