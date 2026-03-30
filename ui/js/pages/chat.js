@@ -35,14 +35,11 @@ const TOOL_ICONS = {
   search_knowledge: '\uD83D\uDD0D', ingest_document: '\uD83D\uDCDA',
   generate_image: '\uD83C\uDFA8', analyze_image: '\uD83D\uDDBC\uFE0F',
   analyze_pdf: '\uD83D\uDCC3', browser_screenshot: '\uD83C\uDF10',
-  manage_process: '\u2699\uFE0F', check_service: '\uD83D\uDCCA',
+  manage_process: '\u2699\uFE0F',
 };
 
 function getToolIcon(name) {
   if (TOOL_ICONS[name]) return TOOL_ICONS[name];
-  if (name.startsWith('incus_')) return '\uD83D\uDCE6';
-  if (name.startsWith('systemd_')) return '\u2699\uFE0F';
-  if (name.startsWith('prometheus_')) return '\uD83D\uDCCA';
   return '\uD83D\uDD27';
 }
 

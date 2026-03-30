@@ -324,8 +324,9 @@ def detect_tool_unavailable(text: str, tools_used: list[str]) -> bool:
 _TOOL_UNAVAIL_RETRY_MSG = {
     "role": "developer",
     "content": (
-        "Every tool in your tool list is available. Call the "
-        "tool instead of claiming it's unavailable."
+        "STOP. Every tool in your tool list is available and enabled. "
+        "Do NOT claim tools are disabled, unavailable, or unsupported. "
+        "Call the tool NOW — if it fails, you'll get an error you can work with."
     ),
 }
 

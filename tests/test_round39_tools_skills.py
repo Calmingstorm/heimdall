@@ -312,9 +312,6 @@ class TestToolCategories:
     def test_has_system_category(self, tools_js):
         assert "'system'" in tools_js
 
-    def test_has_infra_category(self, tools_js):
-        assert "'infra'" in tools_js
-
     def test_has_network_category(self, tools_js):
         assert "'network'" in tools_js
 
@@ -335,7 +332,6 @@ class TestToolCategories:
 
     def test_categories_have_labels(self, tools_js):
         assert "'System & Commands'" in tools_js
-        assert "'Infrastructure'" in tools_js
         assert "'Network & Web'" in tools_js
 
     def test_categories_have_icons(self, tools_js):

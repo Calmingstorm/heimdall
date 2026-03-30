@@ -9,13 +9,12 @@ No classifier, no approval prompts, no hesitation.
 
 ## Features
 
-- **80 built-in tools** — SSH, Ansible, Incus, Prometheus, browser automation, scheduling, knowledge base, autonomous loops, and more
+- **61 built-in tools** — SSH, browser automation, scheduling, knowledge base, autonomous loops, skills, agents, and more
 - **Autonomous execution** — every message gets Codex with full tool access, no classification or approval needed
 - **Two-tier execution** — Codex handles direct tools, delegates complex multi-step tasks to Claude Code CLI
 - **Direct local execution** — localhost commands use subprocess directly (no SSH overhead)
 - **Extensible skill system** — create custom tools at runtime via Discord, with a Python API for SSH, HTTP, memory, and scheduling
 - **RAG knowledge base** — local embeddings (fastembed) + sqlite-vec + SQLite FTS5 hybrid search with reciprocal rank fusion (no external servers)
-- **Tool packs** — infrastructure tools (systemd, Incus, Ansible, Prometheus, ComfyUI) are opt-in via config
 - **PDF analysis** — extract text from PDF files and Discord attachments via PyMuPDF
 - **Image analysis** — proactive image analysis via LLM vision
 - **Image generation** — text-to-image via ComfyUI API (optional)
@@ -23,7 +22,7 @@ No classifier, no approval prompts, no hesitation.
 - **Process management** — start, poll, write stdin to, and kill background processes
 - **Voice support** — join voice channels, transcribe speech, respond with TTS (optional GPU sidecar)
 - **Browser automation** — take screenshots, read pages, click elements, fill forms via headless Chromium
-- **Background tasks** — delegate long-running operations, track progress with embeds
+- **Background tasks** — delegate long-running operations to background workers
 - **Webhook receiver** — Gitea push/PR events, Grafana alerts, generic JSON webhooks
 - **Anti-fabrication** — detects and retries when the LLM fabricates command output
 - **Anti-hedging** — detects and retries "shall I?" / "would you like?" hesitation (bot-to-bot)
@@ -114,9 +113,6 @@ Every Discord message
       ├── GENERATION: generate_image (ComfyUI), generate_file
       └── LOOPS: start_loop, stop_loop, list_loops (autonomous recurring tasks)
 
-Tool packs (opt-in infrastructure tools):
-  systemd(3), incus(11), ansible(1), prometheus(4), comfyui(1)
-  Empty config = all 61 tools loaded (backward compatible)
 ```
 
 No classifier. No routing. No approval buttons. Tools are capabilities, not suggestions.
@@ -180,8 +176,8 @@ src/
 │   ├── circuit_breaker.py  # Health tracking for LLM backends
 │   └── types.py            # Backend-agnostic LLMResponse and ToolCall types
 ├── tools/
-│   ├── registry.py         # 80 tool definitions + 5 tool packs
-│   ├── executor.py         # Tool execution (local subprocess, SSH, Prometheus, Incus, etc.)
+│   ├── registry.py         # 61 tool definitions
+│   ├── executor.py         # Tool execution (local subprocess, SSH)
 │   ├── ssh.py              # SSH + local subprocess dispatch (is_local_address, run_local_command, run_ssh_command)
 │   ├── tool_memory.py      # Per-tool learning from past executions
 │   ├── skill_manager.py    # Runtime skill loading from Python files
@@ -231,7 +227,7 @@ Heimdall includes a browser-based management interface at `http://host:3939/ui/`
 - **Dashboard** — bot status, uptime, connected guilds, quick stats, recent activity
 - **Chat** — web-based chat interface with real-time WebSocket communication
 - **Sessions** — view active conversations, message history, clear sessions
-- **Tools** — browse all 61 tools, toggle tool packs on/off
+- **Tools** — browse all 61 tools, search and filter by category
 - **Skills** — create, edit, delete runtime skills with a code editor
 - **Knowledge** — browse, search, ingest, and delete knowledge base documents
 - **Schedules** — manage cron jobs, one-time tasks, and webhook-triggered tasks
@@ -282,7 +278,7 @@ The config file uses `${VAR}` for required env vars and `${VAR:-default}` for op
 - **`timezone`** — IANA timezone string (default: `"UTC"`)
 - **`discord`** — token, allowed users/channels, `respond_to_bots`, `require_mention`
 - **`openai_codex`** — enable/disable, model, credentials path
-- **`tools`** — SSH keys, hosts, services, playbooks, timeout settings, host aliases for Prometheus/Ansible/Claude Code/Incus
+- **`tools`** — SSH keys, hosts, timeout settings, host aliases for Claude Code/Incus
 - **`webhook`** — enable/disable, channel routing for Gitea and Grafana
 - **`search`** — search DB path (SQLite for embeddings + FTS)
 - **`voice`** — enable/disable, service URL, wake word
@@ -315,18 +311,20 @@ discord:
 | Category | Tools | Examples |
 |----------|-------|---------|
 | Command Execution | 3 | run_command, run_command_multi, run_script |
+| File Operations | 3 | read_file, write_file, post_file |
 | Browser | 6 | browser_screenshot, browser_read_page, browser_click, browser_fill |
 | Knowledge Base | 4 | search_knowledge, ingest_document, list_knowledge, delete_knowledge |
 | Scheduling | 3 | schedule_task, list_schedules, delete_schedule |
-| Skills | 4 | create_skill, edit_skill, delete_skill, list_skills |
-| File Operations | 3 | read_file, write_file, post_file |
+| Skills | 9 | create_skill, edit_skill, delete_skill, list_skills, enable_skill, install_skill, export_skill, skill_status |
+| Agents | 8 | spawn_agent, send_to_agent, list_agents, kill_agent, get_agent_results, wait_for_agents |
+| Autonomous Loops | 3 | start_loop, stop_loop, list_loops |
+| Background Tasks | 3 | delegate_task, list_tasks, cancel_task |
 | Web | 2 | web_search, fetch_url |
 | Deep Reasoning | 1 | claude_code |
-| Background Tasks | 3 | delegate_task, list_tasks, cancel_task |
 | PDF & Images | 3 | analyze_pdf, analyze_image, generate_image (ComfyUI) |
 | Rich Discord | 2 | add_reaction, create_poll |
-| Process Mgmt | 1 | manage_process (start/poll/write/kill/list) |
-| Other | 7+ | purge_messages, parse_time, memory_manage, search_history, search_audit, create_digest, manage_list |
+| Process Mgmt | 2 | manage_process, manage_list |
+| Other | 9 | purge_messages, read_channel, generate_file, parse_time, memory_manage, search_history, search_audit, create_digest, set_permission |
 
 All tools execute immediately when called. No approval prompts, no confirmation buttons.
 
@@ -380,7 +378,7 @@ Skills receive a `SkillContext` object with these methods:
 | `remember(key, value)` | Persistent memory (survives restarts) |
 | `recall(key)` | Retrieve persistent memory |
 | `get_hosts()` | List configured host aliases |
-| `get_services()` | List allowed services |
+| `get_services()` | List allowed services (returns empty — systemd tools removed) |
 | `schedule_task(desc, action, channel)` | Schedule a task |
 | `list_schedules()` | List scheduled tasks |
 | `delete_schedule(id)` | Delete a scheduled task |

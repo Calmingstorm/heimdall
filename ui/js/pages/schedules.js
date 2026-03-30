@@ -95,7 +95,7 @@ export default {
           <div>
             <label class="text-gray-400 text-xs block mb-1">Tool Name</label>
             <input v-model="form.tool_name" type="text" class="hm-input"
-                   placeholder="e.g. check_disk" />
+                   placeholder="e.g. run_command" />
           </div>
           <div>
             <label class="text-gray-400 text-xs block mb-1">Tool Input (JSON)</label>

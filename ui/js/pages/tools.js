@@ -23,7 +23,6 @@ function sparklineSVG(values, width, height, color) {
 /** Category mapping for tools — groups tools by functional area */
 const TOOL_CATEGORIES = [
   { id: 'system', label: 'System & Commands', icon: '\u{1F5A5}', match: n => /^(run_command|run_script|read_file|write_file|list_directory|search_files|manage_process|file_)/.test(n) },
-  { id: 'infra', label: 'Infrastructure', icon: '\u{1F3D7}', match: n => /^(check_|systemd_|incus_|ansible_|prometheus_)/.test(n) },
   { id: 'network', label: 'Network & Web', icon: '\u{1F310}', match: n => /^(web_|browser_|search_web|fetch_url|http_)/.test(n) },
   { id: 'knowledge', label: 'Knowledge & Search', icon: '\u{1F4DA}', match: n => /^(search_knowledge|ingest_|knowledge_)/.test(n) },
   { id: 'discord', label: 'Discord', icon: '\u{1F4AC}', match: n => /^(send_|post_|add_reaction|create_poll|purge_|discord_|embed_)/.test(n) },
