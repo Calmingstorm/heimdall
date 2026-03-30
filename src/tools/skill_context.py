@@ -252,11 +252,11 @@ class SkillContext:
         params: dict | None = None,
         timeout: int = 15,
         headers: dict[str, str] | None = None,
-    ) -> dict | list | str:
-        """Perform an HTTP GET request. Auto-parses JSON responses, otherwise returns string.
+    ) -> dict | list | str | bytes:
+        """Perform an HTTP GET request. Auto-parses JSON, returns bytes for binary content.
 
         Custom headers can be passed via *headers*. By default ``Accept: application/json``
-        is included unless overridden.
+        is included unless overridden. Binary content types (image/*, video/*) return raw bytes.
         """
         if is_url_blocked(url):
             self._log.warning("Skill attempted blocked URL: %s", url)
@@ -275,6 +275,11 @@ class SkillContext:
                 ct = resp.content_type or ""
                 if "json" in ct:
                     return await resp.json()
+                # Return raw bytes for binary content (images, gifs, etc.)
+                if ct.startswith(("image/", "application/octet-stream", "video/")):
+                    data = await resp.read()
+                    self._tracker.bytes_downloaded += len(data)
+                    return data
                 text = await resp.text()
                 self._tracker.bytes_downloaded += len(text.encode())
                 try:
