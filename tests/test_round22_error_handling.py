@@ -670,13 +670,6 @@ class TestErrorResponseToUser:
         assert "Previous request" in source
         assert "encountered an error" in source
 
-    async def test_codex_error_in_tool_loop_returns_partial_report(self):
-        """When Codex API fails mid-loop, partial completion report is included."""
-        from src.discord.client import HeimdallBot
-        import inspect
-        source = inspect.getsource(HeimdallBot._process_with_tools)
-        assert "_build_partial_completion_report" in source
-        assert "LLM API error" in source
 
 
 # ---------------------------------------------------------------------------

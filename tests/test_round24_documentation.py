@@ -217,7 +217,6 @@ class TestReadmeSecurity:
 
     def test_input_validation_mentioned(self):
         assert "read_file" in self.readme
-        assert "incus_exec" in self.readme
 
     def test_prompt_injection_mentioned(self):
         assert "prompt injection" in self.readme.lower()

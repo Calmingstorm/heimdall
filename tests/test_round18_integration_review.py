@@ -133,47 +133,6 @@ class TestCircuitBreakerWithCancel:
 # Cross-feature: Per-Tool Timeout + Progress Embed (R12 + R9)
 # ---------------------------------------------------------------------------
 
-class TestTimeoutWithProgressEmbed:
-    """Verify that tool timeouts produce correct progress embed updates."""
-
-    async def test_timeout_step_still_marked_done(self):
-        """When a tool times out, the step is still marked 'done' in progress
-        (the timeout error is returned as a tool result, not an exception)."""
-        stub = _make_bot_stub()
-        stub.config.tools.tool_timeout_seconds = 0.01
-        msg = _make_message()
-
-        async def slow_execute(*a, **kw):
-            await asyncio.sleep(10)
-            return "should not reach"
-
-        stub.tool_executor.execute = AsyncMock(side_effect=slow_execute)
-
-        call_count = 0
-
-        async def fake_chat(**kw):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return _tool_resp("Checking.", [_tool_call("check_disk", "tc1")])
-            else:
-                return _tool_resp("The check timed out.")
-
-        stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
-
-        text, _, is_error, tools_used, _ = await HeimdallBot._process_with_tools(
-            stub, msg, [], system_prompt_override="test",
-        )
-
-        assert is_error is False
-        assert "timed out" in text.lower()
-        assert tools_used == ["check_disk"]
-
-        # Verify embed was updated
-        embed_msg = msg.channel.send.return_value
-        assert embed_msg.edit.called
-
-
 # ---------------------------------------------------------------------------
 # Cross-feature: Error → Checkpoint → Continuity (R14 + R13)
 # ---------------------------------------------------------------------------

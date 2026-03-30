@@ -69,12 +69,7 @@ tools:
       address: "10.0.0.2"
       ssh_user: "root"
       os: "linux"
-  allowed_services:
-    - nginx
-    - postgresql
-    - docker
-  allowed_playbooks:
-    - check-services.yml
+  command_timeout_seconds: 300
 ```
 
 ### 3. Set up SSH keys
@@ -112,7 +107,7 @@ python -m src
 Every Discord message
   → Codex (with 61 tools + personality in system prompt)
       ├── CHAT: Codex responds directly with personality
-      ├── SIMPLE TASK: Codex calls tools directly (run_command, check_disk, web_search, etc.)
+      ├── SIMPLE TASK: Codex calls tools directly (run_command, web_search, read_file, etc.)
       ├── COMPLEX TASK: Codex delegates to claude -p via claude_code tool
       ├── DISCORD OPS: post_file, browser_screenshot, embeds, polls, reactions
       ├── ANALYSIS: analyze_pdf, analyze_image (vision), search_knowledge
@@ -153,7 +148,7 @@ Tool handler → _run_on_host(alias) → _exec_command(address, cmd, ...)
 
 - **10 secret patterns** detected and scrubbed: passwords, API keys, OpenAI sk-, RSA/DSA private keys, DB URIs, GitHub tokens (ghp_/gho_/ghu_/ghs_/ghr_), AWS AKIA, Stripe sk_live_, Slack xox*
 - Scrubbing runs at 9+ locations: LLM responses, error messages, monitor alerts, webhook payloads, knowledge search results, digest output, scheduled tasks, workflow results, skill callbacks
-- Input validation: read_file line limits, incus_exec command quoting, script base64 encoding, interpreter allowlist
+- Input validation: read_file line limits, script base64 encoding, interpreter allowlist
 - Context separator + role architecture prevent prompt injection
 
 ### Tool Loop
@@ -319,11 +314,7 @@ discord:
 
 | Category | Tools | Examples |
 |----------|-------|---------|
-| System Monitoring | 4 | check_service, check_disk, check_memory, check_logs |
 | Command Execution | 3 | run_command, run_command_multi, run_script |
-| Ansible | 1 | run_ansible_playbook |
-| Prometheus | 2 | query_prometheus, query_prometheus_range |
-| Incus | 11 | incus_list, incus_exec, incus_snapshot, incus_launch |
 | Browser | 6 | browser_screenshot, browser_read_page, browser_click, browser_fill |
 | Knowledge Base | 4 | search_knowledge, ingest_document, list_knowledge, delete_knowledge |
 | Scheduling | 3 | schedule_task, list_schedules, delete_schedule |
@@ -376,7 +367,7 @@ Skills receive a `SkillContext` object with these methods:
 | Method | Description |
 |--------|-------------|
 | `await run_on_host(alias, command)` | Execute command on a configured host (local subprocess or SSH) |
-| `await query_prometheus(query)` | Run a PromQL query |
+| `await query_prometheus(query)` | Run a PromQL query via curl |
 | `await read_file(host, path)` | Read a remote file |
 | `await http_get(url)` | HTTP GET request |
 | `await http_post(url, json=...)` | HTTP POST request |

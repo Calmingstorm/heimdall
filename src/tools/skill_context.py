@@ -167,8 +167,21 @@ class SkillContext:
         return await self._executor._run_on_host(alias, command)
 
     async def query_prometheus(self, query: str) -> str:
-        """Run a PromQL instant query against Prometheus. Returns raw JSON."""
-        return await self._executor.execute("query_prometheus", {"query": query})
+        """Run a PromQL instant query against Prometheus via curl.
+
+        Requires Prometheus to be reachable from a configured host.
+        """
+        # Use run_command with curl since the dedicated query_prometheus tool was removed.
+        hosts = list(self._executor.config.hosts.keys())
+        if not hosts:
+            return "No hosts configured to reach Prometheus."
+        host = hosts[0]
+        import shlex
+        safe_query = shlex.quote(query)
+        return await self._executor.execute("run_command", {
+            "host": host,
+            "command": f"curl -sf 'http://localhost:9090/api/v1/query?query={safe_query}'",
+        })
 
     async def read_file(self, host: str, path: str, lines: int = 200) -> str:
         """Read a file from a managed host. Returns file content."""

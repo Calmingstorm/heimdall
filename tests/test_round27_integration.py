@@ -71,12 +71,12 @@ def _make_bot(*, config_dump=None):
 
     dump = config_dump or {
         "discord": {"token": "secret"},
-        "tools": {"tool_packs": []},
+        "tools": {},
         "web": {"api_token": "", "enabled": True},
     }
     bot.config = MagicMock()
     bot.config.model_dump = MagicMock(return_value=dump)
-    bot.config.tools.
+
 
     bot._merged_tool_definitions = MagicMock(return_value=[
         {"name": "run_command", "description": "Run", "input_schema": {}},

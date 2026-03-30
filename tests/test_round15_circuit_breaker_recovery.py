@@ -57,7 +57,6 @@ def _make_bot_stub():
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
-    stub._should_continue_task = HeimdallBot._should_continue_task
     return stub
 
 

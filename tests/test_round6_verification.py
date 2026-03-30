@@ -121,7 +121,6 @@ def local_claude_config(tmp_dir: Path) -> ToolsConfig:
         hosts={
             "localbox": ToolHost(address="127.0.0.1", ssh_user="root", os="linux"),
         },
-        allowed_,
         command_timeout_seconds=30,
         claude_code_host="localbox",
         claude_code_user="claude",

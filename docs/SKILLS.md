@@ -215,7 +215,7 @@ all_config = context.get_all_config()  # {"threshold": 80, ...}
 
 ```python
 # Execute a safe built-in tool
-result = await context.execute_tool("check_disk", {"host": "webserver"})
+result = await context.execute_tool("web_search", {"query": "python asyncio tutorial"})
 result = await context.execute_tool("web_search", {"query": "python asyncio"})
 ```
 
@@ -230,34 +230,24 @@ context.log("ERROR: connection timeout")
 
 ## Safe Tools
 
-Skills can call these 47 built-in tools via `execute_tool()`:
+Skills can call these built-in tools via `execute_tool()`:
 
-**System Monitoring**: check_service, check_docker, check_disk, check_memory, check_logs
+**File**: read_file
 
-**File & Docker**: read_file, docker_logs, docker_compose_status, docker_stats
-
-**Prometheus**: query_prometheus, query_prometheus_range
-
-**Knowledge**: search_knowledge, list_knowledge, ingest_document
+**Knowledge**: search_knowledge, list_knowledge
 
 **Web**: web_search, fetch_url, browser_screenshot, browser_read_page, browser_read_table
 
 **History & Audit**: search_history, search_audit
 
-**Git**: git_status, git_log, git_diff, git_show
-
-**Incus**: incus_list, incus_info, incus_snapshot_list, incus_logs
-
-**Scheduling**: list_schedules
-
-**Skills**: list_skills
+**Scheduling**: list_schedules, list_skills, list_tasks
 
 **Memory**: memory_manage
 
-**Other**: parse_time, list_tasks
+**Other**: parse_time
 
-Write operations (run_command, write_file, restart_service, etc.) are blocked
-for security. Use `run_on_host()` for direct command execution instead.
+Write operations (run_command, write_file, etc.) are blocked for security.
+Use `run_on_host()` for direct command execution instead.
 
 ## Sandbox Limits
 

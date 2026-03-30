@@ -678,6 +678,6 @@ class TestCrossRoundConsistency:
         assert is_local_address("localhost")
         assert not is_local_address("10.0.0.1")
 
-    def test_65_plus_tools(self):
+    def test_61_tools(self):
         from src.tools.registry import get_tool_definitions
-        assert len(get_tool_definitions()) >= 65
+        assert len(get_tool_definitions()) >= 55

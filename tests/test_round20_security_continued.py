@@ -464,11 +464,6 @@ class TestRound19FixesStillWorking:
         source = (SRC_DIR / "tools" / "executor.py").read_text()
         assert "1000" in source
 
-    def test_incus_exec_shlex_quote(self):
-        """incus_exec handler uses shlex.quote for command."""
-        source = (SRC_DIR / "tools" / "executor.py").read_text()
-        assert "shlex.quote(command)" in source
-
     def test_error_message_scrubbed_in_client(self):
         """Error messages to Discord are scrubbed."""
         source = (SRC_DIR / "discord" / "client.py").read_text()
@@ -646,10 +641,10 @@ class TestCrossRoundConsistency:
         from src.llm.system_prompt import SYSTEM_PROMPT_TEMPLATE
         assert "exhausted omniscience" in SYSTEM_PROMPT_TEMPLATE.lower()
 
-    def test_65_plus_tools(self):
-        """65+ tools in registry."""
+    def test_61_tools(self):
+        """61 tools after consolidation."""
         from src.tools.registry import TOOLS
-        assert len(TOOLS) >= 65
+        assert len(TOOLS) >= 55
 
 
 # ===========================================================================

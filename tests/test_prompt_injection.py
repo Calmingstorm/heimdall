@@ -38,8 +38,6 @@ def _make_bot_stub(**overrides):
     host_mock.ssh_user = "root"
     host_mock.address = "10.0.0.2"
     stub.config.tools.hosts = {"desktop": host_mock}
-    stub.config.tools.allowed_
-    stub.config.tools.allowed_
 
     # Context loader
     stub.context_loader.context = "Test infra context."
@@ -467,17 +465,6 @@ class TestBaseTemplateContent:
         stub = _make_bot_stub()
         prompt = stub._build_system_prompt()
         assert "`desktop`: root@10.0.0.2" in prompt
-
-    def test_full_prompt_includes_services(self):
-        stub = _make_bot_stub()
-        prompt = stub._build_system_prompt()
-        assert "`nginx`" in prompt
-        assert "`docker`" in prompt
-
-    def test_full_prompt_includes_playbooks(self):
-        stub = _make_bot_stub()
-        prompt = stub._build_system_prompt()
-        assert "`update.yml`" in prompt
 
     def test_full_prompt_includes_context(self):
         stub = _make_bot_stub()

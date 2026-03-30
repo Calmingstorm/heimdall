@@ -383,7 +383,7 @@ class TestToolCallLimit:
         return SkillContext(executor, "test_skill", resource_tracker=tracker)
 
     async def test_tool_calls_exceeded(self, context: SkillContext):
-        result = await context.execute_tool("check_disk", {"host": "server"})
+        result = await context.execute_tool("read_file", {"host": "server", "path": "/tmp/test"})
         assert "limit" in result.lower()
         assert str(MAX_SKILL_TOOL_CALLS) in result
 
@@ -393,7 +393,7 @@ class TestToolCallLimit:
         tracker = ResourceTracker(tool_calls=0)
         ctx = SkillContext(executor, "test_skill", resource_tracker=tracker)
         mock_exec.return_value = "ok"
-        result = await ctx.execute_tool("check_disk", {"host": "server"})
+        result = await ctx.execute_tool("read_file", {"host": "server", "path": "/tmp/test"})
         assert result == "ok"
         assert tracker.tool_calls == 1
 
@@ -484,8 +484,8 @@ class TestResourceTrackerInContext:
         tracker = ResourceTracker()
         ctx = SkillContext(executor, "test_skill", resource_tracker=tracker)
         mock_exec.return_value = "ok"
-        await ctx.execute_tool("check_disk", {"host": "server"})
-        await ctx.execute_tool("check_memory", {"host": "server"})
+        await ctx.execute_tool("read_file", {"host": "server", "path": "/tmp/a"})
+        await ctx.execute_tool("search_knowledge", {"query": "test"})
         assert tracker.tool_calls == 2
 
 

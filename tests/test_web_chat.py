@@ -57,10 +57,9 @@ def _make_chat_bot(*, codex_available=True, process_result=None):
     bot.config = MagicMock()
     bot.config.model_dump = MagicMock(return_value={
         "discord": {"token": "secret"},
-        "tools": {"tool_packs": []},
+        "tools": {},
         "web": {"api_token": "", "enabled": True},
     })
-    bot.config.tools.
     bot.config.tools.enabled = True
     bot.config.tools.tool_timeout_seconds = 60
     bot.config.discord.respond_to_bots = False

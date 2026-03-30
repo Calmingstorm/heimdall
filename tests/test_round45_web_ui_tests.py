@@ -90,10 +90,9 @@ def _make_bot():
     bot.config = MagicMock()
     bot.config.model_dump = MagicMock(return_value={
         "discord": {"token": "xyzzy-secret", "channels": ["general"]},
-        "tools": {"ssh_key_path": "/key", "tool_packs": []},
+        "tools": {"ssh_key_path": "/key"},
         "web": {"api_token": "tok", "enabled": True},
     })
-    bot.config.tools.
     bot.config.web.api_token = "test-token"
 
     bot._merged_tool_definitions = MagicMock(return_value=[

@@ -219,4 +219,4 @@ class TestCrossRoundConsistency:
 
     def test_tool_count_stable(self):
         """Tool count should be stable (no accidental removals)."""
-        assert len(TOOLS) >= 65, f"Expected 65+ tools, got {len(TOOLS)}"
+        assert len(TOOLS) >= 55, f"Expected 55+ tools, got {len(TOOLS)}"

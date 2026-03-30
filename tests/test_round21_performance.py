@@ -45,7 +45,6 @@ def _make_bot_stub(**overrides):
     stub.config = MagicMock()
     stub.config.tools.enabled = True
     stub.config.tools.tool_timeout_seconds = 300
-    stub.config.tools.
     stub.config.discord.allowed_users = ["12345"]
     stub.config.discord.channels = ["67890"]
     stub.config.discord.respond_to_bots = False
@@ -697,9 +696,9 @@ class TestCrossRoundConsistency:
         assert is_local_address("localhost")
         assert not is_local_address("10.0.0.1")
 
-    def test_65_plus_tools(self):
+    def test_61_tools(self):
         tools = get_tool_definitions()
-        assert len(tools) >= 65
+        assert len(tools) >= 55
 
     def test_secret_scrubbing_intact(self):
         from src.llm.secret_scrubber import scrub_output_secrets

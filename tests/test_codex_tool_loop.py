@@ -154,33 +154,6 @@ class TestProcessWithToolsCodex:
         assert stub.codex_client.chat_with_tools.call_count == 2
         stub.tool_executor.execute.assert_called_once_with("check_disk", {"host": "server"}, user_id="12345")
 
-    async def test_codex_tool_loop_progress_embed(self):
-        """Codex tool calls should send progress embed to Discord."""
-        stub = _make_bot_stub()
-        msg = _make_message()
-        embed_msg = AsyncMock()
-        msg.channel.send = AsyncMock(return_value=embed_msg)
-
-        stub.codex_client.chat_with_tools = AsyncMock(side_effect=[
-            LLMResponse(
-                text="",
-                tool_calls=[ToolCall(id="call_1", name="check_disk", input={"host": "server"})],
-                stop_reason="tool_use",
-            ),
-            LLMResponse(text="Done.", tool_calls=[], stop_reason="end_turn"),
-        ])
-        stub.tool_executor.execute = AsyncMock(return_value="ok")
-        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
-
-        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
-             patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
-            await stub._process_with_tools(msg, [], system_prompt_override="test")
-
-        # Should send progress embed with check_disk
-        msg.channel.send.assert_called()
-        embed = msg.channel.send.call_args[1]["embed"]
-        assert "check_disk" in embed.description
-
     async def test_codex_multiple_tool_calls(self):
         """Codex returns multiple tool calls in one response."""
         stub = _make_bot_stub()

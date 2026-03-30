@@ -701,7 +701,7 @@ class TestXSSPrevention:
         bot.infra_watcher = None
         bot.config = MagicMock()
         bot.config.web.api_token = ""
-        bot.config.tools.
+
 
         from src.web.api import setup_api
         setup_api(app, bot)

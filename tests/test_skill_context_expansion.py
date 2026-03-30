@@ -203,18 +203,18 @@ class TestDeleteSchedule:
 class TestExecuteTool:
     async def test_calls_executor(self, full_context):
         with patch.object(
-            full_context._executor, "execute", new_callable=AsyncMock, return_value="disk ok",
+            full_context._executor, "execute", new_callable=AsyncMock, return_value="file ok",
         ) as mock_exec:
-            result = await full_context.execute_tool("check_disk", {"host": "server"})
-            assert result == "disk ok"
-            mock_exec.assert_called_once_with("check_disk", {"host": "server"})
+            result = await full_context.execute_tool("read_file", {"host": "server", "path": "/tmp/test"})
+            assert result == "file ok"
+            mock_exec.assert_called_once_with("read_file", {"host": "server", "path": "/tmp/test"})
 
     async def test_default_empty_input(self, full_context):
         with patch.object(
             full_context._executor, "execute", new_callable=AsyncMock, return_value="ok",
         ) as mock_exec:
-            await full_context.execute_tool("check_memory")
-            mock_exec.assert_called_once_with("check_memory", {})
+            await full_context.execute_tool("search_knowledge")
+            mock_exec.assert_called_once_with("search_knowledge", {})
 
 
 # --- SkillManager.set_services wiring ---

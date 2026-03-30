@@ -107,8 +107,6 @@ def _make_bot_stub(*, respond_to_bots=False):
     stub.reflector = MagicMock()
     stub.reflector.get_prompt_section = MagicMock(return_value="")
     stub.voice_manager = None
-    # Use the real static method so continuation detection works correctly
-    stub._should_continue_task = HeimdallBot._should_continue_task
     return stub
 
 

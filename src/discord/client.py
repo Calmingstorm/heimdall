@@ -234,6 +234,25 @@ _CONTINUATION_MSG = {
 }
 
 
+def _should_continue_task(text: str, tools_used: list[str], iteration: int) -> bool:
+    """Decide if a text-only response is a mid-task checkpoint that should continue.
+
+    Uses structural signals rather than pure regex: the text should be short
+    (status update, not a complete answer), tools should have been called,
+    and the text should reference future actions or incomplete work.
+
+    Returns True if the loop should inject a continuation prompt instead of
+    exiting with this text as the final response.
+    """
+    if not text or not tools_used:
+        return False
+    # Long responses (>500 chars) are likely complete answers, not checkpoints
+    if len(text) > 500:
+        return False
+    # If no checkpoint patterns match, this is a genuine final answer
+    return _is_mid_task_checkpoint(text)
+
+
 def detect_fabrication(text: str, tools_used: list[str]) -> bool:
     """Detect if a text-only response fabricates tool results.
 
@@ -1125,11 +1144,7 @@ class HeimdallBot(discord.Client):
 
     async def on_ready(self) -> None:
         log.info("Logged in as %s (ID: %s)", self.user, self.user.id)
-        packs = self.config.tools.tool_packs
-        if packs:
-            log.info("Tool packs enabled: %s", ", ".join(packs))
-        else:
-            log.info("Tool packs: all tools loaded (no filtering)")
+        log.info("Tools loaded: %d definitions", len(get_tool_definitions()))
         # Prune stale sessions loaded from disk.  load() reads ALL persisted
         # session files regardless of age; pruning here removes expired ones
         # immediately instead of waiting for the first user message.
@@ -2000,7 +2015,7 @@ class HeimdallBot(discord.Client):
                 if (
                     tools_used_in_loop
                     and continuation_count < max_continuations
-                    and self._should_continue_task(llm_resp.text or "", tools_used_in_loop, iteration)
+                    and _should_continue_task(llm_resp.text or "", tools_used_in_loop, iteration)
                 ):
                     log.info(
                         "Mid-task continuation (%d/%d) after %d tool calls — "
@@ -2304,25 +2319,6 @@ class HeimdallBot(discord.Client):
                 return skill_output, False, False, tools_used_in_loop, True  # handoff=True
 
         return "Too many tool calls in sequence. Please try a simpler request.", False, True, tools_used_in_loop, False
-
-    @staticmethod
-    def _should_continue_task(text: str, tools_used: list[str], iteration: int) -> bool:
-        """Decide if a text-only response is a mid-task checkpoint that should continue.
-
-        Uses structural signals rather than pure regex: the text should be short
-        (status update, not a complete answer), tools should have been called,
-        and the text should reference future actions or incomplete work.
-
-        Returns True if the loop should inject a continuation prompt instead of
-        exiting with this text as the final response.
-        """
-        if not text or not tools_used:
-            return False
-        # Long responses (>500 chars) are likely complete answers, not checkpoints
-        if len(text) > 500:
-            return False
-        # If no checkpoint patterns match, this is a genuine final answer
-        return _is_mid_task_checkpoint(text)
 
     @staticmethod
     def _detect_image_type(data: bytes) -> str | None:
@@ -2717,18 +2713,16 @@ class HeimdallBot(discord.Client):
         tasks = []
         labels = []
 
-        # Disk + memory checks on all hosts
+        # Disk + memory checks on all hosts via run_command
         for host_alias in self.config.tools.hosts:
-            tasks.append(self.tool_executor.execute("check_disk", {"host": host_alias}))
+            tasks.append(self.tool_executor.execute(
+                "run_command", {"host": host_alias, "command": "df -h --exclude-type=tmpfs --exclude-type=devtmpfs"},
+            ))
             labels.append(f"Disk ({host_alias})")
-            tasks.append(self.tool_executor.execute("check_memory", {"host": host_alias}))
+            tasks.append(self.tool_executor.execute(
+                "run_command", {"host": host_alias, "command": "free -h"},
+            ))
             labels.append(f"Memory ({host_alias})")
-
-        # Prometheus firing alerts
-        tasks.append(self.tool_executor.execute(
-            "query_prometheus", {"query": "ALERTS{alertstate='firing'}"}
-        ))
-        labels.append("Prometheus Alerts")
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 

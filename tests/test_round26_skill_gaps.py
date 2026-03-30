@@ -515,7 +515,7 @@ class TestValidateSkillCode:
     def test_name_conflicts_with_builtin(self, skill_mgr: SkillManager):
         code = '''
 SKILL_DEFINITION = {
-    "name": "check_disk",
+    "name": "run_command",
     "description": "Conflicts with builtin",
     "input_schema": {"type": "object", "properties": {}},
 }

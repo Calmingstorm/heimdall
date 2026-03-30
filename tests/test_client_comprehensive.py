@@ -1509,7 +1509,7 @@ class TestFormatDigestRaw:
     """Tests for _format_digest_raw — data collection for digest."""
 
     async def test_format_digest_raw(self):
-        """Should collect disk, memory, and Prometheus data."""
+        """Should collect disk and memory data via run_command."""
         stub = _make_bot_stub()
         stub.config.tools.hosts = {"server": MagicMock(), "desktop": MagicMock()}
         stub.tool_executor.execute = AsyncMock(return_value="42% used")
@@ -1518,7 +1518,6 @@ class TestFormatDigestRaw:
         result = await stub._format_digest_raw()
         assert "Disk" in result
         assert "Memory" in result
-        assert "Prometheus" in result
 
     async def test_format_digest_with_exception(self):
         """Should handle tool execution errors in digest."""
