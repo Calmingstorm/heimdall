@@ -229,8 +229,7 @@ def _is_mid_task_checkpoint(text: str) -> bool:
 _CONTINUATION_MSG = {
     "role": "developer",
     "content": (
-        "Continue executing. Call the next tool(s) to complete the task. "
-        "The user wants the finished result, not a progress update."
+        "Continue executing the remaining steps with tool calls."
     ),
 }
 
@@ -2046,7 +2045,12 @@ class HeimdallBot(discord.Client):
                         continuation_count + 1, max_continuations,
                         len(tools_used_in_loop),
                     )
-                    messages.append({"role": "assistant", "content": llm_resp.text})
+                    # Do NOT append the checkpoint text as an assistant message.
+                    # If we do, Codex sees its own status update + a "continue"
+                    # correction, and responds with "You're right, I reran..."
+                    # By omitting it, Codex just sees tool results → continue
+                    # nudge → and naturally produces more tool calls without
+                    # acknowledging anything.
                     messages.append(_CONTINUATION_MSG)
                     continuation_count += 1
                     continue
