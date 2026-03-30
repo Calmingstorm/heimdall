@@ -6,7 +6,7 @@ Covers:
 - Config endpoint edge cases (PUT non-dict, response redaction, deep merge in API)
 - Dashboard quick actions (reload, clear-all, stop-all)
 - Sessions API (preview, export, bulk clear, source detection)
-- Tool/pack API (pack update, tool stats, packs endpoint)
+- Tool API (tool stats)
 - Knowledge API (search, ingest, reingest, delete)
 - Loop API (list with history, restart, stop)
 - Process API (list with preview, kill)

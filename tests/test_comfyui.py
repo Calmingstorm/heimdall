@@ -1,8 +1,8 @@
-"""Tests for ComfyUI image generation: client, handler, config, tool pack.
+"""Tests for ComfyUI image generation: client, handler, config, tool availability.
 
 Covers: successful generation, disabled config, ComfyUI unavailable,
 timeouts, poll loop, error handling, workflow construction, and
-tool pack membership.
+tool availability.
 """
 from __future__ import annotations
 
@@ -494,10 +494,10 @@ class TestHandleGenerateImage:
 
 
 # ---------------------------------------------------------------------------
-# Tool pack membership
+# Tool availability
 # ---------------------------------------------------------------------------
 
-class TestComfyUIToolPack:
+class TestComfyUIToolAvailability:
     """Tests for generate_image tool availability."""
 
     def test_generate_image_in_tools(self):

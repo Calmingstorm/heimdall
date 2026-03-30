@@ -20,8 +20,8 @@ Discord message → _process_with_tools()
 
 ## Execution Tiers
 
-**Tier 1 — Direct tools (Codex)**: 80 built-in tools for system commands, file ops,
-monitoring, knowledge base, scheduling, Discord operations. Fast, single-step actions.
+**Tier 1 — Direct tools (Codex)**: 61 built-in tools for system commands, file ops,
+knowledge base, scheduling, Discord operations. Fast, single-step actions.
 
 **Tier 2 — Deep reasoning (Claude Code CLI)**: Complex multi-step tasks delegated to
 `claude -p` via the `claude_code` tool. Code generation, repo analysis, debugging.
@@ -41,10 +41,9 @@ Tool handler → _exec_command(address, cmd, timeout, user)
     └── remote?                    → run_ssh_command()   [asyncssh]
 ```
 
-- 60 core tools always available
-- 20 pack tools in 5 opt-in packs: systemd(3), incus(11), ansible(1), prometheus(4), comfyui(1)
-- Discord-native tools (31) handled directly in client.py
-- Executor tools (50) dispatched via _exec_command in executor.py
+- 61 tools always available (no pack system — all tools active)
+- Discord-native tools handled directly in client.py
+- Executor tools dispatched via _exec_command in executor.py
 - User-created skills loaded from data/skills/*.py at runtime
 
 ## Session Management
@@ -127,7 +126,7 @@ Rate limited: 120 req/60s per IP. Security headers. CSRF protection.
 - Connection pooling: TCPConnector with keepalive=30s, limit=10
 - ZoneInfo cache: timezone objects cached to avoid repeated construction
 - Pre-compiled regex: hot-path patterns compiled once at module level
-- Tool→pack mapping: dict lookup instead of linear scan
+- Tool name→handler mapping: dict lookup instead of linear scan
 
 ## Security Model
 
@@ -169,8 +168,8 @@ src/
 ├── scheduler/        # Cron and one-time task scheduler
 ├── search/           # FTS5, sqlite-vec, hybrid search (RRF)
 ├── sessions/         # Conversation history with compaction
-├── tools/            # 80 tool definitions, executor, skills, browser
-│   ├── registry.py   # Tool definitions + 5 tool packs
+├── tools/            # 61 tool definitions, executor, skills, browser
+│   ├── registry.py   # Tool definitions
 │   ├── executor.py   # Tool execution dispatch
 │   ├── skill_manager.py  # Runtime skill loading
 │   └── skill_context.py  # Skill API surface

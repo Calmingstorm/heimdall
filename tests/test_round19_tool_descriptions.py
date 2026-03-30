@@ -86,7 +86,7 @@ class TestCrossReferences:
                 )
 
     def test_no_stale_docker_git_references(self):
-        """No descriptions reference removed docker/git pack tools."""
+        """No descriptions reference removed docker/git tools."""
         removed = {
             "check_docker", "docker_logs", "docker_compose_action",
             "docker_compose_status", "docker_compose_logs", "docker_stats",

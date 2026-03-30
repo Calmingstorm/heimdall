@@ -1,8 +1,8 @@
 """Cross-feature integration tests for the Heimdall Overhaul (Rounds 1-14).
 
-Covers: tool pack filtering with new tools, knowledge/session search
-with LocalEmbedder, FTS-only fallback mode, handler coverage,
-system prompt size, and protected detection code.
+Covers: tool availability, knowledge/session search with LocalEmbedder,
+FTS-only fallback mode, handler coverage, system prompt size, and
+protected detection code.
 """
 from __future__ import annotations
 

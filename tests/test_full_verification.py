@@ -211,7 +211,7 @@ class TestToolSystem:
         assert "fetch_url" in names
 
     def test_no_incus_tools_in_core(self):
-        """Incus tools were moved to tool packs (now removed)."""
+        """Incus tools were removed (shell-wrapper consolidation)."""
         from src.tools.registry import TOOLS
         incus_tools = [t for t in TOOLS if t["name"].startswith("incus_")]
         assert len(incus_tools) == 0
