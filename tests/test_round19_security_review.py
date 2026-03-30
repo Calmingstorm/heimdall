@@ -550,7 +550,7 @@ class TestContextSeparatorIntegrity:
         """Context separator instructs to evaluate available tools."""
         client_path = SRC_DIR / "discord" / "client.py"
         content = client_path.read_text()
-        assert "CURRENTLY AVAILABLE" in content
+        assert "Evaluate tools fresh" in content
 
     def test_separator_blocks_prior_refusals(self):
         """Context separator instructs not to repeat prior refusals."""

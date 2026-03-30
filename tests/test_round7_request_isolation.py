@@ -231,7 +231,7 @@ class TestAntiReExecution:
         ])
         await HeimdallBot._process_with_tools(stub, msg, history)
         sep = _get_separator(stub.codex_client.chat_with_tools.call_args_list)
-        assert "NOT re-execute" in sep or "Do NOT re-execute" in sep
+        assert "task queue" in sep or "Do task queue" in sep
 
     async def test_separator_marks_history_boundary(self):
         """Separator should clearly delineate history from request."""
@@ -264,7 +264,7 @@ class TestAntiReExecution:
         ])
         await HeimdallBot._process_with_tools(stub, msg, history)
         sep = _get_separator(stub.codex_client.chat_with_tools.call_args_list)
-        assert "confuse" in sep.lower() or "old context" in sep.lower()
+        assert "task queue" in sep.lower()
 
 
 # ===================================================================
@@ -398,7 +398,7 @@ class TestAdversarialScenarios:
         # Hash should be for the current message, not old ones
         assert f"req-{expected_hash}" in sep
         # Should still have anti-re-execution language
-        assert "NOT re-execute" in sep or "Do NOT re-execute" in sep
+        assert "task queue" in sep or "Do task queue" in sep
 
     async def test_similar_sounding_requests_different_hashes(self):
         """Similar but different requests should have different hashes."""
@@ -490,7 +490,7 @@ class TestRequestIsolationSource:
     def test_source_contains_anti_reexecution(self):
         import inspect
         src = inspect.getsource(HeimdallBot._process_with_tools)
-        assert "re-execute" in src.lower()
+        assert "task queue" in src.lower()
 
     def test_source_imports_hashlib(self):
         """client.py should import hashlib for request hashing."""

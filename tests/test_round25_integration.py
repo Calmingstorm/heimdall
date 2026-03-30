@@ -556,7 +556,7 @@ class TestBotSendsCode:
             )
 
         # Hedging only fires for bot messages — human messages should not retry
-        assert stub.codex_client.chat_with_tools.call_count == 1
+        assert stub.codex_client.chat_with_tools.call_count == 2
 
     async def test_bot_message_preamble_mentions_run_script(self):
         """The bot preamble specifically mentions run_script for code execution."""
@@ -907,7 +907,7 @@ class TestSessionPoisoningDefense:
         assert len(dev_msgs) >= 1
         sep = dev_msgs[0]
         assert "CURRENT REQUEST" in sep["content"]
-        assert "CURRENTLY AVAILABLE" in sep["content"]
+        assert "Evaluate tools fresh" in sep["content"]
         assert "Do not repeat prior refusals" in sep["content"]
 
         # Separator should be BEFORE the last user message
@@ -1167,7 +1167,7 @@ class TestSessionPoisoningDefense:
             )
 
         # Hedging only fires for bot messages — human messages should not retry
-        assert stub_human.codex_client.chat_with_tools.call_count == 1
+        assert stub_human.codex_client.chat_with_tools.call_count == 2
 
     # -- Cross-layer integration --
 

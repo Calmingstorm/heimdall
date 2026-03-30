@@ -459,7 +459,7 @@ class TestContextSeparator:
         from src.discord import client
         import inspect
         source = inspect.getsource(client.HeimdallBot._process_with_tools)
-        assert "CURRENTLY AVAILABLE" in source
+        assert "Evaluate tools fresh" in source
 
 
 # ---------------------------------------------------------------------------

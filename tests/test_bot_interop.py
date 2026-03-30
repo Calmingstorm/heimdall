@@ -381,8 +381,8 @@ class TestHedgingRetry:
         assert call_count == 3
 
     @pytest.mark.asyncio
-    async def test_hedging_no_retry_for_human_message(self):
-        """Human message + hedging response → no retry (hedging might be appropriate)."""
+    async def test_hedging_retries_for_human_message(self):
+        """Human message + hedging response → retry (Heimdall is an executor, not a menu)."""
         bot = _make_bot_stub(respond_to_bots=False)
         msg = _make_message(is_bot=False)
 
@@ -396,9 +396,8 @@ class TestHedgingRetry:
             bot, msg, [{"role": "user", "content": "check disk"}],
         )
 
-        # Should return the hedging text as-is — no retry for humans
-        assert text == "Would you like me to check the disk on server1?"
-        assert bot.codex_client.chat_with_tools.call_count == 1  # no hedging retry for human messages
+        # Should retry — hedging fires for all messages now
+        assert bot.codex_client.chat_with_tools.call_count == 2
 
     @pytest.mark.asyncio
     async def test_hedging_retry_still_hedges_returns_text(self):

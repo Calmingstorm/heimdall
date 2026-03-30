@@ -748,8 +748,8 @@ class TestBotHedgingRetryIntegration:
         assert call_count == 3  # hedge → tool → final
         assert "run_script" in tools_used
 
-    async def test_human_hedging_not_retried(self):
-        """Hedging on human messages is NOT retried (only bots trigger retry)."""
+    async def test_human_hedging_is_retried(self):
+        """Hedging on human messages IS retried — Heimdall is an executor, not a menu."""
         stub = _make_bot_stub(respond_to_bots=True)
         msg = _make_message(is_bot=False)
 
@@ -760,9 +760,8 @@ class TestBotHedgingRetryIntegration:
 
         history = [{"role": "user", "content": "restart nginx"}]
         text, _, _, tools_used, _ = await HeimdallBot._process_with_tools(stub, msg, history)
-        # Only one call — no retry for humans (hedging is bot-to-bot only)
-        assert stub.codex_client.chat_with_tools.call_count == 1
-        assert "Would you like" in text
+        # Two calls — hedging retry fires for humans too
+        assert stub.codex_client.chat_with_tools.call_count == 2
 
 
 # ---------------------------------------------------------------------------

@@ -216,7 +216,7 @@ class TestContextSeparatorInjection:
         assert len(developer_msgs) >= 1
         sep = developer_msgs[0]
         assert "CURRENT REQUEST" in sep["content"]
-        assert "CURRENTLY AVAILABLE" in sep["content"]
+        assert "Evaluate tools fresh" in sep["content"]
 
     async def test_no_full_separator_with_single_message(self):
         """Full separator should NOT be injected when history has only 1 message,
@@ -776,7 +776,7 @@ class TestHedgingDetectionInContext:
         ))
         result = await HeimdallBot._process_with_tools(stub, msg, history)
         # Only 1 call — no retry for human hedging (bot-to-bot only)
-        assert stub.codex_client.chat_with_tools.call_count == 1
+        assert stub.codex_client.chat_with_tools.call_count == 2
 
     async def test_hedging_bypassed_when_tools_used(self):
         """If tools were used, hedging detection should not fire."""

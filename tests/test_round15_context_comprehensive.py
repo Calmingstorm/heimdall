@@ -1191,7 +1191,7 @@ class TestSourceVerification:
         assert "req_time" in client_src
         assert "channel_ctx" in client_src
         assert "HISTORY ABOVE" in client_src
-        assert "Do NOT re-execute" in client_src
+        assert "NOT a task queue" in client_src
         assert "TOPIC CHANGE DETECTED" in client_src
 
     def test_client_has_thread_inheritance_markers(self):

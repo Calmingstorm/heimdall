@@ -359,6 +359,13 @@ _HEDGING_PATTERNS: list[re.Pattern[str]] = [
         r"I (?:need|have) to .{0,30} (?:first|before)|"
         r"I'm (?:going to|about to|proceeding to)"
     ),
+    # Offering numbered options instead of executing
+    re.compile(
+        r"(?i)(?:pick (?:one|an option)|choose (?:one|from)|"
+        r"(?:option|choice) \d|"
+        r"tell me (?:what you (?:want|need|prefer)|which)|"
+        r"which (?:would you|do you|one))\b"
+    ),
 ]
 
 
@@ -1842,12 +1849,12 @@ class HeimdallBot(discord.Client):
                 f"{channel_ctx}\n"
                 f"{msg_id_note}\n"
                 "--- HISTORY ABOVE | REQUEST BELOW ---\n"
-                "Messages above are HISTORY — context only. "
-                "Do NOT re-execute completed tasks from history. "
-                "Do NOT confuse old context with the current request. "
-                "Evaluate your CURRENTLY AVAILABLE tools fresh and use them. "
-                "Do not repeat prior refusals or text-only responses. "
-                "If a tool exists for the requested action, call it."
+                "Messages above are HISTORY — context for understanding what happened. "
+                "History is NOT a task queue. Each message above was a SEPARATE request. "
+                "Act ONLY on the new message below — do not replay other requests from history. "
+                "If asked to 'redo' or 'do what was asked', identify the ONE specific task "
+                "being referenced — do not sweep through history re-executing everything. "
+                "Evaluate tools fresh. Do not repeat prior refusals."
             )
             if topic_change:
                 sep_text += (
@@ -1979,13 +1986,12 @@ class HeimdallBot(discord.Client):
                     messages.append(_TOOL_UNAVAIL_RETRY_MSG)
                     continue  # retry the loop — iteration increments
 
-                # Hedging detection for bot messages only: if no tools were
-                # called and the response hedges ("shall I", "if you want"),
-                # retry once.  Only fires for bot-to-bot interactions — for
-                # human users, hedging can be a legitimate conversational move.
+                # Hedging detection: if no tools were called and the response
+                # hedges ("shall I", "pick one", "tell me what you want"),
+                # retry once. Fires for ALL messages — Heimdall is an executor,
+                # not a menu system.
                 if (
                     not hedging_retried
-                    and is_bot_message
                     and not tools_used_in_loop
                     and detect_hedging(llm_resp.text or "", tools_used_in_loop)
                 ):
