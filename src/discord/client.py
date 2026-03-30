@@ -184,11 +184,7 @@ def detect_promise_without_action(text: str, tools_used: list[str]) -> bool:
 
 _PROMISE_RETRY_MSG = {
     "role": "developer",
-    "content": (
-        "STOP. You said you would do something but you did NOT call any tools. "
-        "Saying 'I will do X' is NOT the same as doing X. Call the tools NOW — "
-        "do not describe the action, PERFORM it with tool calls in this response."
-    ),
+    "content": "Execute the action with tool calls now.",
 }
 
 
@@ -271,11 +267,7 @@ def detect_fabrication(text: str, tools_used: list[str]) -> bool:
 # Developer message injected when fabrication is detected, prompting a retry.
 _FABRICATION_RETRY_MSG = {
     "role": "developer",
-    "content": (
-        "STOP. Your previous response claimed results but you did NOT call any tools. "
-        "That is a fabrication. You MUST call the appropriate tool to get real results. "
-        "Do NOT respond with text only — call the tool NOW."
-    ),
+    "content": "Call the appropriate tool to get real results.",
 }
 
 
@@ -322,11 +314,7 @@ def detect_tool_unavailable(text: str, tools_used: list[str]) -> bool:
 
 _TOOL_UNAVAIL_RETRY_MSG = {
     "role": "developer",
-    "content": (
-        "STOP. Every tool in your tool list is available and enabled. "
-        "Do NOT claim tools are disabled, unavailable, or unsupported. "
-        "Call the tool NOW — if it fails, you'll get an error you can work with."
-    ),
+    "content": "The tool is available. Try calling it.",
 }
 
 
@@ -385,12 +373,7 @@ def detect_hedging(text: str, tools_used: list[str]) -> bool:
 # Developer message injected when hedging is detected on a bot message.
 _HEDGING_RETRY_MSG = {
     "role": "developer",
-    "content": (
-        "STOP. The user is another bot — it cannot confirm, approve, or choose. "
-        "Do NOT ask permission, suggest plans, or hedge. EXECUTE the requested "
-        "action NOW by calling the appropriate tools. Never say 'if you want', "
-        "'shall I', or 'would you like' — just DO IT."
-    ),
+    "content": "Execute immediately with tool calls.",
 }
 
 
@@ -471,13 +454,7 @@ def detect_premature_failure(text: str, tools_used: list[str]) -> bool:
 
 _FAILURE_RETRY_MSG = {
     "role": "developer",
-    "content": (
-        "STOP. You hit an error but gave up too early. You MUST exhaust ALL "
-        "alternative approaches before reporting failure. Try: different APIs, "
-        "different search terms, different tools, hardcoded IDs if you know them, "
-        "web search for the answer, or any other creative approach. Only report "
-        "failure after ALL options are genuinely exhausted."
-    ),
+    "content": "Try alternative approaches before reporting failure.",
 }
 
 
@@ -1957,87 +1934,69 @@ class HeimdallBot(discord.Client):
                         "Fabrication detected — retrying with correction"
                     )
                     fabrication_retried = True
-                    messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_FABRICATION_RETRY_MSG)
-                    continue  # retry the loop — iteration increments
+                    continue
 
-                # Promise-without-action detection: Codex says "I'll do X"
-                # but doesn't call any tools.
                 if (
                     not promise_retried
                     and not tools_used_in_loop
                     and detect_promise_without_action(llm_resp.text or "", tools_used_in_loop)
                 ):
                     log.warning(
-                        "Promise without action detected — retrying with correction"
+                        "Promise without action detected — retrying"
                     )
                     promise_retried = True
-                    messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_PROMISE_RETRY_MSG)
                     continue
 
-                # Tool-unavailability fabrication: Codex claims a tool is
-                # "not enabled" / "not available" without trying it.
                 if (
                     not unavail_retried
                     and not tools_used_in_loop
                     and detect_tool_unavailable(llm_resp.text or "", tools_used_in_loop)
                 ):
                     log.warning(
-                        "Tool-unavailability fabrication detected — retrying with correction"
+                        "Tool-unavailability fabrication detected — retrying"
                     )
                     unavail_retried = True
-                    messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_TOOL_UNAVAIL_RETRY_MSG)
-                    continue  # retry the loop — iteration increments
+                    continue
 
-                # Hedging detection: if no tools were called and the response
-                # hedges ("shall I", "pick one", "tell me what you want"),
-                # retry once. Fires for ALL messages — Heimdall is an executor,
-                # not a menu system.
+                # Hedging detection: fires for ALL messages — Heimdall is an
+                # executor, not a menu system.
                 if (
                     not hedging_retried
                     and not tools_used_in_loop
                     and detect_hedging(llm_resp.text or "", tools_used_in_loop)
                 ):
                     log.warning(
-                        "Hedging detected — retrying with correction"
+                        "Hedging detected — retrying"
                     )
                     hedging_retried = True
-                    messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_HEDGING_RETRY_MSG)
-                    continue  # retry the loop — iteration increments
+                    continue
 
-                # Code-block hedging: Codex shows a bash/shell command instead
-                # of executing it via run_command.
                 if (
                     not code_hedging_retried
                     and not tools_used_in_loop
                     and detect_code_hedging(llm_resp.text or "", tools_used_in_loop)
                 ):
                     log.warning(
-                        "Code-block hedging detected — retrying with correction"
+                        "Code-block hedging detected — retrying"
                     )
                     code_hedging_retried = True
-                    messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_CODE_HEDGING_RETRY_MSG)
-                    continue  # retry the loop — iteration increments
+                    continue
 
-                # Premature failure detection: if tools were called but the response
-                # reports failure without exhausting alternatives, retry once.
-                # Uses a flag instead of iteration==0 because tools_used_in_loop is
-                # always empty on iteration 0 (no tools called yet), so the check
-                # can only meaningfully fire on iteration 1+ after tools ran.
+                # Premature failure: tools were called but gave up after one error
                 if (
                     not premature_failure_retried
                     and tools_used_in_loop
                     and detect_premature_failure(llm_resp.text or "", tools_used_in_loop)
                 ):
                     log.warning(
-                        "Premature failure detected — retrying with correction"
+                        "Premature failure detected — retrying"
                     )
                     premature_failure_retried = True
-                    messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_FAILURE_RETRY_MSG)
                     continue
 
