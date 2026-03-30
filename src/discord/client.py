@@ -1970,10 +1970,13 @@ class HeimdallBot(discord.Client):
                     messages.append(_TOOL_UNAVAIL_RETRY_MSG)
                     continue  # retry the loop — iteration increments
 
-                # Hedging detection for bot messages: if no tools were called
-                # and the response hedges ("shall I", "if you want"), retry once.
+                # Hedging detection for bot messages only: if no tools were
+                # called and the response hedges ("shall I", "if you want"),
+                # retry once.  Only fires for bot-to-bot interactions — for
+                # human users, hedging can be a legitimate conversational move.
                 if (
                     iteration == 0
+                    and is_bot_message
                     and not tools_used_in_loop
                     and detect_hedging(llm_resp.text or "", tools_used_in_loop)
                 ):

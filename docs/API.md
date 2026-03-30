@@ -179,7 +179,7 @@ Send a chat message and receive a response.
 ```json
 {
   "content": "Disk usage across hosts:\n- webserver: 45%\n- dbserver: 62%",
-  "tools_used": ["check_disk"],
+  "tools_used": ["run_command"],
   "is_error": false
 }
 ```
@@ -567,7 +567,7 @@ List all active agents.
     "goal": "Check disk on webserver",
     "status": "running",
     "iteration_count": 3,
-    "tools_used": ["check_disk", "run_command"],
+    "tools_used": ["run_command"],
     "started_at": "2026-03-27T10:00:00Z"
   }
 ]
@@ -750,7 +750,7 @@ Response:
 {
   "type": "chat_response",
   "content": "Disk usage: 45%",
-  "tools_used": ["check_disk"],
+  "tools_used": ["run_command"],
   "is_error": false
 }
 ```

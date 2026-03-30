@@ -776,8 +776,8 @@ class TestHedgingDetectionInContext:
             text="Would you like me to restart nginx?", tool_calls=[],
         ))
         result = await HeimdallBot._process_with_tools(stub, msg, history)
-        # Only 1 call — no retry for human hedging
-        assert stub.codex_client.chat_with_tools.call_count >= 2  # hedging retries for all messages now
+        # Only 1 call — no retry for human hedging (bot-to-bot only)
+        assert stub.codex_client.chat_with_tools.call_count == 1
 
     async def test_hedging_bypassed_when_tools_used(self):
         """If tools were used, hedging detection should not fire."""

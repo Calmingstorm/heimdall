@@ -277,8 +277,8 @@ class TestFabricationRetry:
 
         assert text == "Sure, which server would you like me to check?"
         assert not is_error
-        # Only 1 call — no retry triggered
-        assert bot.codex_client.chat_with_tools.call_count >= 2  # hedging catches "would you like" now
+        # Only 1 call — no retry triggered (hedging only fires for bot messages)
+        assert bot.codex_client.chat_with_tools.call_count == 1
 
     @pytest.mark.asyncio
     async def test_no_retry_when_tools_already_used(self):

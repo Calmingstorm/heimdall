@@ -555,9 +555,8 @@ class TestBotSendsCode:
                 [{"role": "user", "content": "check disk"}],
             )
 
-        # Hedging now fires for ALL messages (not just bots)
-        # So it should have retried once
-        assert stub.codex_client.chat_with_tools.call_count >= 2
+        # Hedging only fires for bot messages — human messages should not retry
+        assert stub.codex_client.chat_with_tools.call_count == 1
 
     async def test_bot_message_preamble_mentions_run_script(self):
         """The bot preamble specifically mentions run_script for code execution."""
@@ -1167,8 +1166,8 @@ class TestSessionPoisoningDefense:
                 msg_human, [{"role": "user", "content": "deploy"}],
             )
 
-        # Hedging now fires for ALL messages — human messages also get retried
-        assert stub_human.codex_client.chat_with_tools.call_count >= 2
+        # Hedging only fires for bot messages — human messages should not retry
+        assert stub_human.codex_client.chat_with_tools.call_count == 1
 
     # -- Cross-layer integration --
 

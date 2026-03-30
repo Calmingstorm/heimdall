@@ -909,7 +909,7 @@ class TestDetectionOrderBotMessages:
         )
 
         # No retry — hedging only fires for bot messages
-        assert stub.codex_client.chat_with_tools.await_count >= 2  # hedging retries for all messages now
+        assert stub.codex_client.chat_with_tools.await_count == 1
         assert resp == hedging_response
 
 
