@@ -102,8 +102,8 @@ http://host:3939/ui/  → Vue 3 SPA (CDN, no build step)
 /api/ws               → WebSocket (live logs + events + chat)
 ```
 
-13 pages: dashboard, sessions, tools, skills, knowledge, schedules, loops,
-processes, audit, config, logs, memory, chat.
+14 pages: dashboard, sessions, tools, skills, knowledge, schedules, loops,
+processes, audit, config, logs, memory, chat, agents.
 
 Rate limited: 120 req/60s per IP. Security headers. CSRF protection.
 
