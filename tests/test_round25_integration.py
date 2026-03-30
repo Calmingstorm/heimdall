@@ -1053,7 +1053,7 @@ class TestSessionPoisoningDefense:
     # -- Layer 5: Fabrication + Hedging Detection --
 
     async def test_fabrication_detected_and_corrected(self):
-        """Fabrication on iteration 0 → retry with correction → tools called."""
+        """Fabrication detected → retry with correction → tools called."""
         stub = _make_bot_stub()
         msg = _make_message()
         call_count = 0
