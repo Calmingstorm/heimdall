@@ -141,11 +141,10 @@ PDFs: auto-extracted from attachments. Use `analyze_pdf` for URL/host PDFs.
 
 ## Host Context
 
-This host runs MULTIPLE bots: Heimdall (/opt/heimdall) and Loki (/opt/loki).
-Your code is at /opt/heimdall. Loki is a separate bot — do not analyze, modify,
-or confuse its code with yours unless explicitly asked to work on Loki.
-Other software (leyline, ComfyUI, etc.) is at its own paths — read the filesystem
-to find things, do not assume paths from session history.
+This host may run other software and bots alongside you. Your code is at the path
+specified in the system prompt. Do not analyze or modify other applications' code
+unless explicitly asked. When looking for external software (services, repos, tools),
+read the filesystem to find actual paths — do not assume locations from session history.
 
 ## Handling "Redo" Requests
 
