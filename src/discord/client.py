@@ -229,6 +229,51 @@ _PROMISE_RETRY_MSG = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Mid-task continuation — prevents the loop from exiting when the model
+# checkpoints mid-task with text instead of continuing with tool calls.
+# ---------------------------------------------------------------------------
+
+_CHECKPOINT_PATTERNS: list[re.Pattern[str]] = [
+    # "Now I'll/I'm going to/Next I'll/Let me..." — future action statements
+    re.compile(
+        r"(?i)\b(?:now I'(?:ll|m going to)|next (?:I'll|step)|"
+        r"let me|moving on to|proceeding to|continuing with)\b"
+    ),
+    # "I need to..." — incomplete task awareness
+    re.compile(r"(?i)\bI (?:still )?need to\b"),
+    # "Step N:" or "Phase N:" — numbered progress reports
+    re.compile(r"(?i)(?:^|\n)\s*(?:step|phase)\s+\d", re.MULTILINE),
+    # "What failed:" / "What's left:" / "Remaining:" — partial status
+    re.compile(r"(?i)\b(?:what(?:'s| is) (?:left|remaining|next)|what failed|still need)\b"),
+    # "I'll fix/handle/address that..." — acknowledging incomplete work
+    re.compile(r"(?i)\bI'(?:ll|m going to)\s+(?:fix|handle|address|resolve|retry|try)\b"),
+]
+
+
+def _is_mid_task_checkpoint(text: str) -> bool:
+    """Detect if a text response is a mid-task checkpoint rather than a final answer.
+
+    Returns True if the text contains patterns suggesting the model is
+    reporting progress and intending to continue, rather than delivering
+    a completed response.
+    """
+    if not text or len(text) < 20:
+        return False
+    return any(p.search(text) for p in _CHECKPOINT_PATTERNS)
+
+
+_CONTINUATION_MSG = {
+    "role": "developer",
+    "content": (
+        "You are mid-task. Do not stop to report progress — CONTINUE EXECUTING. "
+        "Call the next tool(s) needed to complete the task. Do not describe what "
+        "you will do next — just do it. The user is waiting for a COMPLETED result, "
+        "not a status update."
+    ),
+}
+
+
 def detect_fabrication(text: str, tools_used: list[str]) -> bool:
     """Detect if a text-only response fabricates tool results.
 
@@ -1797,6 +1842,7 @@ class HeimdallBot(discord.Client):
         system_prompt = system_prompt_override or self._system_prompt
         tools = self._merged_tool_definitions() if self.config.tools.enabled else None
         messages = list(history)
+        continuation_injected = False  # Track if we already continued once (prevent infinite loops)
 
         # Insert context separator between history and the current user request
         # so Codex evaluates tools fresh instead of repeating patterns from history
@@ -2038,6 +2084,27 @@ class HeimdallBot(discord.Client):
                     )
                     messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_FAILURE_RETRY_MSG)
+                    continue
+
+                # Continuation: if tools were already used in this loop and
+                # the model gave a text-only response that looks like a mid-task
+                # checkpoint (not a final answer), inject a continuation prompt
+                # and keep the loop going. This prevents the "I did step 1,
+                # now I'll do step 2" pattern from exiting the loop early.
+                # Only continue once to avoid infinite loops.
+                if (
+                    tools_used_in_loop
+                    and not continuation_injected
+                    and _is_mid_task_checkpoint(llm_resp.text or "")
+                ):
+                    log.info(
+                        "Mid-task checkpoint detected after %d tool calls — "
+                        "injecting continuation",
+                        len(tools_used_in_loop),
+                    )
+                    messages.append({"role": "assistant", "content": llm_resp.text})
+                    messages.append(_CONTINUATION_MSG)
+                    continuation_injected = True
                     continue
 
                 # Update progress embed to show completion and disable cancel button
