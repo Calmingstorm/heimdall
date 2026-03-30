@@ -78,10 +78,6 @@ class TestClaudeMdSecurityModel:
         assert "lines" in self.claude_md
         assert "min(1000)" in self.claude_md or "line limit" in self.claude_md.lower()
 
-    def test_incus_exec_fix_documented(self):
-        assert "incus_exec" in self.claude_md
-        assert "shlex.quote" in self.claude_md
-
     def test_prompt_injection_resistance_documented(self):
         assert "prompt injection" in self.claude_md.lower()
 

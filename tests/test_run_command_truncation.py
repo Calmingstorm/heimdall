@@ -128,7 +128,7 @@ class TestConstants:
     """Verify the constant is reasonable."""
 
     def test_max_lines_matches_convention(self):
-        """_RUN_COMMAND_MAX_LINES should be 200, matching docker_logs/read_file/incus_logs."""
+        """_RUN_COMMAND_MAX_LINES should be 200, matching docker_logs/read_file convention."""
         assert _RUN_COMMAND_MAX_LINES == 200
 
     def test_max_lines_positive(self):

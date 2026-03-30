@@ -121,8 +121,8 @@ class TestTypingDuringLLMCall:
 
         assert text == "Disk is fine."
         assert tools_used == ["check_disk"]
-        # typing() called twice: once per iteration
-        assert msg.channel.typing.call_count == 2
+        # typing() called 3 times: LLM call iter 1, tool execution, LLM call iter 2
+        assert msg.channel.typing.call_count == 3
 
     async def test_typing_called_three_iterations(self):
         """For a 3-iteration loop, typing should be called 3 times."""
@@ -147,7 +147,8 @@ class TestTypingDuringLLMCall:
 
         assert text == "All done."
         assert len(tools_used) == 2
-        assert msg.channel.typing.call_count == 3
+        # typing() called 5 times: LLM call + tool exec for iters 1-2, LLM call for iter 3
+        assert msg.channel.typing.call_count == 5
 
     async def test_typing_context_manager_entered_and_exited(self):
         """The typing context manager should be properly entered and exited."""
@@ -165,14 +166,13 @@ class TestTypingDuringLLMCall:
         typing_cm.__aenter__.assert_called_once()
         typing_cm.__aexit__.assert_called_once()
 
-    async def test_typing_not_active_during_tool_execution(self):
-        """Typing should end BEFORE tool execution begins.
+    async def test_typing_active_during_tool_execution(self):
+        """Typing should be active during both LLM calls and tool execution.
 
         The tool loop structure is:
-        1. async with typing: chat_with_tools()  ← typing active here
-        2. send progress message                  ← typing ended
-        3. execute tools                          ← typing NOT active
-        4. back to step 1 for next iteration
+        1. async with typing: chat_with_tools()  ← typing active
+        2. async with typing: execute tools       ← typing active
+        3. back to step 1 for next iteration
         """
         stub = _make_bot_stub()
         msg = _make_message()
@@ -192,7 +192,7 @@ class TestTypingDuringLLMCall:
         # chat_with_tools tracking
         tool_response = LLMResponse(
             text="Checking disk.",
-            tool_calls=[ToolCall(id="tc-1", name="check_disk", input={})],
+            tool_calls=[ToolCall(id="tc-1", name="run_command", input={})],
             stop_reason="tool_use",
         )
         final_response = LLMResponse(text="Done.", tool_calls=[], stop_reason="end_turn")
@@ -216,15 +216,17 @@ class TestTypingDuringLLMCall:
 
         await stub._process_with_tools(msg, [])
 
-        # Verify order: typing wraps LLM call, tool execution is outside
+        # Verify: typing wraps both LLM call and tool execution
         assert call_order == [
-            "typing_enter",   # 1. typing starts
+            "typing_enter",   # 1. typing starts for LLM call
             "llm_call",       # 2. LLM thinks (returns tool call)
-            "typing_exit",    # 3. typing ends
-            "tool_execute",   # 4. tool executes (no typing)
-            "typing_enter",   # 5. typing starts again for next iteration
-            "llm_call",       # 6. LLM thinks (returns final text)
-            "typing_exit",    # 7. typing ends
+            "typing_exit",    # 3. typing ends after LLM
+            "typing_enter",   # 4. typing starts for tool execution
+            "tool_execute",   # 5. tool executes (typing active)
+            "typing_exit",    # 6. typing ends after tools
+            "typing_enter",   # 7. typing starts for next LLM call
+            "llm_call",       # 8. LLM thinks (returns final text)
+            "typing_exit",    # 9. typing ends
         ]
 
     async def test_typing_works_with_no_tools_configured(self):

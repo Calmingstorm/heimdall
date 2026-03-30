@@ -615,7 +615,7 @@ class TestNoShellInjectionInHandlers:
         """Service names are quoted in shell commands."""
         executor_path = SRC_DIR / "tools" / "executor.py"
         content = executor_path.read_text()
-        # check_service, restart_service should quote service names
+        # any systemctl calls should quote service names
         lines = content.split("\n")
         for i, line in enumerate(lines):
             if "systemctl" in line and "service" in line.lower():

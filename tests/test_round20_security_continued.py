@@ -3,7 +3,7 @@ scrubbing, knowledge base ingestion/search scrubbing, edge cases for Round 19 pa
 
 Tests cover: webhook payload secret scrubbing, knowledge base search result scrubbing,
 digest/scheduled/workflow/skill output scrubbing, secret scrubber edge cases for all
-10 patterns, Round 19 fix verification (read_file, incus_exec), and source structure
+10 patterns, Round 19 fix verification (read_file), and source structure
 verification of all scrubbing call sites.
 """
 from __future__ import annotations

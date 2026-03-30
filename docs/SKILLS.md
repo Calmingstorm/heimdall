@@ -22,7 +22,7 @@ SKILL_DEFINITION = {
     },
 }
 
-async def execute(context, params):
+async def execute(inp, context):
     hosts = context.get_hosts()
     if not hosts:
         return "No hosts configured."
@@ -40,7 +40,7 @@ Skills are hot-reloaded when files change. No restart required.
 Every skill file must have:
 
 1. **`SKILL_DEFINITION`** — a dict with tool metadata
-2. **`async def execute(context, params)`** — the entry point
+2. **`async def execute(inp, context)`** — the entry point
 
 ### SKILL_DEFINITION
 
@@ -91,15 +91,15 @@ SKILL_DEFINITION = {
 ### Execute Function
 
 ```python
-async def execute(context, params):
-    url = params.get("url", "")
-    timeout = params.get("timeout", 10)
+async def execute(inp, context):
+    url = inp.get("url", "")
+    timeout = inp.get("timeout", 10)
     # ... do work ...
     return "Result text"  # Returned to the LLM
 ```
 
+- `inp` — dict matching `input_schema`, passed by the LLM
 - `context` — a `SkillContext` instance with the full skill API
-- `params` — dict matching `input_schema`, passed by the LLM
 - Return a string (sent back to the LLM as tool output)
 - Raise an exception to report an error
 
@@ -320,7 +320,7 @@ SKILL_DEFINITION = {
     "input_schema": {"type": "object", "properties": {}},
 }
 
-async def execute(context, params):
+async def execute(inp, context):
     threshold = context.get_config("threshold", default=80)
     # ...
 ```
@@ -355,7 +355,7 @@ Skills can signal that their output should go directly to the LLM for further
 processing (rather than being treated as a final tool result):
 
 ```python
-async def execute(context, params):
+async def execute(inp, context):
     data = await context.run_on_host("webserver", "df -h")
     return {"output": data, "handoff": True}
 ```
@@ -386,8 +386,8 @@ SKILL_DEFINITION = {
     },
 }
 
-async def execute(context, params):
-    urls = params.get("urls", [])
+async def execute(inp, context):
+    urls = inp.get("urls", [])
     results = []
     for url in urls:
         try:
@@ -409,7 +409,7 @@ SKILL_DEFINITION = {
     "input_schema": {"type": "object", "properties": {}},
 }
 
-async def execute(context, params):
+async def execute(inp, context):
     hosts = context.get_hosts()
     if not hosts:
         return "No hosts configured."
@@ -444,7 +444,7 @@ SKILL_DEFINITION = {
     "input_schema": {"type": "object", "properties": {}},
 }
 
-async def execute(context, params):
+async def execute(inp, context):
     domains = context.get_config("domains", default=[])
     warn_days = context.get_config("warn_days", default=30)
 

@@ -2052,14 +2052,8 @@ class HeimdallBot(discord.Client):
                 })
             messages.append({"role": "assistant", "content": assistant_content})
 
-            tool_calls_this_iter = llm_resp.tool_calls
-
-            # Execute tools
-            tool_calls = tool_calls_this_iter
-
-            # Track tool names used in this iteration
-            tool_names = [t.name for t in tool_calls]
-            tools_used_in_loop.extend(tool_names)
+            tool_calls = llm_resp.tool_calls
+            tools_used_in_loop.extend(t.name for t in tool_calls)
 
             # Execute tools in parallel
             async def _run_tool(block):
@@ -2266,10 +2260,9 @@ class HeimdallBot(discord.Client):
 
             # Run all tool calls concurrently with per-tool timeout
             tool_timeout = self.config.tools.tool_timeout_seconds
-            _LONG_TIMEOUT_TOOLS = _LONG_TIMEOUT_TOOL_SET
 
             async def _run_tool_with_timeout(block):
-                t = 3660 if block.name in _LONG_TIMEOUT_TOOLS else tool_timeout
+                t = 3660 if block.name in _LONG_TIMEOUT_TOOL_SET else tool_timeout
                 try:
                     return await asyncio.wait_for(
                         _run_tool(block), timeout=t,
@@ -2298,10 +2291,10 @@ class HeimdallBot(discord.Client):
                         "content": error_msg,
                     }
 
-            step_t0 = time.monotonic()
-            tool_results = await asyncio.gather(
-                *[_run_tool_with_timeout(b) for b in tool_calls],
-            )
+            async with message.channel.typing():
+                tool_results = await asyncio.gather(
+                    *[_run_tool_with_timeout(b) for b in tool_calls],
+                )
             messages.append({"role": "user", "content": list(tool_results)})
 
             # Inject pending image blocks as vision content for the next LLM call.
@@ -2320,7 +2313,7 @@ class HeimdallBot(discord.Client):
             # Codex to handle the response instead of another tool-loop iteration.
             tool_names_this_round = [b.name for b in tool_calls]
             if (
-                getattr(self, "codex_client", None)
+                self.codex_client
                 and all(self.skill_manager.should_handoff_to_codex(n) is True for n in tool_names_this_round)
             ):
                 # Collect skill results as context for Codex
