@@ -63,6 +63,7 @@ MAX_TOOL_ITERATIONS = 20
 TOOL_OUTPUT_MAX_CHARS = 12000  # ~3000 tokens; cap tool results to prevent context bloat
 _LONG_TIMEOUT_TOOL_SET = frozenset({"claude_code"})  # Tools that get extended timeout (3660s vs config default)
 SEND_MAX_RETRIES = 3
+_CONTINUATION_MAX_CHARS = 500  # Responses longer than this are likely complete answers, not checkpoints
 
 # Pre-compiled regex for merging adjacent code blocks in combine_bot_messages
 _ADJACENT_FENCE_RE = re.compile(r"\n```[ \t]*\n\n```(\w*)[ \t]*\n")
@@ -246,8 +247,7 @@ def _should_continue_task(text: str, tools_used: list[str]) -> bool:
     """
     if not text or not tools_used:
         return False
-    # Long responses (>500 chars) are likely complete answers, not checkpoints
-    if len(text) > 500:
+    if len(text) > _CONTINUATION_MAX_CHARS:
         return False
     # If no checkpoint patterns match, this is a genuine final answer
     return _is_mid_task_checkpoint(text)

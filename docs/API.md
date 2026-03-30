@@ -50,22 +50,22 @@ Bot status, uptime, connected guilds, and feature flags.
 ```json
 {
   "status": "online",
-  "uptime": 3600.5,
-  "guilds": 3,
-  "channels": 12,
-  "sessions": 5,
-  "tools": 80,
-  "skills": 3,
-  "loops": 1,
-  "agents": 0,
-  "processes": 2,
-  "features": {
-    "voice": false,
-    "browser": true,
-    "monitoring": true,
-    "learning": true,
-    "web_ui": true,
-    "comfyui": false
+  "uptime_seconds": 3600.5,
+  "guilds": [{"id": "123", "name": "My Server", "member_count": 42}],
+  "guild_count": 1,
+  "user_count": 42,
+  "tool_count": 61,
+  "skill_count": 3,
+  "session_count": 5,
+  "loop_count": 1,
+  "schedule_count": 4,
+  "agent_count": 0,
+  "agent_running": 0,
+  "process_count": 2,
+  "process_running": 1,
+  "monitoring": {
+    "status": "ok",
+    "last_check": "2026-03-30T12:00:00Z"
   }
 }
 ```
