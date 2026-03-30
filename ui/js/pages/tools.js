@@ -1,6 +1,6 @@
 /**
  * Heimdall Management UI — Tools Page (Round 39 Redesign)
- * Card layout with usage sparklines, categorized tool grid, pack toggles
+ * Card layout with usage sparklines, categorized tool grid
  */
 import { api } from '../api.js';
 
@@ -80,50 +80,14 @@ export default {
             <div class="tl-stat-label">Core Tools</div>
           </div>
           <div class="tl-stat-card">
-            <div class="tl-stat-value">{{ packCount }}</div>
-            <div class="tl-stat-label">Pack Tools</div>
+            <div class="tl-stat-value">{{ skillCount }}</div>
+            <div class="tl-stat-label">Skill Tools</div>
           </div>
           <div class="tl-stat-card">
             <div class="tl-stat-value">{{ totalUsage.toLocaleString() }}</div>
             <div class="tl-stat-label">Total Executions</div>
             <div v-if="usageHistory.length > 1" class="tl-stat-spark" v-html="totalSparkline"></div>
           </div>
-        </div>
-
-        <!-- Tool Packs -->
-        <div class="tl-packs-section mb-4">
-          <div class="flex items-center justify-between mb-3">
-            <div class="tl-section-title">
-              <span class="tl-section-icon">\u{1F4E6}</span> Tool Packs
-            </div>
-            <span v-if="packsAllLoaded" class="badge badge-success">All packs loaded</span>
-          </div>
-          <div class="tl-pack-grid">
-            <div v-for="(info, name) in packs" :key="name"
-                 class="tl-pack-card"
-                 :class="info.enabled ? 'tl-pack-enabled' : 'tl-pack-disabled'">
-              <div class="flex items-center justify-between mb-1">
-                <span class="tl-pack-name">{{ name }}</span>
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox"
-                         :checked="info.enabled"
-                         @change="togglePack(name, $event.target.checked)"
-                         class="sr-only peer">
-                  <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:bg-amber-600
-                              after:content-[''] after:absolute after:top-[2px] after:left-[2px]
-                              after:bg-white after:rounded-full after:h-4 after:w-4
-                              after:transition-all peer-checked:after:translate-x-full"></div>
-                </label>
-              </div>
-              <div class="tl-pack-count">{{ info.tool_count }} tools</div>
-              <div v-if="info.enabled && info.tools" class="tl-pack-tools">
-                <span v-for="t in info.tools.slice(0, 3)" :key="t" class="tl-pack-tool-tag">{{ t }}</span>
-                <span v-if="info.tools.length > 3" class="tl-pack-tool-more">+{{ info.tools.length - 3 }}</span>
-              </div>
-            </div>
-          </div>
-          <div v-if="packSaving" class="mt-2 text-xs text-gray-500">Saving...</div>
-          <div v-if="packError" class="mt-2 text-xs text-red-400">{{ packError }}</div>
         </div>
 
         <!-- Search + Category filter -->
@@ -156,7 +120,6 @@ export default {
                    @click="toggleExpand(t.name)">
                 <div class="tl-tool-header">
                   <span class="tl-tool-name">{{ t.name }}</span>
-                  <span v-if="t.pack" class="tl-tool-pack-badge">{{ t.pack }}</span>
                 </div>
                 <div class="tl-tool-desc">{{ truncate(t.description, 80) }}</div>
                 <div class="tl-tool-footer">
@@ -199,7 +162,6 @@ export default {
                   <th style="width:30%">Name</th>
                   <th class="mobile-hide">Description</th>
                   <th style="width:100px" class="text-right">Uses</th>
-                  <th style="width:80px" class="mobile-hide">Pack</th>
                 </tr>
               </thead>
               <tbody>
@@ -217,13 +179,9 @@ export default {
                         <span v-else class="text-gray-600 text-sm">\u2014</span>
                       </div>
                     </td>
-                    <td class="mobile-hide">
-                      <span v-if="t.pack" class="badge badge-warning">{{ t.pack }}</span>
-                      <span v-else class="badge badge-info">core</span>
-                    </td>
                   </tr>
                   <tr v-if="expanded[t.name]" class="tool-detail-row">
-                    <td colspan="4" class="tool-detail-cell">
+                    <td colspan="3" class="tool-detail-cell">
                       <div class="text-gray-300 text-sm whitespace-pre-wrap">{{ t.description }}</div>
                     </td>
                   </tr>
@@ -245,14 +203,9 @@ export default {
 
   setup() {
     const tools = ref([]);
-    const packs = ref({});
-    const packsAllLoaded = ref(false);
-    const enabledPacks = ref([]);
     const loading = ref(true);
     const error = ref(null);
     const search = ref('');
-    const packSaving = ref(false);
-    const packError = ref(null);
     const stats = ref({});
     const expanded = ref({});
     const viewMode = ref('cards');
@@ -260,7 +213,7 @@ export default {
     const usageHistory = ref([]);
 
     const coreCount = computed(() => tools.value.filter(t => t.is_core).length);
-    const packCount = computed(() => tools.value.filter(t => !t.is_core).length);
+    const skillCount = computed(() => tools.value.filter(t => !t.is_core).length);
     const totalUsage = computed(() => Object.values(stats.value).reduce((a, b) => a + b, 0));
 
     /** Generate sparkline data from stats — bucketize tools by usage tier */
@@ -376,15 +329,11 @@ export default {
       loading.value = true;
       error.value = null;
       try {
-        const [toolsData, packsData, statsData] = await Promise.all([
+        const [toolsData, statsData] = await Promise.all([
           api.get('/api/tools'),
-          api.get('/api/tools/packs'),
           api.get('/api/tools/stats').catch(() => ({})),
         ]);
         tools.value = toolsData;
-        packs.value = packsData.packs || {};
-        packsAllLoaded.value = packsData.all_packs_loaded || false;
-        enabledPacks.value = packsData.enabled_packs || [];
         stats.value = statsData || {};
         // Build usage history from stats for total sparkline
         const vals = Object.values(statsData || {}).filter(v => v > 0).sort((a, b) => a - b);
@@ -395,33 +344,6 @@ export default {
       loading.value = false;
     }
 
-    async function togglePack(name, enabled) {
-      packSaving.value = true;
-      packError.value = null;
-      let newPacks;
-      if (packsAllLoaded.value && !enabled) {
-        newPacks = Object.keys(packs.value).filter(p => p !== name);
-      } else if (packsAllLoaded.value && enabled) {
-        packSaving.value = false;
-        return;
-      } else {
-        const current = new Set(enabledPacks.value);
-        if (enabled) {
-          current.add(name);
-        } else {
-          current.delete(name);
-        }
-        newPacks = [...current];
-      }
-      try {
-        await api.put('/api/tools/packs', { packs: newPacks });
-        await fetchTools();
-      } catch (e) {
-        packError.value = e.message;
-      }
-      packSaving.value = false;
-    }
-
     function refresh() {
       fetchTools();
     }
@@ -429,12 +351,11 @@ export default {
     onMounted(() => { fetchTools(); });
 
     return {
-      tools, packs, packsAllLoaded, loading, error, search,
-      packSaving, packError, stats, expanded, viewMode,
+      tools, loading, error, search, stats, expanded, viewMode,
       activeCategory, usageHistory,
-      coreCount, packCount, totalUsage, filteredTools, groupedTools,
+      coreCount, skillCount, totalUsage, filteredTools, groupedTools,
       usedCategories, toolSparklines, totalSparkline,
-      truncate, toggleExpand, togglePack, refresh,
+      truncate, toggleExpand, refresh,
     };
   },
 };

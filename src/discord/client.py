@@ -1880,6 +1880,9 @@ class HeimdallBot(discord.Client):
         continuation_count = 0
         max_continuations = 3
 
+        # Premature failure gets one retry (flag prevents infinite retry loops)
+        premature_failure_retried = False
+
         user_id = str(message.author.id)
 
         # Filter tools based on user permission tier (skip for test webhooks)
@@ -1996,14 +1999,18 @@ class HeimdallBot(discord.Client):
 
                 # Premature failure detection: if tools were called but the response
                 # reports failure without exhausting alternatives, retry once.
+                # Uses a flag instead of iteration==0 because tools_used_in_loop is
+                # always empty on iteration 0 (no tools called yet), so the check
+                # can only meaningfully fire on iteration 1+ after tools ran.
                 if (
-                    iteration == 0
+                    not premature_failure_retried
                     and tools_used_in_loop
                     and detect_premature_failure(llm_resp.text or "", tools_used_in_loop)
                 ):
                     log.warning(
                         "Premature failure detected — retrying with correction"
                     )
+                    premature_failure_retried = True
                     messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_FAILURE_RETRY_MSG)
                     continue

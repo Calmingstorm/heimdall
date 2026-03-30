@@ -1633,8 +1633,6 @@ textarea.hm-input {
   background: rgba(17, 24, 39, 0.5);
   border-left: 2px solid var(--hm-accent);
 }
-.tool-pack-card { transition: opacity var(--hm-transition-base), border-color var(--hm-transition-base); }
-
 /* ================================================================
    TOOLS PAGE — Card Layout + Sparklines (Round 39)
    ================================================================ */
@@ -1688,72 +1686,6 @@ textarea.hm-input {
 .tl-view-active {
   color: var(--hm-accent) !important;
   background: var(--hm-accent-dim) !important;
-}
-
-/* Section titles */
-.tl-section-title {
-  font-size: var(--hm-text-sm);
-  font-weight: 600;
-  color: var(--hm-text-muted);
-  display: flex;
-  align-items: center;
-  gap: var(--hm-space-2);
-}
-.tl-section-icon { font-size: var(--hm-text-md); }
-
-/* Pack section */
-.tl-packs-section {
-  background: var(--hm-surface);
-  border: 1px solid var(--hm-border);
-  border-radius: var(--hm-radius-lg);
-  padding: var(--hm-space-5);
-}
-.tl-pack-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: var(--hm-space-3);
-}
-.tl-pack-card {
-  padding: var(--hm-space-4);
-  border-radius: var(--hm-radius-md);
-  border: 1px solid var(--hm-border);
-  transition: all var(--hm-transition-base);
-}
-.tl-pack-enabled {
-  border-color: rgba(34, 197, 94, 0.3);
-  background: rgba(34, 197, 94, 0.05);
-}
-.tl-pack-disabled {
-  border-color: var(--hm-border);
-  background: rgba(17, 24, 39, 0.3);
-  opacity: 0.6;
-}
-.tl-pack-name {
-  font-size: var(--hm-text-sm);
-  font-weight: 600;
-  color: var(--hm-text);
-}
-.tl-pack-count {
-  font-size: var(--hm-text-xs);
-  color: var(--hm-text-dim);
-}
-.tl-pack-tools {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--hm-space-1);
-  margin-top: var(--hm-space-2);
-}
-.tl-pack-tool-tag {
-  font-size: var(--hm-text-xs);
-  font-family: var(--hm-font-mono);
-  color: var(--hm-text-dim);
-  background: rgba(217, 119, 6, 0.08);
-  padding: 1px var(--hm-space-2);
-  border-radius: var(--hm-radius-sm);
-}
-.tl-pack-tool-more {
-  font-size: var(--hm-text-xs);
-  color: var(--hm-text-dim);
 }
 
 /* Search input */
@@ -1833,13 +1765,6 @@ textarea.hm-input {
   font-size: var(--hm-text-sm);
   font-weight: 600;
   color: var(--hm-text);
-}
-.tl-tool-pack-badge {
-  font-size: var(--hm-text-xs);
-  color: var(--hm-warning);
-  background: rgba(234, 179, 8, 0.1);
-  padding: 1px var(--hm-space-2);
-  border-radius: var(--hm-radius-sm);
 }
 .tl-tool-desc {
   font-size: var(--hm-text-xs);
@@ -3189,6 +3114,4 @@ a:focus-visible {
   /* Tighter page padding */
   .hm-main .p-6 { padding: var(--hm-space-4); }
 
-  /* Tool pack cards: single column */
-  .pack-grid-mobile { grid-template-columns: 1fr !important; }
 }

@@ -53,7 +53,7 @@ def _make_bot():
     bot._merged_tool_definitions = MagicMock(return_value=[
         {"name": "run_command", "description": "Run a shell command", "is_core": True},
         {"name": "read_file", "description": "Read a file", "is_core": True},
-        {"name": "incus_list", "description": "List containers", "is_core": False, "pack": "incus"},
+        {"name": "web_search", "description": "Search the web", "is_core": True},
     ])
     bot.sessions = MagicMock()
     bot.sessions._sessions = {}
@@ -144,30 +144,6 @@ class TestToolsTemplateStructure:
     def test_has_total_sparkline(self, tools_js):
         assert "totalSparkline" in tools_js
 
-    def test_has_packs_section(self, tools_js):
-        assert "tl-packs-section" in tools_js
-
-    def test_has_pack_grid(self, tools_js):
-        assert "tl-pack-grid" in tools_js
-
-    def test_has_pack_card(self, tools_js):
-        assert "tl-pack-card" in tools_js
-
-    def test_has_pack_enabled_class(self, tools_js):
-        assert "tl-pack-enabled" in tools_js
-
-    def test_has_pack_disabled_class(self, tools_js):
-        assert "tl-pack-disabled" in tools_js
-
-    def test_has_pack_name(self, tools_js):
-        assert "tl-pack-name" in tools_js
-
-    def test_has_pack_count(self, tools_js):
-        assert "tl-pack-count" in tools_js
-
-    def test_has_pack_tool_tags(self, tools_js):
-        assert "tl-pack-tool-tag" in tools_js
-
     def test_has_category_chips(self, tools_js):
         assert "tl-category-chips" in tools_js
 
@@ -234,9 +210,6 @@ class TestToolsTemplateStructure:
     def test_has_tool_param_req(self, tools_js):
         assert "tl-tool-param-req" in tools_js
 
-    def test_has_tool_pack_badge(self, tools_js):
-        assert "tl-tool-pack-badge" in tools_js
-
     def test_has_loading_skeleton(self, tools_js):
         assert "skeleton" in tools_js
 
@@ -273,8 +246,8 @@ class TestToolsLogic:
     def test_has_core_count_computed(self, tools_js):
         assert "const coreCount = computed" in tools_js
 
-    def test_has_pack_count_computed(self, tools_js):
-        assert "const packCount = computed" in tools_js
+    def test_has_skill_count_computed(self, tools_js):
+        assert "const skillCount = computed" in tools_js
 
     def test_has_total_usage_computed(self, tools_js):
         assert "const totalUsage = computed" in tools_js
@@ -309,9 +282,6 @@ class TestToolsLogic:
     def test_has_fetch_tools(self, tools_js):
         assert "async function fetchTools()" in tools_js
 
-    def test_has_toggle_pack(self, tools_js):
-        assert "async function togglePack(" in tools_js
-
     def test_has_truncate(self, tools_js):
         assert "function truncate(" in tools_js
 
@@ -324,14 +294,8 @@ class TestToolsLogic:
     def test_api_get_tools(self, tools_js):
         assert "/api/tools" in tools_js
 
-    def test_api_get_packs(self, tools_js):
-        assert "/api/tools/packs" in tools_js
-
     def test_api_get_stats(self, tools_js):
         assert "/api/tools/stats" in tools_js
-
-    def test_api_put_packs(self, tools_js):
-        assert "api.put('/api/tools/packs'" in tools_js
 
 
 # ===================================================================
@@ -829,42 +793,6 @@ class TestToolsCSS:
     def test_tl_view_active(self, style_css):
         assert ".tl-view-active" in style_css
 
-    def test_tl_section_title(self, style_css):
-        assert ".tl-section-title" in style_css
-
-    def test_tl_section_icon(self, style_css):
-        assert ".tl-section-icon" in style_css
-
-    def test_tl_packs_section(self, style_css):
-        assert ".tl-packs-section" in style_css
-
-    def test_tl_pack_grid(self, style_css):
-        assert ".tl-pack-grid" in style_css
-
-    def test_tl_pack_card(self, style_css):
-        assert ".tl-pack-card" in style_css
-
-    def test_tl_pack_enabled(self, style_css):
-        assert ".tl-pack-enabled" in style_css
-
-    def test_tl_pack_disabled(self, style_css):
-        assert ".tl-pack-disabled" in style_css
-
-    def test_tl_pack_name(self, style_css):
-        assert ".tl-pack-name" in style_css
-
-    def test_tl_pack_count(self, style_css):
-        assert ".tl-pack-count" in style_css
-
-    def test_tl_pack_tools(self, style_css):
-        assert ".tl-pack-tools" in style_css
-
-    def test_tl_pack_tool_tag(self, style_css):
-        assert ".tl-pack-tool-tag" in style_css
-
-    def test_tl_pack_tool_more(self, style_css):
-        assert ".tl-pack-tool-more" in style_css
-
     def test_tl_search(self, style_css):
         assert ".tl-search" in style_css
 
@@ -906,9 +834,6 @@ class TestToolsCSS:
 
     def test_tl_tool_name(self, style_css):
         assert ".tl-tool-name" in style_css
-
-    def test_tl_tool_pack_badge(self, style_css):
-        assert ".tl-tool-pack-badge" in style_css
 
     def test_tl_tool_desc(self, style_css):
         assert ".tl-tool-desc" in style_css
@@ -1144,7 +1069,7 @@ class TestDesignTokenUsage:
         assert "var(--hm-surface)" in section
 
     def test_tools_uses_hm_border(self, style_css):
-        idx = style_css.index(".tl-pack-card")
+        idx = style_css.index(".tl-tool-card")
         section = style_css[idx:idx + 200]
         assert "var(--hm-border)" in section
 
@@ -1206,10 +1131,6 @@ class TestBackwardCompatibility:
         assert "search" in tools_js
         assert "filteredTools" in tools_js
 
-    def test_tools_has_pack_toggle(self, tools_js):
-        assert "togglePack" in tools_js
-        assert "packSaving" in tools_js
-
     def test_tools_has_expand(self, tools_js):
         assert "toggleExpand" in tools_js
         assert "expanded" in tools_js
@@ -1219,7 +1140,6 @@ class TestBackwardCompatibility:
 
     def test_tools_api_calls_preserved(self, tools_js):
         assert "api.get('/api/tools')" in tools_js
-        assert "api.get('/api/tools/packs')" in tools_js
         assert "api.get('/api/tools/stats')" in tools_js
 
     def test_tools_has_error_handling(self, tools_js):
