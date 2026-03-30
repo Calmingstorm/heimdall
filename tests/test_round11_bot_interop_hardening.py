@@ -661,7 +661,7 @@ class TestFabricationRetryRealistic:
 
         history = [{"role": "user", "content": "health check"}]
         text, _, _, tools_used, _ = await HeimdallBot._process_with_tools(stub, msg, history)
-        # Second response returned — fabrication retry only fires on iteration 0
+        # Second response returned — fabrication retry only fires once (flag-based)
         assert call_count == 2
         assert not tools_used
 
@@ -771,12 +771,13 @@ class TestBotHedgingRetryIntegration:
 
 
 class TestFabricationThenHedging:
-    """When fabrication fires on iteration 0, hedging check on iteration 1 is skipped."""
+    """When fabrication fires, hedging on retry is also caught — cascading detection."""
 
-    async def test_fabrication_retry_then_hedging_not_fired(self):
+    async def test_fabrication_retry_then_hedging_also_fired(self):
         """
         Iteration 0: fabrication detected → retry
-        Iteration 1: response has hedging text but iteration != 0, so returns as-is.
+        Iteration 1: hedging detected → retry (flag-based, not iteration-locked)
+        Iteration 2: final answer returned.
         """
         stub = _make_bot_stub(respond_to_bots=True)
         msg = _make_message(is_bot=True)
@@ -791,9 +792,15 @@ class TestFabricationThenHedging:
                     text="I ran the command and here's the output: all good",
                     tool_calls=[],
                 )
-            # Second: hedging text (but won't trigger retry since iteration > 0)
+            if call_count == 2:
+                # Second: hedging text — now caught by flag-based detection
+                return LLMResponse(
+                    text="Would you like me to check again?",
+                    tool_calls=[],
+                )
+            # Third: final answer
             return LLMResponse(
-                text="Would you like me to check again?",
+                text="Server is healthy.",
                 tool_calls=[],
             )
 
@@ -801,8 +808,8 @@ class TestFabricationThenHedging:
 
         history = [{"role": "user", "content": "check the server"}]
         text, _, _, tools_used, _ = await HeimdallBot._process_with_tools(stub, msg, history)
-        assert call_count == 2
-        assert "Would you like" in text
+        assert call_count == 3
+        assert "healthy" in text.lower()
 
 
 # ---------------------------------------------------------------------------

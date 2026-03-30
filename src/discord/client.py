@@ -1881,7 +1881,16 @@ class HeimdallBot(discord.Client):
         continuation_count = 0
         max_continuations = 3
 
-        # Premature failure gets one retry (flag prevents infinite retry loops)
+        # Each first-response detector gets one retry via a flag.
+        # Using flags instead of iteration==0 allows cascading detection:
+        # if fabrication fires on iter 0 and hedging fires on iter 1,
+        # both get caught.  The `not tools_used_in_loop` guard already
+        # ensures these only fire before any tools have been called.
+        fabrication_retried = False
+        promise_retried = False
+        unavail_retried = False
+        hedging_retried = False
+        code_hedging_retried = False
         premature_failure_retried = False
 
         user_id = str(message.author.id)
@@ -1926,18 +1935,17 @@ class HeimdallBot(discord.Client):
             except Exception as api_err:
                 return f"LLM API error: {api_err}", False, True, tools_used_in_loop, False
             if not llm_resp.is_tool_use:
-                # Fabrication detection: if no tools were called on the FIRST
-                # iteration and the response looks like it fabricated results,
-                # inject a correction and retry once.
+                # Fabrication detection: if no tools were called and the
+                # response looks like it fabricated results, retry once.
                 if (
-                    iteration == 0
+                    not fabrication_retried
                     and not tools_used_in_loop
                     and detect_fabrication(llm_resp.text or "", tools_used_in_loop)
                 ):
                     log.warning(
-                        "Fabrication detected on first response — retrying with correction"
+                        "Fabrication detected — retrying with correction"
                     )
-                    # Add the fabricated response and correction to messages
+                    fabrication_retried = True
                     messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_FABRICATION_RETRY_MSG)
                     continue  # retry the loop — iteration increments
@@ -1945,13 +1953,14 @@ class HeimdallBot(discord.Client):
                 # Promise-without-action detection: Codex says "I'll do X"
                 # but doesn't call any tools.
                 if (
-                    iteration == 0
+                    not promise_retried
                     and not tools_used_in_loop
                     and detect_promise_without_action(llm_resp.text or "", tools_used_in_loop)
                 ):
                     log.warning(
                         "Promise without action detected — retrying with correction"
                     )
+                    promise_retried = True
                     messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_PROMISE_RETRY_MSG)
                     continue
@@ -1959,13 +1968,14 @@ class HeimdallBot(discord.Client):
                 # Tool-unavailability fabrication: Codex claims a tool is
                 # "not enabled" / "not available" without trying it.
                 if (
-                    iteration == 0
+                    not unavail_retried
                     and not tools_used_in_loop
                     and detect_tool_unavailable(llm_resp.text or "", tools_used_in_loop)
                 ):
                     log.warning(
                         "Tool-unavailability fabrication detected — retrying with correction"
                     )
+                    unavail_retried = True
                     messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_TOOL_UNAVAIL_RETRY_MSG)
                     continue  # retry the loop — iteration increments
@@ -1975,7 +1985,7 @@ class HeimdallBot(discord.Client):
                 # retry once.  Only fires for bot-to-bot interactions — for
                 # human users, hedging can be a legitimate conversational move.
                 if (
-                    iteration == 0
+                    not hedging_retried
                     and is_bot_message
                     and not tools_used_in_loop
                     and detect_hedging(llm_resp.text or "", tools_used_in_loop)
@@ -1983,6 +1993,7 @@ class HeimdallBot(discord.Client):
                     log.warning(
                         "Hedging detected — retrying with correction"
                     )
+                    hedging_retried = True
                     messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_HEDGING_RETRY_MSG)
                     continue  # retry the loop — iteration increments
@@ -1990,13 +2001,14 @@ class HeimdallBot(discord.Client):
                 # Code-block hedging: Codex shows a bash/shell command instead
                 # of executing it via run_command.
                 if (
-                    iteration == 0
+                    not code_hedging_retried
                     and not tools_used_in_loop
                     and detect_code_hedging(llm_resp.text or "", tools_used_in_loop)
                 ):
                     log.warning(
                         "Code-block hedging detected — retrying with correction"
                     )
+                    code_hedging_retried = True
                     messages.append({"role": "assistant", "content": llm_resp.text})
                     messages.append(_CODE_HEDGING_RETRY_MSG)
                     continue  # retry the loop — iteration increments

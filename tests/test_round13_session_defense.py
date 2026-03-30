@@ -690,10 +690,9 @@ class TestFabricationDetectionInContext:
         ]
         assert len(correction_msgs) >= 1
 
-    async def test_fabrication_only_on_first_iteration(self):
-        """Fabrication detection should only fire on iteration 0."""
-        # This is tested implicitly — after retry (iteration=1),
-        # even fabricated text won't trigger another retry
+    async def test_fabrication_only_fires_once(self):
+        """Fabrication detection should only fire once (flag-based)."""
+        # After retry, fabrication flag prevents a second retry
         stub = _make_process_with_tools_stub()
         msg = _make_msg()
         history = [
@@ -854,8 +853,8 @@ class TestPoisonedHistoryPrevention:
         # At most a few should leak in (the most recent ones)
         assert len(old_poison) < 10
 
-    async def test_fabrication_then_hedging_order(self):
-        """Fabrication should fire before hedging — both on iteration 0."""
+    async def test_fabrication_then_hedging_cascading(self):
+        """Fabrication fires first, then hedging fires on the retry — cascading detection."""
         stub = _make_process_with_tools_stub(respond_to_bots=True)
         msg = _make_msg(is_bot=True)
         history = [
@@ -863,15 +862,16 @@ class TestPoisonedHistoryPrevention:
             {"role": "assistant", "content": "resp"},
             {"role": "user", "content": "check disk"},
         ]
-        # First: fabrication; second: hedging (should NOT fire since iteration=1)
+        # First: fabrication → retry; second: hedging → retry; third: final
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=[
             LLMResponse(text="I ran df -h and the disk is fine.", tool_calls=[]),
             LLMResponse(text="Would you like me to check something else?", tool_calls=[]),
+            LLMResponse(text="Disk usage is at 42%.", tool_calls=[]),
         ])
         result = await HeimdallBot._process_with_tools(stub, msg, history)
-        # Fabrication fires on iteration 0 → retry → hedging text on iteration 1 NOT retried
-        assert stub.codex_client.chat_with_tools.call_count == 2
-        assert "would you like" in result[0].lower()
+        # Fabrication fires → retry → hedging fires → retry → final answer
+        assert stub.codex_client.chat_with_tools.call_count == 3
+        assert "42%" in result[0]
 
     async def test_context_separator_prevents_history_pattern_repeat(self):
         """Separator should prevent the model from repeating old refusals."""

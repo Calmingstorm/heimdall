@@ -1092,8 +1092,8 @@ class TestSessionPoisoningDefense:
                            if m.get("role") == "developer" and "fabrication" in m.get("content", "").lower()]
         assert len(dev_corrections) >= 1
 
-    async def test_fabrication_only_checked_on_iteration_zero(self):
-        """Fabrication detection only fires on iteration 0 — not after tool use."""
+    async def test_fabrication_not_checked_after_tool_use(self):
+        """Fabrication detection does not fire after tools have been used."""
         stub = _make_bot_stub()
         msg = _make_message()
         call_count = 0
@@ -1120,7 +1120,7 @@ class TestSessionPoisoningDefense:
                 msg, [{"role": "user", "content": "check disk"}],
             )
 
-        assert call_count == 2  # No retry — fabrication only checked on iteration 0
+        assert call_count == 2  # No retry — fabrication not checked after tool use
         assert "check_disk" in tools_used
 
     async def test_hedging_detected_for_all_messages(self):

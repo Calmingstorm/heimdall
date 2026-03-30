@@ -5,8 +5,8 @@ When Heimdall receives messages from other bots:
    to execute immediately and never hedge.
 2. detect_hedging() catches phrases like "shall I", "if you want" that bots
    should never receive.
-3. If hedging is detected on the first iteration with no tools called, the tool
-   loop retries once with a developer correction message.
+3. If hedging is detected with no tools called, the tool loop retries once
+   with a developer correction message (flag-based, not iteration-locked).
 """
 from __future__ import annotations
 
