@@ -38,7 +38,7 @@ The `context` (SkillContext) object provides:
     context.get_config(key, default=None) — get a skill config value
     context.get_all_config()       — get all skill config values (with defaults)
     context.get_hosts()            — list available host aliases
-    context.get_services()         — list allowed service names
+    context.get_services()         — returns [] (systemd tools removed; use run_on_host)
 
   Logging:
     context.log(message)           — write a log message
@@ -59,7 +59,6 @@ SKILL_DEFINITION = {
         },
         "required": [],
     },
-    "requires_approval": False,
 }
 
 

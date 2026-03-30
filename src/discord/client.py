@@ -3232,8 +3232,7 @@ class HeimdallBot(discord.Client):
         """Run a single loop iteration through Codex with full tool access.
 
         Simplified version of _process_with_tools for autonomous loops:
-        same Codex + tool execution pipeline but without progress embeds,
-        cancel buttons, or detection retries.
+        same Codex + tool execution pipeline but without detection retries.
         """
         if not self.codex_client:
             return "Codex client not available."

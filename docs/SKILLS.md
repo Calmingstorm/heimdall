@@ -203,9 +203,6 @@ context.delete_schedule("schedule-id-123")
 # Get available hosts
 hosts = context.get_hosts()  # ["webserver", "dbserver", ...]
 
-# Get allowed services
-services = context.get_services()  # ["nginx", "postgresql", ...]
-
 # Get skill-specific config (set via API or web UI)
 threshold = context.get_config("threshold", default=80)
 all_config = context.get_all_config()  # {"threshold": 80, ...}

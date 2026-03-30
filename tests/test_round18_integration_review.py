@@ -1,8 +1,8 @@
 """Cross-feature integration tests — Round 18 full review.
 
 These tests verify interactions between features added in different rounds:
-- Circuit breaker recovery + cancel button (R15 + R17)
-- Per-tool timeout + progress embed step status (R12 + R9)
+- Circuit breaker recovery + typing indicator (R15 + R17)
+- Per-tool timeout + error handling (R12 + R9)
 - Error checkpoint-save continuity (R14 + R13)
 - All 6 terminal paths of _process_with_tools (comprehensive)
 """
@@ -58,7 +58,7 @@ def _make_bot_stub():
     stub._send_with_retry = AsyncMock()
     stub._merged_tool_definitions = MagicMock(return_value=[
         {"name": "run_command", "description": "Run", "input_schema": {"type": "object", "properties": {}}},
-        {"name": "check_disk", "description": "Disk", "input_schema": {"type": "object", "properties": {}}},
+        {"name": "run_command", "description": "Disk", "input_schema": {"type": "object", "properties": {}}},
     ])
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
@@ -93,11 +93,11 @@ def _tool_resp(text="", tool_calls=None):
 
 
 # ---------------------------------------------------------------------------
-# Cross-feature: Circuit Breaker + Cancel Button (R15 + R17)
+# Cross-feature: Circuit Breaker + Tool Loop (R15 + R17)
 # ---------------------------------------------------------------------------
 
 class TestCircuitBreakerWithCancel:
-    """Verify cancel button works during/after circuit breaker recovery."""
+    """Verify tool loop completes during/after circuit breaker recovery."""
 
     async def test_circuit_breaker_recovery_then_normal_completion(self):
         """Circuit breaker opens, recovery succeeds, loop completes normally."""
@@ -110,11 +110,11 @@ class TestCircuitBreakerWithCancel:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return _tool_resp("Step 1", [_tool_call("check_disk", "tc1")])
+                return _tool_resp("Step 1", [_tool_call("run_command", "tc1")])
             elif call_count == 2:
                 raise CircuitOpenError("codex", 0.01)
             elif call_count == 3:
-                return _tool_resp("Recovered", [_tool_call("check_disk", "tc2")])
+                return _tool_resp("Recovered", [_tool_call("run_command", "tc2")])
             else:
                 return _tool_resp("Done")
 
@@ -126,11 +126,11 @@ class TestCircuitBreakerWithCancel:
 
         assert is_error is False
         assert text == "Done"
-        assert tools_used == ["check_disk", "check_disk"]
+        assert tools_used == ["run_command", "run_command"]
 
 
 # ---------------------------------------------------------------------------
-# Cross-feature: Per-Tool Timeout + Progress Embed (R12 + R9)
+# Cross-feature: Per-Tool Timeout + Error Handling (R12 + R9)
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ class TestAllTerminalPaths:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return _tool_resp("Checking", [_tool_call("check_disk", "tc1")])
+                return _tool_resp("Checking", [_tool_call("run_command", "tc1")])
             return _tool_resp("All good.")
 
         stub.codex_client.chat_with_tools = AsyncMock(side_effect=fake_chat)
@@ -213,7 +213,7 @@ class TestAllTerminalPaths:
 
         assert text == "All good."
         assert is_error is False
-        assert tools_used == ["check_disk"]
+        assert tools_used == ["run_command"]
         assert handoff is False
 
     async def test_path_3_api_error(self):
@@ -254,7 +254,7 @@ class TestAllTerminalPaths:
         msg = _make_message()
 
         stub.codex_client.chat_with_tools = AsyncMock(
-            return_value=_tool_resp("Another step", [_tool_call("check_disk", "tc1")]),
+            return_value=_tool_resp("Another step", [_tool_call("run_command", "tc1")]),
         )
 
         text, _, is_error, tools_used, handoff = await HeimdallBot._process_with_tools(
