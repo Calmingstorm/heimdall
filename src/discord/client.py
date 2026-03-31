@@ -151,20 +151,45 @@ _FABRICATION_PATTERNS: list[re.Pattern[str]] = [
 
 
 _PROMISE_PATTERNS: list[re.Pattern[str]] = [
-    # "I'll do X now" / "I'm doing X" / "I will execute" / "executing now"
+    # "I'll <verb>" — any verb after I'll/I will (not just a fixed list)
     re.compile(
-        r"(?i)\b(?:I'(?:ll|m)\s+(?:do|make|execute|run|create|generate|start|"
-        r"check|read|pull|fetch|send|write|deploy|install|build|investigate|"
-        r"handle|process|replicate|mirror|join)|"
-        r"I will\s+(?:do|make|execute|run|create|generate|start|check)|"
-        r"(?:executing|running|doing|starting|creating|generating)\s+"
-        r"(?:that|this|it)\s+(?:now|immediately|right now))\b"
+        r"(?i)\bI'(?:ll|m going to)\s+\w+"
     ),
-    # "Plan: X" followed by no tool calls
+    # "I'm <gerund>" — any -ing verb after I'm
     re.compile(
-        r"(?i)^Plan:\s+.{10,}",
+        r"(?i)\bI'm\s+\w+ing\b"
+    ),
+    # "I will <verb>"
+    re.compile(
+        r"(?i)\bI will\s+\w+"
+    ),
+    # "I can <verb> it/that/this immediately/now/right now"
+    re.compile(
+        r"(?i)\bI can\s+\w+\s+(?:it|that|this|right now|now|immediately)\b"
+    ),
+    # Action openers without subject — "On it", "Working on", "Spawning"
+    re.compile(
+        r"(?i)^(?:On it|Working on|Spawning|Starting now|Kicking off)\b",
         re.MULTILINE,
     ),
+    # "Plan:" or "Plan in" followed by description
+    re.compile(
+        r"(?i)^Plan(?::|(?:\s+in\s+))\s*.{10,}",
+        re.MULTILINE,
+    ),
+]
+
+# Phrases that indicate genuine chat, not a promise to act.
+# If any of these appear, the promise detector should NOT fire.
+_PROMISE_CHAT_EXEMPTIONS: list[re.Pattern[str]] = [
+    # Opinions/thoughts — "I'm thinking", "I'm not sure", "I'm guessing"
+    re.compile(r"(?i)\bI'm\s+(?:thinking|not sure|unsure|guessing|wondering|curious)"),
+    # Statements about state — "I'm aware", "I'm online", "I'm Heimdall"
+    re.compile(r"(?i)\bI'm\s+(?:aware|online|here|ready|Heimdall|a |the |not )"),
+    # Refusals — "I can't", "I won't"
+    re.compile(r"(?i)\bI\s+(?:can't|won't|cannot|will not)\b"),
+    # Past tense reports — "I'll note that", "I'm reporting"
+    re.compile(r"(?i)\bI'll\s+(?:note|say|add|mention|point out)\b"),
 ]
 
 
@@ -178,6 +203,9 @@ def detect_promise_without_action(text: str, tools_used: list[str]) -> bool:
     if tools_used:
         return False
     if not text or len(text) < 15:
+        return False
+    # Check exemptions first — genuine chat shouldn't trigger
+    if any(p.search(text) for p in _PROMISE_CHAT_EXEMPTIONS):
         return False
     return any(p.search(text) for p in _PROMISE_PATTERNS)
 
