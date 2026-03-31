@@ -272,8 +272,16 @@ def _should_continue_task(text: str, tools_used: list[str]) -> bool:
         return False
     if len(text) > _CONTINUATION_MAX_CHARS:
         return False
-    # If no checkpoint patterns match, this is a genuine final answer
-    return _is_mid_task_checkpoint(text)
+    # Check both checkpoint patterns AND promise patterns — if the model
+    # used tools but ends with "I'll do X next", that's a mid-task pause
+    if _is_mid_task_checkpoint(text):
+        return True
+    # Promise patterns (exemptions already filtered by the promise detector,
+    # but here we just check raw patterns since tools WERE used)
+    if any(p.search(text) for p in _PROMISE_PATTERNS):
+        if not any(p.search(text) for p in _PROMISE_CHAT_EXEMPTIONS):
+            return True
+    return False
 
 
 def detect_fabrication(text: str, tools_used: list[str]) -> bool:
