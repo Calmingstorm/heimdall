@@ -1808,7 +1808,6 @@ class HeimdallBot(discord.Client):
                 self.codex_client.chat(
                     messages=[{"role": "user", "content": classifier_user_msg}],
                     system=self._CLASSIFIER_SYSTEM_PROMPT,
-                    max_tokens=50,
                 ),
                 timeout=10,
             )
