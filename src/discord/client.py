@@ -166,9 +166,11 @@ _PROMISE_PATTERNS: list[re.Pattern[str]] = [
     re.compile(
         r"(?i)\bI can\s+\w+\s+(?:it|that|this|right now|now|immediately)\b"
     ),
-    # Action openers without subject — "On it", "Working on", "Spawning"
+    # Action openers without subject — gerund-initial promises
     re.compile(
-        r"(?i)^(?:On it|Working on|Spawning|Starting now|Kicking off)\b",
+        r"(?i)^(?:On it|Working on|Spawning|Spinning up|Starting|Kicking off|"
+        r"Setting up|Pulling|Generating|Building|Deploying|Running|"
+        r"Creating|Launching|Firing up|Booting|Preparing|Fetching)\b",
         re.MULTILINE,
     ),
     # "Plan:" or "Plan in" followed by description
