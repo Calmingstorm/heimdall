@@ -1204,11 +1204,19 @@ class HeimdallBot(discord.Client):
             return
 
         # require_mention: only respond when the bot is @mentioned (or in DMs)
+        # Bot messages skip this gate — they go into the buffer and the mention
+        # check happens after all segments are collected (so multi-message bot
+        # responses where only the first part has the @mention still get through).
         if self.config.discord.require_mention:
             is_dm = not hasattr(message.channel, "guild") or message.channel.guild is None
-            is_mentioned = self.user and self.user.mentioned_in(message)
-            if not is_dm and not is_mentioned:
-                return
+            is_bot_buffered = message.author.bot and self.config.discord.respond_to_bots
+            if not is_dm and not is_bot_buffered:
+                is_mentioned = self.user and (
+                    self.user.mentioned_in(message)
+                    or f"<@{self.user.id}>" in (message.content or "")
+                )
+                if not is_mentioned:
+                    return
 
         log.info(
             "on_message fired: msg_id=%s channel=%s content=%r",
@@ -1249,6 +1257,13 @@ class HeimdallBot(discord.Client):
                     return
                 combined = combine_bot_messages(parts)
                 log.info("Bot buffer flushed: %d messages from %s combined", len(parts), orig_msg.author)
+                # require_mention for bots: check if ANY buffered part mentions us
+                if self.config.discord.require_mention and self.user:
+                    mention_str = f"<@{self.user.id}>"
+                    mention_nick = f"<@!{self.user.id}>"
+                    if not any(mention_str in p or mention_nick in p for p in parts):
+                        log.info("Bot buffer discarded: no mention found in %d messages from %s", len(parts), orig_msg.author)
+                        return
                 # Strip mention from combined content
                 if self.user:
                     combined = combined.replace(f"<@{self.user.id}>", "").strip()
