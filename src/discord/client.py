@@ -216,11 +216,9 @@ _PROMISE_RETRY_MSG = {
 
 
 # ---------------------------------------------------------------------------
-# Mid-task continuation — prevents the loop from exiting when the model
-# checkpoints mid-task with text instead of continuing with tool calls.
+# Continuation message — injected when the classifier determines the
+# response is incomplete and the model should keep working.
 # ---------------------------------------------------------------------------
-
-
 
 _CONTINUATION_MSG = {
     "role": "developer",
@@ -2072,8 +2070,7 @@ class HeimdallBot(discord.Client):
                     continue
 
                 # Tier 3: Completion classifier — uses LLM to judge whether
-                # the user's request was fully addressed.  Replaces the old
-                # regex-based _should_continue_task / _is_mid_task_checkpoint.
+                # the user's request was fully addressed.
                 if (
                     tools_used_in_loop
                     and continuation_count < max_continuations
@@ -2088,9 +2085,9 @@ class HeimdallBot(discord.Client):
                             continuation_count + 1, max_continuations,
                             len(tools_used_in_loop),
                         )
-                        # Do NOT append the checkpoint text as an assistant
-                        # message — Codex just sees tool results → continue
-                        # nudge → and naturally produces more tool calls.
+                        # Do NOT append the incomplete response as an assistant
+                        # message — inject the continuation nudge alone so
+                        # the model responds fresh with tool calls.
                         if reason:
                             messages.append({
                                 "role": "developer",
