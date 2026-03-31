@@ -220,7 +220,7 @@ class TestCompactionWithFn:
 
 class TestCodexChatMaxTokens:
     async def test_max_tokens_override(self):
-        """Per-call max_tokens should appear in the request body."""
+        """Per-call max_tokens should appear in the request body as max_output_tokens."""
         from src.llm.openai_codex import CodexChatClient
 
         auth = MagicMock()
@@ -239,11 +239,11 @@ class TestCodexChatMaxTokens:
 
         await client.chat(messages=[], system="test", max_tokens=300)
 
-        # max_output_tokens is NOT sent — the Responses API rejects it
-        assert "max_output_tokens" not in captured
+        # Per-call max_tokens overrides instance default
+        assert captured["max_output_tokens"] == 300
 
-    async def test_max_tokens_not_sent_to_api(self):
-        """The Responses API rejects max_output_tokens, so it must not be in the body."""
+    async def test_instance_max_tokens_sent_to_api(self):
+        """Instance max_tokens is sent as max_output_tokens when no per-call override."""
         from src.llm.openai_codex import CodexChatClient
 
         auth = MagicMock()
@@ -251,6 +251,28 @@ class TestCodexChatMaxTokens:
         auth.get_account_id = MagicMock(return_value="acct")
 
         client = CodexChatClient(auth=auth, model="gpt-4", max_tokens=4096)
+
+        captured = {}
+
+        async def mock_stream(headers, body):
+            captured.update(body)
+            return "response"
+
+        client._stream_request = mock_stream
+
+        await client.chat(messages=[], system="test")
+
+        assert captured["max_output_tokens"] == 4096
+
+    async def test_no_max_tokens_when_both_none(self):
+        """When neither per-call nor instance max_tokens set, key is absent."""
+        from src.llm.openai_codex import CodexChatClient
+
+        auth = MagicMock()
+        auth.get_access_token = AsyncMock(return_value="token")
+        auth.get_account_id = MagicMock(return_value="acct")
+
+        client = CodexChatClient(auth=auth, model="gpt-4", max_tokens=None)
 
         captured = {}
 

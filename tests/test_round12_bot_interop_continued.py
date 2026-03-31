@@ -114,6 +114,7 @@ def _make_on_message_stub(**overrides):
 
     for k, v in overrides.items():
         setattr(stub, k, v)
+    stub._classify_completion = AsyncMock(return_value=(True, ""))
     return stub
 
 
@@ -149,6 +150,7 @@ def _make_process_with_tools_stub(respond_to_bots=True):
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
+    stub._classify_completion = AsyncMock(return_value=(True, ""))
     return stub
 
 

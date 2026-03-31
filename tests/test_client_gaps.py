@@ -249,6 +249,7 @@ def _make_bot_stub(**overrides):
 
     for k, v in overrides.items():
         setattr(stub, k, v)
+    stub._classify_completion = AsyncMock(return_value=(True, ""))
     return stub
 
 

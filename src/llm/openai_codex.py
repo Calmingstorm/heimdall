@@ -76,6 +76,9 @@ class CodexChatClient:
             "store": False,
             "stream": True,
         }
+        effective_max = max_tokens if max_tokens is not None else self.max_tokens
+        if effective_max:
+            body["max_output_tokens"] = effective_max
 
         return await self._stream_request(headers, body)
 

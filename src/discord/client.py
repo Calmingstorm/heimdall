@@ -63,7 +63,6 @@ MAX_TOOL_ITERATIONS = 20
 TOOL_OUTPUT_MAX_CHARS = 12000  # ~3000 tokens; cap tool results to prevent context bloat
 _LONG_TIMEOUT_TOOL_SET = frozenset({"claude_code"})  # Tools that get extended timeout (3660s vs config default)
 SEND_MAX_RETRIES = 3
-_CONTINUATION_MAX_CHARS = 500  # Responses longer than this are likely complete answers, not checkpoints
 
 # Pre-compiled regex for merging adjacent code blocks in combine_bot_messages
 _ADJACENT_FENCE_RE = re.compile(r"\n```[ \t]*\n\n```(\w*)[ \t]*\n")
@@ -221,33 +220,6 @@ _PROMISE_RETRY_MSG = {
 # checkpoints mid-task with text instead of continuing with tool calls.
 # ---------------------------------------------------------------------------
 
-_CHECKPOINT_PATTERNS: list[re.Pattern[str]] = [
-    # "Now I'll/I'm going to/Next I'll/Let me..." — future action statements
-    re.compile(
-        r"(?i)\b(?:now I'(?:ll|m going to)|next (?:I'll|step)|"
-        r"let me|moving on to|proceeding to|continuing with)\b"
-    ),
-    # "I need to..." — incomplete task awareness
-    re.compile(r"(?i)\bI (?:still )?need to\b"),
-    # "Step N:" or "Phase N:" — numbered progress reports
-    re.compile(r"(?i)(?:^|\n)\s*(?:step|phase)\s+\d", re.MULTILINE),
-    # "What failed:" / "What's left:" / "Remaining:" — partial status
-    re.compile(r"(?i)\b(?:what(?:'s| is) (?:left|remaining|next)|what failed|still need)\b"),
-    # "I'll fix/handle/address that..." — acknowledging incomplete work
-    re.compile(r"(?i)\bI'(?:ll|m going to)\s+(?:fix|handle|address|resolve|retry|try)\b"),
-]
-
-
-def _is_mid_task_checkpoint(text: str) -> bool:
-    """Detect if a text response is a mid-task checkpoint rather than a final answer.
-
-    Returns True if the text contains patterns suggesting the model is
-    reporting progress and intending to continue, rather than delivering
-    a completed response.
-    """
-    if not text or len(text) < 20:
-        return False
-    return any(p.search(text) for p in _CHECKPOINT_PATTERNS)
 
 
 _CONTINUATION_MSG = {
@@ -257,28 +229,6 @@ _CONTINUATION_MSG = {
     ),
 }
 
-
-def _should_continue_task(text: str, tools_used: list[str]) -> bool:
-    """Decide if a text-only response is a mid-task checkpoint that should continue.
-
-    Uses structural signals rather than pure regex: the text should be short
-    (status update, not a complete answer), tools should have been called,
-    and the text should reference future actions or incomplete work.
-
-    Returns True if the loop should inject a continuation prompt instead of
-    exiting with this text as the final response.
-    """
-    if not text or not tools_used:
-        return False
-    # Check checkpoint patterns (short status updates)
-    if len(text) <= _CONTINUATION_MAX_CHARS and _is_mid_task_checkpoint(text):
-        return True
-    # Promise patterns — check regardless of length. A long response with
-    # real results but "I'll rerun" tacked on the end is still a promise.
-    if any(p.search(text) for p in _PROMISE_PATTERNS):
-        if not any(p.search(text) for p in _PROMISE_CHAT_EXEMPTIONS):
-            return True
-    return False
 
 
 def detect_fabrication(text: str, tools_used: list[str]) -> bool:
@@ -300,7 +250,7 @@ def detect_fabrication(text: str, tools_used: list[str]) -> bool:
 # Developer message injected when fabrication is detected, prompting a retry.
 _FABRICATION_RETRY_MSG = {
     "role": "developer",
-    "content": "Call the appropriate tool to get real results.",
+    "content": "That was a fabrication. Call the appropriate tool to get real results.",
 }
 
 
@@ -406,7 +356,7 @@ def detect_hedging(text: str, tools_used: list[str]) -> bool:
 # Developer message injected when hedging is detected on a bot message.
 _HEDGING_RETRY_MSG = {
     "role": "developer",
-    "content": "Execute immediately with tool calls.",
+    "content": "This is another bot. Do not say 'shall I' or 'if you want'. Execute immediately with tool calls.",
 }
 
 
@@ -1816,6 +1766,19 @@ class HeimdallBot(discord.Client):
                 except Exception as e:
                     log.warning("Failed to send pending skill files: %s", e)
 
+    async def _classify_completion(
+        self,
+        user_message: str,
+        response_text: str,
+        tools_used: list[str],
+    ) -> tuple[bool, str]:
+        """Judge whether the assistant's response fully addresses the user's request.
+
+        Returns (is_complete, reason).  Stub implementation — always returns
+        COMPLETE.  Round 2 will wire in the actual LLM classifier call.
+        """
+        return True, ""
+
     async def _process_with_tools(
         self,
         message: discord.Message,
@@ -2033,30 +1996,35 @@ class HeimdallBot(discord.Client):
                     messages.append(_FAILURE_RETRY_MSG)
                     continue
 
-                # Structural continuation: if tools were already used in this
-                # loop and the model responds with text instead of more tool
-                # calls, decide whether to continue based on structural signals
-                # rather than just regex patterns.
+                # Tier 3: Completion classifier — uses LLM to judge whether
+                # the user's request was fully addressed.  Replaces the old
+                # regex-based _should_continue_task / _is_mid_task_checkpoint.
                 if (
                     tools_used_in_loop
                     and continuation_count < max_continuations
-                    and _should_continue_task(llm_resp.text or "", tools_used_in_loop)
                 ):
-                    log.info(
-                        "Mid-task continuation (%d/%d) after %d tool calls — "
-                        "injecting continuation",
-                        continuation_count + 1, max_continuations,
-                        len(tools_used_in_loop),
+                    is_complete, reason = await self._classify_completion(
+                        message.content, llm_resp.text or "", tools_used_in_loop,
                     )
-                    # Do NOT append the checkpoint text as an assistant message.
-                    # If we do, Codex sees its own status update + a "continue"
-                    # correction, and responds with "You're right, I reran..."
-                    # By omitting it, Codex just sees tool results → continue
-                    # nudge → and naturally produces more tool calls without
-                    # acknowledging anything.
-                    messages.append(_CONTINUATION_MSG)
-                    continuation_count += 1
-                    continue
+                    if not is_complete:
+                        log.info(
+                            "Completion classifier: INCOMPLETE (%d/%d) "
+                            "after %d tool calls — injecting continuation",
+                            continuation_count + 1, max_continuations,
+                            len(tools_used_in_loop),
+                        )
+                        # Do NOT append the checkpoint text as an assistant
+                        # message — Codex just sees tool results → continue
+                        # nudge → and naturally produces more tool calls.
+                        if reason:
+                            messages.append({
+                                "role": "developer",
+                                "content": f"You are not done. {reason}. Continue with tool calls now.",
+                            })
+                        else:
+                            messages.append(_CONTINUATION_MSG)
+                        continuation_count += 1
+                        continue
 
                 return llm_resp.text or _EMPTY_RESPONSE_FALLBACK, False, False, tools_used_in_loop, False
 

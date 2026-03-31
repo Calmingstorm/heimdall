@@ -64,6 +64,7 @@ def _make_bot_stub(respond_to_bots=False):
     stub.permissions = MagicMock()
     stub.permissions.filter_tools = MagicMock(side_effect=lambda uid, tools: tools)
     stub._track_recent_action = MagicMock()
+    stub._classify_completion = AsyncMock(return_value=(True, ""))
     return stub
 
 

@@ -76,6 +76,7 @@ def _make_bot_stub():
     stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
     stub._handle_message_inner = HeimdallBot._handle_message_inner.__get__(stub)
     stub._track_recent_action = HeimdallBot._track_recent_action.__get__(stub)
+    stub._classify_completion = AsyncMock(return_value=(True, ""))
     return stub
 
 
