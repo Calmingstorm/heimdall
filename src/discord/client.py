@@ -1766,6 +1766,23 @@ class HeimdallBot(discord.Client):
                 except Exception as e:
                     log.warning("Failed to send pending skill files: %s", e)
 
+    _CLASSIFIER_SYSTEM_PROMPT = (
+        "You are a completion judge. A user asked an AI assistant to do something. "
+        "The assistant called some tools, then wrote a response. Your job: decide "
+        "if the user's requested outcome was actually achieved.\n\n"
+        "COMPLETE means:\n"
+        "- The user's full request was addressed (not just part of it)\n"
+        "- The assistant is not promising to do more work\n"
+        "- A failure report after genuinely trying counts as COMPLETE\n\n"
+        "INCOMPLETE means:\n"
+        "- The assistant only did part of what was asked (e.g., built but didn't deploy)\n"
+        "- The assistant is describing work it still plans to do\n"
+        "- The assistant is reporting partial progress with more steps remaining\n\n"
+        'If INCOMPLETE, briefly state what\'s missing after a colon.\n'
+        'Examples: "INCOMPLETE: deployment not performed" or "INCOMPLETE: verification step missing"\n'
+        'If COMPLETE, just say: "COMPLETE"'
+    )
+
     async def _classify_completion(
         self,
         user_message: str,
@@ -1774,9 +1791,67 @@ class HeimdallBot(discord.Client):
     ) -> tuple[bool, str]:
         """Judge whether the assistant's response fully addresses the user's request.
 
-        Returns (is_complete, reason).  Stub implementation — always returns
-        COMPLETE.  Round 2 will wire in the actual LLM classifier call.
+        Uses the same CodexClient (same OAuth, same API) to make a lightweight
+        classifier call.  Fail-open: any error/timeout/ambiguity → COMPLETE.
+
+        Returns (is_complete, reason).  reason is non-empty only for INCOMPLETE.
         """
+        if not self.codex_client:
+            return True, ""
+
+        classifier_user_msg = (
+            f"User's task: {user_message}\n\n"
+            f"Tools called: {', '.join(tools_used)}\n\n"
+            f"Assistant's response: {response_text}"
+        )
+
+        try:
+            raw = await asyncio.wait_for(
+                self.codex_client.chat(
+                    messages=[{"role": "user", "content": classifier_user_msg}],
+                    system=self._CLASSIFIER_SYSTEM_PROMPT,
+                    max_tokens=50,
+                ),
+                timeout=10,
+            )
+        except Exception:
+            log.info("Completion classifier: error/timeout — treating as COMPLETE")
+            return True, ""
+
+        return self._parse_classifier_response(raw)
+
+    @staticmethod
+    def _parse_classifier_response(raw: str) -> tuple[bool, str]:
+        """Parse the classifier's raw text into (is_complete, reason).
+
+        Checks INCOMPLETE first (more specific), then COMPLETE, else fail-open.
+        """
+        stripped = (raw or "").strip()
+        upper = stripped.upper()
+
+        if upper.startswith("INCOMPLETE"):
+            # Extract reason after first colon, dash, or em-dash
+            reason = ""
+            for sep in (":", " - ", " — ", "—"):
+                idx = stripped.find(sep)
+                if idx != -1:
+                    reason = stripped[idx + len(sep):].strip()
+                    break
+            log.info(
+                "Completion classifier: INCOMPLETE reason=%r (raw: %r)",
+                reason, stripped[:80],
+            )
+            return False, reason
+
+        if upper.startswith("COMPLETE"):
+            log.info("Completion classifier: COMPLETE (raw: %r)", stripped[:80])
+            return True, ""
+
+        # Ambiguous / gibberish → fail-open
+        log.info(
+            "Completion classifier: ambiguous response, treating as COMPLETE (raw: %r)",
+            stripped[:80],
+        )
         return True, ""
 
     async def _process_with_tools(
