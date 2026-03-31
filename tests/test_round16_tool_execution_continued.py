@@ -96,6 +96,7 @@ def _make_bot_stub():
     stub._handle_delegate_task = HeimdallBot._handle_delegate_task.__get__(stub)
     stub._handle_list_tasks = HeimdallBot._handle_list_tasks.__get__(stub)
     stub._handle_cancel_task = HeimdallBot._handle_cancel_task.__get__(stub)
+    stub._classify_completion = AsyncMock(return_value=(True, ""))
     return stub
 
 

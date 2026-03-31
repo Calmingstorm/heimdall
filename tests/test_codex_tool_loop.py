@@ -84,6 +84,7 @@ def _make_bot_stub():
     stub._inject_tool_hints = AsyncMock(side_effect=lambda sp, *a, **kw: sp)
     stub._pending_files = {}
     stub._track_recent_action = MagicMock()
+    stub._classify_completion = AsyncMock(return_value=(True, ""))
     return stub
 
 

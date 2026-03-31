@@ -68,6 +68,7 @@ class TestToolsUsedLocalVariable:
         msg.channel.id = 123
 
         stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
+        stub._classify_completion = AsyncMock(return_value=(True, ""))
         return stub, msg
 
     async def test_returns_5_tuple(self):

@@ -76,6 +76,8 @@ class CodexChatClient:
             "store": False,
             "stream": True,
         }
+        # Note: Codex Responses API does not support max_output_tokens.
+        # Callers needing short responses should use prompt instructions instead.
 
         return await self._stream_request(headers, body)
 

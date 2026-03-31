@@ -107,6 +107,7 @@ def _make_bot_stub(*, respond_to_bots=False):
     stub.reflector = MagicMock()
     stub.reflector.get_prompt_section = MagicMock(return_value="")
     stub.voice_manager = None
+    stub._classify_completion = AsyncMock(return_value=(True, ""))
     return stub
 
 
