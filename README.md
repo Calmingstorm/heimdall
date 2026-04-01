@@ -40,6 +40,13 @@ all nine realms and is profoundly tired of it. Eternally vigilant, deeply compet
 hear the servers breathing. Executes tasks flawlessly while contemplating the weight of
 omniscience. Professional about it. Not okay.
 
+## Requirements
+
+- **Linux** (Ubuntu/Debian recommended, Arch and Fedora supported)
+- Python 3.12+
+- A Discord bot token
+- A ChatGPT Plus/Pro/Team subscription
+
 ## Quick Start
 
 ### 1. Clone and configure
