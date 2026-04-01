@@ -24,8 +24,8 @@ sessions:
 
 tools:
   enabled: true
-  ssh_key_path: "/app/.ssh/id_ed25519"       # Docker/Incus: /app/.ssh/  Bare metal: ~/.ssh/
-  ssh_known_hosts_path: "/app/.ssh/known_hosts"
+  ssh_key_path: "~/.ssh/id_ed25519"
+  ssh_known_hosts_path: "~/.ssh/known_hosts"
   hosts: {}
   # Example host config:
   #   myhost:
@@ -35,25 +35,10 @@ tools:
   #     address: "10.0.0.2"
   #     ssh_user: "deploy"
   #     os: "linux"
-  allowed_services: []
-  # Example services:
-  #   - nginx
-  #   - postgresql
-  #   - docker
-  #   - prometheus
-  allowed_playbooks: []
-  # Example playbooks:
-  #   - check-services.yml
-  #   - system-info.yml
-  ansible_directory: "/ansible"
   command_timeout_seconds: 300
-  # prometheus_host: "myserver"   # Host alias to run Prometheus queries on
-  # ansible_host: "myhost"       # Host alias to run Ansible playbooks from
-  # claude_code_host: "myhost"   # Default host for claude -p
+  # claude_code_host: "myhost"   # Default host for claude -p (omit to disable claude_code tool)
   # claude_code_user: ""         # Non-root user for claude -p edits (e.g. "deploy")
   # claude_code_dir: "/opt/project"  # Default working directory for claude -p
-  # incus_host: "myhost"         # Host alias where Incus runs
-  # tool_packs: [systemd, incus, prometheus]  # Empty or absent = all tools loaded
 
 webhook:
   enabled: false
@@ -69,7 +54,7 @@ learning:
 
 search:
   enabled: true
-  search_db_path: "./data/chromadb"  # Directory for search SQLite DBs
+  search_db_path: "./data/search"
 
 logging:
   level: "INFO"
