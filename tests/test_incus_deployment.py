@@ -64,6 +64,10 @@ class TestMultiDeploymentConfig:
         assert bc.cdp_url == "ws://10.0.0.5:3000?token=custom"
 
 
+_SCRIPTS_DIR_EXISTS = Path("scripts").exists()
+
+
+@pytest.mark.skipif(not _SCRIPTS_DIR_EXISTS, reason="scripts/ not present (stripped for public repo)")
 class TestIncusDeployScript:
     """Incus deployment script exists and is well-formed."""
 
@@ -100,6 +104,7 @@ class TestIncusDeployScript:
         assert "chmod" in content and "700" in content
 
 
+@pytest.mark.skipif(not _SCRIPTS_DIR_EXISTS, reason="scripts/ not present (stripped for public repo)")
 class TestMonitorScript:
     """Monitor script supports multiple deployment types."""
 
