@@ -22,8 +22,22 @@ from src.tools.registry import TOOLS, get_tool_definitions
 
 
 def _patch_load_extension():
-    """Patch sqlite-vec load_extension to fail (simulate missing extension)."""
-    return patch("src.search.sqlite_vec.load_extension", return_value=False)
+    """Patch sqlite-vec load_extension to fail (simulate missing extension).
+
+    Patches at both the definition site and the import site to ensure
+    the mock takes effect regardless of import resolution order.
+    """
+    from contextlib import ExitStack
+    class _multi_patch:
+        def __enter__(self):
+            self._stack = ExitStack()
+            self._stack.enter_context(patch("src.search.sqlite_vec.load_extension", return_value=False))
+            self._stack.enter_context(patch("src.knowledge.store.load_extension", return_value=False))
+            self._stack.enter_context(patch("src.search.vectorstore.load_extension", return_value=False))
+            return self
+        def __exit__(self, *args):
+            self._stack.__exit__(*args)
+    return _multi_patch()
 
 
 # ===========================================================================
