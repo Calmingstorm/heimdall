@@ -1,0 +1,58 @@
+site_name: Heimdall
+site_description: Autonomous executor Discord bot powered by GPT-5.4
+site_url: https://calmingstorm.github.io/heimdall/
+repo_url: https://github.com/Calmingstorm/heimdall
+repo_name: Calmingstorm/heimdall
+
+theme:
+  name: material
+  palette:
+    - scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - search.highlight
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Quick Start: getting-started.md
+      - Configuration: configuration.md
+  - Guide:
+      - Tools: tools.md
+      - Skills: skills.md
+      - Agents: agents.md
+      - Web UI: web-ui.md
+  - Reference:
+      - Architecture: architecture.md
+      - REST API: api.md
+      - Detection Systems: detection.md
+  - Disclaimer: disclaimer.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - tables
+  - toc:
+      permalink: true
