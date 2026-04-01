@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -786,6 +787,7 @@ class TestSkillManagerInit:
         mgr = SkillManager(str(skills_dir), executor)
         assert not mgr.has_skill("broken")
 
+    @pytest.mark.skipif(os.getuid() == 0, reason="root can read any file regardless of permissions")
     def test_unreadable_skill_file(self, tmp_dir: Path, tools_config: ToolsConfig):
         skills_dir = tmp_dir / "skills6"
         skills_dir.mkdir()
