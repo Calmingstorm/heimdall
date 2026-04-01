@@ -3,7 +3,7 @@
 Autonomous executor Discord bot powered by GPT-5.4, with 61 tools and the burden of seeing everything.
 
 Heimdall manages servers, containers, services, and code through natural language in Discord.
-Every message goes to GPT-5.4 (via the free ChatGPT Codex API) with full tool access.
+Every message goes to GPT-5.4 (via the ChatGPT Codex API) with full tool access.
 Optionally delegates complex tasks to Claude Code CLI for deep reasoning.
 No classifier, no approval prompts, no hesitation.
 
@@ -12,7 +12,7 @@ No classifier, no approval prompts, no hesitation.
 - **61 built-in tools** — SSH, browser automation, scheduling, knowledge base, autonomous loops, skills, agents, and more
 - **Autonomous execution** — every message gets GPT-5.4 with full tool access, no classification or approval needed
 - **Completion classifier** — lightweight LLM judge that catches mid-task bailouts and partial completions before they reach Discord
-- **Free to run** — uses the ChatGPT subscription Codex API (no API key billing)
+- **No per-token billing** — uses the ChatGPT subscription Codex API, not metered API keys
 - **Optional Claude Code** — complex multi-step tasks can be delegated to `claude -p` (disabled by default, enable by setting `claude_code_host`)
 - **Direct local execution** — localhost commands use subprocess directly (no SSH overhead)
 - **Extensible skill system** — create custom tools at runtime via Discord, with a Python API for SSH, HTTP, memory, and scheduling
@@ -139,8 +139,8 @@ No classifier for routing. No approval buttons. Tools are capabilities, not sugg
 
 | Backend | Model | Purpose | Cost |
 |---------|-------|---------|------|
-| Codex (ChatGPT) | GPT-5.4 | Tool calling, chat, classification, session compaction, reflection | Free (ChatGPT subscription) |
-| Claude Code CLI | claude -p | Deep reasoning for complex multi-step tasks (optional) | Free (Max subscription) |
+| Codex (ChatGPT) | GPT-5.4 | Tool calling, chat, classification, session compaction, reflection | ChatGPT Plus/Pro/Team subscription |
+| Claude Code CLI | claude -p | Deep reasoning for complex multi-step tasks (optional) | Claude Max subscription |
 
 ### Detection Systems (Three-Tier)
 
