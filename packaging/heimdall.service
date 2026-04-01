@@ -1,0 +1,30 @@
+[Unit]
+Description=Heimdall Discord Bot — Autonomous Executor
+Documentation=https://github.com/calmingstorm/heimdall
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=heimdall
+Group=heimdall
+WorkingDirectory=/opt/heimdall
+ExecStart=/opt/heimdall/.venv/bin/python -m src
+EnvironmentFile=/etc/heimdall/.env
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/heimdall /var/log/heimdall
+
+# Resource limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
