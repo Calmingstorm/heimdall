@@ -930,11 +930,15 @@ class HeimdallBot(discord.Client):
         """Merge built-in and skill tool definitions, deduplicating by name.
 
         Built-in tools take priority over skills with the same name.
-        Cached — invalidated on skill create/edit/delete.
+        Tools requiring unconfigured backends are excluded (e.g. claude_code
+        without claude_code_host). Cached — invalidated on skill create/edit/delete.
         """
         if self._cached_merged_tools is not None:
             return self._cached_merged_tools
         builtin = get_tool_definitions()
+        # Filter out tools that require unconfigured backends
+        if not self.config.tools.claude_code_host:
+            builtin = [t for t in builtin if t["name"] != "claude_code"]
         builtin_names = {t["name"] for t in builtin}
         skill_defs = [
             t for t in self.skill_manager.get_tool_definitions()
