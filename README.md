@@ -52,7 +52,7 @@ cp .env.example .env
 
 ### 2. Set up Codex authentication
 
-Heimdall uses the ChatGPT Codex API (free with a ChatGPT Plus/Pro/Team subscription). You need to authenticate once:
+Heimdall uses the ChatGPT Codex API (requires a ChatGPT Plus/Pro/Team subscription). You need to authenticate once:
 
 ```bash
 # If you have a browser on the same machine:
