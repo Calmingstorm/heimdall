@@ -350,16 +350,7 @@ class TestDeploymentFiles:
         assert "DISCORD_TOKEN" in content
         # Anthropic removed — no classifier
 
-    def test_incus_deploy_script_exists(self):
-        script = ROOT / "scripts" / "incus-deploy.sh"
-        assert script.exists()
-        assert os.access(str(script), os.X_OK)
-
-    def test_monitor_script_multi_deploy(self):
-        content = (ROOT / "scripts" / "monitor.sh").read_text()
-        assert "docker" in content
-        assert "incus" in content
-        assert "local" in content
+    # Removed: incus-deploy.sh and monitor.sh existence tests (scripts/ not shipped in public repo)
 
 
 # ---------------------------------------------------------------------------
