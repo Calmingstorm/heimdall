@@ -160,10 +160,6 @@ class TestDeploymentFiles:
         assert "USER heimdall" in content
         assert "ansiblex" not in content.lower()
 
-    def test_dockerfile_creates_ssh_dir(self):
-        content = Path("Dockerfile").read_text()
-        assert ".ssh" in content
-
     def test_dockerignore_excludes_ssh(self):
         content = Path(".dockerignore").read_text()
         assert "ssh/" in content

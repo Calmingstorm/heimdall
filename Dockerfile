@@ -11,7 +11,7 @@ RUN useradd -m -s /bin/bash heimdall
 WORKDIR /app
 
 COPY pyproject.toml .
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[all]"
 
 COPY src/ src/
 COPY ui/ ui/

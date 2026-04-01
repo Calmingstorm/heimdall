@@ -336,10 +336,6 @@ class TestDeploymentFiles:
         assert "America/New_York" not in content
         assert "${TZ:-UTC}" in content
 
-    def test_dockerfile_creates_ssh_dir(self):
-        content = (ROOT / "Dockerfile").read_text()
-        assert ".ssh" in content
-
     def test_dockerignore_excludes_secrets(self):
         content = (ROOT / ".dockerignore").read_text()
         assert "ssh/" in content

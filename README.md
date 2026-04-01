@@ -117,7 +117,8 @@ docker compose up -d
 
 **Bare metal:**
 ```bash
-pip install -e .
+pip install -e .              # Core only
+pip install -e ".[all]"       # All features (PDF, browser, voice)
 python -m src
 ```
 
@@ -339,7 +340,7 @@ See `docs/SKILLS.md` for the full development guide.
 
 ```bash
 pip install -e ".[dev]"
-python -m pytest tests/ -q
+python -m pytest tests/ -q     # 8800+ tests, all mocked
 ```
 
 9000+ tests, all mocked — no SSH, API, or Discord connections needed.
