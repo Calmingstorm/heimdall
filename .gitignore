@@ -38,3 +38,7 @@ AUDIT_FINDINGS.md
 PRODUCTION_LOGS.txt
 CURRENT_LEARNED.json
 ui_old/
+scripts/
+CLAUDE.md
+consolidate-loop.sh
+consolidate_log.txt
