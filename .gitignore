@@ -38,3 +38,4 @@ AUDIT_FINDINGS.md
 PRODUCTION_LOGS.txt
 CURRENT_LEARNED.json
 ui_old/
+push-github.sh
