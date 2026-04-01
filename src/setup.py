@@ -6,6 +6,8 @@ Usage:
     python -m src.setup --headless       # Add a Codex account (paste-the-URL mode)
     python -m src.setup --list           # List configured accounts
     python -m src.setup --remove N       # Remove account at index N
+    python -m src.setup wizard           # Interactive setup wizard (full config)
+    python -m src.setup wizard --check   # Check if setup is needed
 
 Credentials are saved to data/codex_auth.json as an array of account objects.
 The bot's CodexAuthPool reads this file at startup and rotates between accounts
@@ -223,6 +225,17 @@ def main() -> None:
     remove_parser = sub.add_parser("remove", help="Remove an account by index")
     remove_parser.add_argument("index", type=int, help="Account index to remove")
 
+    # Wizard subcommand
+    wizard_parser = sub.add_parser("wizard", help="Interactive setup wizard (full config)")
+    wizard_parser.add_argument("--headless", action="store_true",
+                               help="Headless mode (no browser for Codex auth)")
+    wizard_parser.add_argument("--check", action="store_true",
+                               help="Check if setup is needed (exit 0=no, 1=yes)")
+    wizard_parser.add_argument("--config-path", default="config.yml",
+                               help="Path to config.yml (default: config.yml)")
+    wizard_parser.add_argument("--env-path", default=".env",
+                               help="Path to .env file (default: .env)")
+
     # Also support --headless and --list as top-level flags for convenience
     parser.add_argument("--headless", action="store_true",
                         help="Paste callback URL manually (no local browser needed)")
@@ -239,6 +252,15 @@ def main() -> None:
     elif args.remove is not None:
         args.index = args.remove
         cmd_remove(args)
+    elif args.command == "wizard":
+        from .setup_wizard import run_wizard
+        run_wizard(
+            config_path=Path(args.config_path),
+            env_path=Path(args.env_path),
+            credentials_path=Path(args.credentials_path),
+            headless=getattr(args, "headless", False),
+            check_only=getattr(args, "check", False),
+        )
     elif args.command == "list":
         cmd_list(args)
     elif args.command == "remove":
