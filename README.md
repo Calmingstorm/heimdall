@@ -93,12 +93,19 @@ Heimdall can also operate with no remote hosts — it runs commands locally via 
 
 ### 4. Set up SSH keys (if using remote hosts)
 
+**Docker:**
 ```bash
-# Copy your SSH private key (the bot uses this to reach remote hosts)
-# Localhost commands use direct subprocess — no SSH key needed for local
+mkdir -p ssh
 cp ~/.ssh/id_ed25519 ssh/id_ed25519
 cp ~/.ssh/known_hosts ssh/known_hosts
 chmod 600 ssh/id_ed25519
+# docker-compose mounts ssh/ into the container automatically
+```
+
+**Bare metal:**
+```bash
+# Heimdall uses ~/.ssh/ by default — no extra setup needed
+# if the bot runs as a user that already has SSH keys configured
 ```
 
 ### 5. Deploy

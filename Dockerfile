@@ -14,11 +14,11 @@ COPY pyproject.toml .
 RUN pip install --no-cache-dir .
 
 COPY src/ src/
+COPY ui/ ui/
 COPY config.yml .
 
-RUN mkdir -p data/context data/sessions data/logs data/usage data/skills data/chromadb .ssh && \
-    chown -R heimdall:heimdall /app && \
-    chmod 700 .ssh
+RUN mkdir -p data/context data/sessions data/logs data/usage data/skills data/search && \
+    chown -R heimdall:heimdall /app
 
 USER heimdall
 

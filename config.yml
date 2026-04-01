@@ -24,7 +24,7 @@ sessions:
 
 tools:
   enabled: true
-  ssh_key_path: "~/.ssh/id_ed25519"
+  ssh_key_path: "~/.ssh/id_ed25519"       # Docker: mount ssh/ to /home/heimdall/.ssh via docker-compose
   ssh_known_hosts_path: "~/.ssh/known_hosts"
   hosts: {}
   # Example host config:
@@ -92,4 +92,5 @@ comfyui:
 
 web:
   enabled: true
+  port: 3000  # Health check + web UI port. Docker maps this to 3939 on the host.
   api_token: ""  # Empty = no auth (dev mode). Set a secret token for production.
