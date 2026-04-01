@@ -13,7 +13,10 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
+_CLAUDE_MD_EXISTS = (ROOT / "CLAUDE.md").exists()
 
+
+@pytest.mark.skipif(not _CLAUDE_MD_EXISTS, reason="CLAUDE.md not present (stripped for public repo)")
 class TestClaudeMdSessionDefense:
     """CLAUDE.md documents all 5 session defense layers."""
 
@@ -46,6 +49,7 @@ class TestClaudeMdSessionDefense:
         assert "reflector" in self.claude_md.lower()
 
 
+@pytest.mark.skipif(not _CLAUDE_MD_EXISTS, reason="CLAUDE.md not present (stripped for public repo)")
 class TestClaudeMdSecurityModel:
     """CLAUDE.md documents security model from Rounds 19-20."""
 
@@ -82,6 +86,7 @@ class TestClaudeMdSecurityModel:
         assert "prompt injection" in self.claude_md.lower()
 
 
+@pytest.mark.skipif(not _CLAUDE_MD_EXISTS, reason="CLAUDE.md not present (stripped for public repo)")
 class TestClaudeMdToolExecution:
     """CLAUDE.md documents tool execution flow from Rounds 15-16."""
 
@@ -111,6 +116,7 @@ class TestClaudeMdToolExecution:
         assert "handoff" in self.claude_md
 
 
+@pytest.mark.skipif(not _CLAUDE_MD_EXISTS, reason="CLAUDE.md not present (stripped for public repo)")
 class TestClaudeMdBotInterop:
     """CLAUDE.md documents bot interop from Rounds 11-12."""
 
@@ -140,6 +146,7 @@ class TestClaudeMdBotInterop:
         assert "anti-poisoning" in self.claude_md.lower() or "not saved" in self.claude_md.lower()
 
 
+@pytest.mark.skipif(not _CLAUDE_MD_EXISTS, reason="CLAUDE.md not present (stripped for public repo)")
 class TestClaudeMdCaching:
     """CLAUDE.md documents caching strategy from Rounds 21-22."""
 
@@ -272,6 +279,7 @@ class TestReadmePerformance:
         assert "connection pooling" in self.readme.lower()
 
 
+@pytest.mark.skipif(not _CLAUDE_MD_EXISTS, reason="CLAUDE.md not present (stripped for public repo)")
 class TestCrossDocConsistencyRound24:
     """README.md and CLAUDE.md are consistent on new sections."""
 

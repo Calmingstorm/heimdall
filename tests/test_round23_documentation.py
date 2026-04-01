@@ -12,6 +12,8 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
+_CLAUDE_MD_EXISTS = (ROOT / "CLAUDE.md").exists()
+
 
 class TestReadmeAccuracy:
     """README.md matches the actual codebase."""
@@ -130,6 +132,7 @@ class TestReadmeAccuracy:
         assert "**`anthropic`**" not in self.readme
 
 
+@pytest.mark.skipif(not _CLAUDE_MD_EXISTS, reason="CLAUDE.md not present (stripped for public repo)")
 class TestClaudeMdAccuracy:
     """CLAUDE.md matches the actual codebase."""
 
@@ -208,6 +211,7 @@ class TestClaudeMdAccuracy:
         assert "5-layer" in lower or "five-layer" in lower or "5 layer" in lower
 
 
+@pytest.mark.skipif(not _CLAUDE_MD_EXISTS, reason="CLAUDE.md not present (stripped for public repo)")
 class TestCrossDocConsistency:
     """README and CLAUDE.md are consistent with each other."""
 
@@ -266,6 +270,7 @@ class TestCrossDocConsistency:
         # CLAUDE.md can mention it in "Removed Features" only
 
 
+@pytest.mark.skipif(not _CLAUDE_MD_EXISTS, reason="CLAUDE.md not present (stripped for public repo)")
 class TestDocumentedFilesExist:
     """Every file path mentioned in docs actually exists."""
 
