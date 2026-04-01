@@ -340,7 +340,7 @@ class TestRequireMention:
         stub._handle_message.assert_awaited_once()
 
     async def test_require_mention_bot_no_mention_ignored(self):
-        """Both flags: bot message without @mention should be ignored."""
+        """Both flags: bot message without @mention should be buffered then discarded."""
         stub = _make_bot_stub()
         stub.config.discord.respond_to_bots = True
         stub.config.discord.require_mention = True
@@ -348,6 +348,10 @@ class TestRequireMention:
         stub._is_allowed_channel = MagicMock(return_value=True)
         stub._handle_message = AsyncMock()
         stub.user.mentioned_in = MagicMock(return_value=False)
+        stub._bot_msg_buffer = {}
+        stub._bot_msg_tasks = {}
+        stub._bot_msg_buffer_delay = 0.05  # fast flush for test
+        stub._bot_msg_buffer_max = 20
         stub.on_message = HeimdallBot.on_message.__get__(stub)
 
         msg = _make_message(content="hello from bot")
@@ -355,6 +359,9 @@ class TestRequireMention:
         msg.id = int(time.time() * 1000) + 205
 
         await stub.on_message(msg)
+        # Message enters buffer, wait for flush
+        await asyncio.sleep(0.1)
+        # _handle_message should NOT be called — mention check in flush rejects it
         stub._handle_message.assert_not_called()
 
 

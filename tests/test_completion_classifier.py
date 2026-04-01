@@ -93,88 +93,9 @@ class TestKeptItems:
 
 
 # ---------------------------------------------------------------------------
-# 3. max_tokens forwarding in CodexChatClient.chat() (Round 1)
-# ---------------------------------------------------------------------------
-
-
-class TestMaxTokensForwarding:
-    """Verify that chat() passes max_tokens to the API body."""
-
-    @pytest.mark.asyncio
-    async def test_max_tokens_added_to_body(self):
-        from src.llm.openai_codex import CodexChatClient
-
-        client = MagicMock(spec=CodexChatClient)
-        client.model = "gpt-4"
-        client.max_tokens = None
-        client.auth = MagicMock()
-        client.auth.get_access_token = AsyncMock(return_value="tok")
-        client.auth.get_account_id = MagicMock(return_value=None)
-        client._convert_messages = MagicMock(return_value=[])
-
-        captured_body = {}
-
-        async def fake_stream(headers, body):
-            captured_body.update(body)
-            return "ok"
-
-        client._stream_request = fake_stream
-
-        result = await CodexChatClient.chat(
-            client, messages=[], system="sys", max_tokens=10,
-        )
-        assert result == "ok"
-        assert captured_body.get("max_output_tokens") == 10
-
-    @pytest.mark.asyncio
-    async def test_no_max_tokens_when_none(self):
-        from src.llm.openai_codex import CodexChatClient
-
-        client = MagicMock(spec=CodexChatClient)
-        client.model = "gpt-4"
-        client.max_tokens = None
-        client.auth = MagicMock()
-        client.auth.get_access_token = AsyncMock(return_value="tok")
-        client.auth.get_account_id = MagicMock(return_value=None)
-        client._convert_messages = MagicMock(return_value=[])
-
-        captured_body = {}
-
-        async def fake_stream(headers, body):
-            captured_body.update(body)
-            return "ok"
-
-        client._stream_request = fake_stream
-
-        result = await CodexChatClient.chat(
-            client, messages=[], system="sys",
-        )
-        assert "max_output_tokens" not in captured_body
-
-    @pytest.mark.asyncio
-    async def test_instance_max_tokens_used_as_fallback(self):
-        from src.llm.openai_codex import CodexChatClient
-
-        client = MagicMock(spec=CodexChatClient)
-        client.model = "gpt-4"
-        client.max_tokens = 500
-        client.auth = MagicMock()
-        client.auth.get_access_token = AsyncMock(return_value="tok")
-        client.auth.get_account_id = MagicMock(return_value=None)
-        client._convert_messages = MagicMock(return_value=[])
-
-        captured_body = {}
-
-        async def fake_stream(headers, body):
-            captured_body.update(body)
-            return "ok"
-
-        client._stream_request = fake_stream
-
-        result = await CodexChatClient.chat(
-            client, messages=[], system="sys",
-        )
-        assert captured_body.get("max_output_tokens") == 500
+# Note: max_tokens forwarding tests removed — Codex Responses API rejects
+# max_output_tokens (HTTP 400). The chat() method accepts the parameter
+# but does not send it to the API.
 
 
 # ---------------------------------------------------------------------------
@@ -430,8 +351,6 @@ class TestClassifyCompletion:
         call_kwargs = bot.codex_client.chat.call_args
         # Check system prompt
         assert call_kwargs.kwargs["system"] == HeimdallBot._CLASSIFIER_SYSTEM_PROMPT
-        # Check max_tokens
-        assert call_kwargs.kwargs["max_tokens"] == 50
         # Check user message contains task, tools, and response
         user_msg = call_kwargs.kwargs["messages"][0]["content"]
         assert "deploy app" in user_msg
@@ -1110,7 +1029,6 @@ class TestIntegrationClassifierComplete:
         # Classifier API was called once via codex_client.chat
         stub.codex_client.chat.assert_called_once()
         call_kw = stub.codex_client.chat.call_args.kwargs
-        assert call_kw["max_tokens"] == 50
         assert "check disk usage" in call_kw["messages"][0]["content"]
         assert "run_command" in call_kw["messages"][0]["content"]
 
