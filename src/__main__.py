@@ -13,6 +13,13 @@ from .logging import setup_logging, get_logger
 
 
 def main() -> None:
+    # Route to setup if --setup or setup subcommand
+    if "--setup" in sys.argv or (len(sys.argv) > 1 and sys.argv[1] == "setup"):
+        sys.argv = [sys.argv[0]] + [a for a in sys.argv[1:] if a not in ("--setup", "setup")]
+        from .setup import main as setup_main
+        setup_main()
+        return
+
     config_path = sys.argv[1] if len(sys.argv) > 1 else "config.yml"
 
     if not Path(config_path).exists():
