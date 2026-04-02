@@ -24,6 +24,7 @@ from ..setup_wizard import (
     build_env,
     is_setup_needed,
     validate_token_format,
+    write_env_file,
 )
 from ..tools.registry import get_tool_definitions
 from .chat import MAX_CHAT_CONTENT_LEN, process_web_chat
@@ -114,13 +115,11 @@ def _write_config(path: Path, data: dict) -> None:
 
 
 def _write_env_file(path: Path, content: str) -> None:
-    """Write .env file with restricted permissions."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content)
-    try:
-        path.chmod(0o600)
-    except OSError:
-        pass
+    """Write .env file with restricted permissions.
+
+    Delegates to the shared ``write_env_file`` from ``setup_wizard``.
+    """
+    write_env_file(path, content)
 
 
 def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:

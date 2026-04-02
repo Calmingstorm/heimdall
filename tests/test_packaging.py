@@ -125,7 +125,7 @@ class TestValidateServiceFile:
             "WorkingDirectory=/opt/heimdall\n"
             "ExecStart=/opt/heimdall/.venv/bin/python -m src\n"
             "EnvironmentFile=/etc/heimdall/.env\n"
-            "Restart=on-failure\n"
+            "Restart=always\n"
             "[Install]\nWantedBy=multi-user.target\n"
         )
         errors = validate_service_file(content)
@@ -139,7 +139,7 @@ class TestValidateServiceFile:
             "WorkingDirectory=/opt/heimdall\n"
             "ExecStart=/opt/heimdall/.venv/bin/python -m src\n"
             "EnvironmentFile=/etc/heimdall/.env\n"
-            "Restart=on-failure\n"
+            "Restart=always\n"
             "[Install]\n"
         )
         errors = validate_service_file(content)
@@ -173,7 +173,7 @@ class TestValidateServiceFile:
         """REQUIRED_SERVICE_DIRECTIVES contains the spec from BUILD_STATUS.md."""
         assert REQUIRED_SERVICE_DIRECTIVES["Type"] == "simple"
         assert REQUIRED_SERVICE_DIRECTIVES["User"] == "heimdall"
-        assert REQUIRED_SERVICE_DIRECTIVES["Restart"] == "on-failure"
+        assert REQUIRED_SERVICE_DIRECTIVES["Restart"] == "always"
         assert REQUIRED_SERVICE_DIRECTIVES["ExecStart"] == "/opt/heimdall/.venv/bin/python -m src"
 
 

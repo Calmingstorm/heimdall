@@ -629,9 +629,10 @@ class TestSetupWizardPageStructure:
     def test_exports_default_component(self, setup_wizard_js):
         assert "export default" in setup_wizard_js
 
-    def test_imports_api(self, setup_wizard_js):
-        assert "import" in setup_wizard_js
-        assert "api" in setup_wizard_js
+    def test_uses_raw_fetch(self, setup_wizard_js):
+        """Setup wizard uses raw fetch() since auth isn't configured yet."""
+        assert "fetch(" in setup_wizard_js
+        assert "/api/setup/complete" in setup_wizard_js
 
 
 class TestAppSetupRoute:

@@ -31,7 +31,7 @@ REQUIRED_SERVICE_DIRECTIVES = {
     "WorkingDirectory": "/opt/heimdall",
     "ExecStart": "/opt/heimdall/.venv/bin/python -m src",
     "EnvironmentFile": "/etc/heimdall/.env",
-    "Restart": "on-failure",
+    "Restart": "always",
 }
 
 

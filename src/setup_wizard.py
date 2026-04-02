@@ -5,6 +5,7 @@ Usage:
     python -m src.setup wizard              # Full interactive setup
     python -m src.setup wizard --headless   # Headless mode (no browser)
     python -m src.setup wizard --check      # Check if setup is needed
+    python -m src.setup wizard --reconfigure  # Re-run wizard on existing config
 
 Walks the user through configuring Discord, Codex auth, hosts, features,
 and web UI.  Generates config.yml and .env from answers.  All I/O goes
@@ -27,6 +28,54 @@ from typing import Any
 
 import aiohttp
 import yaml
+
+
+# ---------------------------------------------------------------------------
+# ANSI colour helpers (auto-detect TTY)
+# ---------------------------------------------------------------------------
+
+def _supports_color() -> bool:
+    """Return True if stdout appears to support ANSI colour codes."""
+    if os.environ.get("NO_COLOR"):
+        return False
+    if os.environ.get("FORCE_COLOR"):
+        return True
+    return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+
+
+_COLOR_ENABLED = _supports_color()
+
+
+def _c(code: str, text: str) -> str:
+    """Wrap *text* in ANSI escape if colour is enabled."""
+    if not _COLOR_ENABLED:
+        return text
+    return f"\033[{code}m{text}\033[0m"
+
+
+def color_header(text: str) -> str:
+    """Bold cyan for section headers."""
+    return _c("1;36", text)
+
+
+def color_success(text: str) -> str:
+    """Green for success messages."""
+    return _c("32", text)
+
+
+def color_error(text: str) -> str:
+    """Red for error messages."""
+    return _c("31", text)
+
+
+def color_warn(text: str) -> str:
+    """Yellow for warnings."""
+    return _c("33", text)
+
+
+def color_dim(text: str) -> str:
+    """Dim for secondary info."""
+    return _c("2", text)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -290,6 +339,32 @@ def detect_systemd() -> bool:
     return shutil.which("systemctl") is not None
 
 
+def write_env_file(path: Path, content: str) -> None:
+    """Write .env file with restricted permissions.
+
+    Shared between the CLI wizard and the web API — single source of truth.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+    try:
+        path.chmod(0o600)
+    except OSError:
+        pass  # Windows or permission issue
+
+
+def load_existing_config(config_path: Path) -> dict[str, Any] | None:
+    """Load an existing config.yml and return it as a dict.
+
+    Returns None if the file doesn't exist or can't be parsed.
+    """
+    if not config_path.exists():
+        return None
+    try:
+        return yaml.safe_load(config_path.read_text()) or None
+    except Exception:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Wizard runner
 # ---------------------------------------------------------------------------
@@ -309,6 +384,7 @@ class SetupWizard:
         env_path: Path = DEFAULT_ENV_PATH,
         credentials_path: Path = Path("data/codex_auth.json"),
         headless: bool = False,
+        reconfigure: bool = False,
         input_fn: Callable[[str], str] = input,
         print_fn: Callable[..., None] = print,
     ):
@@ -316,6 +392,7 @@ class SetupWizard:
         self.env_path = env_path
         self.credentials_path = credentials_path
         self.headless = headless
+        self.reconfigure = reconfigure
         self._input = input_fn
         self._print = print_fn
 
@@ -329,28 +406,65 @@ class SetupWizard:
         self.timezone: str = "UTC"
         self.codex_configured: bool = False
 
+        # Pre-populate from existing config in reconfigure mode
+        if self.reconfigure:
+            self._load_existing()
+
+    def _load_existing(self) -> None:
+        """Pre-populate wizard fields from existing config (for reconfigure)."""
+        existing = load_existing_config(self.config_path)
+        if not existing:
+            return
+        self.timezone = existing.get("timezone", "UTC")
+        tools = existing.get("tools", {})
+        for name, host_info in tools.get("hosts", {}).items():
+            if isinstance(host_info, dict) and host_info.get("address"):
+                self.hosts[name] = {
+                    "address": host_info["address"],
+                    "ssh_user": host_info.get("ssh_user", "root"),
+                }
+        self.features = {
+            "browser": existing.get("browser", {}).get("enabled", False),
+            "voice": existing.get("voice", {}).get("enabled", False),
+            "comfyui": existing.get("comfyui", {}).get("enabled", False),
+        }
+        self.web_api_token = existing.get("web", {}).get("api_token", "")
+        self.claude_code_host = tools.get("claude_code_host", "")
+
     # -- Prompt helpers -----------------------------------------------------
 
     def _prompt(self, message: str, default: str = "") -> str:
-        """Prompt for input with optional default."""
+        """Prompt for input with optional default.  Returns default on Ctrl+C."""
         if default:
             display = f"{message} [{default}]: "
         else:
             display = f"{message}: "
-        value = self._input(display).strip()
+        try:
+            value = self._input(display).strip()
+        except (KeyboardInterrupt, EOFError):
+            self._print("")
+            return default
         return value if value else default
 
     def _prompt_yes_no(self, message: str, default: bool = False) -> bool:
-        """Prompt for a yes/no answer."""
+        """Prompt for a yes/no answer.  Returns default on Ctrl+C."""
         suffix = " [Y/n]" if default else " [y/N]"
-        answer = self._input(f"{message}{suffix}: ").strip().lower()
+        try:
+            answer = self._input(f"{message}{suffix}: ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            self._print("")
+            return default
         if not answer:
             return default
         return answer in ("y", "yes")
 
     def _prompt_secret(self, message: str) -> str:
-        """Prompt for a secret value (no default shown)."""
-        return self._input(f"{message}: ").strip()
+        """Prompt for a secret value.  Returns empty on Ctrl+C."""
+        try:
+            return self._input(f"{message}: ").strip()
+        except (KeyboardInterrupt, EOFError):
+            self._print("")
+            return ""
 
     # -- Wizard steps -------------------------------------------------------
 
@@ -359,36 +473,42 @@ class SetupWizard:
 
         Returns True if token is valid, False to abort.
         """
-        self._print("\n=== Step 1: Discord Bot Token ===\n")
+        self._print(f"\n{color_header('=== Step 1: Discord Bot Token ===')}\n")
         self._print("Create a bot at https://discord.com/developers/applications")
-        self._print("Required intents: MESSAGE CONTENT, SERVER MEMBERS\n")
+        self._print("Required intents: MESSAGE CONTENT, SERVER MEMBERS")
+        self._print(color_dim("Token format: three dot-separated base64 parts\n"))
 
         for attempt in range(3):
+            remaining = 3 - attempt
             token = self._prompt_secret("Paste your bot token")
             if not token:
-                self._print("No token provided.")
+                self._print(color_warn(f"  No token provided. ({remaining - 1} attempts left)"))
                 continue
 
             if not validate_token_format(token):
-                self._print("Token format looks invalid (expected 3 dot-separated parts).")
+                self._print(color_warn("  Token format invalid — expected 3 dot-separated parts."))
+                if remaining > 1:
+                    self._print(color_dim(f"  {remaining - 1} attempt(s) left"))
                 continue
 
-            self._print("Validating token...")
+            self._print("Validating token with Discord API...")
             valid, info = asyncio.run(validate_discord_token(token))
             if valid:
                 self.discord_token = token.strip()
                 self.bot_info = info
-                self._print(f"  Bot: {info.get('username', 'unknown')} (ID: {info.get('id', '?')})")
+                self._print(color_success(f"  Bot: {info.get('username', 'unknown')} (ID: {info.get('id', '?')})"))
                 return True
             else:
-                self._print(f"  Token validation failed: {info.get('error', 'unknown error')}")
+                self._print(color_error(f"  Token validation failed: {info.get('error', 'unknown error')}"))
+                if remaining > 1:
+                    self._print(color_dim(f"  {remaining - 1} attempt(s) left"))
 
-        self._print("\nFailed to validate token after 3 attempts.")
+        self._print(color_error("\nFailed to validate token after 3 attempts."))
         return False
 
     def step_codex_auth(self) -> None:
         """Step 2: Set up Codex (ChatGPT) authentication."""
-        self._print("\n=== Step 2: Codex Authentication ===\n")
+        self._print(f"\n{color_header('=== Step 2: Codex Authentication ===')}\n")
         self._print("Codex (ChatGPT) provides the AI backend.  You need a free")
         self._print("ChatGPT account.  This step opens a browser for OAuth login.\n")
 
@@ -424,7 +544,7 @@ class SetupWizard:
 
     def step_hosts(self) -> None:
         """Step 3: Configure remote hosts."""
-        self._print("\n=== Step 3: Remote Hosts ===\n")
+        self._print(f"\n{color_header('=== Step 3: Remote Hosts ===')}\n")
         self._print("Heimdall can manage remote servers via SSH.")
         self._print("You can also add hosts later in config.yml.\n")
 
@@ -444,14 +564,14 @@ class SetupWizard:
                 continue
 
             self.hosts[name] = {"address": address, "ssh_user": ssh_user}
-            self._print(f"  Added host '{name}' ({ssh_user}@{address})")
+            self._print(color_success(f"  Added host '{name}' ({ssh_user}@{address})"))
 
         if self.hosts:
             self._print(f"\n  Configured {len(self.hosts)} host(s)")
 
     def step_features(self) -> None:
         """Step 4: Toggle optional features."""
-        self._print("\n=== Step 4: Optional Features ===\n")
+        self._print(f"\n{color_header('=== Step 4: Optional Features ===')}\n")
         self._print("Enable extra capabilities (all can be changed later).\n")
 
         self.features["browser"] = self._prompt_yes_no("Enable browser automation?")
@@ -480,7 +600,7 @@ class SetupWizard:
 
     def step_web_token(self) -> None:
         """Step 5: Set up web UI authentication."""
-        self._print("\n=== Step 5: Web UI Authentication ===\n")
+        self._print(f"\n{color_header('=== Step 5: Web UI Authentication ===')}\n")
         self._print("The web management UI can be protected with an API token.\n")
 
         if self._prompt_yes_no("Generate a random API token for the web UI?", default=True):
@@ -496,7 +616,7 @@ class SetupWizard:
 
         Returns (config_written, env_written).
         """
-        self._print("\n=== Step 6: Write Configuration ===\n")
+        self._print(f"\n{color_header('=== Step 6: Write Configuration ===')}\n")
 
         cfg = build_config(
             timezone=self.timezone,
@@ -538,41 +658,37 @@ class SetupWizard:
         """Write config dict as YAML."""
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
         self.config_path.write_text(yaml.dump(cfg, default_flow_style=False, sort_keys=False))
-        self._print(f"  Wrote {self.config_path}")
+        self._print(color_success(f"  Wrote {self.config_path}"))
 
     def _write_env_file(self, content: str) -> None:
-        """Write .env file with restricted permissions."""
-        self.env_path.parent.mkdir(parents=True, exist_ok=True)
-        self.env_path.write_text(content)
-        try:
-            self.env_path.chmod(0o600)
-        except OSError:
-            pass  # Windows or permission issue
-        self._print(f"  Wrote {self.env_path}")
+        """Write .env file with restricted permissions (delegates to shared helper)."""
+        write_env_file(self.env_path, content)
+        self._print(color_success(f"  Wrote {self.env_path}"))
 
     def step_start_service(self) -> None:
         """Step 7: Offer to start the systemd service."""
         if not detect_systemd():
-            self._print("\n  systemd not detected — start Heimdall manually.")
+            self._print(f"\n  {color_dim('systemd not detected — start Heimdall manually.')}")
             return
 
-        self._print("\n=== Step 7: Start Heimdall ===\n")
-        if self._prompt_yes_no("Start Heimdall service now?"):
+        self._print(f"\n{color_header('=== Step 7: Start Heimdall ===')}\n")
+        action = "restart" if self.reconfigure else "start"
+        if self._prompt_yes_no(f"{action.title()} Heimdall service now?"):
             try:
                 subprocess.run(
-                    ["sudo", "systemctl", "start", "heimdall"],
+                    ["sudo", "systemctl", action, "heimdall"],
                     check=True,
                     capture_output=True,
                     text=True,
                     timeout=30,
                 )
-                self._print("  Heimdall service started!")
+                self._print(color_success(f"  Heimdall service {action}ed!"))
             except subprocess.CalledProcessError as exc:
-                self._print(f"  Failed to start service: {exc.stderr}")
+                self._print(color_error(f"  Failed to {action} service: {exc.stderr}"))
             except FileNotFoundError:
-                self._print("  'sudo' not found — start manually: systemctl start heimdall")
+                self._print(color_warn(f"  'sudo' not found — {action} manually: systemctl {action} heimdall"))
             except subprocess.TimeoutExpired:
-                self._print("  Start command timed out.")
+                self._print(color_error(f"  {action.title()} command timed out."))
 
     # -- Main entry point ---------------------------------------------------
 
@@ -581,13 +697,18 @@ class SetupWizard:
 
         Returns True if setup completed successfully, False otherwise.
         """
-        self._print("=" * 50)
-        self._print("  Heimdall Setup Wizard")
-        self._print("=" * 50)
+        banner = "  Heimdall Setup Wizard"
+        if self.reconfigure:
+            banner = "  Heimdall Reconfigure Wizard"
+        self._print(color_header("=" * 50))
+        self._print(color_header(banner))
+        self._print(color_header("=" * 50))
+        if self.reconfigure:
+            self._print(color_dim("  (Existing settings loaded as defaults)\n"))
 
         # Step 1: Discord token (required)
         if not self.step_discord_token():
-            self._print("\nSetup cancelled — Discord token is required.")
+            self._print(color_error("\nSetup cancelled — Discord token is required."))
             return False
 
         # Step 2: Codex auth (optional but recommended)
@@ -609,9 +730,9 @@ class SetupWizard:
         self.step_start_service()
 
         # Summary
-        self._print("\n" + "=" * 50)
-        self._print("  Setup complete!")
-        self._print("=" * 50)
+        self._print("\n" + color_header("=" * 50))
+        self._print(color_success("  Setup complete!"))
+        self._print(color_header("=" * 50))
         if config_written:
             self._print(f"  Config:  {self.config_path}")
         if env_written:
@@ -634,6 +755,7 @@ def run_wizard(
     credentials_path: Path = Path("data/codex_auth.json"),
     headless: bool = False,
     check_only: bool = False,
+    reconfigure: bool = False,
 ) -> None:
     """Entry point for ``python -m src.setup wizard``."""
     if check_only:
@@ -646,11 +768,12 @@ def run_wizard(
         env_path=env_path,
         credentials_path=credentials_path,
         headless=headless,
+        reconfigure=reconfigure,
     )
     try:
         success = wizard.run()
     except KeyboardInterrupt:
-        print("\n\nSetup cancelled by user.")
+        print(color_warn("\n\nSetup cancelled by user."))
         sys.exit(130)
 
     sys.exit(0 if success else 1)

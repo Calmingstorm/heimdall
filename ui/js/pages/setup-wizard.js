@@ -4,8 +4,6 @@
  * Multi-step form shown when Heimdall detects it hasn't been configured yet.
  * No auth required (runs before auth is configured).
  */
-import { api } from '../api.js';
-
 const { ref, computed, reactive, onMounted } = Vue;
 
 export default {
@@ -162,10 +160,10 @@ export default {
           </p>
           <div v-if="generatedToken" class="p-3 rounded bg-gray-800 border border-gray-600 mb-3 text-left">
             <p class="text-xs text-gray-400 mb-1">Your Web UI API Token (save this!):</p>
-            <code class="text-sm text-green-400 break-all">{{ generatedToken }}</code>
+            <code class="text-sm text-green-400 break-all select-all">{{ generatedToken }}</code>
           </div>
           <p class="text-xs text-gray-500">
-            Refresh this page in a few seconds to access the management UI.
+            Reloading in {{ reloadCountdown }}s...
           </p>
         </div>
 
@@ -178,7 +176,11 @@ export default {
             Next
           </button>
           <button v-else @click="submit" class="btn btn-primary" :disabled="submitting">
-            {{ submitting ? 'Applying...' : 'Apply Configuration' }}
+            <span v-if="submitting" class="inline-flex items-center gap-2">
+              <svg class="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+              Applying...
+            </span>
+            <span v-else>Apply Configuration</span>
           </button>
         </div>
       </div>
@@ -191,6 +193,7 @@ export default {
     const submitting = ref(false);
     const setupDone = ref(false);
     const generatedToken = ref('');
+    const reloadCountdown = ref(10);
 
     const form = reactive({
       discord_token: '',
@@ -303,6 +306,14 @@ export default {
           return;
         }
         setupDone.value = true;
+        // Auto-reload after countdown
+        const timer = setInterval(() => {
+          reloadCountdown.value--;
+          if (reloadCountdown.value <= 0) {
+            clearInterval(timer);
+            window.location.reload();
+          }
+        }, 1000);
       } catch (e) {
         error.value = e.message || 'Network error';
       } finally {
@@ -312,8 +323,8 @@ export default {
 
     return {
       steps, currentStep, error, submitting, setupDone, generatedToken,
-      form, tokenHint, validHosts, enabledFeatures, canProceed,
-      addHost, removeHost, nextStep, prevStep, submit,
+      reloadCountdown, form, tokenHint, validHosts, enabledFeatures,
+      canProceed, addHost, removeHost, nextStep, prevStep, submit,
     };
   },
 };

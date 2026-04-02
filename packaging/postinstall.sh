@@ -8,6 +8,12 @@ LOG_DIR="/var/log/heimdall"
 SERVICE_USER="heimdall"
 SERVICE_GROUP="heimdall"
 
+# --- Detect upgrade vs fresh install ---
+IS_UPGRADE="false"
+if [ -f "$CONFIG_DIR/config.yml" ] && [ -f "$CONFIG_DIR/.env" ]; then
+    IS_UPGRADE="true"
+fi
+
 # --- Create system user and group ---
 if ! getent group "$SERVICE_GROUP" >/dev/null 2>&1; then
     groupadd --system "$SERVICE_GROUP"
@@ -60,20 +66,37 @@ chmod 600 "$CONFIG_DIR/.env"
 systemctl daemon-reload
 systemctl enable heimdall.service
 
-echo ""
-echo "=================================================="
-echo "  Heimdall installed successfully!"
-echo "=================================================="
-echo ""
-echo "  Config:  $CONFIG_DIR/config.yml"
-echo "  Env:     $CONFIG_DIR/.env"
-echo "  Data:    $DATA_DIR"
-echo "  Logs:    $LOG_DIR"
-echo ""
-echo "  Next steps:"
-echo "    1. Edit $CONFIG_DIR/.env and set DISCORD_TOKEN"
-echo "    2. Run the setup wizard: sudo -u heimdall $INSTALL_DIR/.venv/bin/python -m src.setup"
-echo "    3. Start the service: sudo systemctl start heimdall"
-echo ""
-echo "  Or use the web wizard at http://localhost:3000/ui/ after starting."
-echo "=================================================="
+if [ "$IS_UPGRADE" = "true" ]; then
+    echo ""
+    echo "=================================================="
+    echo "  Heimdall upgraded successfully!"
+    echo "=================================================="
+    echo ""
+    echo "  Existing configuration preserved:"
+    echo "    Config:  $CONFIG_DIR/config.yml"
+    echo "    Env:     $CONFIG_DIR/.env"
+    echo ""
+    echo "  Restart to apply the update:"
+    echo "    sudo systemctl restart heimdall"
+    echo ""
+    echo "  To reconfigure: sudo -u heimdall $INSTALL_DIR/.venv/bin/python -m src.setup wizard --reconfigure"
+    echo "=================================================="
+else
+    echo ""
+    echo "=================================================="
+    echo "  Heimdall installed successfully!"
+    echo "=================================================="
+    echo ""
+    echo "  Config:  $CONFIG_DIR/config.yml"
+    echo "  Env:     $CONFIG_DIR/.env"
+    echo "  Data:    $DATA_DIR"
+    echo "  Logs:    $LOG_DIR"
+    echo ""
+    echo "  Next steps:"
+    echo "    1. Edit $CONFIG_DIR/.env and set DISCORD_TOKEN"
+    echo "    2. Run the setup wizard: sudo -u heimdall $INSTALL_DIR/.venv/bin/python -m src.setup wizard"
+    echo "    3. Start the service: sudo systemctl start heimdall"
+    echo ""
+    echo "  Or use the web wizard at http://localhost:3000/ui/ after starting."
+    echo "=================================================="
+fi

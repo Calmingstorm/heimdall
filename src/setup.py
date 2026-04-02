@@ -235,6 +235,8 @@ def main() -> None:
                                help="Path to config.yml (default: config.yml)")
     wizard_parser.add_argument("--env-path", default=".env",
                                help="Path to .env file (default: .env)")
+    wizard_parser.add_argument("--reconfigure", action="store_true",
+                               help="Re-run wizard on existing config (loads current values as defaults)")
 
     # Also support --headless and --list as top-level flags for convenience
     parser.add_argument("--headless", action="store_true",
@@ -260,6 +262,7 @@ def main() -> None:
             credentials_path=Path(args.credentials_path),
             headless=getattr(args, "headless", False),
             check_only=getattr(args, "check", False),
+            reconfigure=getattr(args, "reconfigure", False),
         )
     elif args.command == "list":
         cmd_list(args)
