@@ -30,9 +30,8 @@ jobs:
       - name: Install nfpm
         run: |
           NFPM_VERSION=$(curl -s https://api.github.com/repos/goreleaser/nfpm/releases/latest | grep -o '"tag_name":"[^"]*"' | cut -d'"' -f4)
-          curl -sLO "https://github.com/goreleaser/nfpm/releases/download/${NFPM_VERSION}/nfpm_${NFPM_VERSION#v}_linux_amd64.tar.gz"
-          tar xzf "nfpm_${NFPM_VERSION#v}_linux_amd64.tar.gz" nfpm
-          mv nfpm /usr/local/bin/
+          curl -sLO "https://github.com/goreleaser/nfpm/releases/download/${NFPM_VERSION}/nfpm_${NFPM_VERSION#v}_amd64.deb"
+          sudo dpkg -i "nfpm_${NFPM_VERSION#v}_amd64.deb"
           nfpm --version
 
       - name: Build .deb package
