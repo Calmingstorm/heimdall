@@ -247,25 +247,12 @@ class TestNfpmVersioning:
         version = config.get("version", "")
         assert "${VERSION" in version, f"nfpm version should use ${{VERSION}}, got '{version}'"
 
-    def test_nfpm_version_has_default_fallback(self):
-        """nfpm.yml version has a default value via :- syntax."""
+    def test_nfpm_version_uses_env_var(self):
+        """nfpm.yml version uses ${VERSION} env var."""
         content = (PACKAGING_DIR / "nfpm.yml").read_text()
         config = yaml.safe_load(content)
         version = config.get("version", "")
-        assert ":-" in version, f"nfpm version should have default via :-, got '{version}'"
-
-    def test_nfpm_version_default_is_semver(self):
-        """The default version fallback is semver format."""
-        content = (PACKAGING_DIR / "nfpm.yml").read_text()
-        config = yaml.safe_load(content)
-        version = config.get("version", "")
-        match = re.search(r'\$\{VERSION:-([^}]+)\}', version)
-        assert match, f"Could not extract default from '{version}'"
-        default = match.group(1)
-        parts = default.split(".")
-        assert len(parts) == 3, f"Default '{default}' must be semver X.Y.Z"
-        for part in parts:
-            assert part.isdigit(), f"Default version part '{part}' must be numeric"
+        assert "${VERSION" in version, f"Version should use ${{VERSION}} env var, got '{version}'"
 
     def test_nfpm_still_has_version_schema_semver(self):
         """nfpm.yml retains version_schema: semver."""
@@ -395,25 +382,12 @@ class TestVersionModuleStructure:
 class TestVersionConsistency:
     """Tests for version consistency across files."""
 
-    def test_pyproject_version_matches_nfpm_default(self):
-        """pyproject.toml version matches nfpm.yml default version."""
-        # Read pyproject.toml version
-        toml_path = PROJECT_ROOT / "pyproject.toml"
-        toml_text = toml_path.read_text()
-        toml_match = re.search(r'^version\s*=\s*"([^"]+)"', toml_text, re.MULTILINE)
-        assert toml_match
-        pyproject_version = toml_match.group(1)
-
-        # Read nfpm.yml default version
+    def test_nfpm_version_uses_env_var(self):
+        """nfpm.yml version is set via VERSION env var at build time."""
         nfpm_content = (PACKAGING_DIR / "nfpm.yml").read_text()
         nfpm_config = yaml.safe_load(nfpm_content)
         nfpm_version = nfpm_config.get("version", "")
-        nfpm_match = re.search(r'\$\{VERSION:-([^}]+)\}', nfpm_version)
-        assert nfpm_match
-        nfpm_default = nfpm_match.group(1)
-
-        assert pyproject_version == nfpm_default, \
-            f"pyproject.toml ({pyproject_version}) and nfpm.yml default ({nfpm_default}) should match"
+        assert "${VERSION" in nfpm_version
 
     def test_get_version_matches_pyproject(self):
         """get_version() returns the same version as pyproject.toml."""

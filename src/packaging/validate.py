@@ -280,8 +280,8 @@ REQUIRED_DEB_DEPENDS = ["python3.12", "python3.12-venv", "openssh-client"]
 
 # Paths the package must install content to
 REQUIRED_CONTENT_DESTINATIONS = [
-    "/opt/heimdall/src/",
-    "/opt/heimdall/ui/",
+    "/opt/heimdall/src",
+    "/opt/heimdall/ui",
     "/opt/heimdall/pyproject.toml",
     "/opt/heimdall/config.yml",
     "/opt/heimdall/.env.example",
@@ -380,7 +380,8 @@ def validate_nfpm_config(config: dict[str, Any]) -> list[str]:
 def validate_nfpm_file_references(config: dict[str, Any], base_dir: Path) -> list[str]:
     """Check that all files referenced by nfpm config actually exist.
 
-    ``base_dir`` is the directory containing nfpm.yml (packaging/).
+    ``base_dir`` is the repo root (where nfpm runs from). All paths in
+    nfpm.yml are relative to the repo root, not the packaging/ directory.
 
     Checks:
     - Script files exist relative to base_dir

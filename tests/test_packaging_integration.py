@@ -47,9 +47,10 @@ from src.setup_wizard import (
     validate_token_format,
 )
 
-PACKAGING_DIR = Path(__file__).parent.parent / "packaging"
-WORKFLOWS_DIR = Path(__file__).parent.parent / ".github" / "workflows"
-UI_DIR = Path(__file__).parent.parent / "ui"
+REPO_ROOT = Path(__file__).parent.parent
+PACKAGING_DIR = REPO_ROOT / "packaging"
+WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
+UI_DIR = REPO_ROOT / "ui"
 SRC_DIR = Path(__file__).parent.parent / "src"
 
 
@@ -148,7 +149,7 @@ class TestNfpmScriptConsistency:
         """All source files referenced by nfpm.yml exist."""
         content = (PACKAGING_DIR / "nfpm.yml").read_text()
         config = parse_nfpm_config(content)
-        errors = validate_nfpm_file_references(config, PACKAGING_DIR)
+        errors = validate_nfpm_file_references(config, REPO_ROOT)
         assert errors == [], f"Missing nfpm content sources: {errors}"
 
     def test_nfpm_installs_setup_wizard_module(self):
@@ -156,7 +157,7 @@ class TestNfpmScriptConsistency:
         content = (PACKAGING_DIR / "nfpm.yml").read_text()
         config = parse_nfpm_config(content)
         dsts = [e.get("dst", "") for e in config.get("contents", [])]
-        assert any("/opt/heimdall/src/" in d for d in dsts), \
+        assert any("/opt/heimdall/src" in d for d in dsts), \
             "nfpm must install src/ (contains setup_wizard.py)"
 
     def test_nfpm_installs_web_ui(self):
@@ -164,7 +165,7 @@ class TestNfpmScriptConsistency:
         content = (PACKAGING_DIR / "nfpm.yml").read_text()
         config = parse_nfpm_config(content)
         dsts = [e.get("dst", "") for e in config.get("contents", [])]
-        assert any("/opt/heimdall/ui/" in d for d in dsts), \
+        assert any("/opt/heimdall/ui" in d for d in dsts), \
             "nfpm must install ui/ (contains setup-wizard.js)"
 
 
@@ -554,7 +555,7 @@ class TestAllValidatorsPassOnRealFiles:
     def test_nfpm_file_references_valid(self):
         content = (PACKAGING_DIR / "nfpm.yml").read_text()
         config = parse_nfpm_config(content)
-        errors = validate_nfpm_file_references(config, PACKAGING_DIR)
+        errors = validate_nfpm_file_references(config, REPO_ROOT)
         assert errors == [], f"nfpm file reference errors: {errors}"
 
     def test_release_workflow_valid(self):

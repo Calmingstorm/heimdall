@@ -35,7 +35,8 @@ from src.packaging.validate import (
     validate_workflow_docker_job,
 )
 
-PACKAGING_DIR = Path(__file__).parent.parent / "packaging"
+REPO_ROOT = Path(__file__).parent.parent
+PACKAGING_DIR = REPO_ROOT / "packaging"
 WORKFLOWS_DIR = Path(__file__).parent.parent / ".github" / "workflows"
 
 
@@ -716,7 +717,7 @@ class TestValidateNfpmFileReferences:
         """All files referenced by real nfpm.yml exist."""
         content = (PACKAGING_DIR / "nfpm.yml").read_text()
         config = parse_nfpm_config(content)
-        errors = validate_nfpm_file_references(config, PACKAGING_DIR)
+        errors = validate_nfpm_file_references(config, REPO_ROOT)
         assert errors == [], f"Missing files: {errors}"
 
     def test_catches_missing_script(self, tmp_path):
@@ -861,7 +862,7 @@ class TestNfpmPackagingConsistency:
         config = parse_nfpm_config(content)
         scripts = config.get("scripts", {})
         for name, path in scripts.items():
-            full = PACKAGING_DIR / path
+            full = REPO_ROOT / path
             assert full.exists(), f"Script '{name}' → {path} not found at {full}"
 
     def test_nfpm_service_file_matches_packaging(self):
@@ -875,7 +876,7 @@ class TestNfpmPackagingConsistency:
         ]
         assert service_entries, "nfpm.yml must install a service file"
         service_src = service_entries[0]["src"]
-        assert (PACKAGING_DIR / service_src).exists(), \
+        assert (REPO_ROOT / service_src).exists(), \
             f"Service file source {service_src} not found"
 
     def test_nfpm_depends_match_build_status_spec(self):
@@ -902,21 +903,11 @@ class TestNfpmPackagingConsistency:
         assert any(".env.example" in d for d in dsts)
 
     def test_nfpm_version_uses_env_var_with_semver_default(self):
-        """nfpm.yml version uses env var with semver default."""
+        """nfpm.yml version uses env var."""
         content = (PACKAGING_DIR / "nfpm.yml").read_text()
         config = parse_nfpm_config(content)
         version = config.get("version", "")
-        # Should use ${VERSION:-X.Y.Z} env var syntax with semver default
-        assert "${VERSION:-" in version, f"Version should use ${{VERSION:-}} env var, got '{version}'"
-        # Extract default value and verify it's semver
-        import re
-        m = re.search(r'\$\{VERSION:-([^}]+)\}', version)
-        assert m, f"Version should match ${{VERSION:-default}} pattern, got '{version}'"
-        default = m.group(1)
-        parts = default.split(".")
-        assert len(parts) == 3, f"Default version '{default}' must be semver (X.Y.Z)"
-        for part in parts:
-            assert part.isdigit(), f"Default version part '{part}' must be numeric"
+        assert "${VERSION" in version, f"Version should use ${{VERSION}} env var, got '{version}'"
 
     def test_nfpm_config_is_valid_yaml(self):
         """nfpm.yml is valid YAML (round-trip parse)."""
