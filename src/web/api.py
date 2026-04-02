@@ -19,6 +19,12 @@ from croniter import croniter
 from ..config.schema import Config
 from ..llm.secret_scrubber import scrub_output_secrets
 from ..logging import get_logger
+from ..setup_wizard import (
+    build_config,
+    build_env,
+    is_setup_needed,
+    validate_token_format,
+)
 from ..tools.registry import get_tool_definitions
 from .chat import MAX_CHAT_CONTENT_LEN, process_web_chat
 
@@ -107,6 +113,16 @@ def _write_config(path: Path, data: dict) -> None:
         yaml.dump(data, f, default_flow_style=False)
 
 
+def _write_env_file(path: Path, content: str) -> None:
+    """Write .env file with restricted permissions."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content)
+    try:
+        path.chmod(0o600)
+    except OSError:
+        pass
+
+
 def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
     """Create all API route handlers bound to the given bot instance."""
     routes = web.RouteTableDef()
@@ -175,6 +191,98 @@ def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
             "authenticated": True,
             "timeout_seconds": timeout,
             "active_sessions": sm.active_count if sm else 0,
+        })
+
+    # ------------------------------------------------------------------
+    # Setup wizard (first-boot, no auth required)
+    # ------------------------------------------------------------------
+
+    @routes.get("/api/setup/status")
+    async def setup_status(_request: web.Request) -> web.Response:
+        """Check whether first-boot setup is needed."""
+        config_path = Path("config.yml")
+        env_path = Path(".env")
+        needed = is_setup_needed(config_path, env_path)
+        return web.json_response({"needed": needed})
+
+    @routes.post("/api/setup/complete")
+    async def setup_complete(request: web.Request) -> web.Response:
+        """Receive wizard data, write config files, signal restart."""
+        try:
+            data = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid JSON"}, status=400)
+
+        # Validate required fields
+        discord_token = (data.get("discord_token") or "").strip()
+        if not discord_token:
+            return web.json_response(
+                {"error": "discord_token is required"}, status=400
+            )
+        if not validate_token_format(discord_token):
+            return web.json_response(
+                {"error": "discord_token format is invalid"}, status=400
+            )
+
+        # Extract optional fields
+        hosts: dict[str, dict[str, str]] = {}
+        raw_hosts = data.get("hosts")
+        if isinstance(raw_hosts, dict):
+            for name, info in raw_hosts.items():
+                if isinstance(info, dict) and info.get("address"):
+                    hosts[str(name)] = {
+                        "address": str(info["address"]),
+                        "ssh_user": str(info.get("ssh_user", "root")),
+                    }
+
+        features: dict[str, bool] = {}
+        raw_features = data.get("features")
+        if isinstance(raw_features, dict):
+            for key in ("browser", "voice", "comfyui"):
+                if key in raw_features:
+                    features[key] = bool(raw_features[key])
+
+        web_api_token = str(data.get("web_api_token", "")).strip()
+        claude_code_host = str(data.get("claude_code_host", "")).strip()
+        timezone = str(data.get("timezone", "UTC")).strip() or "UTC"
+
+        # Build config and env content
+        cfg = build_config(
+            timezone=timezone,
+            hosts=hosts,
+            features=features,
+            web_api_token=web_api_token,
+            claude_code_host=claude_code_host,
+        )
+        env_content = build_env(discord_token)
+
+        # Write files
+        config_path = Path("config.yml")
+        env_path = Path(".env")
+        try:
+            await asyncio.to_thread(_write_config, config_path, cfg)
+            await asyncio.to_thread(_write_env_file, env_path, env_content)
+        except Exception as e:
+            log.error("Setup wizard failed to write config: %s", e)
+            return web.json_response(
+                {"error": f"Failed to write config: {_sanitize_error(e)}"},
+                status=500,
+            )
+
+        log.info("Setup wizard completed — config files written")
+
+        # Schedule a delayed process exit to allow the HTTP response to be sent.
+        # Under systemd (Restart=on-failure) or Docker (restart: unless-stopped),
+        # the process will be restarted automatically with the new config.
+        import os as _os
+        import signal as _signal
+        loop = asyncio.get_event_loop()
+        loop.call_later(2.0, _os.kill, _os.getpid(), _signal.SIGTERM)
+
+        return web.json_response({
+            "status": "ok",
+            "message": "Configuration saved. Heimdall is restarting...",
+            "restart_scheduled": True,
         })
 
     # ------------------------------------------------------------------

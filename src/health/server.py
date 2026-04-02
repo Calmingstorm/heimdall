@@ -30,6 +30,9 @@ _AUTH_SKIP_PREFIXES = ("/health", "/webhook/", "/ui")
 # Exact API paths that skip token auth (login must be accessible unauthenticated)
 _AUTH_SKIP_PATHS = frozenset({"/api/auth/login"})
 
+# API path prefixes that skip token auth (setup wizard runs before auth is configured)
+_AUTH_SKIP_API_PREFIXES = ("/api/setup/",)
+
 # Rate-limit: max requests per window per IP on /api/ routes
 _RATE_LIMIT_MAX = 120
 _RATE_LIMIT_WINDOW = 60  # seconds
@@ -125,6 +128,9 @@ def _make_auth_middleware(
             return await handler(request)
         # Skip auth for login endpoint
         if path in _AUTH_SKIP_PATHS:
+            return await handler(request)
+        # Skip auth for setup wizard (runs before auth is configured)
+        if any(path.startswith(p) for p in _AUTH_SKIP_API_PREFIXES):
             return await handler(request)
         # Skip auth if no token configured (dev mode)
         token = web_config.api_token

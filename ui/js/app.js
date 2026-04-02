@@ -17,6 +17,7 @@ import AuditPage from './pages/audit.js';
 import MemoryPage from './pages/memory.js';
 import AgentsPage from './pages/agents.js';
 import ChatPage from './pages/chat.js';
+import SetupWizardPage from './pages/setup-wizard.js';
 
 const { createApp, ref, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
 const { createRouter, createWebHashHistory } = VueRouter;
@@ -28,6 +29,7 @@ const { createRouter, createWebHashHistory } = VueRouter;
 // ---------------------------------------------------------------------------
 const routes = [
   { path: '/',           redirect: '/dashboard' },
+  { path: '/setup',      component: SetupWizardPage, meta: { label: 'Setup', noSidebar: true } },
   { path: '/dashboard',  component: DashboardPage,  meta: { label: 'Dashboard',  icon: '\u{1F4CA}' } },
   { path: '/chat',       component: ChatPage,       meta: { label: 'Chat',       icon: '\u{1F4AD}' } },
   { path: '/sessions',   component: SessionsPage,   meta: { label: 'Sessions',   icon: '\u{1F4AC}' } },
@@ -194,7 +196,7 @@ const App = {
     const botStatus = ref('starting');
     const botUptime = ref('');
 
-    const navRoutes = routes.filter(r => r.meta);
+    const navRoutes = routes.filter(r => r.meta && r.meta.icon);
 
     // Handle session expiry from the API client
     api.onSessionExpired = () => {
@@ -218,9 +220,22 @@ const App = {
       }
     }
 
-    // Check auth on mount
+    // Check auth on mount (with first-boot setup detection)
     onMounted(async () => {
       document.addEventListener('keydown', onKeydown);
+      // Check if first-boot setup is needed
+      try {
+        const setupResp = await fetch('/api/setup/status');
+        if (setupResp.ok) {
+          const setupData = await setupResp.json();
+          if (setupData.needed) {
+            authState.value = 'ready';
+            router.push('/setup');
+            return;
+          }
+        }
+      } catch { /* server unreachable, continue normal flow */ }
+      // Normal auth check
       const check = await api.check();
       if (check.ok) {
         authState.value = 'ready';
