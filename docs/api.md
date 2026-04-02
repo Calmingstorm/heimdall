@@ -1,9 +1,11 @@
 # Heimdall REST API Reference
 
-Heimdall exposes a REST API on port 3939 for web-based management. The API shares
+Heimdall exposes a REST API for web-based management. The API shares
 the health server and is available when `web.enabled: true` in config.
 
-**Base URL**: `http://host:3939/api`
+**Default port**: 3000 (bare metal / .deb) or 3939 (Docker, mapped from container port 3000)
+
+**Base URL**: `http://host:3000/api` (bare metal) or `http://host:3939/api` (Docker)
 
 ## Authentication
 

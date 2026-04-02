@@ -1,6 +1,6 @@
 # Web Management UI
 
-Browser-based management interface at `http://host:3939/ui/`.
+Browser-based management interface at `http://host:3000/ui/` (bare metal / .deb) or `http://host:3939/ui/` (Docker).
 
 ## Setup
 

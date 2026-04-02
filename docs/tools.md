@@ -8,11 +8,11 @@ Heimdall has 61 built-in tools. All execute immediately when called — no appro
 |----------|-------|-------|
 | Command Execution | 3 | `run_command`, `run_command_multi`, `run_script` |
 | File Operations | 3 | `read_file`, `write_file`, `post_file` |
-| Browser | 6 | `browser_screenshot`, `browser_read_page`, `browser_click`, `browser_fill`, `browser_navigate`, `browser_evaluate` |
+| Browser | 6 | `browser_screenshot`, `browser_read_page`, `browser_read_table`, `browser_click`, `browser_fill`, `browser_evaluate` |
 | Knowledge Base | 4 | `search_knowledge`, `ingest_document`, `list_knowledge`, `delete_knowledge` |
 | Scheduling | 3 | `schedule_task`, `list_schedules`, `delete_schedule` |
 | Skills | 9 | `create_skill`, `edit_skill`, `delete_skill`, `list_skills`, `enable_skill`, `disable_skill`, `install_skill`, `export_skill`, `skill_status` |
-| Agents | 8 | `spawn_agent`, `send_to_agent`, `list_agents`, `kill_agent`, `get_agent_results`, `wait_for_agents`, `agent_status`, `clear_agents` |
+| Agents | 8 | `spawn_agent`, `send_to_agent`, `list_agents`, `kill_agent`, `get_agent_results`, `wait_for_agents`, `spawn_loop_agents`, `collect_loop_agents` |
 | Autonomous Loops | 3 | `start_loop`, `stop_loop`, `list_loops` |
 | Background Tasks | 3 | `delegate_task`, `list_tasks`, `cancel_task` |
 | Web | 2 | `web_search`, `fetch_url` |

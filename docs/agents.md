@@ -34,6 +34,8 @@ Heimdall can spawn multiple agents in parallel. Each agent executes independentl
 | `kill_agent` | Terminate an agent |
 | `get_agent_results` | Get an agent's output |
 | `wait_for_agents` | Wait for agents to complete |
+| `spawn_loop_agents` | Spawn agents from within an autonomous loop iteration |
+| `collect_loop_agents` | Collect results from loop-spawned agents |
 
 ## Loop Integration
 
