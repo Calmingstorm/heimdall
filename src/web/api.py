@@ -27,6 +27,7 @@ from ..setup_wizard import (
     write_env_file,
 )
 from ..tools.registry import get_tool_definitions
+from ..version import get_version
 from .chat import MAX_CHAT_CONTENT_LEN, process_web_chat
 
 if TYPE_CHECKING:
@@ -338,6 +339,7 @@ def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
             monitoring = _default_mon
 
         return web.json_response({
+            "version": get_version(),
             "status": "online" if bot.is_ready() else "starting",
             "uptime_seconds": round(uptime, 1),
             "guilds": guilds,

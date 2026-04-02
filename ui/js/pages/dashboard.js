@@ -53,6 +53,8 @@ export default {
                 {{ status.status === 'online' ? 'Online' : 'Starting' }}
                 <span class="dash-hero-sep">\u00b7</span>
                 {{ uptime }}
+                <span v-if="status.version" class="dash-hero-sep">\u00b7</span>
+                <span v-if="status.version" class="text-gray-500">v{{ status.version }}</span>
               </div>
             </div>
           </div>

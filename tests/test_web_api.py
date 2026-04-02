@@ -1470,7 +1470,7 @@ class TestSensitiveFieldProtection:
             body = await resp.json()
             # Verify only expected keys are present
             expected_keys = {
-                "status", "uptime_seconds", "guilds", "guild_count",
+                "version", "status", "uptime_seconds", "guilds", "guild_count",
                 "user_count", "tool_count", "skill_count", "session_count",
                 "loop_count", "schedule_count",
                 "agent_count", "agent_running",

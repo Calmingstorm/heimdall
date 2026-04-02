@@ -901,17 +901,22 @@ class TestNfpmPackagingConsistency:
         dsts = [e.get("dst", "") for e in config.get("contents", [])]
         assert any(".env.example" in d for d in dsts)
 
-    def test_nfpm_version_is_semver(self):
-        """nfpm.yml version follows semver pattern."""
+    def test_nfpm_version_uses_env_var_with_semver_default(self):
+        """nfpm.yml version uses env var with semver default."""
         content = (PACKAGING_DIR / "nfpm.yml").read_text()
         config = parse_nfpm_config(content)
         version = config.get("version", "")
-        # Strip optional leading 'v'
-        v = version.lstrip("v")
-        parts = v.split(".")
-        assert len(parts) == 3, f"Version '{version}' must be semver (X.Y.Z)"
+        # Should use ${VERSION:-X.Y.Z} env var syntax with semver default
+        assert "${VERSION:-" in version, f"Version should use ${{VERSION:-}} env var, got '{version}'"
+        # Extract default value and verify it's semver
+        import re
+        m = re.search(r'\$\{VERSION:-([^}]+)\}', version)
+        assert m, f"Version should match ${{VERSION:-default}} pattern, got '{version}'"
+        default = m.group(1)
+        parts = default.split(".")
+        assert len(parts) == 3, f"Default version '{default}' must be semver (X.Y.Z)"
         for part in parts:
-            assert part.isdigit(), f"Version part '{part}' must be numeric"
+            assert part.isdigit(), f"Default version part '{part}' must be numeric"
 
     def test_nfpm_config_is_valid_yaml(self):
         """nfpm.yml is valid YAML (round-trip parse)."""
