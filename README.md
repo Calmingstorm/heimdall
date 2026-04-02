@@ -47,86 +47,75 @@ omniscience. Professional about it. Not okay.
 - A Discord bot token
 - A ChatGPT Plus/Pro/Team subscription
 
-## Quick Start
+## Install
 
-### 1. Clone and configure
+There are three ways to deploy Heimdall: `.deb` package, Docker, or bare metal. All methods include an interactive setup wizard.
+
+### Option A: .deb Package (Ubuntu/Debian)
+
+```bash
+# Download the latest release
+curl -LO https://github.com/calmingstorm/heimdall/releases/latest/download/heimdall_amd64.deb
+
+# Install
+sudo dpkg -i heimdall_amd64.deb
+
+# Run the setup wizard (creates config, authenticates Codex)
+sudo -u heimdall /opt/heimdall/.venv/bin/python -m src.setup wizard
+
+# Start the service
+sudo systemctl start heimdall
+```
+
+The `.deb` package installs Heimdall to `/opt/heimdall/`, configuration to `/etc/heimdall/`, and data to `/var/lib/heimdall/`. It creates a `heimdall` system user and a systemd service.
+
+### Option B: Docker
 
 ```bash
 git clone https://github.com/Calmingstorm/heimdall.git && cd heimdall
 cp .env.example .env
 # Edit .env — set DISCORD_TOKEN
-```
-
-### 2. Set up Codex authentication
-
-Heimdall uses the ChatGPT Codex API (requires a ChatGPT Plus/Pro/Team subscription). You need to authenticate once:
-
-```bash
-# If you have a browser on the same machine:
-python -m src.setup
-
-# If running on a headless server (paste the callback URL manually):
-python -m src.setup --headless
-
-# Add additional accounts for rate limit rotation:
-python -m src.setup add
-python -m src.setup add --headless
-
-# View configured accounts:
-python -m src.setup --list
-
-# Remove an account:
-python -m src.setup --remove 0
-```
-
-Tokens auto-refresh at runtime. Re-run setup if the bot is offline for more than 7 days.
-
-### 3. Configure hosts (optional)
-
-Edit `config.yml` to add your infrastructure:
-
-```yaml
-tools:
-  hosts:
-    webserver:
-      address: "10.0.0.1"
-      ssh_user: "deploy"
-    dbserver:
-      address: "10.0.0.2"
-      ssh_user: "root"
-```
-
-Heimdall can also operate with no remote hosts — it runs commands locally via subprocess.
-
-### 4. Set up SSH keys (if using remote hosts)
-
-**Docker:**
-```bash
-mkdir -p ssh
-cp ~/.ssh/id_ed25519 ssh/id_ed25519
-cp ~/.ssh/known_hosts ssh/known_hosts
-chmod 600 ssh/id_ed25519
-# docker-compose mounts ssh/ into the container automatically
-```
-
-**Bare metal:**
-```bash
-# Heimdall uses ~/.ssh/ by default — no extra setup needed
-# if the bot runs as a user that already has SSH keys configured
-```
-
-### 5. Deploy
-
-**Docker (recommended):**
-```bash
 docker compose up -d
 ```
 
-**Bare metal:**
+On first start, open `http://localhost:3939/ui/` to complete setup via the web wizard.
+
+### Option C: Bare Metal
+
 ```bash
-pip install -e .              # Core only
-pip install -e ".[all]"       # All features (PDF, browser, voice)
+git clone https://github.com/Calmingstorm/heimdall.git && cd heimdall
+pip install -e ".[all]"       # Or just: pip install -e .
+
+# Interactive setup wizard (Discord token, Codex auth, hosts, features)
+python -m src.setup wizard
+
+# Or configure manually:
+cp .env.example .env && $EDITOR .env
+
+# Start
 python -m src
+```
+
+See [docs/getting-started.md](docs/getting-started.md) for detailed instructions for each method.
+
+### Setup Wizard
+
+The setup wizard guides you through all required configuration:
+
+1. **Discord token** — validates with a test API call
+2. **Codex auth** — OAuth login for the ChatGPT API
+3. **Hosts** — add remote servers for SSH management
+4. **Features** — toggle browser automation, voice, ComfyUI, Claude Code
+5. **Web UI token** — set an API token for the management UI
+6. **Write config** — generates `config.yml` and `.env`
+7. **Start service** — optionally start Heimdall via systemd
+
+Run it from the CLI (`python -m src.setup wizard`) or via the web UI on first boot (`http://host:3000/ui/`). To reconfigure later: `python -m src.setup wizard --reconfigure`.
+
+### Version
+
+```bash
+python -m src --version    # Show installed version
 ```
 
 ## Architecture
@@ -341,7 +330,7 @@ Create custom tools at runtime via Discord or as `.py` files in `data/skills/`.
 @Heimdall create a skill called "disk_report" that checks disk usage on all hosts
 ```
 
-See `docs/SKILLS.md` for the full development guide.
+See `docs/skills.md` for the full development guide.
 
 ## Development
 
@@ -356,9 +345,12 @@ python -m pytest tests/ -q     # 8800+ tests, all mocked
 
 | Document | Description |
 |----------|-------------|
-| `docs/API.md` | REST API reference (55 endpoints + WebSocket) |
-| `docs/SKILLS.md` | Skill development guide |
-| `docs/ARCHITECTURE.md` | Internal architecture reference |
+| [Getting Started](docs/getting-started.md) | Installation and setup for all deployment methods |
+| [Packaging](docs/packaging.md) | Building .deb packages, Docker images, and creating releases |
+| [REST API](docs/api.md) | REST API reference (55 endpoints + WebSocket) |
+| [Skills](docs/skills.md) | Skill development guide |
+| [Architecture](docs/architecture.md) | Internal architecture reference |
+| [Configuration](docs/configuration.md) | All config sections and environment variables |
 
 ## Disclaimer
 

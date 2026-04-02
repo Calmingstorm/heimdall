@@ -22,7 +22,9 @@ Heimdall is "The All-Seeing Guardian" — in Norse mythology, he watches everyth
 
 ## Quick Links
 
-- [Getting Started](getting-started.md) — clone, configure, deploy
+- [Getting Started](getting-started.md) — install via .deb, Docker, or bare metal
+- [Packaging](packaging.md) — building .deb packages, Docker images, and releases
+- [Configuration](configuration.md) — all config sections and environment variables
 - [Tools](tools.md) — all 61 built-in tools
 - [Skills](skills.md) — create custom tools
 - [REST API](api.md) — 55 API endpoints

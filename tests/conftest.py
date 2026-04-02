@@ -1,11 +1,28 @@
 """Shared fixtures for Heimdall test suite."""
 from __future__ import annotations
 
+import asyncio
 import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def _ensure_event_loop():
+    """Ensure an event loop exists for every test.
+
+    pytest-asyncio in auto mode can close the event loop after async tests,
+    breaking subsequent non-async tests that call asyncio.get_event_loop().
+    This fixture ensures a loop always exists.
+    """
+    yield
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
 
 from src.tools.registry import invalidate_tool_defs_cache
 
