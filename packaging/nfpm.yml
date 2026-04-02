@@ -32,27 +32,27 @@ recommends:
 
 contents:
   # --- Application source code ---
-  - src: ../src/
+  - src: ./src/
     dst: /opt/heimdall/src/
 
   # --- Web UI ---
-  - src: ../ui/
+  - src: ./ui/
     dst: /opt/heimdall/ui/
 
   # --- Python project files ---
-  - src: ../pyproject.toml
+  - src: ./pyproject.toml
     dst: /opt/heimdall/pyproject.toml
 
   # --- Config template (postinstall copies to /etc/heimdall/ if not present) ---
-  - src: ../config.yml
+  - src: ./config.yml
     dst: /opt/heimdall/config.yml
 
   # --- Environment template ---
-  - src: ../.env.example
+  - src: ./.env.example
     dst: /opt/heimdall/.env.example
 
   # --- Systemd service file ---
-  - src: heimdall.service
+  - src: ./packaging/heimdall.service
     dst: /usr/lib/systemd/system/heimdall.service
 
   # --- Create required directories ---
@@ -72,8 +72,8 @@ contents:
       mode: 0755
 
 scripts:
-  postinstall: postinstall.sh
-  preremove: preremove.sh
+  postinstall: ./packaging/postinstall.sh
+  preremove: ./packaging/preremove.sh
 
 overrides:
   deb:
