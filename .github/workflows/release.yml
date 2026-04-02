@@ -11,7 +11,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: calmingstorm/heimdall
 
 jobs:
   # --- Build .deb package using nfpm ---
@@ -28,9 +28,12 @@ jobs:
         run: sed -i "s/^version = .*/version = \"${{ steps.version.outputs.version }}\"/" pyproject.toml
 
       - name: Install nfpm
-        uses: goreleaser/nfpm-action@v1
-        with:
-          install-only: true
+        run: |
+          NFPM_VERSION=$(curl -s https://api.github.com/repos/goreleaser/nfpm/releases/latest | grep -o '"tag_name":"[^"]*"' | cut -d'"' -f4)
+          curl -sLO "https://github.com/goreleaser/nfpm/releases/download/${NFPM_VERSION}/nfpm_${NFPM_VERSION#v}_linux_amd64.tar.gz"
+          tar xzf "nfpm_${NFPM_VERSION#v}_linux_amd64.tar.gz" nfpm
+          mv nfpm /usr/local/bin/
+          nfpm --version
 
       - name: Build .deb package
         run: |
