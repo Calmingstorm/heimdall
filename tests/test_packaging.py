@@ -1,17 +1,26 @@
-"""Tests for Heimdall packaging validation — systemd service, postinstall, preremove."""
+"""Tests for Heimdall packaging validation — systemd, scripts, nfpm config."""
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
+import yaml
 
 from src.packaging.validate import (
     DATA_SUBDIRS,
     FHS_PATHS,
+    REQUIRED_CONTENT_DESTINATIONS,
+    REQUIRED_DEB_DEPENDS,
+    REQUIRED_NFPM_FIELDS,
+    REQUIRED_NFPM_SCRIPTS,
     REQUIRED_SERVICE_DIRECTIVES,
     check_script_syntax,
     extract_script_operations,
+    parse_nfpm_config,
     parse_systemd_unit,
+    validate_nfpm_config,
+    validate_nfpm_contents_consistency,
+    validate_nfpm_file_references,
     validate_postinstall,
     validate_preremove,
     validate_service_file,
@@ -487,3 +496,419 @@ class TestPackagingConsistency:
         ops = extract_script_operations(content)
         symlink_text = " ".join(ops["symlinks"])
         assert "/var/lib/heimdall" in symlink_text, "Must symlink data dir"
+
+
+# ---------------------------------------------------------------------------
+# parse_nfpm_config
+# ---------------------------------------------------------------------------
+
+class TestParseNfpmConfig:
+    """Tests for nfpm YAML parsing."""
+
+    def test_parses_valid_yaml(self):
+        """Parser returns dict from valid YAML."""
+        content = "name: heimdall\narch: amd64\n"
+        result = parse_nfpm_config(content)
+        assert result["name"] == "heimdall"
+        assert result["arch"] == "amd64"
+
+    def test_raises_on_invalid_yaml(self):
+        """Parser raises ValueError on invalid YAML."""
+        with pytest.raises(ValueError, match="Invalid YAML"):
+            parse_nfpm_config("invalid: yaml: [broken\n")
+
+    def test_raises_on_non_dict(self):
+        """Parser raises ValueError if top-level is not a dict."""
+        with pytest.raises(ValueError, match="Expected dict"):
+            parse_nfpm_config("- item1\n- item2\n")
+
+    def test_parses_nested_structures(self):
+        """Parser handles nested dicts and lists."""
+        content = "scripts:\n  postinstall: post.sh\ncontents:\n  - src: a\n    dst: /b\n"
+        result = parse_nfpm_config(content)
+        assert result["scripts"]["postinstall"] == "post.sh"
+        assert result["contents"][0]["dst"] == "/b"
+
+    def test_parses_multiline_description(self):
+        """Parser handles YAML multiline strings."""
+        content = "name: test\ndescription: |\n  Line one.\n  Line two.\n"
+        result = parse_nfpm_config(content)
+        assert "Line one." in result["description"]
+        assert "Line two." in result["description"]
+
+    def test_parses_real_nfpm_file(self):
+        """Parser successfully reads the real nfpm.yml."""
+        content = (PACKAGING_DIR / "nfpm.yml").read_text()
+        result = parse_nfpm_config(content)
+        assert result["name"] == "heimdall"
+
+
+# ---------------------------------------------------------------------------
+# validate_nfpm_config
+# ---------------------------------------------------------------------------
+
+class TestValidateNfpmConfig:
+    """Tests for nfpm config validation."""
+
+    def test_valid_real_config(self):
+        """Real nfpm.yml passes validation."""
+        content = (PACKAGING_DIR / "nfpm.yml").read_text()
+        config = parse_nfpm_config(content)
+        errors = validate_nfpm_config(config)
+        assert errors == [], f"Validation errors: {errors}"
+
+    def test_missing_required_field(self):
+        """Validation catches missing required fields."""
+        config = {"name": "heimdall"}
+        errors = validate_nfpm_config(config)
+        # Should flag missing arch, platform, version, description, maintainer
+        missing_fields = [e for e in errors if "Missing required field" in e]
+        assert len(missing_fields) >= 4
+
+    def test_empty_required_field(self):
+        """Validation catches empty string for required fields."""
+        config = {
+            "name": "heimdall", "arch": "amd64", "platform": "linux",
+            "version": "1.0.0", "description": "   ", "maintainer": "test",
+            "depends": ["python3.12", "python3.12-venv", "openssh-client"],
+            "contents": [{"dst": d} for d in REQUIRED_CONTENT_DESTINATIONS],
+            "scripts": {"postinstall": "post.sh", "preremove": "pre.sh"},
+        }
+        errors = validate_nfpm_config(config)
+        assert any("Empty required field: description" in e for e in errors)
+
+    def test_wrong_package_name(self):
+        """Validation catches wrong package name."""
+        config = {
+            "name": "wrongname", "arch": "amd64", "platform": "linux",
+            "version": "1.0.0", "description": "desc", "maintainer": "test",
+            "depends": [], "contents": [], "scripts": {},
+        }
+        errors = validate_nfpm_config(config)
+        assert any("Package name must be 'heimdall'" in e for e in errors)
+
+    def test_invalid_arch(self):
+        """Validation catches unexpected architecture."""
+        config = {
+            "name": "heimdall", "arch": "sparc", "platform": "linux",
+            "version": "1.0.0", "description": "desc", "maintainer": "test",
+            "depends": [], "contents": [], "scripts": {},
+        }
+        errors = validate_nfpm_config(config)
+        assert any("Unexpected arch" in e for e in errors)
+
+    def test_wrong_platform(self):
+        """Validation catches non-linux platform."""
+        config = {
+            "name": "heimdall", "arch": "amd64", "platform": "darwin",
+            "version": "1.0.0", "description": "desc", "maintainer": "test",
+            "depends": [], "contents": [], "scripts": {},
+        }
+        errors = validate_nfpm_config(config)
+        assert any("Platform must be 'linux'" in e for e in errors)
+
+    def test_missing_dependency(self):
+        """Validation catches missing required dependency."""
+        config = {
+            "name": "heimdall", "arch": "amd64", "platform": "linux",
+            "version": "1.0.0", "description": "desc", "maintainer": "test",
+            "depends": ["python3.12"],
+            "contents": [], "scripts": {},
+        }
+        errors = validate_nfpm_config(config)
+        assert any("python3.12-venv" in e for e in errors)
+        assert any("openssh-client" in e for e in errors)
+
+    def test_all_dependencies_present(self):
+        """Validation passes when all required deps are present."""
+        content = (PACKAGING_DIR / "nfpm.yml").read_text()
+        config = parse_nfpm_config(content)
+        errors = validate_nfpm_config(config)
+        dep_errors = [e for e in errors if "Missing required dependency" in e]
+        assert dep_errors == []
+
+    def test_missing_content_destination(self):
+        """Validation catches missing content destinations."""
+        config = {
+            "name": "heimdall", "arch": "amd64", "platform": "linux",
+            "version": "1.0.0", "description": "desc", "maintainer": "test",
+            "depends": REQUIRED_DEB_DEPENDS[:],
+            "contents": [{"src": "a", "dst": "/opt/heimdall/src/"}],
+            "scripts": {"postinstall": "p.sh", "preremove": "r.sh"},
+        }
+        errors = validate_nfpm_config(config)
+        # Should flag missing ui/, pyproject.toml, etc.
+        assert any("Missing content destination" in e for e in errors)
+
+    def test_empty_contents(self):
+        """Validation catches empty contents list."""
+        config = {
+            "name": "heimdall", "arch": "amd64", "platform": "linux",
+            "version": "1.0.0", "description": "desc", "maintainer": "test",
+            "depends": [], "contents": [], "scripts": {},
+        }
+        errors = validate_nfpm_config(config)
+        assert any("contents" in e.lower() and "empty" in e.lower() for e in errors)
+
+    def test_missing_script(self):
+        """Validation catches missing script hooks."""
+        config = {
+            "name": "heimdall", "arch": "amd64", "platform": "linux",
+            "version": "1.0.0", "description": "desc", "maintainer": "test",
+            "depends": [], "contents": [], "scripts": {"postinstall": "p.sh"},
+        }
+        errors = validate_nfpm_config(config)
+        assert any("Missing script: preremove" in e for e in errors)
+
+    def test_empty_script_path(self):
+        """Validation catches empty script path."""
+        config = {
+            "name": "heimdall", "arch": "amd64", "platform": "linux",
+            "version": "1.0.0", "description": "desc", "maintainer": "test",
+            "depends": [], "contents": [],
+            "scripts": {"postinstall": "", "preremove": "r.sh"},
+        }
+        errors = validate_nfpm_config(config)
+        assert any("Empty script path: postinstall" in e for e in errors)
+
+    def test_depends_not_a_list(self):
+        """Validation catches depends as non-list."""
+        config = {
+            "name": "heimdall", "arch": "amd64", "platform": "linux",
+            "version": "1.0.0", "description": "desc", "maintainer": "test",
+            "depends": "python3.12",
+            "contents": [], "scripts": {},
+        }
+        errors = validate_nfpm_config(config)
+        assert any("'depends' must be a list" in e for e in errors)
+
+    def test_accepts_arm64(self):
+        """Validation accepts arm64 architecture."""
+        config = {
+            "name": "heimdall", "arch": "arm64", "platform": "linux",
+            "version": "1.0.0", "description": "desc", "maintainer": "test",
+            "depends": REQUIRED_DEB_DEPENDS[:],
+            "contents": [{"dst": d} for d in REQUIRED_CONTENT_DESTINATIONS],
+            "scripts": {"postinstall": "p.sh", "preremove": "r.sh"},
+        }
+        errors = validate_nfpm_config(config)
+        assert not any("arch" in e.lower() for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# validate_nfpm_file_references
+# ---------------------------------------------------------------------------
+
+class TestValidateNfpmFileReferences:
+    """Tests for nfpm file reference validation."""
+
+    def test_real_config_files_exist(self):
+        """All files referenced by real nfpm.yml exist."""
+        content = (PACKAGING_DIR / "nfpm.yml").read_text()
+        config = parse_nfpm_config(content)
+        errors = validate_nfpm_file_references(config, PACKAGING_DIR)
+        assert errors == [], f"Missing files: {errors}"
+
+    def test_catches_missing_script(self, tmp_path):
+        """Validation catches missing script file."""
+        config = {"scripts": {"postinstall": "nonexistent.sh"}, "contents": []}
+        errors = validate_nfpm_file_references(config, tmp_path)
+        assert any("postinstall" in e and "not found" in e for e in errors)
+
+    def test_catches_missing_content_source(self, tmp_path):
+        """Validation catches missing content source file."""
+        config = {
+            "scripts": {},
+            "contents": [{"src": "missing_dir/", "dst": "/opt/pkg/"}],
+        }
+        errors = validate_nfpm_file_references(config, tmp_path)
+        assert any("not found" in e for e in errors)
+
+    def test_ignores_dir_type_entries(self, tmp_path):
+        """Validation skips entries without src (type: dir)."""
+        config = {
+            "scripts": {},
+            "contents": [{"dst": "/etc/myapp/", "type": "dir"}],
+        }
+        errors = validate_nfpm_file_references(config, tmp_path)
+        assert errors == []
+
+    def test_script_relative_to_base_dir(self, tmp_path):
+        """Script paths resolve relative to the base directory."""
+        script = tmp_path / "post.sh"
+        script.write_text("#!/bin/bash\necho ok\n")
+        config = {"scripts": {"postinstall": "post.sh"}, "contents": []}
+        errors = validate_nfpm_file_references(config, tmp_path)
+        assert errors == []
+
+
+# ---------------------------------------------------------------------------
+# validate_nfpm_contents_consistency
+# ---------------------------------------------------------------------------
+
+class TestValidateNfpmContentsConsistency:
+    """Tests for nfpm contents consistency with FHS layout."""
+
+    def test_real_config_consistent(self):
+        """Real nfpm.yml contents are consistent with FHS layout."""
+        content = (PACKAGING_DIR / "nfpm.yml").read_text()
+        config = parse_nfpm_config(content)
+        errors = validate_nfpm_contents_consistency(config)
+        assert errors == [], f"Consistency errors: {errors}"
+
+    def test_missing_systemd_service(self):
+        """Validation catches missing systemd service file in contents."""
+        config = {"contents": [{"src": "a", "dst": "/opt/heimdall/src/"}]}
+        errors = validate_nfpm_contents_consistency(config)
+        assert any("systemd service" in e.lower() for e in errors)
+
+    def test_missing_app_files(self):
+        """Validation catches no files under /opt/heimdall/."""
+        config = {"contents": [
+            {"src": "a.service", "dst": "/usr/lib/systemd/system/heimdall.service"},
+        ]}
+        errors = validate_nfpm_contents_consistency(config)
+        assert any("/opt/heimdall/" in e for e in errors)
+
+    def test_missing_source_code(self):
+        """Validation catches missing src/ directory."""
+        config = {"contents": [
+            {"src": "a.service", "dst": "/usr/lib/systemd/system/heimdall.service"},
+            {"src": "ui/", "dst": "/opt/heimdall/ui/"},
+        ]}
+        errors = validate_nfpm_contents_consistency(config)
+        assert any("src" in e.lower() for e in errors)
+
+    def test_complete_contents(self):
+        """Validation passes with complete content set."""
+        config = {"contents": [
+            {"src": "s/", "dst": "/opt/heimdall/src/"},
+            {"src": "u/", "dst": "/opt/heimdall/ui/"},
+            {"src": "h.service", "dst": "/usr/lib/systemd/system/heimdall.service"},
+        ]}
+        errors = validate_nfpm_contents_consistency(config)
+        assert errors == []
+
+
+# ---------------------------------------------------------------------------
+# nfpm constants
+# ---------------------------------------------------------------------------
+
+class TestNfpmConstants:
+    """Tests for nfpm validation constants."""
+
+    def test_required_fields_include_name(self):
+        """Required fields list includes 'name'."""
+        assert "name" in REQUIRED_NFPM_FIELDS
+
+    def test_required_fields_include_version(self):
+        """Required fields list includes 'version'."""
+        assert "version" in REQUIRED_NFPM_FIELDS
+
+    def test_required_deps_include_python(self):
+        """Required deps include python3.12."""
+        assert "python3.12" in REQUIRED_DEB_DEPENDS
+
+    def test_required_deps_include_venv(self):
+        """Required deps include python3.12-venv."""
+        assert "python3.12-venv" in REQUIRED_DEB_DEPENDS
+
+    def test_required_deps_include_ssh(self):
+        """Required deps include openssh-client."""
+        assert "openssh-client" in REQUIRED_DEB_DEPENDS
+
+    def test_required_scripts_include_postinstall(self):
+        """Required scripts include postinstall."""
+        assert "postinstall" in REQUIRED_NFPM_SCRIPTS
+
+    def test_required_scripts_include_preremove(self):
+        """Required scripts include preremove."""
+        assert "preremove" in REQUIRED_NFPM_SCRIPTS
+
+    def test_required_destinations_cover_src(self):
+        """Required destinations include application source."""
+        assert any("/opt/heimdall/src" in d for d in REQUIRED_CONTENT_DESTINATIONS)
+
+    def test_required_destinations_cover_service(self):
+        """Required destinations include systemd service file."""
+        assert any("systemd" in d for d in REQUIRED_CONTENT_DESTINATIONS)
+
+    def test_required_destinations_cover_config(self):
+        """Required destinations include config.yml template."""
+        assert any("config.yml" in d for d in REQUIRED_CONTENT_DESTINATIONS)
+
+
+# ---------------------------------------------------------------------------
+# Cross-file: nfpm + packaging scripts consistency
+# ---------------------------------------------------------------------------
+
+class TestNfpmPackagingConsistency:
+    """Tests that nfpm.yml is consistent with postinstall/preremove scripts."""
+
+    def test_nfpm_scripts_match_packaging_files(self):
+        """nfpm.yml script refs point to actual packaging scripts."""
+        content = (PACKAGING_DIR / "nfpm.yml").read_text()
+        config = parse_nfpm_config(content)
+        scripts = config.get("scripts", {})
+        for name, path in scripts.items():
+            full = PACKAGING_DIR / path
+            assert full.exists(), f"Script '{name}' → {path} not found at {full}"
+
+    def test_nfpm_service_file_matches_packaging(self):
+        """nfpm.yml references the same service file as packaging/."""
+        nfpm_content = (PACKAGING_DIR / "nfpm.yml").read_text()
+        config = parse_nfpm_config(nfpm_content)
+        # Find the service file content entry
+        service_entries = [
+            e for e in config.get("contents", [])
+            if isinstance(e, dict) and e.get("dst", "").endswith(".service")
+        ]
+        assert service_entries, "nfpm.yml must install a service file"
+        service_src = service_entries[0]["src"]
+        assert (PACKAGING_DIR / service_src).exists(), \
+            f"Service file source {service_src} not found"
+
+    def test_nfpm_depends_match_build_status_spec(self):
+        """nfpm.yml dependencies match the BUILD_STATUS.md specification."""
+        content = (PACKAGING_DIR / "nfpm.yml").read_text()
+        config = parse_nfpm_config(content)
+        depends = config.get("depends", [])
+        assert "python3.12" in depends
+        assert "python3.12-venv" in depends
+        assert "openssh-client" in depends
+
+    def test_nfpm_installs_pyproject(self):
+        """nfpm.yml installs pyproject.toml (needed for pip install)."""
+        content = (PACKAGING_DIR / "nfpm.yml").read_text()
+        config = parse_nfpm_config(content)
+        dsts = [e.get("dst", "") for e in config.get("contents", [])]
+        assert any("pyproject.toml" in d for d in dsts)
+
+    def test_nfpm_installs_env_example(self):
+        """nfpm.yml installs .env.example (template for postinstall)."""
+        content = (PACKAGING_DIR / "nfpm.yml").read_text()
+        config = parse_nfpm_config(content)
+        dsts = [e.get("dst", "") for e in config.get("contents", [])]
+        assert any(".env.example" in d for d in dsts)
+
+    def test_nfpm_version_is_semver(self):
+        """nfpm.yml version follows semver pattern."""
+        content = (PACKAGING_DIR / "nfpm.yml").read_text()
+        config = parse_nfpm_config(content)
+        version = config.get("version", "")
+        # Strip optional leading 'v'
+        v = version.lstrip("v")
+        parts = v.split(".")
+        assert len(parts) == 3, f"Version '{version}' must be semver (X.Y.Z)"
+        for part in parts:
+            assert part.isdigit(), f"Version part '{part}' must be numeric"
+
+    def test_nfpm_config_is_valid_yaml(self):
+        """nfpm.yml is valid YAML (round-trip parse)."""
+        content = (PACKAGING_DIR / "nfpm.yml").read_text()
+        parsed = yaml.safe_load(content)
+        assert isinstance(parsed, dict)
+        # Re-dump and re-parse to verify round-trip
+        dumped = yaml.dump(parsed)
+        reparsed = yaml.safe_load(dumped)
+        assert reparsed["name"] == parsed["name"]

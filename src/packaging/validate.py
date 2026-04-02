@@ -1,5 +1,5 @@
 """
-Validate Heimdall packaging artifacts (systemd unit, shell scripts).
+Validate Heimdall packaging artifacts (systemd unit, shell scripts, nfpm config).
 
 Used by tests and by the release workflow to catch packaging errors early.
 """
@@ -8,6 +8,9 @@ from __future__ import annotations
 import re
 import subprocess
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 # FHS paths that postinstall must create/reference
 FHS_PATHS = {
@@ -263,3 +266,180 @@ def check_script_syntax(script_path: Path) -> tuple[bool, str]:
         return False, "bash not found"
     except subprocess.TimeoutExpired:
         return False, "syntax check timed out"
+
+
+# ---------------------------------------------------------------------------
+# nfpm.yml validation
+# ---------------------------------------------------------------------------
+
+# Required top-level fields in nfpm.yml
+REQUIRED_NFPM_FIELDS = ["name", "arch", "platform", "version", "description", "maintainer"]
+
+# Required package dependencies
+REQUIRED_DEB_DEPENDS = ["python3.12", "python3.12-venv", "openssh-client"]
+
+# Paths the package must install content to
+REQUIRED_CONTENT_DESTINATIONS = [
+    "/opt/heimdall/src/",
+    "/opt/heimdall/ui/",
+    "/opt/heimdall/pyproject.toml",
+    "/opt/heimdall/config.yml",
+    "/opt/heimdall/.env.example",
+    "/usr/lib/systemd/system/heimdall.service",
+]
+
+# Required script hooks
+REQUIRED_NFPM_SCRIPTS = ["postinstall", "preremove"]
+
+
+def parse_nfpm_config(content: str) -> dict[str, Any]:
+    """Parse nfpm.yml content into a dict.
+
+    Returns the parsed YAML dict, or raises ValueError on invalid YAML.
+    """
+    try:
+        parsed = yaml.safe_load(content)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Invalid YAML: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(f"Expected dict at top level, got {type(parsed).__name__}")
+    return parsed
+
+
+def validate_nfpm_config(config: dict[str, Any]) -> list[str]:
+    """Validate an nfpm config dict. Returns list of error strings.
+
+    Checks:
+    - Required top-level fields present and non-empty
+    - Package name is 'heimdall'
+    - Architecture and platform set correctly
+    - Dependencies include required packages
+    - Contents section includes required destinations
+    - Scripts section references postinstall and preremove
+    """
+    errors: list[str] = []
+
+    # Required fields
+    for field in REQUIRED_NFPM_FIELDS:
+        val = config.get(field)
+        if val is None:
+            errors.append(f"Missing required field: {field}")
+        elif isinstance(val, str) and not val.strip():
+            errors.append(f"Empty required field: {field}")
+
+    # Package name
+    if config.get("name") != "heimdall":
+        errors.append(f"Package name must be 'heimdall', got '{config.get('name')}'")
+
+    # Architecture
+    if config.get("arch") not in ("amd64", "arm64", "all"):
+        errors.append(f"Unexpected arch: {config.get('arch')}")
+
+    # Platform
+    if config.get("platform") != "linux":
+        errors.append(f"Platform must be 'linux', got '{config.get('platform')}'")
+
+    # Dependencies
+    depends = config.get("depends", [])
+    if not isinstance(depends, list):
+        errors.append("'depends' must be a list")
+    else:
+        for dep in REQUIRED_DEB_DEPENDS:
+            if not any(dep in d for d in depends):
+                errors.append(f"Missing required dependency: {dep}")
+
+    # Contents
+    contents = config.get("contents", [])
+    if not isinstance(contents, list):
+        errors.append("'contents' must be a list")
+    elif not contents:
+        errors.append("'contents' is empty — package installs nothing")
+    else:
+        destinations = set()
+        for entry in contents:
+            if isinstance(entry, dict) and "dst" in entry:
+                destinations.add(entry["dst"])
+        for req_dst in REQUIRED_CONTENT_DESTINATIONS:
+            if req_dst not in destinations:
+                errors.append(f"Missing content destination: {req_dst}")
+
+    # Scripts
+    scripts = config.get("scripts", {})
+    if not isinstance(scripts, dict):
+        errors.append("'scripts' must be a dict")
+    else:
+        for script_name in REQUIRED_NFPM_SCRIPTS:
+            if script_name not in scripts:
+                errors.append(f"Missing script: {script_name}")
+            elif not scripts[script_name]:
+                errors.append(f"Empty script path: {script_name}")
+
+    return errors
+
+
+def validate_nfpm_file_references(config: dict[str, Any], base_dir: Path) -> list[str]:
+    """Check that all files referenced by nfpm config actually exist.
+
+    ``base_dir`` is the directory containing nfpm.yml (packaging/).
+
+    Checks:
+    - Script files exist relative to base_dir
+    - Content source files exist relative to base_dir
+    """
+    errors: list[str] = []
+
+    # Check script files
+    scripts = config.get("scripts", {})
+    for name, script_path in scripts.items():
+        if script_path:
+            full_path = base_dir / script_path
+            if not full_path.exists():
+                errors.append(f"Script '{name}' not found: {full_path}")
+
+    # Check content source files/dirs
+    contents = config.get("contents", [])
+    for entry in contents:
+        if not isinstance(entry, dict):
+            continue
+        src = entry.get("src")
+        entry_type = entry.get("type", "")
+        if not src:
+            # Entries without src (type: dir) are just directory creation
+            continue
+        full_path = base_dir / src
+        if not full_path.exists():
+            errors.append(f"Content source not found: {src} (resolved to {full_path})")
+
+    return errors
+
+
+def validate_nfpm_contents_consistency(config: dict[str, Any]) -> list[str]:
+    """Validate that nfpm contents are consistent with FHS layout.
+
+    Checks that the package installs to the expected directories
+    and includes the systemd service file.
+    """
+    errors: list[str] = []
+
+    contents = config.get("contents", [])
+    destinations = {
+        entry["dst"]
+        for entry in contents
+        if isinstance(entry, dict) and "dst" in entry
+    }
+
+    # Service file must go to systemd directory
+    systemd_dsts = [d for d in destinations if "systemd" in d and d.endswith(".service")]
+    if not systemd_dsts:
+        errors.append("No systemd service file in contents")
+
+    # Application code must go under /opt/heimdall/
+    app_dsts = [d for d in destinations if d.startswith("/opt/heimdall/")]
+    if not app_dsts:
+        errors.append("No application files under /opt/heimdall/")
+
+    # Check that source code directory is included
+    if not any(d.startswith("/opt/heimdall/src") for d in destinations):
+        errors.append("Source code directory /opt/heimdall/src/ not in contents")
+
+    return errors

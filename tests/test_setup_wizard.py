@@ -141,7 +141,7 @@ class TestValidateHostAddress:
     """Tests for host address validation."""
 
     def test_valid_ipv4(self):
-        assert validate_host_address("192.168.1.1") is True
+        assert validate_host_address("10.0.0.1") is True
 
     def test_valid_ipv4_zeros(self):
         assert validate_host_address("0.0.0.0") is True

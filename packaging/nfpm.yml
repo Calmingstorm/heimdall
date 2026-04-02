@@ -1,0 +1,83 @@
+# nfpm configuration for building Heimdall .deb packages
+# https://nfpm.goreleaser.com/docs/configuration/
+#
+# Build with: nfpm package --config packaging/nfpm.yml --packager deb --target dist/
+# Version override: nfpm package --config packaging/nfpm.yml --packager deb --target dist/ VERSION=1.2.3
+
+name: heimdall
+arch: amd64
+platform: linux
+version: v1.0.0
+version_schema: semver
+
+section: admin
+priority: optional
+maintainer: Heimdall Maintainers <heimdall@localhost>
+description: |
+  Heimdall — autonomous executor Discord bot.
+  An AI-powered Discord bot that manages infrastructure via chat.
+  Powered by GPT-5.4 with 61 tools for shell, SSH, file I/O,
+  browser automation, knowledge management, and more.
+vendor: Heimdall
+homepage: https://github.com/calmingstorm/heimdall
+license: MIT
+
+depends:
+  - python3.12
+  - python3.12-venv
+  - openssh-client
+
+recommends:
+  - python3-pip
+
+contents:
+  # --- Application source code ---
+  - src: ../src/
+    dst: /opt/heimdall/src/
+
+  # --- Web UI ---
+  - src: ../ui/
+    dst: /opt/heimdall/ui/
+
+  # --- Python project files ---
+  - src: ../pyproject.toml
+    dst: /opt/heimdall/pyproject.toml
+
+  # --- Config template (postinstall copies to /etc/heimdall/ if not present) ---
+  - src: ../config.yml
+    dst: /opt/heimdall/config.yml
+
+  # --- Environment template ---
+  - src: ../.env.example
+    dst: /opt/heimdall/.env.example
+
+  # --- Systemd service file ---
+  - src: heimdall.service
+    dst: /usr/lib/systemd/system/heimdall.service
+
+  # --- Create required directories ---
+  - dst: /etc/heimdall/
+    type: dir
+    file_info:
+      mode: 0755
+
+  - dst: /var/lib/heimdall/
+    type: dir
+    file_info:
+      mode: 0755
+
+  - dst: /var/log/heimdall/
+    type: dir
+    file_info:
+      mode: 0755
+
+scripts:
+  postinstall: postinstall.sh
+  preremove: preremove.sh
+
+overrides:
+  deb:
+    depends:
+      - python3.12
+      - python3.12-venv
+      - openssh-client
