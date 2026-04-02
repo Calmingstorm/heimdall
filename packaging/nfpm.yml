@@ -2,7 +2,6 @@
 # https://nfpm.goreleaser.com/docs/configuration/
 #
 # Build with: nfpm package --config packaging/nfpm.yml --packager deb --target dist/
-# Version override: nfpm package --config packaging/nfpm.yml --packager deb --target dist/ VERSION=1.2.3
 
 name: heimdall
 arch: amd64
@@ -32,18 +31,20 @@ recommends:
 
 contents:
   # --- Application source code ---
-  - src: ./src/
-    dst: /opt/heimdall/src/
+  - src: ./src
+    dst: /opt/heimdall/src
+    type: tree
 
   # --- Web UI ---
-  - src: ./ui/
-    dst: /opt/heimdall/ui/
+  - src: ./ui
+    dst: /opt/heimdall/ui
+    type: tree
 
   # --- Python project files ---
   - src: ./pyproject.toml
     dst: /opt/heimdall/pyproject.toml
 
-  # --- Config template (postinstall copies to /etc/heimdall/ if not present) ---
+  # --- Config template ---
   - src: ./config.yml
     dst: /opt/heimdall/config.yml
 
