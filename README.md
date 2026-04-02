@@ -330,7 +330,7 @@ Create custom tools at runtime via Discord or as `.py` files in `data/skills/`.
 @Heimdall create a skill called "disk_report" that checks disk usage on all hosts
 ```
 
-See `docs/SKILLS.md` for the full development guide.
+See `docs/skills.md` for the full development guide.
 
 ## Development
 

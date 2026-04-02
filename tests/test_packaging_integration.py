@@ -12,7 +12,6 @@ Validates that all components from Rounds 1-5 work together correctly:
 from __future__ import annotations
 
 import copy
-import os
 import stat
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch

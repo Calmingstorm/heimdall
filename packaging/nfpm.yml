@@ -16,7 +16,7 @@ maintainer: Heimdall Maintainers <heimdall@localhost>
 description: |
   Heimdall — autonomous executor Discord bot.
   An AI-powered Discord bot that manages infrastructure via chat.
-  Powered by GPT-5.4 with 61 tools for shell, SSH, file I/O,
+  Powered by LLM with 61 tools for shell, SSH, file I/O,
   browser automation, knowledge management, and more.
 vendor: Heimdall
 homepage: https://github.com/calmingstorm/heimdall

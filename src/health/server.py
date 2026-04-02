@@ -24,9 +24,6 @@ log = get_logger("health")
 SendMessageCallback = Callable[[str, str], Awaitable[None]]
 TriggerCallback = Callable[[str, dict], Awaitable[int]]
 
-# Paths that skip API token authentication
-_AUTH_SKIP_PREFIXES = ("/health", "/webhook/", "/ui")
-
 # Exact API paths that skip token auth (login must be accessible unauthenticated)
 _AUTH_SKIP_PATHS = frozenset({"/api/auth/login"})
 
