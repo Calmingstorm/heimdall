@@ -52,12 +52,23 @@ if [ ! -d "$INSTALL_DIR/.venv" ]; then
 fi
 
 "$INSTALL_DIR/.venv/bin/pip" install --quiet --upgrade pip
-# Install dependencies only (not as a package — src/ runs from source to avoid
-# circular import with discord.py when the working directory is /opt/heimdall)
+# Install all dependencies including optional features.
+# We install deps from pyproject.toml directly (not `pip install .`) to avoid
+# installing src/ as a package, which causes circular imports with discord.py
+# when the working directory is /opt/heimdall.
 "$INSTALL_DIR/.venv/bin/pip" install --quiet -r <("$INSTALL_DIR/.venv/bin/python" -c "
-import tomllib, pathlib
+import tomllib, pathlib, itertools
 d = tomllib.loads(pathlib.Path('$INSTALL_DIR/pyproject.toml').read_text())
-for dep in d.get('project', {}).get('dependencies', []): print(dep)
+proj = d.get('project', {})
+deps = list(proj.get('dependencies', []))
+for extra in proj.get('optional-dependencies', {}).values():
+    deps.extend(extra)
+seen = set()
+for dep in deps:
+    name = dep.split('>')[0].split('<')[0].split('=')[0].split('!')[0].split('[')[0].strip().lower()
+    if name not in seen and name != 'heimdall':
+        seen.add(name)
+        print(dep)
 ")
 
 # --- Set ownership ---
