@@ -52,7 +52,13 @@ if [ ! -d "$INSTALL_DIR/.venv" ]; then
 fi
 
 "$INSTALL_DIR/.venv/bin/pip" install --quiet --upgrade pip
-"$INSTALL_DIR/.venv/bin/pip" install --quiet "$INSTALL_DIR"
+# Install dependencies only (not as a package — src/ runs from source to avoid
+# circular import with discord.py when the working directory is /opt/heimdall)
+"$INSTALL_DIR/.venv/bin/pip" install --quiet -r <("$INSTALL_DIR/.venv/bin/python" -c "
+import tomllib, pathlib
+d = tomllib.loads(pathlib.Path('$INSTALL_DIR/pyproject.toml').read_text())
+for dep in d.get('project', {}).get('dependencies', []): print(dep)
+")
 
 # --- Set ownership ---
 chown -R "$SERVICE_USER:$SERVICE_GROUP" "$DATA_DIR"
