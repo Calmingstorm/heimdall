@@ -136,6 +136,28 @@ export default {
                     <img :src="url" :alt="'Image ' + (j+1)" loading="lazy" @click="openImage(url)" @error="onImageError($event)"/>
                   </div>
                 </div>
+
+                <!-- Attached files (from tool calls like browser_screenshot, post_file) -->
+                <div v-if="msg.files && msg.files.length > 0" class="chat-files" style="margin-top: 8px;">
+                  <div v-for="(file, j) in msg.files" :key="'f'+j" style="margin-bottom: 6px;">
+                    <img
+                      v-if="file.content_type && file.content_type.startsWith('image/')"
+                      :src="'data:' + file.content_type + ';base64,' + file.data"
+                      :alt="file.filename"
+                      style="max-width: 100%; border-radius: 6px; border: 1px solid var(--border); cursor: pointer;"
+                      @click="openImage('data:' + file.content_type + ';base64,' + file.data)"
+                      loading="lazy"
+                    />
+                    <a
+                      v-else
+                      :href="'data:' + file.content_type + ';base64,' + file.data"
+                      :download="file.filename"
+                      style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; border: 1px solid var(--border); color: var(--text-secondary); font-size: 13px; text-decoration: none;"
+                    >
+                      \uD83D\uDCCE {{ file.filename }} ({{ (file.size / 1024).toFixed(1) }} KB)
+                    </a>
+                  </div>
+                </div>
               </div>
 
               <!-- Timestamp -->
@@ -260,6 +282,7 @@ export default {
         tools_used: extras.tools_used || [],
         is_error: extras.is_error || false,
         images: role === 'bot' ? extractImageUrls(content) : [],
+        files: extras.files || [],
         _showTools: false,
       };
       messages.value.push(msg);
@@ -347,6 +370,7 @@ export default {
         addMessage('bot', data.content, {
           tools_used: data.tools_used || [],
           is_error: data.is_error || false,
+          files: data.files || [],
         });
       } else if (data.type === 'chat_error') {
         addMessage('bot', data.error || 'Unknown error', { is_error: true });
@@ -363,6 +387,7 @@ export default {
         addMessage('bot', result.response, {
           tools_used: result.tools_used || [],
           is_error: result.is_error || false,
+          files: result.files || [],
         });
       } catch (e) {
         addMessage('bot', e.message || 'Failed to send message', { is_error: true });
@@ -419,8 +444,46 @@ export default {
       }, 120000);
     }
 
+    async function loadHistory() {
+      try {
+        const session = await api.get('/api/sessions/web-default');
+        if (session && session.messages && session.messages.length > 0) {
+          for (const m of session.messages) {
+            const role = m.role === 'user' ? 'user' : 'bot';
+            let content = m.content || '';
+            // Strip "[Username]: " prefix from user messages
+            if (role === 'user') {
+              const prefixMatch = content.match(/^\[.*?\]:\s*/);
+              if (prefixMatch) content = content.slice(prefixMatch[0].length);
+            }
+            if (!content.trim()) continue;
+            const msg = {
+              id: ++msgIdCounter,
+              role,
+              content,
+              timestamp: m.timestamp ? m.timestamp * 1000 : Date.now(),
+              html: role === 'bot' ? renderMarkdown(content) : '',
+              tools_used: [],
+              is_error: false,
+              images: role === 'bot' ? extractImageUrls(content) : [],
+              files: [],
+              _showTools: false,
+            };
+            messages.value.push(msg);
+          }
+          nextTick(() => {
+            scrollToBottom();
+            attachCopyButtons();
+          });
+        }
+      } catch (e) {
+        // No session yet — that's fine, start fresh
+      }
+    }
+
     onMounted(() => {
       ws.subscribe('chat', onChatMessage);
+      loadHistory();
       nextTick(() => inputEl.value?.focus());
     });
 

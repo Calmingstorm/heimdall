@@ -452,11 +452,15 @@ def create_api_routes(bot: HeimdallBot) -> web.RouteTableDef:
             user_id=user_id, username=username,
         )
         status = 200 if not result["is_error"] else 502
-        return web.json_response({
+        resp = {
             "response": result["response"],
             "tools_used": result["tools_used"],
             "is_error": result["is_error"],
-        }, status=status)
+        }
+        files = result.get("files", [])
+        if files:
+            resp["files"] = files
+        return web.json_response(resp, status=status)
 
     # ------------------------------------------------------------------
     # Sessions

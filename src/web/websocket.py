@@ -142,12 +142,16 @@ class WebSocketManager:
                 self._bot, content, channel_id,
                 user_id=user_id, username=username,
             )
-            await ws.send_json({
+            resp = {
                 "type": "chat_response",
                 "content": result["response"],
                 "tools_used": result["tools_used"],
                 "is_error": result["is_error"],
-            })
+            }
+            files = result.get("files", [])
+            if files:
+                resp["files"] = files
+            await ws.send_json(resp)
         except Exception as e:
             log.error("WebSocket chat error: %s", e, exc_info=True)
             await ws.send_json({

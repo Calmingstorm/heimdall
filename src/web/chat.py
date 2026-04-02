@@ -43,17 +43,53 @@ class _WebSentMessage:
 
 
 class _WebChannel:
-    """Minimal channel-like object for web messages."""
+    """Minimal channel-like object for web messages.
+
+    Captures files posted via send(file=...) so they can be returned
+    to the web client as base64 data.
+    """
 
     def __init__(self, channel_id: str):
         self.id = channel_id
         self.name = "web-chat"
         self.guild = None
+        self.captured_files: list[dict] = []
 
     def typing(self):
         return _NoOpContextManager()
 
     async def send(self, content=None, **kwargs) -> _WebSentMessage:
+        import base64
+        # Capture file if provided
+        file = kwargs.get("file")
+        if file is not None:
+            try:
+                fp = file.fp
+                filename = getattr(file, "filename", "file")
+                data = fp.read()
+                if data:
+                    # Detect content type from filename
+                    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+                    content_type = {
+                        "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+                        "gif": "image/gif", "webp": "image/webp", "svg": "image/svg+xml",
+                        "pdf": "application/pdf", "txt": "text/plain", "json": "application/json",
+                    }.get(ext, "application/octet-stream")
+                    self.captured_files.append({
+                        "filename": filename,
+                        "content_type": content_type,
+                        "data": base64.b64encode(data).decode("ascii"),
+                        "size": len(data),
+                    })
+            except Exception as e:
+                log.warning("Failed to capture web chat file: %s", e)
+
+        # Capture files (plural)
+        files = kwargs.get("files")
+        if files:
+            for f in files:
+                await self.send(file=f)
+
         return _WebSentMessage()
 
     async def fetch_message(self, message_id: int):
@@ -120,6 +156,7 @@ async def process_web_chat(
       - is_error: bool — whether an error occurred
     """
     msg = WebMessage(channel_id=channel_id, user_id=user_id, username=username, content=content)
+    web_channel = msg.channel  # type: _WebChannel
     tagged = f"[{username}]: {content}"
     bot.sessions.add_message(channel_id, "user", tagged, user_id=user_id)
 
@@ -169,6 +206,7 @@ async def process_web_chat(
             "response": response,
             "tools_used": tools_used,
             "is_error": is_error,
+            "files": web_channel.captured_files,
         }
     except Exception as e:
         log.error("Web chat error: %s", e, exc_info=True)
@@ -177,4 +215,5 @@ async def process_web_chat(
             "response": f"Error processing message: {_scrub(str(e))}",
             "tools_used": [],
             "is_error": True,
+            "files": [],
         }
