@@ -28,9 +28,9 @@ jobs:
         run: sed -i "s/^version = .*/version = \"${{ steps.version.outputs.version }}\"/" pyproject.toml
 
       - name: Install nfpm
-        run: |
-          curl -sfL https://install.goreleaser.com/github.com/goreleaser/nfpm.sh | sh -s -- -b /usr/local/bin
-          nfpm --version
+        uses: goreleaser/nfpm-action@v1
+        with:
+          install-only: true
 
       - name: Build .deb package
         run: |
