@@ -443,3 +443,267 @@ def validate_nfpm_contents_consistency(config: dict[str, Any]) -> list[str]:
         errors.append("Source code directory /opt/heimdall/src/ not in contents")
 
     return errors
+
+
+# ---------------------------------------------------------------------------
+# GitHub Actions workflow validation
+# ---------------------------------------------------------------------------
+
+# Required jobs in the release workflow
+REQUIRED_RELEASE_JOBS = ["build-deb", "build-docker", "create-release"]
+
+# Required permissions for the release workflow
+REQUIRED_RELEASE_PERMISSIONS = ["contents", "packages"]
+
+# GitHub Actions used in the release workflow (action name → minimum major version)
+EXPECTED_ACTIONS = {
+    "actions/checkout": 4,
+    "actions/upload-artifact": 4,
+    "actions/download-artifact": 4,
+    "docker/login-action": 3,
+    "docker/setup-buildx-action": 3,
+    "docker/build-push-action": 5,
+    "softprops/action-gh-release": 2,
+}
+
+
+def parse_workflow(content: str) -> dict[str, Any]:
+    """Parse a GitHub Actions workflow YAML into a dict.
+
+    Returns the parsed dict, or raises ValueError on invalid YAML.
+    """
+    try:
+        parsed = yaml.safe_load(content)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Invalid YAML: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(f"Expected dict at top level, got {type(parsed).__name__}")
+    return parsed
+
+
+def validate_release_workflow(config: dict[str, Any]) -> list[str]:
+    """Validate a GitHub Actions release workflow. Returns list of error strings.
+
+    Checks:
+    - Required top-level keys: name, on, permissions, jobs
+    - Trigger is on push to v* tags
+    - Required permissions: contents (write), packages (write)
+    - Required jobs: build-deb, build-docker, create-release
+    - create-release depends on build-deb and build-docker
+    - Each job has runs-on and steps
+    - Key actions are referenced in steps
+    """
+    errors: list[str] = []
+
+    # Top-level keys — note: PyYAML parses bare 'on' as boolean True
+    for key in ("name", "on", "jobs"):
+        if key not in config and (key != "on" or True not in config):
+            errors.append(f"Missing top-level key: {key}")
+
+    # Trigger: must be push with v* tag
+    # PyYAML converts the bare key 'on' to boolean True
+    on_config = config.get("on") or config.get(True, {})
+    if isinstance(on_config, dict):
+        push = on_config.get("push", {})
+        if isinstance(push, dict):
+            tags = push.get("tags", [])
+            if not any("v" in str(t) for t in tags):
+                errors.append("Workflow must trigger on v* tag push")
+        else:
+            errors.append("'on.push' must be a mapping")
+    else:
+        errors.append("'on' must be a mapping")
+
+    # Permissions
+    perms = config.get("permissions", {})
+    if isinstance(perms, dict):
+        for perm in REQUIRED_RELEASE_PERMISSIONS:
+            if perm not in perms:
+                errors.append(f"Missing permission: {perm}")
+            elif perms[perm] != "write":
+                errors.append(f"Permission '{perm}' must be 'write', got '{perms[perm]}'")
+    else:
+        errors.append("'permissions' must be a mapping")
+
+    # Jobs
+    jobs = config.get("jobs", {})
+    if not isinstance(jobs, dict):
+        errors.append("'jobs' must be a mapping")
+        return errors
+
+    for job_name in REQUIRED_RELEASE_JOBS:
+        if job_name not in jobs:
+            errors.append(f"Missing required job: {job_name}")
+
+    # Validate each job has runs-on and steps
+    for job_name, job_config in jobs.items():
+        if not isinstance(job_config, dict):
+            errors.append(f"Job '{job_name}' must be a mapping")
+            continue
+        if "runs-on" not in job_config:
+            errors.append(f"Job '{job_name}' missing 'runs-on'")
+        if "steps" not in job_config:
+            errors.append(f"Job '{job_name}' missing 'steps'")
+        elif not isinstance(job_config["steps"], list) or not job_config["steps"]:
+            errors.append(f"Job '{job_name}' has no steps")
+
+    # create-release must depend on build jobs
+    release_job = jobs.get("create-release", {})
+    if isinstance(release_job, dict):
+        needs = release_job.get("needs", [])
+        if isinstance(needs, str):
+            needs = [needs]
+        if "build-deb" not in needs:
+            errors.append("create-release must need build-deb")
+        if "build-docker" not in needs:
+            errors.append("create-release must need build-docker")
+
+    return errors
+
+
+def extract_workflow_actions(config: dict[str, Any]) -> list[str]:
+    """Extract all GitHub Actions references (uses: values) from a workflow.
+
+    Returns a list of action references like 'actions/checkout@v4'.
+    """
+    actions: list[str] = []
+    jobs = config.get("jobs", {})
+    if not isinstance(jobs, dict):
+        return actions
+
+    for job_config in jobs.values():
+        if not isinstance(job_config, dict):
+            continue
+        steps = job_config.get("steps", [])
+        if not isinstance(steps, list):
+            continue
+        for step in steps:
+            if isinstance(step, dict) and "uses" in step:
+                actions.append(step["uses"])
+
+    return actions
+
+
+def validate_workflow_actions(config: dict[str, Any]) -> list[str]:
+    """Validate that expected actions are referenced and use pinned versions.
+
+    Returns list of error strings. Empty = valid.
+    """
+    errors: list[str] = []
+    actions = extract_workflow_actions(config)
+
+    # Check each expected action is used
+    for action_name, min_major in EXPECTED_ACTIONS.items():
+        matching = [a for a in actions if a.startswith(action_name)]
+        if not matching:
+            errors.append(f"Expected action not found: {action_name}")
+            continue
+
+        # Check version pinning (must have @vN)
+        for ref in matching:
+            if "@" not in ref:
+                errors.append(f"Action not version-pinned: {ref}")
+            else:
+                version_part = ref.split("@")[1]
+                if not version_part.startswith("v"):
+                    errors.append(f"Action version should start with 'v': {ref}")
+                else:
+                    try:
+                        major = int(version_part[1:].split(".")[0])
+                        if major < min_major:
+                            errors.append(
+                                f"Action {action_name} version too old: "
+                                f"v{major} < v{min_major}"
+                            )
+                    except ValueError:
+                        pass  # Non-numeric version is OK (e.g. sha pins)
+
+    return errors
+
+
+def validate_workflow_docker_job(config: dict[str, Any]) -> list[str]:
+    """Validate the build-docker job pushes to GHCR with correct tags.
+
+    Returns list of error strings. Empty = valid.
+    """
+    errors: list[str] = []
+    jobs = config.get("jobs", {})
+    if "build-docker" not in jobs:
+        errors.append("build-docker job not found or invalid")
+        return errors
+    docker_job = jobs["build-docker"]
+    if not isinstance(docker_job, dict):
+        errors.append("build-docker job not found or invalid")
+        return errors
+
+    steps = docker_job.get("steps", [])
+    if not isinstance(steps, list):
+        errors.append("build-docker has no steps")
+        return errors
+
+    # Must have a GHCR login step
+    has_login = any(
+        isinstance(s, dict) and "docker/login-action" in s.get("uses", "")
+        for s in steps
+    )
+    if not has_login:
+        errors.append("build-docker must log in to container registry")
+
+    # Must have a build-push step
+    build_steps = [
+        s for s in steps
+        if isinstance(s, dict) and "docker/build-push-action" in s.get("uses", "")
+    ]
+    if not build_steps:
+        errors.append("build-docker must use docker/build-push-action")
+    else:
+        build_step = build_steps[0]
+        with_config = build_step.get("with", {})
+        if not with_config.get("push"):
+            errors.append("build-push-action must have push: true")
+        tags = str(with_config.get("tags", ""))
+        if "latest" not in tags:
+            errors.append("Docker tags must include 'latest'")
+
+    return errors
+
+
+def validate_workflow_deb_job(config: dict[str, Any]) -> list[str]:
+    """Validate the build-deb job installs nfpm and builds a .deb.
+
+    Returns list of error strings. Empty = valid.
+    """
+    errors: list[str] = []
+    jobs = config.get("jobs", {})
+    if "build-deb" not in jobs:
+        errors.append("build-deb job not found or invalid")
+        return errors
+    deb_job = jobs["build-deb"]
+    if not isinstance(deb_job, dict):
+        errors.append("build-deb job not found or invalid")
+        return errors
+
+    steps = deb_job.get("steps", [])
+    if not isinstance(steps, list):
+        errors.append("build-deb has no steps")
+        return errors
+
+    # Collect all step content (names and run commands)
+    step_text = ""
+    for s in steps:
+        if isinstance(s, dict):
+            step_text += s.get("name", "") + " "
+            step_text += str(s.get("run", "")) + " "
+
+    if "nfpm" not in step_text.lower():
+        errors.append("build-deb must install and use nfpm")
+
+    # Check uses fields for upload-artifact
+    has_upload = any(
+        isinstance(s, dict) and "upload-artifact" in s.get("uses", "")
+        for s in steps
+    )
+    if not has_upload:
+        errors.append("build-deb must upload .deb as artifact")
+
+    return errors

@@ -1,4 +1,4 @@
-"""Tests for Heimdall packaging validation — systemd, scripts, nfpm config."""
+"""Tests for Heimdall packaging validation — systemd, scripts, nfpm, workflow."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,25 +8,35 @@ import yaml
 
 from src.packaging.validate import (
     DATA_SUBDIRS,
+    EXPECTED_ACTIONS,
     FHS_PATHS,
     REQUIRED_CONTENT_DESTINATIONS,
     REQUIRED_DEB_DEPENDS,
     REQUIRED_NFPM_FIELDS,
     REQUIRED_NFPM_SCRIPTS,
+    REQUIRED_RELEASE_JOBS,
+    REQUIRED_RELEASE_PERMISSIONS,
     REQUIRED_SERVICE_DIRECTIVES,
     check_script_syntax,
     extract_script_operations,
+    extract_workflow_actions,
     parse_nfpm_config,
     parse_systemd_unit,
+    parse_workflow,
     validate_nfpm_config,
     validate_nfpm_contents_consistency,
     validate_nfpm_file_references,
     validate_postinstall,
     validate_preremove,
+    validate_release_workflow,
     validate_service_file,
+    validate_workflow_actions,
+    validate_workflow_deb_job,
+    validate_workflow_docker_job,
 )
 
 PACKAGING_DIR = Path(__file__).parent.parent / "packaging"
+WORKFLOWS_DIR = Path(__file__).parent.parent / ".github" / "workflows"
 
 
 # ---------------------------------------------------------------------------
@@ -912,3 +922,543 @@ class TestNfpmPackagingConsistency:
         dumped = yaml.dump(parsed)
         reparsed = yaml.safe_load(dumped)
         assert reparsed["name"] == parsed["name"]
+
+
+# ---------------------------------------------------------------------------
+# parse_workflow
+# ---------------------------------------------------------------------------
+
+class TestParseWorkflow:
+    """Tests for GitHub Actions workflow YAML parsing."""
+
+    def test_parses_valid_yaml(self):
+        """Parser returns dict from valid workflow YAML."""
+        content = "name: Test\non:\n  push:\n    tags: ['v*']\njobs: {}\n"
+        result = parse_workflow(content)
+        assert result["name"] == "Test"
+
+    def test_raises_on_invalid_yaml(self):
+        """Parser raises ValueError on invalid YAML."""
+        with pytest.raises(ValueError, match="Invalid YAML"):
+            parse_workflow("invalid: yaml: [broken\n")
+
+    def test_raises_on_non_dict(self):
+        """Parser raises ValueError if top-level is not a dict."""
+        with pytest.raises(ValueError, match="Expected dict"):
+            parse_workflow("- item1\n- item2\n")
+
+    def test_parses_real_release_workflow(self):
+        """Parser successfully reads the real release.yml."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        result = parse_workflow(content)
+        assert result["name"] == "Release"
+        assert "jobs" in result
+
+    def test_parses_nested_job_structure(self):
+        """Parser handles nested jobs with steps."""
+        content = (
+            "name: CI\non:\n  push:\n    tags: ['v*']\n"
+            "jobs:\n  build:\n    runs-on: ubuntu-latest\n"
+            "    steps:\n      - uses: actions/checkout@v4\n"
+        )
+        result = parse_workflow(content)
+        assert "build" in result["jobs"]
+        assert result["jobs"]["build"]["steps"][0]["uses"] == "actions/checkout@v4"
+
+
+# ---------------------------------------------------------------------------
+# validate_release_workflow
+# ---------------------------------------------------------------------------
+
+class TestValidateReleaseWorkflow:
+    """Tests for release workflow validation."""
+
+    def test_valid_real_workflow(self):
+        """Real release.yml passes validation."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        config = parse_workflow(content)
+        errors = validate_release_workflow(config)
+        assert errors == [], f"Validation errors: {errors}"
+
+    def test_missing_top_level_key(self):
+        """Validation catches missing top-level keys."""
+        config = {"name": "Test"}
+        errors = validate_release_workflow(config)
+        assert any("Missing top-level key: on" in e for e in errors)
+        assert any("Missing top-level key: jobs" in e for e in errors)
+
+    def test_missing_tag_trigger(self):
+        """Validation catches workflow without v* tag trigger."""
+        config = {
+            "name": "Test",
+            "on": {"push": {"branches": ["main"]}},
+            "permissions": {"contents": "write", "packages": "write"},
+            "jobs": {},
+        }
+        errors = validate_release_workflow(config)
+        assert any("v* tag push" in e for e in errors)
+
+    def test_missing_permissions(self):
+        """Validation catches missing required permissions."""
+        config = {
+            "name": "Test",
+            "on": {"push": {"tags": ["v*"]}},
+            "permissions": {},
+            "jobs": {},
+        }
+        errors = validate_release_workflow(config)
+        assert any("Missing permission: contents" in e for e in errors)
+        assert any("Missing permission: packages" in e for e in errors)
+
+    def test_wrong_permission_level(self):
+        """Validation catches non-write permission level."""
+        config = {
+            "name": "Test",
+            "on": {"push": {"tags": ["v*"]}},
+            "permissions": {"contents": "read", "packages": "write"},
+            "jobs": {},
+        }
+        errors = validate_release_workflow(config)
+        assert any("contents" in e and "write" in e for e in errors)
+
+    def test_missing_required_jobs(self):
+        """Validation catches missing required jobs."""
+        config = {
+            "name": "Test",
+            "on": {"push": {"tags": ["v*"]}},
+            "permissions": {"contents": "write", "packages": "write"},
+            "jobs": {"build-deb": {"runs-on": "ubuntu-latest", "steps": [{}]}},
+        }
+        errors = validate_release_workflow(config)
+        assert any("Missing required job: build-docker" in e for e in errors)
+        assert any("Missing required job: create-release" in e for e in errors)
+
+    def test_job_missing_runs_on(self):
+        """Validation catches job without runs-on."""
+        config = {
+            "name": "Test",
+            "on": {"push": {"tags": ["v*"]}},
+            "permissions": {"contents": "write", "packages": "write"},
+            "jobs": {
+                "build-deb": {"steps": [{}]},
+                "build-docker": {"runs-on": "ubuntu-latest", "steps": [{}]},
+                "create-release": {
+                    "runs-on": "ubuntu-latest",
+                    "needs": ["build-deb", "build-docker"],
+                    "steps": [{}],
+                },
+            },
+        }
+        errors = validate_release_workflow(config)
+        assert any("build-deb" in e and "runs-on" in e for e in errors)
+
+    def test_job_missing_steps(self):
+        """Validation catches job without steps."""
+        config = {
+            "name": "Test",
+            "on": {"push": {"tags": ["v*"]}},
+            "permissions": {"contents": "write", "packages": "write"},
+            "jobs": {
+                "build-deb": {"runs-on": "ubuntu-latest"},
+                "build-docker": {"runs-on": "ubuntu-latest", "steps": [{}]},
+                "create-release": {
+                    "runs-on": "ubuntu-latest",
+                    "needs": ["build-deb", "build-docker"],
+                    "steps": [{}],
+                },
+            },
+        }
+        errors = validate_release_workflow(config)
+        assert any("build-deb" in e and "steps" in e for e in errors)
+
+    def test_create_release_missing_needs(self):
+        """Validation catches create-release without build job dependencies."""
+        config = {
+            "name": "Test",
+            "on": {"push": {"tags": ["v*"]}},
+            "permissions": {"contents": "write", "packages": "write"},
+            "jobs": {
+                "build-deb": {"runs-on": "ubuntu-latest", "steps": [{}]},
+                "build-docker": {"runs-on": "ubuntu-latest", "steps": [{}]},
+                "create-release": {
+                    "runs-on": "ubuntu-latest",
+                    "steps": [{}],
+                },
+            },
+        }
+        errors = validate_release_workflow(config)
+        assert any("create-release must need build-deb" in e for e in errors)
+        assert any("create-release must need build-docker" in e for e in errors)
+
+    def test_create_release_needs_as_string(self):
+        """Validation handles 'needs' as a single string."""
+        config = {
+            "name": "Test",
+            "on": {"push": {"tags": ["v*"]}},
+            "permissions": {"contents": "write", "packages": "write"},
+            "jobs": {
+                "build-deb": {"runs-on": "ubuntu-latest", "steps": [{}]},
+                "build-docker": {"runs-on": "ubuntu-latest", "steps": [{}]},
+                "create-release": {
+                    "runs-on": "ubuntu-latest",
+                    "needs": "build-deb",
+                    "steps": [{}],
+                },
+            },
+        }
+        errors = validate_release_workflow(config)
+        # build-deb should be OK, but build-docker should be missing
+        assert not any("need build-deb" in e for e in errors)
+        assert any("need build-docker" in e for e in errors)
+
+    def test_valid_tag_patterns(self):
+        """Validation accepts v* tag pattern in various forms."""
+        config = {
+            "name": "Test",
+            "on": {"push": {"tags": ["v*"]}},
+            "permissions": {"contents": "write", "packages": "write"},
+            "jobs": {
+                "build-deb": {"runs-on": "ubuntu-latest", "steps": [{}]},
+                "build-docker": {"runs-on": "ubuntu-latest", "steps": [{}]},
+                "create-release": {
+                    "runs-on": "ubuntu-latest",
+                    "needs": ["build-deb", "build-docker"],
+                    "steps": [{}],
+                },
+            },
+        }
+        errors = validate_release_workflow(config)
+        assert not any("tag push" in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# extract_workflow_actions
+# ---------------------------------------------------------------------------
+
+class TestExtractWorkflowActions:
+    """Tests for extracting GitHub Actions references from workflows."""
+
+    def test_extracts_actions_from_real_workflow(self):
+        """Extractor finds all actions in the real release.yml."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        config = parse_workflow(content)
+        actions = extract_workflow_actions(config)
+        assert any("actions/checkout" in a for a in actions)
+        assert any("docker/build-push-action" in a for a in actions)
+        assert any("softprops/action-gh-release" in a for a in actions)
+
+    def test_extracts_from_single_job(self):
+        """Extractor finds actions in a single-job workflow."""
+        config = {
+            "jobs": {
+                "test": {
+                    "steps": [
+                        {"uses": "actions/checkout@v4"},
+                        {"run": "echo hello"},
+                        {"uses": "actions/setup-python@v5"},
+                    ]
+                }
+            }
+        }
+        actions = extract_workflow_actions(config)
+        assert len(actions) == 2
+        assert "actions/checkout@v4" in actions
+        assert "actions/setup-python@v5" in actions
+
+    def test_skips_run_only_steps(self):
+        """Extractor ignores steps without 'uses'."""
+        config = {"jobs": {"test": {"steps": [{"run": "echo hi"}]}}}
+        actions = extract_workflow_actions(config)
+        assert actions == []
+
+    def test_empty_jobs(self):
+        """Extractor handles empty jobs dict."""
+        assert extract_workflow_actions({"jobs": {}}) == []
+
+    def test_no_jobs_key(self):
+        """Extractor handles missing jobs key."""
+        assert extract_workflow_actions({}) == []
+
+
+# ---------------------------------------------------------------------------
+# validate_workflow_actions
+# ---------------------------------------------------------------------------
+
+class TestValidateWorkflowActions:
+    """Tests for workflow action version validation."""
+
+    def test_real_workflow_actions_valid(self):
+        """Real release.yml uses expected actions with valid versions."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        config = parse_workflow(content)
+        errors = validate_workflow_actions(config)
+        assert errors == [], f"Action validation errors: {errors}"
+
+    def test_missing_expected_action(self):
+        """Validation catches missing expected action."""
+        config = {"jobs": {"test": {"steps": [{"uses": "actions/checkout@v4"}]}}}
+        errors = validate_workflow_actions(config)
+        assert any("Expected action not found: docker/login-action" in e for e in errors)
+
+    def test_action_without_version_pin(self):
+        """Validation catches action without version pinning."""
+        config = {
+            "jobs": {
+                "test": {
+                    "steps": [
+                        {"uses": "actions/checkout"},  # No @vN
+                    ]
+                }
+            }
+        }
+        errors = validate_workflow_actions(config)
+        assert any("not version-pinned" in e for e in errors)
+
+    def test_action_version_too_old(self):
+        """Validation catches action with major version below minimum."""
+        config = {
+            "jobs": {
+                "test": {
+                    "steps": [
+                        {"uses": "actions/checkout@v2"},  # min is v4
+                    ]
+                }
+            }
+        }
+        errors = validate_workflow_actions(config)
+        assert any("version too old" in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# validate_workflow_docker_job
+# ---------------------------------------------------------------------------
+
+class TestValidateWorkflowDockerJob:
+    """Tests for Docker job validation in release workflow."""
+
+    def test_real_docker_job_valid(self):
+        """Real release.yml Docker job passes validation."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        config = parse_workflow(content)
+        errors = validate_workflow_docker_job(config)
+        assert errors == [], f"Docker job errors: {errors}"
+
+    def test_missing_docker_login(self):
+        """Validation catches missing container registry login."""
+        config = {
+            "jobs": {
+                "build-docker": {
+                    "steps": [
+                        {"uses": "docker/build-push-action@v6", "with": {"push": True}},
+                    ]
+                }
+            }
+        }
+        errors = validate_workflow_docker_job(config)
+        assert any("log in" in e for e in errors)
+
+    def test_missing_build_push_action(self):
+        """Validation catches missing build-push-action."""
+        config = {
+            "jobs": {
+                "build-docker": {
+                    "steps": [
+                        {"uses": "docker/login-action@v3"},
+                    ]
+                }
+            }
+        }
+        errors = validate_workflow_docker_job(config)
+        assert any("build-push-action" in e for e in errors)
+
+    def test_push_not_enabled(self):
+        """Validation catches build-push without push: true."""
+        config = {
+            "jobs": {
+                "build-docker": {
+                    "steps": [
+                        {"uses": "docker/login-action@v3"},
+                        {"uses": "docker/build-push-action@v6", "with": {"push": False}},
+                    ]
+                }
+            }
+        }
+        errors = validate_workflow_docker_job(config)
+        assert any("push: true" in e for e in errors)
+
+    def test_missing_latest_tag(self):
+        """Validation catches Docker tags without 'latest'."""
+        config = {
+            "jobs": {
+                "build-docker": {
+                    "steps": [
+                        {"uses": "docker/login-action@v3"},
+                        {
+                            "uses": "docker/build-push-action@v6",
+                            "with": {"push": True, "tags": "ghcr.io/test:v1.0.0"},
+                        },
+                    ]
+                }
+            }
+        }
+        errors = validate_workflow_docker_job(config)
+        assert any("latest" in e for e in errors)
+
+    def test_missing_docker_job(self):
+        """Validation catches completely missing build-docker job."""
+        config = {"jobs": {}}
+        errors = validate_workflow_docker_job(config)
+        assert any("not found" in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# validate_workflow_deb_job
+# ---------------------------------------------------------------------------
+
+class TestValidateWorkflowDebJob:
+    """Tests for .deb job validation in release workflow."""
+
+    def test_real_deb_job_valid(self):
+        """Real release.yml .deb job passes validation."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        config = parse_workflow(content)
+        errors = validate_workflow_deb_job(config)
+        assert errors == [], f"Deb job errors: {errors}"
+
+    def test_missing_nfpm(self):
+        """Validation catches build-deb without nfpm."""
+        config = {
+            "jobs": {
+                "build-deb": {
+                    "steps": [
+                        {"uses": "actions/checkout@v4"},
+                        {"run": "dpkg-deb --build pkg"},
+                        {"uses": "actions/upload-artifact@v4"},
+                    ]
+                }
+            }
+        }
+        errors = validate_workflow_deb_job(config)
+        assert any("nfpm" in e for e in errors)
+
+    def test_missing_artifact_upload(self):
+        """Validation catches build-deb without artifact upload."""
+        config = {
+            "jobs": {
+                "build-deb": {
+                    "steps": [
+                        {"uses": "actions/checkout@v4"},
+                        {"name": "Install nfpm", "run": "curl nfpm"},
+                        {"name": "Build", "run": "nfpm package"},
+                    ]
+                }
+            }
+        }
+        errors = validate_workflow_deb_job(config)
+        assert any("upload" in e.lower() for e in errors)
+
+    def test_missing_deb_job(self):
+        """Validation catches completely missing build-deb job."""
+        config = {"jobs": {}}
+        errors = validate_workflow_deb_job(config)
+        assert any("not found" in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# Workflow constants
+# ---------------------------------------------------------------------------
+
+class TestWorkflowConstants:
+    """Tests for workflow validation constants."""
+
+    def test_required_jobs_complete(self):
+        """Required release jobs list is complete."""
+        assert "build-deb" in REQUIRED_RELEASE_JOBS
+        assert "build-docker" in REQUIRED_RELEASE_JOBS
+        assert "create-release" in REQUIRED_RELEASE_JOBS
+
+    def test_required_permissions_complete(self):
+        """Required permissions include contents and packages."""
+        assert "contents" in REQUIRED_RELEASE_PERMISSIONS
+        assert "packages" in REQUIRED_RELEASE_PERMISSIONS
+
+    def test_expected_actions_include_checkout(self):
+        """Expected actions include actions/checkout."""
+        assert "actions/checkout" in EXPECTED_ACTIONS
+
+    def test_expected_actions_include_docker_actions(self):
+        """Expected actions include Docker build actions."""
+        assert "docker/login-action" in EXPECTED_ACTIONS
+        assert "docker/build-push-action" in EXPECTED_ACTIONS
+
+    def test_expected_actions_include_release(self):
+        """Expected actions include GitHub release action."""
+        assert "softprops/action-gh-release" in EXPECTED_ACTIONS
+
+    def test_expected_actions_have_min_versions(self):
+        """All expected actions have positive minimum major versions."""
+        for action, min_ver in EXPECTED_ACTIONS.items():
+            assert isinstance(min_ver, int) and min_ver >= 1, \
+                f"{action} min version must be >= 1"
+
+
+# ---------------------------------------------------------------------------
+# Cross-file: workflow + packaging consistency
+# ---------------------------------------------------------------------------
+
+class TestWorkflowPackagingConsistency:
+    """Tests that release workflow is consistent with packaging config."""
+
+    def test_workflow_references_nfpm_config_path(self):
+        """Release workflow references packaging/nfpm.yml."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        assert "packaging/nfpm.yml" in content
+
+    def test_workflow_builds_deb_format(self):
+        """Release workflow builds .deb (not rpm or other)."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        assert "--packager deb" in content
+
+    def test_workflow_uploads_deb_artifact(self):
+        """Release workflow uploads .deb files as artifacts."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        assert "*.deb" in content
+
+    def test_workflow_creates_github_release(self):
+        """Release workflow creates a GitHub Release."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        assert "action-gh-release" in content
+
+    def test_workflow_pushes_to_ghcr(self):
+        """Release workflow pushes Docker images to GHCR."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        assert "ghcr.io" in content
+
+    def test_workflow_extracts_version_from_tag(self):
+        """Release workflow extracts version from git tag."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        assert "GITHUB_REF_NAME" in content
+
+    def test_workflow_is_valid_yaml(self):
+        """Release workflow is valid YAML (round-trip parse)."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        parsed = yaml.safe_load(content)
+        assert isinstance(parsed, dict)
+        dumped = yaml.dump(parsed)
+        reparsed = yaml.safe_load(dumped)
+        assert reparsed["name"] == parsed["name"]
+
+    def test_workflow_tags_docker_with_latest(self):
+        """Release workflow tags Docker image with 'latest'."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        assert "latest" in content
+
+    def test_workflow_uses_buildx(self):
+        """Release workflow uses Docker Buildx for efficient builds."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        assert "setup-buildx-action" in content
+
+    def test_workflow_generates_changelog(self):
+        """Release workflow generates a changelog for the release."""
+        content = (WORKFLOWS_DIR / "release.yml").read_text()
+        assert "changelog" in content.lower()
