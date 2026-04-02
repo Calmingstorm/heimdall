@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -381,6 +382,7 @@ class TestIsSetupNeeded:
             env_path=tmp_path / ".env",
         ) is False
 
+    @pytest.mark.skipif(os.getuid() == 0, reason="root can read any file regardless of permissions")
     def test_corrupt_env_file(self, tmp_path):
         """Setup needed when .env file is unreadable."""
         (tmp_path / "config.yml").write_text("discord:\n  token: test\n")
