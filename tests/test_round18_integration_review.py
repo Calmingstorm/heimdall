@@ -20,7 +20,6 @@ import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
     HeimdallBot,
-    MAX_TOOL_ITERATIONS,
 )
 from src.llm.circuit_breaker import CircuitOpenError  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
@@ -42,6 +41,8 @@ def _make_bot_stub():
     stub.config = MagicMock()
     stub.config.tools.enabled = True
     stub.config.tools.tool_timeout_seconds = 300
+    stub.config.tools.max_tool_iterations_chat = 30
+    stub.config.tools.max_tool_iterations_loop = 100
     stub.config.discord.allowed_users = ["user-1"]
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
@@ -250,8 +251,9 @@ class TestAllTerminalPaths:
         assert handoff is False
 
     async def test_path_5_max_iterations(self):
-        """LLM keeps calling tools until MAX_TOOL_ITERATIONS → error."""
+        """LLM keeps calling tools until chat cap hit → error."""
         stub = _make_bot_stub()
+        stub.config.tools.max_tool_iterations_chat = 4  # cheap cap
         msg = _make_message()
 
         stub.codex_client.chat_with_tools = AsyncMock(
@@ -263,8 +265,8 @@ class TestAllTerminalPaths:
         )
 
         assert is_error is True
-        assert "too many tool calls" in text.lower()
-        assert len(tools_used) == MAX_TOOL_ITERATIONS
+        assert "chat tool-iteration cap" in text.lower()
+        assert len(tools_used) == 4
         assert handoff is False
 
     async def test_path_skill_handoff(self):

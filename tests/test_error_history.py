@@ -36,6 +36,8 @@ def _make_bot_stub():
     stub.config = MagicMock()
     stub.config.tools.enabled = True
     stub.config.tools.tool_timeout_seconds = 300
+    stub.config.tools.max_tool_iterations_chat = 30
+    stub.config.tools.max_tool_iterations_loop = 100
     stub.config.discord.allowed_users = []
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
@@ -122,11 +124,12 @@ class TestProcessWithToolsErrorFlag:
         assert already_sent is False  # Codex path doesn't pre-stream to Discord
 
     async def test_max_iterations_returns_is_error_true(self):
-        """When the tool loop exhausts MAX_TOOL_ITERATIONS, is_error=True."""
+        """When the chat tool loop exhausts its cap, is_error=True."""
         stub = _make_bot_stub()
         msg = _make_message()
         stub.config.tools.enabled = True
         stub.config.tools.tool_timeout_seconds = 300
+        stub.config.tools.max_tool_iterations_chat = 5  # cheap cap
         stub._merged_tool_definitions = MagicMock(return_value=[{"name": "test"}])
 
         # Make every chat_with_tools return a tool call to exhaust the loop
@@ -148,7 +151,7 @@ class TestProcessWithToolsErrorFlag:
              patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
             text, already_sent, is_error, _tools, _handoff = await stub._process_with_tools(msg, [])
         assert is_error is True
-        assert "Too many tool calls" in text
+        assert "chat tool-iteration cap" in text.lower()
 
     async def test_codex_error_propagates_to_handle_message(self):
         """When Codex raises in task route, _handle_message_inner catches it as is_error."""

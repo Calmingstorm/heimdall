@@ -30,7 +30,6 @@ from src.discord.client import (  # noqa: E402
     detect_hedging,
     DISCORD_MAX_LEN,
     TOOL_OUTPUT_MAX_CHARS,
-    MAX_TOOL_ITERATIONS,
     _EMPTY_RESPONSE_FALLBACK,
     scrub_response_secrets,
     truncate_tool_output,
@@ -866,10 +865,12 @@ class TestErrorHandlingEdgeCases:
         saved = add_calls[-1][0][2]
         assert "error" in saved.lower()
 
-    async def test_max_tool_iterations_returns_error(self):
-        """Hitting MAX_TOOL_ITERATIONS returns an error."""
-        # Verified by constant check
-        assert MAX_TOOL_ITERATIONS == 20
+    async def test_max_tool_iterations_defaults_exist(self):
+        """Chat and loop caps have sane defaults (30 and 100)."""
+        from src.config.schema import ToolsConfig
+        tc = ToolsConfig()
+        assert tc.max_tool_iterations_chat == 30
+        assert tc.max_tool_iterations_loop == 100
 
 
 # ---------------------------------------------------------------------------
@@ -973,9 +974,12 @@ class TestEdgeCaseSourceStructure:
         """Discord max message length constant is 2000."""
         assert DISCORD_MAX_LEN == 2000
 
-    def test_max_tool_iterations_is_20(self):
-        """Max tool loop iterations is 20."""
-        assert MAX_TOOL_ITERATIONS == 20
+    def test_max_tool_iterations_defaults(self):
+        """Default caps: chat=30, loop=100 (loops need more budget)."""
+        from src.config.schema import ToolsConfig
+        tc = ToolsConfig()
+        assert tc.max_tool_iterations_chat == 30
+        assert tc.max_tool_iterations_loop == 100
 
     def test_tool_output_max_chars_reasonable(self):
         """Tool output max chars is reasonable (not too small, not too large)."""

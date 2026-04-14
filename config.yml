@@ -36,6 +36,11 @@ tools:
   #     ssh_user: "deploy"
   #     os: "linux"
   command_timeout_seconds: 300
+  # Max tool-calling iterations per request before the loop force-exits.
+  # Chat: normal Discord messages. Loop: autonomous loop iterations.
+  # Loops need more budget (exploration + execution + verification + commit).
+  max_tool_iterations_chat: 30
+  max_tool_iterations_loop: 100
   # claude_code_host: "myhost"   # Default host for claude -p (omit to disable claude_code tool)
   # claude_code_user: ""         # Non-root user for claude -p edits (e.g. "deploy")
   # claude_code_dir: "/opt/project"  # Default working directory for claude -p

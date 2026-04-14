@@ -20,7 +20,6 @@ import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
     HeimdallBot,
-    MAX_TOOL_ITERATIONS,
     TOOL_OUTPUT_MAX_CHARS,
     truncate_tool_output,
 )
@@ -41,6 +40,8 @@ def _make_bot_stub():
     stub.config = MagicMock()
     stub.config.tools.enabled = True
     stub.config.tools.tool_timeout_seconds = 300
+    stub.config.tools.max_tool_iterations_chat = 30
+    stub.config.tools.max_tool_iterations_loop = 100
     stub.config.discord.allowed_users = []
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
@@ -524,11 +525,12 @@ class TestToolSelectionAndPrompt:
 # ---------------------------------------------------------------------------
 
 class TestMaxIterations:
-    """The tool loop stops after MAX_TOOL_ITERATIONS."""
+    """The tool loop stops at the configured chat cap."""
 
     async def test_max_iterations_returns_error(self):
-        """After MAX_TOOL_ITERATIONS, returns error message."""
+        """After the chat cap is reached, returns cap-hit message + error flag."""
         stub = _make_bot_stub()
+        stub.config.tools.max_tool_iterations_chat = 7  # cheap cap for test
         msg = _make_message()
 
         tc = ToolCall(id="tool-1", name="check_disk", input={})
@@ -540,12 +542,15 @@ class TestMaxIterations:
             text, already_sent, is_error, _tools, _handoff = await stub._process_with_tools(msg, [])
 
         assert is_error is True
-        assert "Too many tool calls" in text
-        assert stub.codex_client.chat_with_tools.call_count == MAX_TOOL_ITERATIONS
+        assert "chat tool-iteration cap" in text.lower()
+        assert stub.codex_client.chat_with_tools.call_count == 7
 
-    async def test_max_iterations_constant_is_20(self):
-        """MAX_TOOL_ITERATIONS should be 20."""
-        assert MAX_TOOL_ITERATIONS == 20
+    async def test_cap_defaults(self):
+        """Defaults: chat=30, loop=100."""
+        from src.config.schema import ToolsConfig
+        tc = ToolsConfig()
+        assert tc.max_tool_iterations_chat == 30
+        assert tc.max_tool_iterations_loop == 100
 
 
 # ---------------------------------------------------------------------------

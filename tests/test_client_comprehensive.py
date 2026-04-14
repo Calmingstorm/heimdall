@@ -38,7 +38,6 @@ from src.discord.client import (  # noqa: E402
     scrub_response_secrets,
     truncate_tool_output,
     DISCORD_MAX_LEN,
-    MAX_TOOL_ITERATIONS,
     TOOL_OUTPUT_MAX_CHARS,
 )
 
@@ -65,6 +64,10 @@ def _make_bot_stub(**overrides):
     stub.config = MagicMock()
     stub.config.tools.enabled = True
     stub.config.tools.tool_timeout_seconds = 300
+    # Default caps mirror production schema defaults. Individual tests that
+    # want to hit the cap cheaply override these to a small int.
+    stub.config.tools.max_tool_iterations_chat = 30
+    stub.config.tools.max_tool_iterations_loop = 100
     stub.config.discord.allowed_users = ["12345"]
     stub.config.discord.channels = ["67890"]
     stub.config.discord.respond_to_bots = False
@@ -2576,19 +2579,18 @@ class TestVoiceCommands:
 class TestProcessWithTools:
     """Tests for _process_with_tools tool loop."""
 
-    async def test_max_iterations_exceeded(self):
-        """Should return error after MAX_TOOL_ITERATIONS."""
+    async def test_chat_cap_uses_config_value(self):
+        """Chat path reads max_tool_iterations_chat from config, not a module constant."""
         from src.llm.types import LLMResponse, ToolCall
 
         stub = _make_bot_stub()
+        stub.config.tools.max_tool_iterations_chat = 3  # cheap cap for this test
         stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
 
-        # Track iteration count
         iteration_count = [0]
 
         async def fake_chat_with_tools(messages, system, tools):
             iteration_count[0] += 1
-            # Always return a tool_use response to force iteration
             return LLMResponse(
                 text="",
                 tool_calls=[ToolCall(id=f"t{iteration_count[0]}", name="check_disk", input={})],
@@ -2599,7 +2601,6 @@ class TestProcessWithTools:
         stub._merged_tool_definitions = MagicMock(return_value=[
             {"name": "check_disk", "description": "Check disk"}
         ])
-        # Tool executor returns output so iterations proceed
         stub.tool_executor.execute = AsyncMock(return_value="42% used")
         stub.audit = MagicMock()
         stub.audit.log_execution = AsyncMock()
@@ -2611,9 +2612,200 @@ class TestProcessWithTools:
             text, already_sent, is_error, tools, _handoff = await stub._process_with_tools(
                 msg, [{"role": "user", "content": "check all disks"}],
             )
-        assert "Too many tool calls" in text
         assert is_error is True
-        assert iteration_count[0] == MAX_TOOL_ITERATIONS
+        assert iteration_count[0] == 3
+        # Cap-hit message must name the cap and the config key so the operator
+        # knows how to tune it — hiding this as "(no response)" caused the
+        # original silent-truncation bug report.
+        assert "chat tool-iteration cap" in text
+        assert "(3)" in text
+        assert "max_tool_iterations_chat" in text
+
+    async def test_chat_cap_message_keeps_error_flag(self):
+        """Cap hit is surfaced as is_error=True so message routing treats it as failure."""
+        from src.llm.types import LLMResponse, ToolCall
+
+        stub = _make_bot_stub()
+        stub.config.tools.max_tool_iterations_chat = 2
+        stub._process_with_tools = HeimdallBot._process_with_tools.__get__(stub)
+
+        async def fake_chat_with_tools(messages, system, tools):
+            return LLMResponse(
+                text="",
+                tool_calls=[ToolCall(id="t", name="check_disk", input={})],
+                stop_reason="tool_use",
+            )
+
+        stub.codex_client.chat_with_tools = fake_chat_with_tools
+        stub._merged_tool_definitions = MagicMock(return_value=[
+            {"name": "check_disk", "description": "Check disk"}
+        ])
+        stub.tool_executor.execute = AsyncMock(return_value="ok")
+        stub.audit = MagicMock()
+        stub.audit.log_execution = AsyncMock()
+        stub._track_recent_action = MagicMock()
+
+        msg = _make_message()
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
+             patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
+            _text, _already_sent, is_error, _tools, _handoff = await stub._process_with_tools(
+                msg, [{"role": "user", "content": "check"}],
+            )
+        assert is_error is True
+
+
+# ---------------------------------------------------------------------------
+# _run_loop_iteration — autonomous loop tool iterations
+# ---------------------------------------------------------------------------
+
+class TestRunLoopIterationCap:
+    """Loop path reads max_tool_iterations_loop from config and reports hits."""
+
+    def _make_loop_stub(self, loop_cap: int):
+        """Minimal stub for _run_loop_iteration with the given loop cap."""
+        from src.llm.types import LLMResponse, ToolCall
+
+        stub = _make_bot_stub()
+        stub.config.tools.max_tool_iterations_loop = loop_cap
+        stub.config.tools.enabled = True
+        stub._build_system_prompt = MagicMock(return_value="system")
+        stub._merged_tool_definitions = MagicMock(return_value=[
+            {"name": "check_disk", "description": "Check disk"},
+        ])
+        stub.loop_manager = MagicMock()
+        stub.loop_manager._loops = {}
+        stub._run_loop_iteration = HeimdallBot._run_loop_iteration.__get__(stub)
+        stub.audit = MagicMock()
+        stub.audit.log_execution = AsyncMock()
+        stub.tool_executor.execute = AsyncMock(return_value="ok")
+
+        iteration_count = [0]
+
+        async def fake_chat_with_tools(messages, system, tools):
+            iteration_count[0] += 1
+            return LLMResponse(
+                text="",
+                tool_calls=[
+                    ToolCall(
+                        id=f"t{iteration_count[0]}",
+                        name="check_disk",
+                        input={},
+                    )
+                ],
+                stop_reason="tool_use",
+            )
+
+        stub.codex_client.chat_with_tools = fake_chat_with_tools
+        return stub, iteration_count
+
+    async def test_loop_cap_uses_config_value(self):
+        """Loop path respects max_tool_iterations_loop, not a module constant."""
+        stub, iteration_count = self._make_loop_stub(loop_cap=4)
+        channel = MagicMock()
+        channel.id = 123
+
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
+             patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
+            result = await stub._run_loop_iteration(
+                prompt="go", channel=channel, prev_context=None, user_id="u1",
+            )
+
+        assert iteration_count[0] == 4
+        # Cap hit with no final text → visible "cap hit" message naming the knob
+        assert "loop tool-iteration cap" in result
+        assert "(4)" in result
+        assert "max_tool_iterations_loop" in result
+
+    async def test_loop_cap_hit_counts_tool_calls(self):
+        """The cap-hit message reports how many tool calls were made."""
+        from src.llm.types import LLMResponse, ToolCall
+
+        stub, _ = self._make_loop_stub(loop_cap=3)
+
+        # Return 2 tool calls per response, for 3 iterations → 6 tool calls
+        async def fake_chat(messages, system, tools):
+            return LLMResponse(
+                text="",
+                tool_calls=[
+                    ToolCall(id="a", name="check_disk", input={}),
+                    ToolCall(id="b", name="check_disk", input={}),
+                ],
+                stop_reason="tool_use",
+            )
+
+        stub.codex_client.chat_with_tools = fake_chat
+        channel = MagicMock()
+        channel.id = 123
+
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
+             patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
+            result = await stub._run_loop_iteration(
+                prompt="go", channel=channel, prev_context=None, user_id="u1",
+            )
+        assert "6 tool calls" in result
+
+    async def test_loop_keeps_final_text_when_codex_produced_any(self):
+        """If Codex produced text during the loop, return THAT — not the cap-hit fallback.
+
+        Critical: the cap-hit message must only be used when final_text is empty.
+        If Codex gave a mid-loop summary, the user deserves to see it.
+        """
+        from src.llm.types import LLMResponse, ToolCall
+
+        stub, _ = self._make_loop_stub(loop_cap=3)
+
+        call_count = [0]
+
+        async def fake_chat(messages, system, tools):
+            call_count[0] += 1
+            # Iteration 1: text + tool call. Iterations 2-3: only tool calls.
+            if call_count[0] == 1:
+                return LLMResponse(
+                    text="Partial progress: disk checked.",
+                    tool_calls=[ToolCall(id="t", name="check_disk", input={})],
+                    stop_reason="tool_use",
+                )
+            return LLMResponse(
+                text="",
+                tool_calls=[ToolCall(id=f"t{call_count[0]}", name="check_disk", input={})],
+                stop_reason="tool_use",
+            )
+
+        stub.codex_client.chat_with_tools = fake_chat
+        channel = MagicMock()
+        channel.id = 123
+
+        with patch("src.discord.client.scrub_output_secrets", side_effect=lambda x: x), \
+             patch("src.discord.client.truncate_tool_output", side_effect=lambda x: x):
+            result = await stub._run_loop_iteration(
+                prompt="go", channel=channel, prev_context=None, user_id="u1",
+            )
+        # Mid-loop text is preserved; cap-hit message NOT used
+        assert result == "Partial progress: disk checked."
+        assert "cap" not in result
+
+    async def test_loop_returns_no_response_when_codex_exits_cleanly_empty(self):
+        """If Codex stops (no tool_calls) with empty text and cap NOT hit → '(no response)'.
+
+        The cap-hit message is specifically for the case where we ran out of
+        iteration budget. A clean empty exit is a different failure mode.
+        """
+        from src.llm.types import LLMResponse
+
+        stub, _ = self._make_loop_stub(loop_cap=10)
+
+        async def fake_chat(messages, system, tools):
+            # Clean exit: no text, no tools
+            return LLMResponse(text="", tool_calls=[], stop_reason="stop")
+
+        stub.codex_client.chat_with_tools = fake_chat
+        channel = MagicMock()
+        channel.id = 123
+
+        result = await stub._run_loop_iteration(
+            prompt="go", channel=channel, prev_context=None, user_id="u1",
+        )
+        assert result == "(no response)"
 
 
 # ---------------------------------------------------------------------------

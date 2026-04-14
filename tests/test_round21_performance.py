@@ -568,9 +568,11 @@ class TestMemoryUsagePatterns:
         assert 1000 <= TOOL_OUTPUT_MAX_CHARS <= 50000
 
     def test_max_tool_iterations_bounded(self):
-        """MAX_TOOL_ITERATIONS prevents infinite loops."""
-        from src.discord.client import MAX_TOOL_ITERATIONS
-        assert MAX_TOOL_ITERATIONS == 20
+        """Both tool-iteration caps have sane defaults that prevent infinite loops."""
+        from src.config.schema import ToolsConfig
+        tc = ToolsConfig()
+        assert 1 <= tc.max_tool_iterations_chat <= 500
+        assert 1 <= tc.max_tool_iterations_loop <= 500
 
 
 # ---------------------------------------------------------------------------

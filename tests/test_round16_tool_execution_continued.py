@@ -24,7 +24,6 @@ import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
     HeimdallBot,
-    MAX_TOOL_ITERATIONS,
     TOOL_OUTPUT_MAX_CHARS,
     truncate_tool_output,
 )
@@ -46,6 +45,8 @@ def _make_bot_stub():
     stub.config = MagicMock()
     stub.config.tools.enabled = True
     stub.config.tools.tool_timeout_seconds = 300
+    stub.config.tools.max_tool_iterations_chat = 30
+    stub.config.tools.max_tool_iterations_loop = 100
     stub.config.discord.allowed_users = []
     stub.config.discord.respond_to_bots = False
     stub.config.discord.require_mention = False
@@ -851,8 +852,9 @@ class TestToolLoopMultiStep:
         assert captured_msgs[0] < captured_msgs[1] < captured_msgs[2] < captured_msgs[3]
 
     async def test_max_iterations_guard(self):
-        """Tool loop stops after MAX_TOOL_ITERATIONS with error."""
+        """Tool loop stops at the configured chat cap with error."""
         stub = _make_bot_stub()
+        stub.config.tools.max_tool_iterations_chat = 6  # cheap cap
         msg = _make_message()
 
         tc = ToolCall(id="tc-loop", name="run_command", input={"command": "loop"})
@@ -867,8 +869,8 @@ class TestToolLoopMultiStep:
             )
 
         assert is_error is True
-        assert "too many" in text.lower() or "simpler" in text.lower()
-        assert len(tools_used) == MAX_TOOL_ITERATIONS
+        assert "chat tool-iteration cap" in text.lower()
+        assert len(tools_used) == 6
 
     async def test_tools_used_tracks_all_iterations(self):
         """tools_used accumulates across all iterations."""
@@ -1591,8 +1593,9 @@ class TestSourceStructureVerification:
         assert "tool_timeout" in source
 
     def test_max_tool_iterations_guard(self):
+        """Guard that the chat path still has a bounded iteration loop."""
         source = inspect.getsource(HeimdallBot._process_with_tools)
-        assert "MAX_TOOL_ITERATIONS" in source
+        assert "max_tool_iterations_chat" in source
 
     def test_fallback_to_tool_executor(self):
         """Unknown tools fall through to tool_executor.execute."""

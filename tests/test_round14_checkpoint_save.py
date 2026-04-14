@@ -36,6 +36,8 @@ def _make_bot_stub():
     stub._system_prompt = "You are a bot."
     stub.config = MagicMock()
     stub.config.tools.enabled = True
+    stub.config.tools.max_tool_iterations_chat = 30
+    stub.config.tools.max_tool_iterations_loop = 100
     stub.config.tools.tool_timeout_seconds = 300
     stub.config.discord.allowed_users = []
     stub.config.discord.respond_to_bots = False

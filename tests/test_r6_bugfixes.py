@@ -93,6 +93,8 @@ class TestToolsUsedLocalVariable:
         """Tools from multiple iterations should all appear in the returned list."""
         stub, msg = self._make_bot_stub()
         stub.config.tools.enabled = True
+        stub.config.tools.max_tool_iterations_chat = 30
+        stub.config.tools.max_tool_iterations_loop = 100
         stub.config.tools.tool_timeout_seconds = 300
         stub._merged_tool_definitions = MagicMock(return_value=[{"name": "t"}])
 

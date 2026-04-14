@@ -59,7 +59,9 @@ SECRET_SCRUB_PATTERNS = [
 ]
 
 DISCORD_MAX_LEN = 2000
-MAX_TOOL_ITERATIONS = 20
+# Tool-iteration caps are now configurable per path (chat vs loop) via
+# config.tools.max_tool_iterations_chat / _loop. Read fresh each request so
+# config updates via /api/config PUT take effect on the next message/iteration.
 TOOL_OUTPUT_MAX_CHARS = 12000  # ~3000 tokens; cap tool results to prevent context bloat
 _LONG_TIMEOUT_TOOL_SET = frozenset({"claude_code"})  # Tools that get extended timeout (3660s vs config default)
 SEND_MAX_RETRIES = 3
@@ -1997,10 +1999,11 @@ class HeimdallBot(discord.Client):
         # Collect image blocks from analyze_image calls for vision injection
         pending_image_blocks: list[dict] = []
 
-        log.info("Tool loop starting: %d tools available, %d messages in history",
-                 len(tools) if tools else 0, len(messages))
+        chat_cap = self.config.tools.max_tool_iterations_chat
+        log.info("Tool loop starting: %d tools available, %d messages in history, cap=%d",
+                 len(tools) if tools else 0, len(messages), chat_cap)
 
-        for iteration in range(MAX_TOOL_ITERATIONS):
+        for iteration in range(chat_cap):
             # Show typing indicator while waiting for LLM response
             try:
                 async with message.channel.typing():
@@ -2415,7 +2418,16 @@ class HeimdallBot(discord.Client):
                 )
                 return skill_output, False, False, tools_used_in_loop, True  # handoff=True
 
-        return "Too many tool calls in sequence. Please try a simpler request.", False, True, tools_used_in_loop, False
+        log.warning(
+            "Chat tool-iteration cap hit (%d) after %d tool calls; exiting loop",
+            chat_cap, len(tools_used_in_loop),
+        )
+        return (
+            f"Hit the chat tool-iteration cap ({chat_cap}) after "
+            f"{len(tools_used_in_loop)} tool calls. Task may be partially "
+            f"complete. Raise `tools.max_tool_iterations_chat` in config "
+            f"(or via the web UI) if this happens often."
+        ), False, True, tools_used_in_loop, False
 
     @staticmethod
     def _detect_image_type(data: bytes) -> str | None:
@@ -3351,8 +3363,10 @@ class HeimdallBot(discord.Client):
         final_text = ""
         tool_timeout = self.config.tools.tool_timeout_seconds
         channel_id_str = str(getattr(channel, "id", ""))
+        loop_cap = self.config.tools.max_tool_iterations_loop
+        tool_calls_made = 0
 
-        for _iteration in range(MAX_TOOL_ITERATIONS):
+        for _iteration in range(loop_cap):
             try:
                 response = await self.codex_client.chat_with_tools(
                     messages=messages, system=system_prompt, tools=tools or [],
@@ -3366,6 +3380,8 @@ class HeimdallBot(discord.Client):
 
             if not response.tool_calls:
                 break
+
+            tool_calls_made += len(response.tool_calls)
 
             # Build assistant content with tool_use blocks (matches _process_with_tools format)
             assistant_content: list[dict] = []
@@ -3449,8 +3465,25 @@ class HeimdallBot(discord.Client):
             final_text = scrub_output_secrets(final_text)
             if len(final_text) > DISCORD_MAX_LEN:
                 final_text = final_text[:DISCORD_MAX_LEN - 50] + "\n... (truncated)"
+            return final_text
 
-        return final_text or "(no response)"
+        # No final text produced. If we exhausted the cap without Codex ever
+        # returning a tool-free response, say so — the previous "(no response)"
+        # silently hid the fact that the loop did real work but ran out of
+        # budget. Tell the operator what happened and how to tune it.
+        if tool_calls_made >= loop_cap:
+            log.warning(
+                "Loop tool-iteration cap hit (%d) after %d tool calls; no final summary from Codex",
+                loop_cap, tool_calls_made,
+            )
+            return (
+                f"Iteration hit the loop tool-iteration cap ({loop_cap}) "
+                f"after {tool_calls_made} tool calls. No final summary was "
+                f"produced by Codex. Raise `tools.max_tool_iterations_loop` "
+                f"in config (or via the web UI) if this happens repeatedly."
+            )
+
+        return "(no response)"
 
     async def _dispatch_loop_tool(
         self,

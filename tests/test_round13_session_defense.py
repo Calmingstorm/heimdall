@@ -61,6 +61,8 @@ def _make_handle_message_stub(**overrides):
     stub._recent_actions_expiry = 3600
     stub.config = MagicMock()
     stub.config.tools.enabled = True
+    stub.config.tools.max_tool_iterations_chat = 30
+    stub.config.tools.max_tool_iterations_loop = 100
     stub.config.tools.tool_timeout_seconds = 300
     stub.config.discord.allowed_users = ["user-1"]
     stub.config.discord.channels = []
@@ -136,6 +138,8 @@ def _make_process_with_tools_stub(respond_to_bots=True):
     stub._pending_files = {}
     stub.config = MagicMock()
     stub.config.tools.enabled = True
+    stub.config.tools.max_tool_iterations_chat = 30
+    stub.config.tools.max_tool_iterations_loop = 100
     stub.config.tools.tool_timeout_seconds = 300
     stub.config.discord.allowed_users = ["user-1"]
     stub.config.discord.respond_to_bots = respond_to_bots

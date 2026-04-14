@@ -19,7 +19,6 @@ import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
     HeimdallBot,
-    MAX_TOOL_ITERATIONS,
     TOOL_OUTPUT_MAX_CHARS,
     _EMPTY_RESPONSE_FALLBACK,
     _FABRICATION_RETRY_MSG,
@@ -76,6 +75,8 @@ def _make_bot_stub(*, respond_to_bots=False):
     stub._embedder = None
     stub.config = MagicMock()
     stub.config.tools.enabled = True
+    stub.config.tools.max_tool_iterations_chat = 30
+    stub.config.tools.max_tool_iterations_loop = 100
     stub.config.tools.tool_timeout_seconds = 300
     stub.config.discord.allowed_users = ["user-1"]
     stub.config.discord.respond_to_bots = respond_to_bots

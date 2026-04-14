@@ -16,7 +16,7 @@ sys.modules.setdefault("discord.ext.voice_recv", MagicMock())
 
 import pytest  # noqa: E402
 
-from src.discord.client import HeimdallBot, MAX_TOOL_ITERATIONS  # noqa: E402
+from src.discord.client import HeimdallBot  # noqa: E402
 from src.llm.circuit_breaker import CircuitOpenError  # noqa: E402
 from src.llm.types import LLMResponse, ToolCall  # noqa: E402
 
@@ -35,6 +35,8 @@ def _make_bot_stub():
     stub._pending_files = {}
     stub.config = MagicMock()
     stub.config.tools.enabled = True
+    stub.config.tools.max_tool_iterations_chat = 30
+    stub.config.tools.max_tool_iterations_loop = 100
     stub.config.tools.tool_timeout_seconds = 300
     stub.config.discord.allowed_users = ["user-1"]
     stub.config.discord.respond_to_bots = False

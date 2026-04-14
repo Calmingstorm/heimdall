@@ -22,7 +22,6 @@ import pytest  # noqa: E402
 
 from src.discord.client import (  # noqa: E402
     HeimdallBot,
-    MAX_TOOL_ITERATIONS,
     TOOL_OUTPUT_MAX_CHARS,
     _EMPTY_RESPONSE_FALLBACK,
     _FABRICATION_RETRY_MSG,
@@ -54,6 +53,8 @@ def _make_bot_stub(*, respond_to_bots=False):
     stub.config = MagicMock()
     stub.config.tools.enabled = True
     stub.config.tools.tool_timeout_seconds = 300
+    stub.config.tools.max_tool_iterations_chat = 30
+    stub.config.tools.max_tool_iterations_loop = 100
     stub.config.discord.allowed_users = ["user-1"]
     stub.config.discord.respond_to_bots = respond_to_bots
     stub.config.discord.require_mention = False
@@ -778,8 +779,9 @@ class TestMultiStepFailureRecovery:
         assert "check_disk" in tools_used
 
     async def test_max_iterations_with_partial_report(self):
-        """Tool loop hits MAX_TOOL_ITERATIONS → partial report of completed steps."""
+        """Tool loop hits chat cap → partial report of completed steps."""
         stub = _make_bot_stub()
+        stub.config.tools.max_tool_iterations_chat = 5  # cheap cap for test
         msg = _make_message()
 
         # Always return a tool call (never a final text response)
@@ -795,8 +797,8 @@ class TestMultiStepFailureRecovery:
             )
 
         assert is_error is True
-        assert len(tools_used) == MAX_TOOL_ITERATIONS
-        assert "too many tool calls" in text.lower()
+        assert len(tools_used) == 5
+        assert "chat tool-iteration cap" in text.lower()
 
     async def test_error_in_handle_message_inner_saves_sanitized(self):
         """_handle_message_inner saves sanitized error marker, not raw error."""

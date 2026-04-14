@@ -45,6 +45,11 @@ class ToolsConfig(BaseModel):
     claude_code_user: str = ""
     claude_code_dir: str = "/opt/project"
     skill_allowed_urls: list[str] = Field(default_factory=list)
+    # Max tool-calling iterations before the tool loop force-exits.
+    # Chat: normal Discord messages. Loop: autonomous loop iterations.
+    # Loops typically need more budget (exploration + execution + verification + commit).
+    max_tool_iterations_chat: int = 30
+    max_tool_iterations_loop: int = 100
 
 
 class LoggingConfig(BaseModel):

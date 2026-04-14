@@ -207,6 +207,22 @@ class TestToolsConfig:
         assert tc.claude_code_user == "deploy"
         assert tc.claude_code_dir == "/home/deploy/project"
 
+    def test_max_tool_iterations_chat_default_is_30(self):
+        """Chat path: default cap is 30 (human turn — moderate budget)."""
+        assert ToolsConfig().max_tool_iterations_chat == 30
+
+    def test_max_tool_iterations_loop_default_is_100(self):
+        """Loop path: default cap is 100 (autonomous iterations need more budget)."""
+        assert ToolsConfig().max_tool_iterations_loop == 100
+
+    def test_max_tool_iterations_accepts_custom_values(self):
+        tc = ToolsConfig(
+            max_tool_iterations_chat=15,
+            max_tool_iterations_loop=200,
+        )
+        assert tc.max_tool_iterations_chat == 15
+        assert tc.max_tool_iterations_loop == 200
+
 
 class TestTimezoneConfig:
     """Round 6: timezone is configurable at the top level."""

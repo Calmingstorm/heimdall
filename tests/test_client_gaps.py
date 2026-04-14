@@ -37,7 +37,6 @@ from src.config.schema import (  # noqa: E402
 from src.discord.client import (  # noqa: E402
     HeimdallBot,
     DISCORD_MAX_LEN,
-    MAX_TOOL_ITERATIONS,
     scrub_response_secrets,
     truncate_tool_output,
 )
@@ -148,6 +147,8 @@ def _make_bot_stub(**overrides):
     stub._background_tasks_max = 20
     stub.config = MagicMock()
     stub.config.tools.enabled = True
+    stub.config.tools.max_tool_iterations_chat = 30
+    stub.config.tools.max_tool_iterations_loop = 100
     stub.config.tools.tool_timeout_seconds = 300
     stub.config.discord.allowed_users = ["12345"]
     stub.config.discord.channels = ["67890"]
