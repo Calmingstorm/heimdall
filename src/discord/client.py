@@ -1813,9 +1813,23 @@ class HeimdallBot(discord.Client):
         Uses the same CodexClient (same OAuth, same API) to make a lightweight
         classifier call.  Fail-open: any error/timeout/ambiguity → COMPLETE.
 
+        Short-circuit: if ``start_loop`` was called, the user's request was to
+        *schedule* recurring work, not to complete it now.  The loop runs
+        asynchronously in the background, so treat the scheduling itself as
+        completion.  Without this, the classifier reads the user's goal (e.g.
+        "run 50 iterations") and keeps flagging the response INCOMPLETE,
+        forcing redundant in-band execution of the loop's body.
+
         Returns (is_complete, reason).  reason is non-empty only for INCOMPLETE.
         """
         if not self.codex_client:
+            return True, ""
+
+        if "start_loop" in tools_used:
+            log.info(
+                "Completion classifier: start_loop called — loop runs in "
+                "background, treating as COMPLETE"
+            )
             return True, ""
 
         classifier_user_msg = (

@@ -1,6 +1,6 @@
 [project]
 name = "heimdall"
-version = "1.0.3"
+version = "1.0.4"
 description = "Heimdall — autonomous executor Discord bot powered by GPT-5.4"
 requires-python = ">=3.12"
 dependencies = [

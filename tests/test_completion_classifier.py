@@ -339,6 +339,68 @@ class TestClassifyCompletion:
         assert reason == ""
 
     @pytest.mark.asyncio
+    async def test_start_loop_short_circuits_to_complete(self):
+        """start_loop is fire-and-forget — scheduling IS the task. Bypass classifier."""
+        bot = _make_classifier_bot("INCOMPLETE: loop iterations not yet run")
+
+        is_complete, reason = await HeimdallBot._classify_completion(
+            bot,
+            "run a loop every 30 minutes for 50 iterations",
+            "Loop started (id=abc123).",
+            ["start_loop"],
+        )
+        assert is_complete is True
+        assert reason == ""
+        # The LLM classifier must NOT be called when start_loop was used.
+        bot.codex_client.chat.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_start_loop_bypasses_even_with_other_tools(self):
+        """Even if other tools ran alongside start_loop, the user's intent was scheduling.
+
+        The completion check happens on the assistant's final (no-tool) response,
+        after start_loop fired successfully. Treat the whole turn as COMPLETE.
+        """
+        bot = _make_classifier_bot("INCOMPLETE")
+
+        is_complete, reason = await HeimdallBot._classify_completion(
+            bot,
+            "check disk then start a loop that cleans tmp every hour",
+            "Disk checked, loop started.",
+            ["run_command", "start_loop"],
+        )
+        assert is_complete is True
+        assert reason == ""
+        bot.codex_client.chat.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_non_loop_tools_still_use_classifier(self):
+        """Regression guard: non-loop tool flows still consult the LLM classifier."""
+        bot = _make_classifier_bot("INCOMPLETE: deployment not performed")
+
+        is_complete, reason = await HeimdallBot._classify_completion(
+            bot, "build and deploy", "Built.", ["run_command"],
+        )
+        assert is_complete is False
+        assert reason == "deployment not performed"
+        bot.codex_client.chat.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_loop_related_non_bypass_tools_still_use_classifier(self):
+        """Other loop-management tools (stop_loop, list_loops) do NOT bypass.
+
+        Only start_loop triggers the short-circuit — stopping or listing loops
+        can legitimately be partial work that the classifier should still judge.
+        """
+        bot = _make_classifier_bot("INCOMPLETE: did not confirm stop succeeded")
+
+        is_complete, reason = await HeimdallBot._classify_completion(
+            bot, "stop the runaway loop", "Attempted stop.", ["stop_loop"],
+        )
+        assert is_complete is False
+        bot.codex_client.chat.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_chat_called_with_correct_params(self):
         """Verify the classifier passes the right system prompt, user msg, and max_tokens."""
         bot = _make_classifier_bot("COMPLETE")
